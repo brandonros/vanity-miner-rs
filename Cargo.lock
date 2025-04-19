@@ -74,6 +74,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytemuck"
+version = "1.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6b1fc10dbac614ebc03540c9dbd60e83887fda27794998c6528f1782047d540"
+
+[[package]]
 name = "cc"
 version = "1.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -120,12 +126,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crunchy"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
-
-[[package]]
 name = "cuda_builder"
 version = "0.3.0"
 source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
@@ -134,28 +134,6 @@ dependencies = [
  "rustc_codegen_nvvm",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "cuda_std"
-version = "0.2.2"
-source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
-dependencies = [
- "bitflags",
- "cuda_std_macros",
- "half",
- "paste",
- "vek",
-]
-
-[[package]]
-name = "cuda_std_macros"
-version = "0.2.0"
-source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -189,6 +167,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "cust"
+version = "0.3.2"
+source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
+dependencies = [
+ "bitflags",
+ "bytemuck",
+ "cust_core",
+ "cust_derive",
+ "cust_raw",
+ "glam",
+ "mint",
+ "serde_json",
+ "vek",
+]
+
+[[package]]
+name = "cust_core"
+version = "0.1.1"
+source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
+dependencies = [
+ "cust_derive",
+ "glam",
+ "mint",
+ "vek",
+]
+
+[[package]]
+name = "cust_derive"
+version = "0.2.0"
+source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "cust_raw"
 version = "0.11.3"
 source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
@@ -203,7 +218,7 @@ name = "ed25519_vanity"
 version = "0.1.0"
 dependencies = [
  "cuda_builder",
- "cuda_std",
+ "cust",
  "nanorand",
 ]
 
@@ -281,20 +296,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "glam"
+version = "0.29.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8babf46d4c1c9d92deac9f7be466f76dfc4482b6452fc5024b5e8daf6ffeb3ee"
+dependencies = [
+ "libm",
+]
+
+[[package]]
 name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
-
-[[package]]
-name = "half"
-version = "2.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "459196ed295495a68f7d7fe1d84f6c4b7ff0e21fe3017b2f283c6fac3ad803c9"
-dependencies = [
- "cfg-if",
- "crunchy",
-]
 
 [[package]]
 name = "hashbrown"
@@ -451,6 +465,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mint"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
+
+[[package]]
 name = "nanorand"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -543,12 +563,6 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
-
-[[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pin-project-lite"

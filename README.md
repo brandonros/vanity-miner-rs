@@ -11,11 +11,8 @@ apt-get autoremove
 apt install pkg-config libssl-dev llvm-7 llvm-7-dev llvm-7-tools clang-7 zlib1g-dev cuda-12-8
 
 # install rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# clone repo
-git clone git@github.com:brandonros/ed25519-vanity-rs.git
-cd ed25519-vanity-rs
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+. "$HOME/.cargo/env"
 
 # build
 export LLVM_CONFIG="llvm-config-7"
