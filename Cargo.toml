@@ -9,3 +9,5 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 
+[build-dependencies]
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

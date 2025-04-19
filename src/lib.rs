@@ -1,14 +1,20 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![allow(improper_ctypes_definitions)]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![cfg_attr(
+    target_os = "cuda",
+    no_std,
+    register_attr(nvvm_internal)
+)]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+use cuda_std::*;
+
+extern crate alloc;
+
+#[kernel]
+pub unsafe fn add(a: &[f32], b: &[f32], c: *mut f32) {
+    let idx = thread::index_1d() as usize;
+    if idx < a.len() {
+        let elem = &mut *c.add(idx);
+        *elem = a[idx] + b[idx];
     }
 }
