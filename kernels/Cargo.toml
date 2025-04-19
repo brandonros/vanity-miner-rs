@@ -1,11 +1,13 @@
 [package]
-name = "ed25519_vanity"
+name = "ed25519_vanity_kernels"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-nanorand = "0.7"
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

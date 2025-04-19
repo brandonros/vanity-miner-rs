@@ -1,8 +1,15 @@
+use std::env;
+use std::path;
+
 use cuda_builder::CudaBuilder;
 
 fn main() {
-    CudaBuilder::new("path/to/gpu/crate/root")
-        .copy_to("some/path.ptx")
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=kernels");
+
+    let out_path = path::PathBuf::from(env::var("OUT_DIR").unwrap());
+    CudaBuilder::new("kernels")
+        .copy_to(out_path.join("kernels.ptx"))
         .build()
         .unwrap();
 }
