@@ -10,8 +10,8 @@ use bs58;
 
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn find_vanity_private_key(vanity_prefix: &[u8], rng_seed: u64) {
-    let vanity_prefix_len = vanity_prefix.len();
+pub unsafe fn find_vanity_private_key(vanity_prefix_ptr: *const u8, vanity_prefix_len: usize, rng_seed: u64) {
+    let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
 
     let idx = cuda_std::thread::index_1d() as usize;
     let mut rng = Xoshiro256StarStar::seed_from_u64(rng_seed + idx as u64);
