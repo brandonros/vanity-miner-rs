@@ -21,13 +21,13 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     let stream = ctx.default_stream();
 
     // Load the pre-compiled PTX that was generated during build
-    println!("Loading module...");
+    println!("[{ordinal}] Loading module...");
     let module = ctx.load_module(Ptx::from_src(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"))))?;
     let f = module.load_function("find_vanity_private_key").unwrap();
 
     // Configure kernel launch parameters
+    let num_blocks = 256;  // Number of blocks    
     let block_size = 256; // Threads per block
-    let num_blocks = 64;  // Number of blocks
     let cfg = LaunchConfig {
         grid_dim: (num_blocks, 1, 1),
         block_dim: (block_size, 1, 1),
@@ -35,17 +35,18 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     };
 
     let mut attempts = 0;
-    println!("Starting search loop...");
+    println!("[{ordinal}] Starting search loop...");
 
     let mut rng = rand::thread_rng();
-    let max_num_iterations: usize = 10000;
+    let max_num_iterations: usize = 128;
     let total_hashes_per_attempt = block_size as u64 * num_blocks as u64 * max_num_iterations as u64;
-    
+    let start_time = Instant::now();
+    let mut matches_found = 0;
+
     loop {
         attempts += 1;
         let rng_seed: u64 = rng.r#gen::<u64>();
-        let start_time = Instant::now();
-
+        
         let mut found_flag = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
@@ -68,17 +69,9 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
         launch_args.arg(&found_public_key_dev);
         launch_args.arg(&found_bs58_encoded_public_key_dev);
 
-        println!("Attempt {}: Launching kernel with seed {}...", attempts, rng_seed);
         unsafe { launch_args.launch(cfg) }?;
 
         stream.synchronize()?;
-
-        let elapsed = start_time.elapsed();
-        let hash_rate = total_hashes_per_attempt as f64 / elapsed.as_secs_f64();
-        println!("Attempt {} took {:.2?} ({:.2}M hashes/sec)", 
-                attempts, 
-                elapsed,
-                hash_rate / 1_000_000.0);
 
         // Check if we found a match
         stream.memcpy_dtoh(&found_flag_dev, &mut found_flag)?;
@@ -89,26 +82,33 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
             stream.memcpy_dtoh(&found_public_key_dev, &mut found_public_key)?;
             stream.memcpy_dtoh(&found_bs58_encoded_public_key_dev, &mut found_bs58_encoded_public_key)?;
 
-            println!("\nFound match after {} attempts!", attempts);
-            println!("Found private key: {:02x?}", found_private_key);
-            println!("Found public key: {:02x?}", found_public_key);
-            println!("Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
+            println!("[{ordinal}] Found private key: {:02x?}", found_private_key);
+            println!("[{ordinal}] Found public key: {:02x?}", found_public_key);
+            println!("[{ordinal}] Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
+
+            matches_found += 1;
+            let elapsed = start_time.elapsed();
+            let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size}");
         }
     }
 }
 
 fn main() -> Result<(), DriverError> {
     // Define the vanity prefix we're looking for
-    let vanity_prefix = "aa";
+    let args = std::env::args().collect::<Vec<String>>();
+    let vanity_prefix = args[1].to_string();
 
     // Initialize CUDA context and get default stream
-    let num_devices = CudaContext::device_count()?;
+    //let num_devices = CudaContext::device_count()?;
+    let num_devices = 1;
     println!("Found {} CUDA devices", num_devices);
 
     let mut handles = Vec::new();
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
-        let handle = std::thread::spawn(move || device_main(i, vanity_prefix.to_string()));
+        let vanity_prefix_clone = vanity_prefix.clone();
+        let handle = std::thread::spawn(move || device_main(i, vanity_prefix_clone));
         handles.push(handle);
     }
     for handle in handles {

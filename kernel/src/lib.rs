@@ -15,13 +15,14 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_len: usize, 
     rng_seed: u64,
     max_num_iterations: usize,
-    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_flag_ptr: *mut f32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
     // read slices from host
-    let found_flag = &*found_flag_ptr;
+    let found_flag_slice = core::slice::from_raw_parts_mut(found_flag_ptr, 1);
+    let mut found_flag = &mut found_flag_slice[0];
     let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
     let found_private_key = core::slice::from_raw_parts_mut(found_private_key_ptr, 32);
     let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
@@ -37,7 +38,7 @@ pub unsafe fn find_vanity_private_key(
     // loop until match is found
     for _ in 0..max_num_iterations {
         // check if match has been found in another thread
-        if found_flag.load(core::sync::atomic::Ordering::SeqCst) != 0.0 {
+        if *found_flag != 0.0 {
             return;
         }
 
@@ -67,7 +68,7 @@ pub unsafe fn find_vanity_private_key(
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
 
             // Then set the flag and use system_fence to ensure visibility across blocks
-            found_flag.store(1.0, core::sync::atomic::Ordering::SeqCst);
+            *found_flag = 1.0;
             return;
         }
     }
