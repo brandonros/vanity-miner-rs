@@ -14,6 +14,7 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 
     rng_seed: u64,
+    max_num_iterations: usize,
     found_flag_ptr: *mut u8,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
@@ -35,14 +36,12 @@ pub unsafe fn find_vanity_private_key(
     // initialize buffers
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
-    let mut num_iterations = 0;
-    const MAX_NUM_ITERATIONS: usize = 1000;
-
+    
     // initialize hasher
     let mut hasher = Hash::new();
 
     // loop until match is found
-    for _ in 0..MAX_NUM_ITERATIONS {
+    for _ in 0..max_num_iterations {
         // check if match has been found in another thread
         if found_flag[0] != 0 {
             break;
@@ -76,7 +75,5 @@ pub unsafe fn find_vanity_private_key(
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
             break;
         }
-
-        num_iterations += 1;
     }
 }

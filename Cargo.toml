@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 cudarc = { version = "0.16.0", features = ["cuda-version-from-build-system"] }
-log = "0.4.27"
+rand = "0.8"
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
