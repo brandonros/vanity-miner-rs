@@ -52,6 +52,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         grid_size, block_size
     );
 
+    let grid_size = 1;
+    let block_size = 1;
+
     // Actually launch the GPU kernel. This will queue up the launch on the stream, it will
     // not block the thread until the kernel is finished.
     unsafe {
