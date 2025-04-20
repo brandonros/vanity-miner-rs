@@ -1,5 +1,5 @@
 [package]
-name = "ed25519_vanity_kernels"
+name = "ed25519_vanity_kernel"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,8 +8,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-ed25519-dalek = { version = "2.1.1", default-features = false }
-bs58 = { path = "./deps/bs58-rs", default-features = false }
+ed25519-compact = { version = "2.1.1", default-features = false }
+bs58 = { version = "0.5.1", default-features = false }
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

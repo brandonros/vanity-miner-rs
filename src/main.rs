@@ -5,7 +5,7 @@ use std::error::Error;
 /// How many numbers to generate and add together.
 const NUMBERS_LEN: usize = 100_000;
 
-static PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/kernels.ptx"));
+static PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
 
 fn main() -> Result<(), Box<dyn Error>> {
     // generate our random vectors.

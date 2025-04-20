@@ -53,21 +53,32 @@ use bs58;
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe fn vecadd(a: &[f32], b: &[f32], c: *mut f32) {
-    let input = [
+    let mut input = [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let mut hash = Hash::new(); // Create a new hash context
-    hash.update(&input[0..32]); // Update with 32 bytes from local_buffer
-    let result = hash.finalize(); // Finalize and get the hash result
-    println!("Hashed input: {:02x?}", result);
+    // sha512
+    let mut hash = Hash::new();
+    hash.update(&input[0..32]);
+    let mut hashed_input = hash.finalize();
+    println!("Hashed input: {:02x?}", hashed_input);
 
-    let mut output = [0; 64];
-    bs58::encode(&result[..32]).onto(&mut output[..]).unwrap();
-    println!("Encoded hash: {:02x?}", output);
+    // Special ed25519 hash modification
+    hashed_input[0] &= 248;
+    hashed_input[31] = (hashed_input[31] & 127) | 64;
+
+    // ed25519
+    let secret_key = SecretKey::from_slice(&hashed_input[0..64]);
+    let public_key = secret_key.public_key();
+    let public_key = public_key.as_slice();
+
+    // sha512 -> bs58
+    let mut bs58_ascii = [0; 64];
+    bs58::encode(&public_key[..32]).onto(&mut bs58_ascii[..]).unwrap();
+    println!("Encoded hash: {:02x?}", bs58_ascii);
 
     /*let (secret_key, public_key, encoded_public_key) = generate_keypair(&input);
     println!("Secret key: {:?}", secret_key);
