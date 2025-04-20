@@ -1,3 +1,5 @@
+#![no_std]
+
 extern crate alloc;
 
 use ed25519_compact::ge_scalarmult_base;

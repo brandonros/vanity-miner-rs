@@ -8,10 +8,9 @@ const NUMBERS_LEN: usize = 100_000;
 static PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // generate our random vectors.
-    let mut wyrand = WyRand::new();
-    let mut lhs = vec![0u8; 32];
-    wyrand.fill(&mut lhs);
+    let vanity_prefix = b"aaaa";
+    let vanity_prefix_len = vanity_prefix.len();
+    let rng_seed: u64 = 2457272140905572020; // TODO: do not hardcode
 
     // initialize CUDA, this will pick the first available device and will
     // make a CUDA context from it.
@@ -31,29 +30,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // allocate the GPU memory needed to house our numbers and copy them over.
     println!("allocating GPU memory");
-    let lhs_gpu = lhs.as_slice().as_dbuf()?;
-
-    let mut out = vec![0u8; 32];
-    let out_buf = out.as_slice().as_dbuf()?;
+    let vanity_prefix_gpu = vanity_prefix.as_slice().as_dbuf()?;
 
     // retrieve the `find_private_key` kernel from the module so we can calculate the right launch config.
     println!("retrieving CUDA kernel");
-    let find_private_key = module.get_function("find_private_key")?;
+    let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
 
     // use the CUDA occupancy API to find an optimal launch configuration for the grid and block size.
     // This will try to maximize how much of the GPU is used by finding the best launch configuration for the
     // current CUDA device/architecture.
     println!("calculating launch configuration");
-    let (_, block_size) = find_private_key.suggested_launch_configuration(0, 0.into())?;
+    let (_, block_size) = find_vanity_private_key.suggested_launch_configuration(0, 0.into())?;
     let grid_size = (NUMBERS_LEN as u32).div_ceil(block_size);
     println!(
         "using {} blocks and {} threads per block",
         grid_size, block_size
     );
-
-    // TODO: remove later, just for testing
-    let grid_size = 1;
-    let block_size = 1;
 
     // Actually launch the GPU kernel. This will queue up the launch on the stream, it will
     // not block the thread until the kernel is finished.
@@ -61,11 +53,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("launching CUDA kernel");
         launch!(
             // slices are passed as two parameters, the pointer and the length.
-            find_private_key<<<grid_size, block_size, 0, stream>>>(
-                lhs_gpu.as_device_ptr(),
-                lhs_gpu.len(),
-                out_buf.as_device_ptr(),
-                out_buf.len(),
+            find_vanity_private_key<<<grid_size, block_size, 0, stream>>>(
+                vanity_prefix_gpu.as_device_ptr(),
+                vanity_prefix_len,
+                rng_seed,
             )
         )?;
         println!("kernel launched");
@@ -74,9 +65,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("synchronizing stream");
     stream.synchronize()?;
     println!("stream synchronized");
-
-    out_buf.copy_to(&mut out)?;
-    println!("out: {:02x?}", out);
 
     Ok(())
 }
