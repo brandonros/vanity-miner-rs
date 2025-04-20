@@ -33,6 +33,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("allocating GPU memory");
     let lhs_gpu = lhs.as_slice().as_dbuf()?;
 
+    let mut out = vec![0u8; 32];
+    let out_buf = out.as_slice().as_dbuf()?;
+
     // retrieve the `find_private_key` kernel from the module so we can calculate the right launch config.
     println!("retrieving CUDA kernel");
     let find_private_key = module.get_function("find_private_key")?;
@@ -61,6 +64,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             find_private_key<<<grid_size, block_size, 0, stream>>>(
                 lhs_gpu.as_device_ptr(),
                 lhs_gpu.len(),
+                out_buf.as_device_ptr(),
+                out_buf.len(),
             )
         )?;
         println!("kernel launched");
@@ -69,6 +74,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("synchronizing stream");
     stream.synchronize()?;
     println!("stream synchronized");
+
+    out_buf.copy_to(&mut out)?;
+    println!("out: {:02x?}", out);
 
     Ok(())
 }

@@ -5,7 +5,7 @@ mod mock_rng;
 use cuda_std::prelude::*;
 use ed25519_compact::{PublicKey, SecretKey, ge_scalarmult_base};
 use hmac_sha512::Hash;
-//use gpu_rand::xoroshiro::Xoroshiro128StarStar;
+use gpu_rand::xoroshiro::Xoroshiro128StarStar;
 use crate::mock_rng::MockXoroshiro128StarStar; 
 use gpu_rand::xoroshiro::rand_core::SeedableRng;
 use gpu_rand::xoroshiro::rand_core::RngCore;
@@ -13,15 +13,13 @@ use bs58;
 
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn find_private_key(a: &[u8]) {
+pub unsafe fn find_private_key(a: &[u8], out_ptr: *mut u8) {
     let idx = thread::index_1d() as usize;
 
-    println!("a: {:02x?}", a);
-    
     let mut rng_seed: u64 = 42; // TODO: make this unique for each thread?
     let mut num_iterations: u64 = 0;
 
-    for _ in 0..100 {
+    for _ in 0..10000 {
         // generate random input for seed
         let mut rng = MockXoroshiro128StarStar::seed_from_u64(rng_seed);
         let mut input = [0u8; 32];
@@ -64,4 +62,7 @@ pub unsafe fn find_private_key(a: &[u8]) {
             break;
         }
     }
+
+    let out = unsafe { core::ptr::slice_from_raw_parts_mut(out_ptr, 32) };
+    (*out)[0] = 123;
 }
