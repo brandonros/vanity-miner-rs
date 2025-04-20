@@ -26,7 +26,7 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     let f = module.load_function("find_vanity_private_key").unwrap();
 
     // Configure kernel launch parameters
-    let num_blocks = 256;  // Number of blocks    
+    let num_blocks = 512;  // Number of blocks    
     let block_size = 256; // Threads per block
     let cfg = LaunchConfig {
         grid_dim: (num_blocks, 1, 1),
@@ -38,8 +38,8 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     println!("[{ordinal}] Starting search loop...");
 
     let mut rng = rand::thread_rng();
-    let max_num_iterations: usize = 128;
-    let total_hashes_per_attempt = block_size as u64 * num_blocks as u64 * max_num_iterations as u64;
+    let iterations_per_thread: usize = 1;
+    let total_hashes_per_attempt = block_size as u64 * num_blocks as u64 * iterations_per_thread as u64;
     let start_time = Instant::now();
     let mut matches_found = 0;
 
@@ -63,7 +63,7 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
         launch_args.arg(&vanity_prefix_dev);
         launch_args.arg(&vanity_prefix_len);
         launch_args.arg(&rng_seed);
-        launch_args.arg(&max_num_iterations);
+        launch_args.arg(&iterations_per_thread);
         launch_args.arg(&found_flag_dev);
         launch_args.arg(&found_private_key_dev);
         launch_args.arg(&found_public_key_dev);
@@ -89,7 +89,7 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
             matches_found += 1;
             let elapsed = start_time.elapsed();
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size} iterations_per_thread = {iterations_per_thread}");
         }
     }
 }

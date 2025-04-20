@@ -14,7 +14,7 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 
     rng_seed: u64,
-    max_num_iterations: usize,
+    iterations_per_thread: usize,
     found_flag_ptr: *mut f32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
@@ -36,7 +36,7 @@ pub unsafe fn find_vanity_private_key(
     let mut hasher = Hash::new();
 
     // loop until match is found
-    for _ in 0..max_num_iterations {
+    for _ in 0..iterations_per_thread {
         // check if match has been found in another thread
         if *found_flag != 0.0 {
             return;
