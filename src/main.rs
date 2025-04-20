@@ -1,9 +1,5 @@
 use cust::prelude::*;
-use nanorand::{Rng, WyRand};
 use std::error::Error;
-
-/// How many numbers to generate and add together.
-const NUMBERS_LEN: usize = 100_000;
 
 static PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
 
@@ -39,13 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // use the CUDA occupancy API to find an optimal launch configuration for the grid and block size.
     // This will try to maximize how much of the GPU is used by finding the best launch configuration for the
     // current CUDA device/architecture.
-    println!("calculating launch configuration");
-    let (_, block_size) = find_vanity_private_key.suggested_launch_configuration(0, 0.into())?;
-    let grid_size = (NUMBERS_LEN as u32).div_ceil(block_size);
-    println!(
-        "using {} blocks and {} threads per block",
-        grid_size, block_size
-    );
+    let grid_size = 32;
+    let block_size = 256;
 
     // Actually launch the GPU kernel. This will queue up the launch on the stream, it will
     // not block the thread until the kernel is finished.
@@ -54,6 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         launch!(
             // slices are passed as two parameters, the pointer and the length.
             find_vanity_private_key<<<grid_size, block_size, 0, stream>>>(
+                // Slices are passed as **two parameters**
                 vanity_prefix_gpu.as_device_ptr(),
                 vanity_prefix_len,
                 rng_seed,
@@ -63,8 +55,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("synchronizing stream");
-    stream.synchronize()?;
-    println!("stream synchronized");
+    match stream.synchronize() {
+        Ok(_) => println!("stream synchronized"),
+        Err(e) => panic!("stream synchronization error: {}", e),
+    }
 
     Ok(())
 }

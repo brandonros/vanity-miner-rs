@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-nanorand = "0.7"
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

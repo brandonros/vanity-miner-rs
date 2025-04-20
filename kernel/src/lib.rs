@@ -41,10 +41,10 @@ pub unsafe fn find_vanity_private_key(vanity_prefix: &[u8], rng_seed: u64) {
 
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
-            cuda_std::println!("found match");
+            /*cuda_std::println!("found match");
             cuda_std::println!("Private key: {:02x?}", private_key);
             cuda_std::println!("Public key: {:02x?}", public_key_bytes);
-            cuda_std::println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
+            cuda_std::println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);*/
             break;
         }
 
