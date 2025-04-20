@@ -1,15 +1,17 @@
+extern crate alloc;
+
 use ed25519_compact::ge_scalarmult_base;
 use ed25519_compact::sha512::Hash;
 use rand_xoshiro::rand_core::{RngCore as _, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use bs58;
 
-#[kernel]
+#[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub fn find_vanity_private_key(vanity_prefix: &[u8], rng_seed: u64) {
+pub unsafe fn find_vanity_private_key(vanity_prefix: &[u8], rng_seed: u64) {
     let vanity_prefix_len = vanity_prefix.len();
 
-    let idx = thread::index_1d() as usize;
+    let idx = cuda_std::thread::index_1d() as usize;
     let mut rng = Xoshiro256StarStar::seed_from_u64(rng_seed + idx as u64);
     let mut hasher = Hash::new();
     let mut private_key = [0u8; 32];
@@ -37,10 +39,10 @@ pub fn find_vanity_private_key(vanity_prefix: &[u8], rng_seed: u64) {
 
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
-            println!("found match");
-            println!("Private key: {:02x?}", private_key);
-            println!("Public key: {:02x?}", public_key_bytes);
-            println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
+            cuda_std::println!("found match");
+            cuda_std::println!("Private key: {:02x?}", private_key);
+            cuda_std::println!("Public key: {:02x?}", public_key_bytes);
+            cuda_std::println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
             break;
         }
 
