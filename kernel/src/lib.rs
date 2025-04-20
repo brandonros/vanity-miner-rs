@@ -14,10 +14,17 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 
     rng_seed: u64,
-    found_flag: *mut u8
+    found_flag_ptr: *mut u8,
+    found_private_key_ptr: *mut u8,
+    found_public_key_ptr: *mut u8,
+    found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
-    // read vanity prefix from host
+    // read slices from host
     let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
+    let found_flag = core::slice::from_raw_parts_mut(found_flag_ptr, 1);
+    let found_private_key = core::slice::from_raw_parts_mut(found_private_key_ptr, 32);
+    let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
+    let found_bs58_encoded_public_key = core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44);
 
     // get thread index
     let idx = cuda_std::thread::index_1d() as usize;
@@ -29,19 +36,15 @@ pub unsafe fn find_vanity_private_key(
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
     let mut num_iterations = 0;
+    const MAX_NUM_ITERATIONS: usize = 1000;
 
     // initialize hasher
     let mut hasher = Hash::new();
 
     // loop until match is found
-    loop {
+    for _ in 0..MAX_NUM_ITERATIONS {
         // check if match has been found in another thread
-        if num_iterations % 1000 == 0 && *found_flag != 0 {
-            break;
-        }
-
-        if num_iterations >= 100 {
-            *found_flag = 1;
+        if found_flag[0] != 0 {
             break;
         }
 
@@ -65,10 +68,12 @@ pub unsafe fn find_vanity_private_key(
 
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
-            cuda_std::println!("found match");
-            cuda_std::println!("Private key: {:02x?}", private_key);
-            cuda_std::println!("Public key: {:02x?}", public_key_bytes);
-            cuda_std::println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
+            found_flag[0] = 1;
+            cuda_std::thread::sync_threads();
+            
+            found_private_key.copy_from_slice(&private_key[0..32]);
+            found_public_key.copy_from_slice(&public_key_bytes[0..32]);
+            found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
             break;
         }
 
