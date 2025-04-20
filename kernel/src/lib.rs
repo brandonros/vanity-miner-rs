@@ -15,7 +15,7 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_len: usize, 
     rng_seed: u64,
     max_num_iterations: usize,
-    found_flag_ptr: *mut cuda_std::atomic::SystemAtomicF32,
+    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
@@ -27,28 +27,18 @@ pub unsafe fn find_vanity_private_key(
     let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
     let found_bs58_encoded_public_key = core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44);
 
-    // get thread index
-    let idx = cuda_std::thread::index_1d() as usize;
-
-    // initialize rng
+    // initialize rng + buffers + hasher
+    let idx = cuda_std::thread::index() as usize;
     let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
-
-    // initialize buffers
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
-    
-    // initialize hasher
     let mut hasher = Hash::new();
-
-    // sync threads
-    cuda_std::thread::sync_threads();
 
     // loop until match is found
     for _ in 0..max_num_iterations {
         // check if match has been found in another thread
-        if found_flag.load(core::sync::atomic::Ordering::Relaxed) != 0.0 {
-            cuda_std::thread::sync_threads();
-            break;
+        if found_flag.load(core::sync::atomic::Ordering::SeqCst) != 0.0 {
+            return;
         }
 
         // generate random input
@@ -71,20 +61,14 @@ pub unsafe fn find_vanity_private_key(
 
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
-            // store match flag
-            found_flag.store(1.0, core::sync::atomic::Ordering::Relaxed);
-
             // copy results to host
             found_private_key.copy_from_slice(&private_key[0..32]);
             found_public_key.copy_from_slice(&public_key_bytes[0..32]);
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
 
-            // sync threads
-            cuda_std::thread::sync_threads();
-            break;
+            // Then set the flag and use system_fence to ensure visibility across blocks
+            found_flag.store(1.0, core::sync::atomic::Ordering::SeqCst);
+            return;
         }
     }
-
-    // sync threads
-    cuda_std::thread::sync_threads();
 }
