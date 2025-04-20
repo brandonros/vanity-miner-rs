@@ -99,8 +99,7 @@ fn main() -> Result<(), DriverError> {
     let vanity_prefix = args[1].to_string();
 
     // Initialize CUDA context and get default stream
-    //let num_devices = CudaContext::device_count()?;
-    let num_devices = 1;
+    let num_devices = CudaContext::device_count()?;
     println!("Found {} CUDA devices", num_devices);
 
     let mut handles = Vec::new();
