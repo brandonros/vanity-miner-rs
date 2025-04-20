@@ -195,24 +195,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cust_core"
-version = "0.1.1"
-source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
-dependencies = [
- "cust_derive",
-]
-
-[[package]]
-name = "cust_derive"
-version = "0.2.0"
-source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "cust_raw"
 version = "0.11.3"
 source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
@@ -225,9 +207,7 @@ dependencies = [
 [[package]]
 name = "ed25519-compact"
 version = "2.1.1"
-dependencies = [
- "cuda_std",
-]
+source = "git+https://github.com/brandonros/rust-ed25519-compact.git?rev=7605359ed8508d4cef3b958157ad41108261f8d1#7605359ed8508d4cef3b958157ad41108261f8d1"
 
 [[package]]
 name = "ed25519_vanity_kernel"
@@ -237,8 +217,7 @@ dependencies = [
  "cuda_builder",
  "cuda_std",
  "ed25519-compact",
- "gpu_rand",
- "hmac-sha512",
+ "rand_xoshiro",
 ]
 
 [[package]]
@@ -321,16 +300,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
-name = "gpu_rand"
-version = "0.1.3"
-source = "git+https://github.com/Rust-GPU/Rust-CUDA.git#290d711507d26f3ca16a484ba02c8a03ba9d7b7c"
-dependencies = [
- "cuda_std",
- "cust_core",
- "rand_core",
-]
-
-[[package]]
 name = "half"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -345,10 +314,6 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
-
-[[package]]
-name = "hmac-sha512"
-version = "1.1.6"
 
 [[package]]
 name = "indexmap"
@@ -643,6 +608,15 @@ name = "rand_core"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
+
+[[package]]
+name = "rand_xoshiro"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
+dependencies = [
+ "rand_core",
+]
 
 [[package]]
 name = "redox_syscall"

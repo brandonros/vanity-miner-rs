@@ -8,10 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-gpu_rand = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-hmac-sha512 = { path = "./deps/rust-hmac-sha512", default-features = false }
-ed25519-compact = { path = "./deps/rust-ed25519-compact", default-features = false, features = ["cuda"] }
+ed25519-compact = { git = "https://github.com/brandonros/rust-ed25519-compact.git", rev = "7605359ed8508d4cef3b958157ad41108261f8d1", default-features = false }
 bs58 = { version = "0.5.1", default-features = false }
+rand_xoshiro = { version = "0.7.0", default-features = false }
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
