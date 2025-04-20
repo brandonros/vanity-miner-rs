@@ -12,6 +12,7 @@ fn main() -> Result<(), DriverError> {
 
     // Initialize CUDA context and get default stream
     let ctx = CudaContext::new(0)?;
+    ctx.bind_to_thread()?;
     let stream = ctx.default_stream();
 
     // Load the pre-compiled PTX that was generated during build
@@ -40,13 +41,13 @@ fn main() -> Result<(), DriverError> {
         let rng_seed: u64 = rng.r#gen::<u64>();
         let start_time = Instant::now();
 
-        let mut found_flag = [0u8; 1];
+        let mut found_flag = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
         let mut found_bs58_encoded_public_key = [0u8; 44];
         
         let vanity_prefix_dev    = stream.memcpy_stod(vanity_prefix)?;
-        let found_flag_dev       = stream.memcpy_stod(&found_flag)?;
+        let found_flag_dev = stream.memcpy_stod(&found_flag)?;
         let found_private_key_dev = stream.memcpy_stod(&found_private_key)?;
         let found_public_key_dev = stream.memcpy_stod(&found_public_key)?;
         let found_bs58_encoded_public_key_dev = stream.memcpy_stod(&found_bs58_encoded_public_key)?;    
@@ -77,14 +78,13 @@ fn main() -> Result<(), DriverError> {
         // Check if we found a match
         stream.memcpy_dtoh(&found_flag_dev, &mut found_flag)?;
         
-        if found_flag[0] != 0 {
+        if found_flag[0] != 0.0 {
             // We found a match! Copy results back to host
             stream.memcpy_dtoh(&found_private_key_dev, &mut found_private_key)?;
             stream.memcpy_dtoh(&found_public_key_dev, &mut found_public_key)?;
             stream.memcpy_dtoh(&found_bs58_encoded_public_key_dev, &mut found_bs58_encoded_public_key)?;
 
             println!("\nFound match after {} attempts!", attempts);
-            println!("Found flag: {:?}", found_flag);
             println!("Found private key: {:02x?}", found_private_key);
             println!("Found public key: {:02x?}", found_public_key);
             println!("Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
