@@ -35,8 +35,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # build
 export LLVM_CONFIG="llvm-config-7"
-export LLVM_LINK_STATIC=1
-export RUST_LOG=info
+export LLVM_LINK_STATIC="1"
+export RUST_LOG="info"
 export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
 cargo build
 ```
