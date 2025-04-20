@@ -295,7 +295,6 @@ dependencies = [
  "cuda_builder",
  "cuda_std",
  "ed25519-dalek",
- "sha2",
 ]
 
 [[package]]

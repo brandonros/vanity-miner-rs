@@ -1,7 +1,9 @@
 extern crate alloc;
 
+mod sha;
+
 use cuda_std::prelude::*;
-use sha2::{Sha512, Digest};
+use crate::sha::Hash;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use bs58;
 
@@ -57,9 +59,15 @@ pub unsafe fn vecadd(a: &[f32], b: &[f32], c: *mut f32) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
+
+    let mut hash = Hash::new(); // Create a new hash context
+    hash.update(&input[0..32]); // Update with 32 bytes from local_buffer
+    let result = hash.finalize(); // Finalize and get the hash result
+    println!("Hashed input: {:02x?}", result);
+
     let mut output = [0; 64];
-    bs58::encode(input).onto(&mut output[..]).unwrap();
-    println!("Encoded public key: {:02x?}", output);
+    bs58::encode(&result[..32]).onto(&mut output[..]).unwrap();
+    println!("Encoded hash: {:02x?}", output);
 
     /*let (secret_key, public_key, encoded_public_key) = generate_keypair(&input);
     println!("Secret key: {:?}", secret_key);
