@@ -13,11 +13,21 @@ ssh-keygen -t rsa -b 3072 -f ~/.ssh/id_rsa -N ""
 git config --global user.name "Brandon Ros"
 git config --global user.email $EMAIL
 
+# clone repo
+git clone git@github.com:brandonros/ed25519-vanity-rs.git
+
 # install system dependencies
 apt update
-apt-get remove --purge 'cuda-12-0*' 'cuda-*12-0*' 'libcublas-12-0' 'libcublas-dev-12-0' cuda-12.0
-apt-get autoremove
-apt install pkg-config libssl-dev llvm-7 llvm-7-dev llvm-7-tools clang-7 zlib1g-dev cuda-12-8
+apt install -y pkg-config libssl-dev zlib1g-dev
+
+# install llvm v7
+curl -sSf -L -O http://security.ubuntu.com/ubuntu/pool/universe/libf/libffi7/libffi7_3.3-5ubuntu1_amd64.deb && \
+curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7_7.0.1-12_amd64.deb && \
+curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-dev_7.0.1-12_amd64.deb && \
+curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/libllvm7_7.0.1-12_amd64.deb && \
+curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-runtime_7.0.1-12_amd64.deb && \
+apt-get install -y ./*.deb && \
+ln -s /usr/bin/llvm-config-7 /usr/bin/llvm-config
 
 # install rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
