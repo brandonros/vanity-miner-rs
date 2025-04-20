@@ -1,64 +1,37 @@
-use cust::prelude::*;
-use std::error::Error;
+use cudarc::{
+    driver::{CudaContext, DriverError, LaunchConfig, PushKernelArg},
+    nvrtc::Ptx,
+};
 
-static PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
-
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), DriverError> {
+    // Define the vanity prefix we're looking for
     let vanity_prefix = b"aaaa";
     let vanity_prefix_len = vanity_prefix.len();
-    let rng_seed: u64 = 2457272140905572020; // TODO: do not hardcode
+    let rng_seed: u64 = 2457272140905572020; // You might want to generate this randomly
 
-    // initialize CUDA, this will pick the first available device and will
-    // make a CUDA context from it.
-    // We don't need the context for anything but it must be kept alive.
-    println!("initializing CUDA");
-    let _ctx = cust::quick_init()?;
+    // Initialize CUDA context and get default stream
+    let ctx = CudaContext::new(0)?;
+    let stream = ctx.default_stream();
 
-    // Make the CUDA module, modules just house the GPU code for the kernels we created.
-    // they can be made from PTX code, cubins, or fatbins.
-    println!("making CUDA module");
-    let module = Module::from_ptx(PTX, &[])?;
+    // Load the pre-compiled PTX that was generated during build
+    let module = ctx.load_module(Ptx::from_src(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"))))?;
+    let f = module.load_function("find_vanity_private_key").unwrap();
 
-    // make a CUDA stream to issue calls to. You can think of this as an OS thread but for dispatching
-    // GPU calls.
-    println!("making CUDA stream");
-    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+    // Configure kernel launch parameters
+    let n = 1; // Number of parallel threads to run
+    let cfg = LaunchConfig::for_num_elems(n as u32);
+    
+    // Copy vanity prefix to device
+    let vanity_prefix_dev = stream.memcpy_stod(vanity_prefix)?;
 
-    // allocate the GPU memory needed to house our numbers and copy them over.
-    println!("allocating GPU memory");
-    let vanity_prefix_gpu = vanity_prefix.as_slice().as_dbuf()?;
+    // Launch the kernel
+    let mut launch_args = stream.launch_builder(&f);
+    launch_args.arg(&vanity_prefix_dev);
+    launch_args.arg(&vanity_prefix_len);
+    launch_args.arg(&rng_seed);
+    unsafe { launch_args.launch(cfg) }?;
 
-    // retrieve the `find_private_key` kernel from the module so we can calculate the right launch config.
-    println!("retrieving CUDA kernel");
-    let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
-
-    // use the CUDA occupancy API to find an optimal launch configuration for the grid and block size.
-    // This will try to maximize how much of the GPU is used by finding the best launch configuration for the
-    // current CUDA device/architecture.
-    let grid_size = 32;
-    let block_size = 256;
-
-    // Actually launch the GPU kernel. This will queue up the launch on the stream, it will
-    // not block the thread until the kernel is finished.
-    unsafe {
-        println!("launching CUDA kernel");
-        launch!(
-            // slices are passed as two parameters, the pointer and the length.
-            find_vanity_private_key<<<grid_size, block_size, 0, stream>>>(
-                // Slices are passed as **two parameters**
-                vanity_prefix_gpu.as_device_ptr(),
-                vanity_prefix_len,
-                rng_seed,
-            )
-        )?;
-        println!("kernel launched");
-    }
-
-    println!("synchronizing stream");
-    match stream.synchronize() {
-        Ok(_) => println!("stream synchronized"),
-        Err(e) => panic!("stream synchronization error: {}", e),
-    }
+    stream.synchronize()?;
 
     Ok(())
 }
