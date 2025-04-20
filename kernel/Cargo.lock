@@ -220,7 +220,8 @@ dependencies = [
  "cuda_builder",
  "cuda_std",
  "ed25519-compact",
- "rand_xoshiro",
+ "rand_core",
+ "rand_xorshift",
 ]
 
 [[package]]
@@ -613,10 +614,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
 
 [[package]]
-name = "rand_xoshiro"
-version = "0.7.0"
+name = "rand_xorshift"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
+checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
 dependencies = [
  "rand_core",
 ]
