@@ -26,8 +26,9 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     let f = module.load_function("find_vanity_private_key").unwrap();
 
     // Configure kernel launch parameters
-    let num_blocks = 512;  // Number of blocks    
-    let block_size = 256; // Threads per block
+    let num_blocks = 1024;  // Number of blocks    
+    let block_size = 128; // Threads per block
+    let iterations_per_thread: usize = 1; // Number of iterations per thread
     let cfg = LaunchConfig {
         grid_dim: (num_blocks, 1, 1),
         block_dim: (block_size, 1, 1),
@@ -38,8 +39,6 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     println!("[{ordinal}] Starting search loop...");
 
     let mut rng = rand::thread_rng();
-    let iterations_per_thread: usize = 1;
-    let total_hashes_per_attempt = block_size as u64 * num_blocks as u64 * iterations_per_thread as u64;
     let start_time = Instant::now();
     let mut matches_found = 0;
 
