@@ -20,9 +20,8 @@ pub unsafe fn find_vanity_private_key(
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
-    let found_flag = &*found_flag_ptr;
-
     // read slices from host
+    let found_flag = &*found_flag_ptr;
     let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
     let found_private_key = core::slice::from_raw_parts_mut(found_private_key_ptr, 32);
     let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
@@ -41,10 +40,14 @@ pub unsafe fn find_vanity_private_key(
     // initialize hasher
     let mut hasher = Hash::new();
 
+    // sync threads
+    cuda_std::thread::sync_threads();
+
     // loop until match is found
     for _ in 0..max_num_iterations {
         // check if match has been found in another thread
         if found_flag.load(core::sync::atomic::Ordering::Relaxed) != 0.0 {
+            cuda_std::thread::sync_threads();
             break;
         }
 
@@ -68,12 +71,20 @@ pub unsafe fn find_vanity_private_key(
 
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
+            // store match flag
             found_flag.store(1.0, core::sync::atomic::Ordering::Relaxed);
+
+            // copy results to host
             found_private_key.copy_from_slice(&private_key[0..32]);
             found_public_key.copy_from_slice(&public_key_bytes[0..32]);
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
+
+            // sync threads
             cuda_std::thread::sync_threads();
             break;
         }
     }
+
+    // sync threads
+    cuda_std::thread::sync_threads();
 }
