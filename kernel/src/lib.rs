@@ -2,40 +2,52 @@ extern crate alloc;
 
 use cuda_std::prelude::*;
 use hmac_sha512::Hash;
-use ed25519_compact::SecretKey;
+use ed25519_compact::{KeyPair, Seed};
+use gpu_rand::DefaultRand;
+use gpu_rand::xoroshiro::rand_core::SeedableRng;
+use gpu_rand::xoroshiro::rand_core::RngCore;
 use bs58;
 
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe fn vecadd(a: &[f32], b: &[f32], c: *mut f32) {
-    let mut input = [
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    ];
-    println!("input: {:02x?}", input);
+    // generate random input
+    let mut rng_seed = 0;
 
-    // sha512
-    let mut hash = Hash::new();
-    hash.update(&input[0..32]);
-    let mut hashed_input = hash.finalize();
-    println!("SHA-512 Hashed input: {:02x?}", hashed_input);
+    loop {
+        let mut rng = DefaultRand::seed_from_u64(rng_seed);
+        let mut input = [0u8; 32];
+        rng.fill_bytes(&mut input);
 
-    // Special ed25519 hash modification
-    hashed_input[0] &= 248;
-    hashed_input[31] = (hashed_input[31] & 127) | 64;
+        // sha512
+        let mut hash = Hash::new();
+        hash.update(&input[0..32]);
+        let mut hashed_input = hash.finalize();
 
-    // ed25519
-    let secret_key = SecretKey::from_slice(&hashed_input[0..64]).unwrap();
-    let public_key = secret_key.public_key();
-    let public_key = public_key.as_slice();
-    println!("Public key: {:02x?}", public_key);
+        // Special ed25519 hash modification
+        hashed_input[0] &= 248;
+        hashed_input[31] = (hashed_input[31] & 127) | 64;
 
-    // bs58
-    let mut bs58_encoded_public_key = [0; 64];
-    bs58::encode(&public_key[..32]).onto(&mut bs58_encoded_public_key[..]).unwrap();
-    println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
+        // ed25519
+        let seed = Seed::from_slice(&hashed_input[0..32]).unwrap();
+        let key_pair = KeyPair::from_seed(seed);
+        let secret_key = key_pair.sk;
+        let public_key = key_pair.pk;
+
+        // bs58
+        let mut bs58_encoded_public_key = [0; 64];
+        bs58::encode(&public_key[..32]).onto(&mut bs58_encoded_public_key[..]).unwrap();
+
+        if bs58_encoded_public_key[0] == 0x31 && bs58_encoded_public_key[1] == 0x31 && 
+            bs58_encoded_public_key[2] == 0x31 && bs58_encoded_public_key[3] == 0x31 {
+            println!("input: {:02x?}", input);
+            println!("SHA-512 Hashed input: {:02x?}", hashed_input);
+            println!("Public key: {:02x?}", public_key);
+            println!("Base58 encoded public key: {:02x?}", bs58_encoded_public_key);
+        }
+
+        rng_seed += 1;
+    }
 
     let idx = thread::index_1d() as usize;
     if idx < a.len() {
