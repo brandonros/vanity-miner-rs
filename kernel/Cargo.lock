@@ -238,6 +238,7 @@ dependencies = [
  "cuda_std",
  "ed25519-compact",
  "gpu_rand",
+ "hmac-sha512",
 ]
 
 [[package]]
@@ -344,6 +345,10 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+
+[[package]]
+name = "hmac-sha512"
+version = "1.1.6"
 
 [[package]]
 name = "indexmap"
