@@ -1,3 +1,0 @@
-[submodule "kernels/deps/bs58-rs"]
-	path = kernels/deps/bs58-rs
-	url = git@github.com:brandonros/bs58-rs.git
