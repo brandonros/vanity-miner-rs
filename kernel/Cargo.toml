@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 gpu_rand = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 hmac-sha512 = { path = "./deps/rust-hmac-sha512", default-features = false }
-ed25519-compact = { path = "./deps/rust-ed25519-compact", default-features = false }
+ed25519-compact = { path = "./deps/rust-ed25519-compact", default-features = false, features = ["cuda"] }
 bs58 = { version = "0.5.1", default-features = false }
 
 [build-dependencies]
