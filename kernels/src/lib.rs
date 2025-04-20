@@ -57,8 +57,9 @@ pub unsafe fn vecadd(a: &[f32], b: &[f32], c: *mut f32) {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
-    let encoded_public_key = bs58::encode(&input);
-    println!("Encoded public key: {}", encoded_public_key);
+    let mut output = [0; 64];
+    bs58::encode(input).onto(&mut output[..]).unwrap();
+    println!("Encoded public key: {:02x?}", output);
 
     /*let (secret_key, public_key, encoded_public_key) = generate_keypair(&input);
     println!("Secret key: {:?}", secret_key);

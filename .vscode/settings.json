@@ -1,0 +1,6 @@
+{
+    "rust-analyzer.cargo.extraEnv": [
+        "LLVM_CONFIG=llvm-config-7",
+        "LD_LIBRARY_PATH=/usr/local/cuda/nvvm/lib64/"
+    ]
+}
