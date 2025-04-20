@@ -68,11 +68,10 @@ pub unsafe fn find_vanity_private_key(
         // check if public key starts with vanity prefix
         if bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix {
             found_flag[0] = 1;
-            cuda_std::thread::sync_threads();
-            
             found_private_key.copy_from_slice(&private_key[0..32]);
             found_public_key.copy_from_slice(&public_key_bytes[0..32]);
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
+            cuda_std::thread::sync_threads();
             break;
         }
     }

@@ -3,12 +3,12 @@ use cudarc::{
     nvrtc::Ptx,
 };
 use rand::Rng;
+use std::time::Instant;
 
 fn main() -> Result<(), DriverError> {
     // Define the vanity prefix we're looking for
-    let vanity_prefix    = b"aaaa";
+    let vanity_prefix    = b"aaaaa";
     let vanity_prefix_len: usize = vanity_prefix.len();
-
 
     // Initialize CUDA context and get default stream
     let ctx = CudaContext::new(0)?;
@@ -32,11 +32,13 @@ fn main() -> Result<(), DriverError> {
     println!("Starting search loop...");
 
     let mut rng = rand::thread_rng();
+    let max_num_iterations: usize = 10000;
+    let total_hashes_per_attempt = block_size as u64 * num_blocks as u64 * max_num_iterations as u64;
     
     loop {
         attempts += 1;
         let rng_seed: u64 = rng.r#gen::<u64>();
-        let max_num_iterations: usize = 10000;
+        let start_time = Instant::now();
 
         let mut found_flag = [0u8; 1];
         let mut found_private_key = [0u8; 32];
@@ -64,6 +66,13 @@ fn main() -> Result<(), DriverError> {
         unsafe { launch_args.launch(cfg) }?;
 
         stream.synchronize()?;
+
+        let elapsed = start_time.elapsed();
+        let hash_rate = total_hashes_per_attempt as f64 / elapsed.as_secs_f64();
+        println!("Attempt {} took {:.2?} ({:.2}M hashes/sec)", 
+                attempts, 
+                elapsed,
+                hash_rate / 1_000_000.0);
 
         // Check if we found a match
         stream.memcpy_dtoh(&found_flag_dev, &mut found_flag)?;
