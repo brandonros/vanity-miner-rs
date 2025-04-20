@@ -207,8 +207,9 @@ dependencies = [
 [[package]]
 name = "ed25519-compact"
 version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9b3460f44bea8cd47f45a0c70892f1eff856d97cd55358b2f73f663789f6190"
+dependencies = [
+ "cuda_std",
+]
 
 [[package]]
 name = "ed25519_vanity_kernel"
@@ -218,6 +219,7 @@ dependencies = [
  "cuda_builder",
  "cuda_std",
  "ed25519-compact",
+ "hmac-sha512",
 ]
 
 [[package]]
@@ -314,6 +316,10 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+
+[[package]]
+name = "hmac-sha512"
+version = "1.1.6"
 
 [[package]]
 name = "indexmap"

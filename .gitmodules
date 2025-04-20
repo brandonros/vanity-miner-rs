@@ -1,0 +1,6 @@
+[submodule "kernel/deps/rust-ed25519-compact"]
+	path = kernel/deps/rust-ed25519-compact
+	url = git@github.com:brandonros/rust-ed25519-compact.git
+[submodule "kernel/deps/rust-hmac-sha512"]
+	path = kernel/deps/rust-hmac-sha512
+	url = git@github.com:brandonros/rust-hmac-sha512.git
