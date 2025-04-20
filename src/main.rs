@@ -7,8 +7,17 @@ use std::time::Instant;
 
 fn main() -> Result<(), DriverError> {
     // Define the vanity prefix we're looking for
-    let vanity_prefix    = b"aaaaa";
-    let vanity_prefix_len: usize = vanity_prefix.len();
+    let vanity_prefix = "aa";
+
+    // check if the vanity prefix contains any of the forbidden characters
+    assert!(vanity_prefix.contains("l") == false); // lowercase L
+    assert!(vanity_prefix.contains("I") == false); // uppercase i
+    assert!(vanity_prefix.contains("0") == false); // zero
+    assert!(vanity_prefix.contains("O") == false); // uppercase o
+
+    // convert the vanity prefix to a byte array
+    let vanity_prefix_bytes = vanity_prefix.as_bytes();
+    let vanity_prefix_len: usize = vanity_prefix_bytes.len();
 
     // Initialize CUDA context and get default stream
     let ctx = CudaContext::new(0)?;
@@ -46,7 +55,7 @@ fn main() -> Result<(), DriverError> {
         let mut found_public_key = [0u8; 32];
         let mut found_bs58_encoded_public_key = [0u8; 44];
         
-        let vanity_prefix_dev    = stream.memcpy_stod(vanity_prefix)?;
+        let vanity_prefix_dev    = stream.memcpy_stod(vanity_prefix_bytes)?;
         let found_flag_dev = stream.memcpy_stod(&found_flag)?;
         let found_private_key_dev = stream.memcpy_stod(&found_private_key)?;
         let found_public_key_dev = stream.memcpy_stod(&found_public_key)?;
