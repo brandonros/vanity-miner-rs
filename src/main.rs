@@ -27,8 +27,8 @@ fn device_main(ordinal: usize, vanity_prefix: String, num_blocks: usize, block_s
 
     // Configure kernel launch parameters
     let cfg = LaunchConfig {
-        grid_dim: (num_blocks, 1, 1),
-        block_dim: (block_size, 1, 1),
+        grid_dim: (num_blocks as u32, 1, 1),
+        block_dim: (block_size as u32, 1, 1),
         shared_mem_bytes: 0,
     };
 
