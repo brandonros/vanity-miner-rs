@@ -90,7 +90,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
             let launches_per_second = launches as f64 / elapsed.as_secs_f64();
             let operations_per_second = total_operations as f64 / elapsed.as_secs_f64() / 1_000_000.00;
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} launches {total_operations} operations blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} launches {total_operations} operations {operations_per_launch} ops/launch {blocks_per_grid} blocks/grid {threads_per_block} threads/block");
         }
     }
 }
