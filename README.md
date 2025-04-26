@@ -13,10 +13,11 @@ ssh-keygen -t rsa -b 3072 -f ~/.ssh/id_rsa -N ""
 
 # configure git
 git config --global user.name "Brandon Ros"
-git config --global user.email $EMAIL
+git config --global user.email "$EMAIL"
 
 # clone repo
 git clone git@github.com:brandonros/ed25519-vanity-rs.git
+cd ed25519-vanity-rs
 
 # install system dependencies
 apt update && apt install -y pkg-config libssl-dev zlib1g-dev clang

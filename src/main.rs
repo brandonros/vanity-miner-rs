@@ -28,7 +28,6 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
     // Configure kernel launch parameters
     let num_blocks = 1024;  // Number of blocks    
     let block_size = 128; // Threads per block
-    let iterations_per_thread: usize = 1; // Number of iterations per thread
     let cfg = LaunchConfig {
         grid_dim: (num_blocks, 1, 1),
         block_dim: (block_size, 1, 1),
@@ -62,7 +61,6 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
         launch_args.arg(&vanity_prefix_dev);
         launch_args.arg(&vanity_prefix_len);
         launch_args.arg(&rng_seed);
-        launch_args.arg(&iterations_per_thread);
         launch_args.arg(&found_flag_dev);
         launch_args.arg(&found_private_key_dev);
         launch_args.arg(&found_public_key_dev);
@@ -88,7 +86,7 @@ fn device_main(ordinal: usize, vanity_prefix: String) -> Result<(), DriverError>
             matches_found += 1;
             let elapsed = start_time.elapsed();
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size} iterations_per_thread = {iterations_per_thread}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size}");
         }
     }
 }
