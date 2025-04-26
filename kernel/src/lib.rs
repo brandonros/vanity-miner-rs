@@ -21,15 +21,23 @@ pub unsafe fn find_vanity_private_key(
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
+    // read vanity prefix from host
+    let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
+    cuda_std::thread::sync_threads();
+
+    // initialize rng + buffers + hasher + flag
+    let idx = cuda_std::thread::index() as usize;
+    let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
+    let mut private_key = [0u8; 32];
+    let mut bs58_encoded_public_key = [0u8; 44];
+    let mut hasher = Hash::new();
+    cuda_std::thread::sync_threads();
+
    // generate random input
-   let idx = cuda_std::thread::index() as usize;
-   let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
-   let mut private_key = [0u8; 32];
    rng.fill_bytes(&mut private_key[0..32]);
    cuda_std::thread::sync_threads();
 
    // sha512 hash input
-   let mut hasher = Hash::new();
    hasher.update(&private_key[0..32]);
    let mut hashed_private_key = hasher.finalize();
    cuda_std::thread::sync_threads();
@@ -44,12 +52,10 @@ pub unsafe fn find_vanity_private_key(
    cuda_std::thread::sync_threads();
 
    // bs58 encode public key
-   let mut bs58_encoded_public_key = [0u8; 44];
    bs58::encode(&public_key_bytes[0..32]).onto(&mut bs58_encoded_public_key[0..]).unwrap();
    cuda_std::thread::sync_threads();
 
    // check if public key starts with vanity prefix
-   let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
    let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
    cuda_std::thread::sync_threads();
 
