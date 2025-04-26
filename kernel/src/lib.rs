@@ -65,6 +65,9 @@ pub unsafe fn find_vanity_private_key(
        }
        i += 1;
    }
+   cuda_std::thread::sync_threads();
+
+   // if match, copy results to host
    if matches {
        // copy results to host
        let found_flag_slice = core::slice::from_raw_parts_mut(found_flag_ptr, 1);
