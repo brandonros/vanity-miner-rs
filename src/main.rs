@@ -26,8 +26,6 @@ fn device_main(ordinal: usize, vanity_prefix: String, num_blocks: usize, block_s
     let f = module.load_function("find_vanity_private_key").unwrap();
 
     // Configure kernel launch parameters
-    let num_blocks = 1024;  // Number of blocks    
-    let block_size = 128; // Threads per block
     let cfg = LaunchConfig {
         grid_dim: (num_blocks, 1, 1),
         block_dim: (block_size, 1, 1),
