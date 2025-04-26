@@ -76,4 +76,5 @@ pub unsafe fn find_vanity_private_key(
        found_public_key.copy_from_slice(&public_key_bytes[0..32]);
        found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
    }
+   cuda_std::thread::sync_threads();
 }
