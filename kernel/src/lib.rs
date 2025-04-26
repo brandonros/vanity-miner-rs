@@ -63,9 +63,9 @@ pub unsafe fn find_vanity_private_key(
        let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
        let found_bs58_encoded_public_key = core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44);
 
-       // TODO: this needs to be atomic
        let mut found_flag = &mut found_flag_slice[0];
        found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
+       cuda_std::thread::device_thread_fence(core::sync::atomic::Ordering::SeqCst);
 
        // TODO: need to copy more than 1 single result
        found_private_key.copy_from_slice(&private_key[0..32]);
