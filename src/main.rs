@@ -82,7 +82,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
             println!("[{ordinal}] Found public key: {:02x?}", found_public_key);
             println!("[{ordinal}] Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
 
-            matches_found += 1;
+            matches_found += found_flag[0] as usize;
             let elapsed = start_time.elapsed();
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
             println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
