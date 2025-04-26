@@ -16,7 +16,7 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_len: usize, 
     rng_seed: u64,
     // output
-    found_flag_ptr: *mut f32,
+    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
@@ -65,7 +65,7 @@ pub unsafe fn find_vanity_private_key(
 
        // TODO: this needs to be atomic
        let mut found_flag = &mut found_flag_slice[0];
-       *found_flag += 1.0;
+       found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
 
        // TODO: need to copy more than 1 single result
        found_private_key.copy_from_slice(&private_key[0..32]);
