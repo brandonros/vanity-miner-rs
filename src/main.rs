@@ -5,7 +5,7 @@ use cudarc::{
 use rand::Rng;
 use std::time::Instant;
 
-fn device_main(ordinal: usize, vanity_prefix: String, num_blocks: usize, block_size: usize) -> Result<(), DriverError> {
+fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, threads_per_block: usize) -> Result<(), DriverError> {
     // check if the vanity prefix contains any of the forbidden characters
     assert!(vanity_prefix.contains("l") == false); // lowercase L
     assert!(vanity_prefix.contains("I") == false); // uppercase i
@@ -27,8 +27,8 @@ fn device_main(ordinal: usize, vanity_prefix: String, num_blocks: usize, block_s
 
     // Configure kernel launch parameters
     let cfg = LaunchConfig {
-        grid_dim: (num_blocks as u32, 1, 1),
-        block_dim: (block_size as u32, 1, 1),
+        grid_dim: (blocks_per_grid as u32, 1, 1),
+        block_dim: (threads_per_block as u32, 1, 1),
         shared_mem_bytes: 0,
     };
 
@@ -93,8 +93,8 @@ fn main() -> Result<(), DriverError> {
     // Define the vanity prefix we're looking for
     let args = std::env::args().collect::<Vec<String>>();
     let vanity_prefix = args[1].to_string();
-    let num_blocks = args[2].parse::<usize>().unwrap();
-    let block_size = args[3].parse::<usize>().unwrap();
+    let blocks_per_grid = args[2].parse::<usize>().unwrap();
+    let threads_per_block = args[3].parse::<usize>().unwrap();
 
     // Initialize CUDA context and get default stream
     let num_devices = CudaContext::device_count()?;
@@ -104,7 +104,7 @@ fn main() -> Result<(), DriverError> {
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let vanity_prefix_clone = vanity_prefix.clone();
-        let handle = std::thread::spawn(move || device_main(i, vanity_prefix_clone, num_blocks, block_size));
+        let handle = std::thread::spawn(move || device_main(i, vanity_prefix_clone, blocks_per_grid, threads_per_block));
         handles.push(handle);
     }
     for handle in handles {
