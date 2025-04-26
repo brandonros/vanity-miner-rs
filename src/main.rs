@@ -85,7 +85,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
             matches_found += 1;
             let elapsed = start_time.elapsed();
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts num_blocks = {num_blocks} block_size = {block_size}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
         }
     }
 }
