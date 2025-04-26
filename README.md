@@ -41,7 +41,7 @@ export LLVM_CONFIG="llvm-config-7"
 export LLVM_LINK_STATIC="1"
 export RUST_LOG="info"
 export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
-BLOCKS_PER_GRID="1024"
-THREADS_PER_BLOCK="128"
+BLOCKS_PER_GRID="4096"
+THREADS_PER_BLOCK="256"
 cargo run --release -- aaaa $BLOCKS_PER_GRID $THREADS_PER_BLOCK
 ```

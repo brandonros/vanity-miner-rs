@@ -33,14 +33,17 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
     };
 
     let mut attempts = 0;
+    let operations_per_launch = blocks_per_grid * threads_per_block;
     println!("[{ordinal}] Starting search loop...");
 
     let mut rng = rand::thread_rng();
     let start_time = Instant::now();
     let mut matches_found = 0;
+    let mut total_operations = 0;
 
     loop {
         attempts += 1;
+        total_operations += operations_per_launch;
         let rng_seed: u64 = rng.r#gen::<u64>();
         
         let mut found_flag = [0.0f32; 1];
@@ -84,8 +87,9 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
 
             matches_found += found_flag[0] as usize;
             let elapsed = start_time.elapsed();
+            let operations_per_second = total_operations as f64 / elapsed.as_secs_f64();
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec) with {attempts} attempts blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec, {operations_per_second:.2} ops/sec) with {attempts} attempts blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
         }
     }
 }
