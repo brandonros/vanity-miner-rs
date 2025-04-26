@@ -77,6 +77,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
             stream.memcpy_dtoh(&found_public_key_dev, &mut found_public_key)?;
             stream.memcpy_dtoh(&found_bs58_encoded_public_key_dev, &mut found_bs58_encoded_public_key)?;
 
+            println!("[{ordinal}] Found flag: {:02x?}", found_flag);
             println!("[{ordinal}] Found private key: {:02x?}", found_private_key);
             println!("[{ordinal}] Found public key: {:02x?}", found_public_key);
             println!("[{ordinal}] Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
