@@ -32,7 +32,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
         shared_mem_bytes: 0,
     };
 
-    let mut attempts = 0;
+    let mut launches = 0;
     let operations_per_launch = blocks_per_grid * threads_per_block;
     println!("[{ordinal}] Starting search loop...");
 
@@ -42,7 +42,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
     let mut total_operations = 0;
 
     loop {
-        attempts += 1;
+        launches += 1;
         total_operations += operations_per_launch;
         let rng_seed: u64 = rng.r#gen::<u64>();
         
@@ -87,10 +87,10 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
 
             matches_found += found_flag[0] as usize;
             let elapsed = start_time.elapsed();
-            let attempts_per_second = attempts as f64 / elapsed.as_secs_f64();
+            let launches_per_second = launches as f64 / elapsed.as_secs_f64();
             let operations_per_second = total_operations as f64 / elapsed.as_secs_f64() / 1_000_000.00;
             let matches_per_second = matches_found as f64 / elapsed.as_secs_f64();
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec, {attempts_per_second:.2} attempts/sec, {operations_per_second:.2}M ops/sec) with {attempts} attempts {total_operations} operations blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
+            println!("[{ordinal}] Found {matches_found} matches in {elapsed:?} ({matches_per_second:.2} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} launches {total_operations} operations blocks_per_grid = {blocks_per_grid} threads_per_block = {threads_per_block}");
         }
     }
 }
