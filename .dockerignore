@@ -1,0 +1,7 @@
+.git
+.github
+.vscode
+target
+.gitignore
+Dockerfile.build
+README.md
