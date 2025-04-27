@@ -41,7 +41,7 @@ jobs:
       - name: Build Docker image and extract binary
         run: |
           # Build the Docker image
-          docker build -t rust-cuda-builder .
+          docker build -f Dockerfile.build -t rust-cuda-builder .
           
           # Create a container from the image
           CONTAINER_ID=$(docker create rust-cuda-builder)
