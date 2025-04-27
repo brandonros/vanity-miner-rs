@@ -43,7 +43,7 @@ export RUST_LOG="info"
 export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
 cargo build --release
 
-BLOCKS_PER_GRID="4096"
-THREADS_PER_BLOCK="256"
-cargo run --release -- aaaa $BLOCKS_PER_GRID $THREADS_PER_BLOCK
+BLOCKS_PER_GRID="128"
+THREADS_PER_BLOCK="128"
+cargo run --release -- aa $BLOCKS_PER_GRID $THREADS_PER_BLOCK
 ```
