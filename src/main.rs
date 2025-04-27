@@ -80,11 +80,12 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
             stream.memcpy_dtoh(&found_public_key_dev, &mut found_public_key)?;
             stream.memcpy_dtoh(&found_bs58_encoded_public_key_dev, &mut found_bs58_encoded_public_key)?;
 
-            println!("[{ordinal}] Found flag: {:02x?}", found_flag);
-            println!("[{ordinal}] Found private key: {:02x?}", found_private_key);
-            println!("[{ordinal}] Found public key: {:02x?}", found_public_key);
-            println!("[{ordinal}] Found bs58 encoded public key: {:02x?}", found_bs58_encoded_public_key);
+            // print
+            let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
+            let public_key_string = String::from_utf8(found_bs58_encoded_public_key).unwrap();
+            println!("[{ordinal}] Found match: {public_key_string} {wallet_formatted_result}");
 
+            // increment stats
             matches_found += found_flag[0] as usize;
             let elapsed = start_time.elapsed();
             let elapsed_seconds = elapsed.as_secs_f64();
