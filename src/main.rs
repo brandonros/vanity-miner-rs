@@ -82,7 +82,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
 
             // print
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
-            let public_key_string = String::from_utf8(found_bs58_encoded_public_key).unwrap();
+            let public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
             println!("[{ordinal}] Found match: {public_key_string} {wallet_formatted_result}");
 
             // increment stats
