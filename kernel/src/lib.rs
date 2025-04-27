@@ -7,6 +7,7 @@ use sha2::Digest as _;
 use ed25519_compact::ge_scalarmult_base;
 use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
+use rand_xoshiro::Xoroshiro128StarStar;
 use bs58;
 
 // fails
@@ -62,6 +63,7 @@ pub unsafe fn find_vanity_private_key(
     // initialize rng + buffers + hasher + flag
     let idx = cuda_std::thread::index() as usize;
     let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
+    //let mut rng = Xoroshiro128StarStar::seed_from_u64(rng_seed + idx as u64);
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
     cuda_std::thread::sync_threads();
@@ -80,7 +82,7 @@ pub unsafe fn find_vanity_private_key(
     cuda_std::thread::sync_threads();
     
     // ed25519 private key -> public key (first 32 bytes only)
-    let public_key_bytes = derrive_public_key(hashed_private_key_bytes);
+    let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
     cuda_std::thread::sync_threads();
     
     // bs58 encode public key
