@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cudarc = { version = "0.16.0", features = ["cuda-version-from-build-system"] }
+cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 hex = "0.4.3"
 rand = "0.8"
 

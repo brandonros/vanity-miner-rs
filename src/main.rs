@@ -1,11 +1,15 @@
-use cudarc::{
-    driver::{CudaContext, DriverError, LaunchConfig, PushKernelArg},
-    nvrtc::Ptx,
-};
+use cust::device::Device;
+use cust::module::Module;
+use cust::prelude::Context;
+use cust::stream::{Stream, StreamFlags};
+use cust::util::SliceExt;
+use cust::memory::CopyDestination;
+use cust::{launch, CudaFlags};
 use rand::Rng;
 use std::time::Instant;
+use std::error::Error;
 
-fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, threads_per_block: usize) -> Result<(), DriverError> {
+fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, threads_per_block: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
     // check if the vanity prefix contains any of the forbidden characters
     assert!(vanity_prefix.contains("l") == false); // lowercase L
     assert!(vanity_prefix.contains("I") == false); // uppercase i
@@ -16,21 +20,15 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
     let vanity_prefix_bytes = vanity_prefix.as_bytes();
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
     
-    let ctx = CudaContext::new(ordinal)?;
-    ctx.bind_to_thread()?;
-    let stream = ctx.default_stream();
+    let device = Device::get_device(ordinal as u32)?;
+    let ctx = Context::new(device)?;
 
     // Load the pre-compiled PTX that was generated during build
     println!("[{ordinal}] Loading module...");
-    let module = ctx.load_module(Ptx::from_src(include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"))))?;
-    let f = module.load_function("find_vanity_private_key").unwrap();
-
-    // Configure kernel launch parameters
-    let cfg = LaunchConfig {
-        grid_dim: (blocks_per_grid as u32, 1, 1),
-        block_dim: (threads_per_block as u32, 1, 1),
-        shared_mem_bytes: 0,
-    };
+    let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
+    let module = Module::from_ptx(ptx, &[])?;
+    let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+    let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
 
     let mut launches = 0;
     let operations_per_launch = blocks_per_grid * threads_per_block;
@@ -51,34 +49,38 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
         let mut found_public_key = [0u8; 32];
         let mut found_bs58_encoded_public_key = [0u8; 44];
         
-        let vanity_prefix_dev = stream.memcpy_stod(vanity_prefix_bytes)?;
-        let found_flag_dev = stream.memcpy_stod(&found_flag)?;
-        let found_private_key_dev = stream.memcpy_stod(&found_private_key)?;
-        let found_public_key_dev = stream.memcpy_stod(&found_public_key)?;
-        let found_bs58_encoded_public_key_dev = stream.memcpy_stod(&found_bs58_encoded_public_key)?;    
+        let vanity_prefix_dev = vanity_prefix_bytes.as_dbuf()?;
+        let found_flag_dev = found_flag.as_dbuf()?;
+        let found_private_key_dev = found_private_key.as_dbuf()?;
+        let found_public_key_dev = found_public_key.as_dbuf()?;
+        let found_bs58_encoded_public_key_dev = found_bs58_encoded_public_key.as_dbuf()?;    
         
         // Launch the kernel
-        let mut launch_args = stream.launch_builder(&f);
-        launch_args.arg(&vanity_prefix_dev);
-        launch_args.arg(&vanity_prefix_len);
-        launch_args.arg(&rng_seed);
-        launch_args.arg(&found_flag_dev);
-        launch_args.arg(&found_private_key_dev);
-        launch_args.arg(&found_public_key_dev);
-        launch_args.arg(&found_bs58_encoded_public_key_dev);
-
-        unsafe { launch_args.launch(cfg) }?;
+        unsafe {
+            launch!(
+                // slices are passed as two parameters, the pointer and the length.
+                find_vanity_private_key<<<blocks_per_grid as u32, threads_per_block as u32, 0, stream>>>(
+                    vanity_prefix_dev.as_device_ptr(),
+                    vanity_prefix_len,
+                    rng_seed,
+                    found_flag_dev.as_device_ptr(),
+                    found_private_key_dev.as_device_ptr(),
+                    found_public_key_dev.as_device_ptr(),
+                    found_bs58_encoded_public_key_dev.as_device_ptr(),
+                )
+            )?;
+        }
 
         stream.synchronize()?;
 
         // Check if we found a match
-        stream.memcpy_dtoh(&found_flag_dev, &mut found_flag)?;
+        found_flag_dev.copy_to(&mut found_flag)?;
         
         if found_flag[0] != 0.0 {
             // We found a match! Copy results back to host
-            stream.memcpy_dtoh(&found_private_key_dev, &mut found_private_key)?;
-            stream.memcpy_dtoh(&found_public_key_dev, &mut found_public_key)?;
-            stream.memcpy_dtoh(&found_bs58_encoded_public_key_dev, &mut found_bs58_encoded_public_key)?;
+            found_private_key_dev.copy_to(&mut found_private_key)?;
+            found_public_key_dev.copy_to(&mut found_public_key)?;
+            found_bs58_encoded_public_key_dev.copy_to(&mut found_bs58_encoded_public_key)?;
 
             // print
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
@@ -97,7 +99,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
     }
 }
 
-fn main() -> Result<(), DriverError> {
+fn main() -> Result<(), Box<dyn Error>> {
     // Define the vanity prefix we're looking for
     let args = std::env::args().collect::<Vec<String>>();
     let vanity_prefix = args[1].to_string();
@@ -105,7 +107,9 @@ fn main() -> Result<(), DriverError> {
     let threads_per_block = args[3].parse::<usize>().unwrap();
 
     // Initialize CUDA context and get default stream
-    let num_devices = CudaContext::device_count()?;
+    
+    cust::init(CudaFlags::empty())?;
+    let num_devices = Device::num_devices()?;
     println!("Found {} CUDA devices", num_devices);
 
     let mut handles = Vec::new();
@@ -116,7 +120,7 @@ fn main() -> Result<(), DriverError> {
         handles.push(handle);
     }
     for handle in handles {
-        handle.join().unwrap()?;
+        handle.join().unwrap().unwrap();
     }
 
     Ok(())

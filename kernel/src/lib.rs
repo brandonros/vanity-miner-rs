@@ -73,7 +73,7 @@ pub unsafe fn find_vanity_private_key(
     cuda_std::thread::sync_threads();
     
     // sha512 hash input
-    let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
+    let mut hashed_private_key_bytes = sha512(&private_key[0..32]);
     cuda_std::thread::sync_threads();
     
     // apply ed25519 clamping
