@@ -21,7 +21,7 @@ fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, th
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
     
     let device = Device::get_device(ordinal as u32)?;
-    let ctx = Context::new(device)?;
+    let _ctx = Context::new(device)?;
 
     // Load the pre-compiled PTX that was generated during build
     println!("[{ordinal}] Loading module...");
