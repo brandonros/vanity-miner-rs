@@ -1,23 +1,23 @@
 #![allow(unused_parens)]
 #![allow(non_camel_case_types)]
 
-use cuda_std::address_space;
 use core::ops::{Add, Sub, Mul};
 
 pub type fiat_25519_u1 = u8;
 pub type fiat_25519_i1 = i8;
 pub type fiat_25519_i2 = i8;
 
-#[inline(always)]
-fn load_8u(s: &[u8]) -> u64 {
-    (s[0] as u64)
-        | ((s[1] as u64) << 8)
-        | ((s[2] as u64) << 16)
-        | ((s[3] as u64) << 24)
-        | ((s[4] as u64) << 32)
-        | ((s[5] as u64) << 40)
-        | ((s[6] as u64) << 48)
-        | ((s[7] as u64) << 56)
+macro_rules! load_8u {
+    ($s:expr, $offset:expr) => {
+        ($s[$offset] as u64)
+            | (($s[$offset + 1] as u64) << 8)
+            | (($s[$offset + 2] as u64) << 16)
+            | (($s[$offset + 3] as u64) << 24)
+            | (($s[$offset + 4] as u64) << 32)
+            | (($s[$offset + 5] as u64) << 40)
+            | (($s[$offset + 6] as u64) << 48)
+            | (($s[$offset + 7] as u64) << 56)
+    };
 }
 
 #[inline(always)]
@@ -399,18 +399,17 @@ fn fiat_25519_selectznz(
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
-    fn from_bytes(s: &[u8]) -> Fe {
-        if s.len() != 32 {
-            panic!("Invalid compressed length")
-        }
-        let mut h = Fe::default();
+    const fn from_bytes_const(s: &[u8; 32]) -> Fe {
+        let mut h = [0u64; 5];
         let mask = 0x7ffffffffffff;
-        h.0[0] = load_8u(&s[0..]) & mask;
-        h.0[1] = (load_8u(&s[6..]) >> 3) & mask;
-        h.0[2] = (load_8u(&s[12..]) >> 6) & mask;
-        h.0[3] = (load_8u(&s[19..]) >> 1) & mask;
-        h.0[4] = (load_8u(&s[24..]) >> 12) & mask;
-        h
+        
+        h[0] = load_8u!(s, 0) & mask;
+        h[1] = (load_8u!(s, 6) >> 3) & mask;
+        h[2] = (load_8u!(s, 12) >> 6) & mask;
+        h[3] = (load_8u!(s, 19) >> 1) & mask;
+        h[4] = (load_8u!(s, 24) >> 12) & mask;
+        
+        Fe(h)
     }
 
     fn carry(&self) -> Fe {
@@ -514,27 +513,22 @@ impl Mul for Fe {
     }
 }
 
-#[address_space(constant)]
 static BXP: [u8; 32] = [
     0x1a, 0xd5, 0x25, 0x8f, 0x60, 0x2d, 0x56, 0xc9, 0xb2, 0xa7, 0x25, 0x95, 0x60, 0xc7, 0x2c,
     0x69, 0x5c, 0xdc, 0xd6, 0xfd, 0x31, 0xe2, 0xa4, 0xc0, 0xfe, 0x53, 0x6e, 0xcd, 0xd3, 0x36,
     0x69, 0x21,
 ];
 
-#[address_space(constant)]
 static BYP: [u8; 32] = [
     0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
     0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
     0x66, 0x66,
 ];
 
-#[address_space(constant)]
 pub static FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
 
-#[address_space(constant)]
 static FE_ONE: Fe = Fe([1, 0, 0, 0, 0]);
 
-#[address_space(constant)]
 pub(crate) static FE_D2: Fe = Fe([
     1859910466990425,
     932731440258426,
@@ -688,12 +682,12 @@ impl GeCached {
         self.t2d.maybe_set(&other.t2d, do_swap);
     }
 
-    pub fn from_bytes(s: &[[u8; 32]; 4]) -> GeCached {
+    pub const fn from_bytes_const(s: &[[u8; 32]; 4]) -> Self {
         GeCached {
-            y_plus_x: Fe::from_bytes(&s[0]),
-            y_minus_x: Fe::from_bytes(&s[1]),
-            z: Fe::from_bytes(&s[2]),
-            t2d: Fe::from_bytes(&s[3]),
+            y_plus_x: Fe::from_bytes_const(&s[0]),
+            y_minus_x: Fe::from_bytes_const(&s[1]),
+            z: Fe::from_bytes_const(&s[2]),
+            t2d: Fe::from_bytes_const(&s[3]),
         }
     }
 
@@ -726,8 +720,8 @@ fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
 }
 
 pub fn calculate_precompute() -> [GeCached; 16] {
-    let bx = Fe::from_bytes(&BXP);
-    let by = Fe::from_bytes(&BYP);
+    let bx = Fe::from_bytes_const(&BXP);
+    let by = Fe::from_bytes_const(&BYP);
     let base = GeP3 {
         x: bx,
         y: by,
