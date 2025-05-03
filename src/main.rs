@@ -9,7 +9,12 @@ use rand::Rng;
 use std::time::Instant;
 use std::error::Error;
 
-fn device_main(ordinal: usize, vanity_prefix: String, blocks_per_grid: usize, threads_per_block: usize) -> Result<(), Box<dyn Error + Send + Sync>> {
+fn device_main(
+    ordinal: usize, 
+    vanity_prefix: String, 
+    blocks_per_grid: usize, 
+    threads_per_block: usize
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // check if the vanity prefix contains any of the forbidden characters
     assert!(vanity_prefix.contains("l") == false); // lowercase L
     assert!(vanity_prefix.contains("I") == false); // uppercase i

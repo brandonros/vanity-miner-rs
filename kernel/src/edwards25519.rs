@@ -687,6 +687,24 @@ impl GeCached {
         self.z.maybe_set(&other.z, do_swap);
         self.t2d.maybe_set(&other.t2d, do_swap);
     }
+
+    pub fn from_bytes(s: &[[u8; 32]; 4]) -> GeCached {
+        GeCached {
+            y_plus_x: Fe::from_bytes(&s[0]),
+            y_minus_x: Fe::from_bytes(&s[1]),
+            z: Fe::from_bytes(&s[2]),
+            t2d: Fe::from_bytes(&s[3]),
+        }
+    }
+
+    pub fn to_bytes(&self) -> [[u8; 32]; 4] {
+        [
+            self.y_plus_x.to_bytes(),
+            self.y_minus_x.to_bytes(),
+            self.z.to_bytes(),
+            self.t2d.to_bytes(),
+        ]
+    }
 }
 
 fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
