@@ -17,14 +17,9 @@ fn sha512_compact(input: &[u8]) -> [u8; 64] {
 
 fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
     use crate::precomputed_table::PRECOMPUTED_TABLE;
-    let mut input = [0u8; 32];
-    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let public_key_bytes = crate::edwards25519::ge_scalarmult(&input, &PRECOMPUTED_TABLE).to_bytes();
+    let public_key_bytes = crate::edwards25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE).to_bytes();
     public_key_bytes
 }
-
-#[address_space(shared)]
-static mut SHARED_VANITY_PREFIX: [u8; 32] = [0; 32]; // Adjust size as needed
 
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
@@ -40,24 +35,19 @@ pub unsafe fn find_vanity_private_key(
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
     // read vanity prefix from host
-    if cuda_std::thread::index_1d() == 0 {
-        for i in 0..vanity_prefix_len {
-            unsafe { SHARED_VANITY_PREFIX[i] = *vanity_prefix_ptr.add(i) };
-        }
-    }
-    cuda_std::thread::sync_threads();
+    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
     
-    // initialize rng + buffers + hasher + flag
+    // initialize rng
     let thread_idx = cuda_std::thread::index() as usize;
     let mut rng_state = thread_idx as u64 ^ rng_seed;
-    let mut private_key = [0u8; 32];
-    let mut bs58_encoded_public_key = [0u8; 44];
-    
-    // generate random input
+
+    // generate random input for private key
     let mut generate_random_byte = || {
-        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        const LCG_MULTIPLIER: u64 = 6364136223846793005;
+        rng_state = rng_state.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
         (rng_state >> 56) as u8
     };
+    let mut private_key = [0u8; 32];
     for i in 0..32 {
         private_key[i] = generate_random_byte();
     }
@@ -67,18 +57,20 @@ pub unsafe fn find_vanity_private_key(
     
     // apply ed25519 clamping
     hashed_private_key_bytes[0] &= 248;
-    hashed_private_key_bytes[31] = (hashed_private_key_bytes[31] & 127) | 64;
+    hashed_private_key_bytes[31] &= 127;
+    hashed_private_key_bytes[31] |= 64;
     
     // ed25519 private key -> public key (first 32 bytes only)
     let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
     
     // bs58 encode public key
+    let mut bs58_encoded_public_key = [0u8; 44];
     bs58::encode(&public_key_bytes[0..32]).onto(&mut bs58_encoded_public_key[0..]).unwrap();
     
     // check if public key starts with vanity prefix
     let mut matches = true;
     for i in 0..vanity_prefix_len {
-        if bs58_encoded_public_key[i] != unsafe { SHARED_VANITY_PREFIX[i] } {
+        if bs58_encoded_public_key[i] != unsafe { vanity_prefix[i] } {
             matches = false;
             break;
         }
