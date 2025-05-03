@@ -371,6 +371,30 @@ fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x44;
 }
 
+#[inline(always)]
+fn fiat_25519_selectznz(
+    out1: &mut [u64; 5],
+    arg1: fiat_25519_u1,
+    arg2: &[u64; 5],
+    arg3: &[u64; 5],
+) {
+    let mut x1: u64 = 0;
+    fiat_25519_cmovznz_u64(&mut x1, arg1, (arg2[0]), (arg3[0]));
+    let mut x2: u64 = 0;
+    fiat_25519_cmovznz_u64(&mut x2, arg1, (arg2[1]), (arg3[1]));
+    let mut x3: u64 = 0;
+    fiat_25519_cmovznz_u64(&mut x3, arg1, (arg2[2]), (arg3[2]));
+    let mut x4: u64 = 0;
+    fiat_25519_cmovznz_u64(&mut x4, arg1, (arg2[3]), (arg3[3]));
+    let mut x5: u64 = 0;
+    fiat_25519_cmovznz_u64(&mut x5, arg1, (arg2[4]), (arg3[4]));
+    out1[0] = x1;
+    out1[1] = x2;
+    out1[2] = x3;
+    out1[3] = x4;
+    out1[4] = x5;
+}
+
 #[derive(Clone, Default, Copy)]
 pub struct Fe(pub [u64; 5]);
 
@@ -443,6 +467,14 @@ impl Fe {
     fn square_and_double(&self) -> Fe {
         let h = self.square();
         (h + h)
+    }
+
+    fn maybe_set(&mut self, other: &Fe, do_swap: u8) {
+        let &mut Fe(f) = self;
+        let &Fe(g) = other;
+        let mut t = [0u64; 5];
+        fiat_25519_selectznz(&mut t, do_swap, &f, &g);
+        self.0 = t
     }
 }
 
@@ -575,6 +607,39 @@ impl GeP3 {
     }
 }
 
+impl Add<GeCached> for GeP3 {
+    type Output = GeP1P1;
+
+    fn add(self, _rhs: GeCached) -> GeP1P1 {
+        let y1_plus_x1 = self.y + self.x;
+        let y1_minus_x1 = self.y - self.x;
+        let a = y1_plus_x1 * _rhs.y_plus_x;
+        let b = y1_minus_x1 * _rhs.y_minus_x;
+        let c = _rhs.t2d * self.t;
+        let zz = self.z * _rhs.z;
+        let d = zz + zz;
+        let x3 = a - b;
+        let y3 = a + b;
+        let z3 = d + c;
+        let t3 = d - c;
+
+        GeP1P1 {
+            x: x3,
+            y: y3,
+            z: z3,
+            t: t3,
+        }
+    }
+}
+
+impl Add<GeP3> for GeP3 {
+    type Output = GeP3;
+
+    fn add(self, other: GeP3) -> GeP3 {
+        (self + other.to_cached()).to_p3()
+    }
+}
+
 impl GeP2 {
     fn dbl(&self) -> GeP1P1 {
         let xx = self.x.square();
@@ -596,12 +661,32 @@ impl GeP2 {
     }
 }
 
+impl GeP1P1 {
+    fn to_p3(&self) -> GeP3 {
+        GeP3 {
+            x: self.x * self.t,
+            y: self.y * self.z,
+            z: self.z * self.t,
+            t: self.x * self.y,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct GeCached {
     y_plus_x: Fe,
     y_minus_x: Fe,
     z: Fe,
     t2d: Fe,
+}
+
+impl GeCached {
+    fn maybe_set(&mut self, other: &GeCached, do_swap: u8) {
+        self.y_plus_x.maybe_set(&other.y_plus_x, do_swap);
+        self.y_minus_x.maybe_set(&other.y_minus_x, do_swap);
+        self.z.maybe_set(&other.z, do_swap);
+        self.t2d.maybe_set(&other.t2d, do_swap);
+    }
 }
 
 fn ge_precompute(base: &GeP3) -> [GeCached; 16] {

@@ -317,13 +317,6 @@ impl Hash {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.state = State::new();
-        self.w = [0u8; 128];
-        self.r = 0;
-        self.len = 0;
-    }
-
     /// Absorb content
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         let input = input.as_ref();
@@ -362,13 +355,6 @@ impl Hash {
         let mut out = [0u8; 64];
         self.state.store(&mut out);
         out
-    }
-
-    /// Compute SHA512(`input`)
-    pub fn hash<T: AsRef<[u8]>>(input: T) -> [u8; 64] {
-        let mut h = Hash::new();
-        h.update(input);
-        h.finalize()
     }
 }
 
