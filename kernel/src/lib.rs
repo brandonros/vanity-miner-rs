@@ -7,6 +7,7 @@ mod edwards25519;
 mod precomputed_table;
 
 use bs58;
+use cuda_std::address_space; 
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = crate::sha512::Hash::new();
@@ -22,6 +23,9 @@ fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
     public_key_bytes
 }
 
+#[address_space(shared)]
+static mut SHARED_VANITY_PREFIX: [u8; 32] = [0; 32]; // Adjust size as needed
+
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe fn find_vanity_private_key(
@@ -36,46 +40,49 @@ pub unsafe fn find_vanity_private_key(
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
     // read vanity prefix from host
-    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
+    if cuda_std::thread::index_1d() == 0 {
+        for i in 0..vanity_prefix_len {
+            unsafe { SHARED_VANITY_PREFIX[i] = *vanity_prefix_ptr.add(i) };
+        }
+    }
     cuda_std::thread::sync_threads();
     
     // initialize rng + buffers + hasher + flag
     let thread_idx = cuda_std::thread::index() as usize;
+    let mut rng_state = thread_idx as u64 ^ rng_seed;
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
-    cuda_std::thread::sync_threads();
     
     // generate random input
-    let mut state = thread_idx as u64 ^ rng_seed;
     let mut generate_random_byte = || {
-        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
-        (state >> 56) as u8
+        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (rng_state >> 56) as u8
     };
     for i in 0..32 {
         private_key[i] = generate_random_byte();
     }
-    cuda_std::thread::sync_threads();
     
     // sha512 hash input
     let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
-    cuda_std::thread::sync_threads();
     
     // apply ed25519 clamping
     hashed_private_key_bytes[0] &= 248;
     hashed_private_key_bytes[31] = (hashed_private_key_bytes[31] & 127) | 64;
-    cuda_std::thread::sync_threads();
     
     // ed25519 private key -> public key (first 32 bytes only)
     let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
-    cuda_std::thread::sync_threads();
     
     // bs58 encode public key
     bs58::encode(&public_key_bytes[0..32]).onto(&mut bs58_encoded_public_key[0..]).unwrap();
-    cuda_std::thread::sync_threads();
     
     // check if public key starts with vanity prefix
-    let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
-    cuda_std::thread::sync_threads();
+    let mut matches = true;
+    for i in 0..vanity_prefix_len {
+        if bs58_encoded_public_key[i] != unsafe { SHARED_VANITY_PREFIX[i] } {
+            matches = false;
+            break;
+        }
+    }
     
     // if match, copy results to host
     if matches {
