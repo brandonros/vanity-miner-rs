@@ -42,8 +42,8 @@ pub unsafe fn find_vanity_private_key(
     let mut rng_state = thread_idx as u64 ^ rng_seed;
 
     // generate random input for private key
+    const LCG_MULTIPLIER: u64 = 6364136223846793005;
     let mut generate_random_byte = || {
-        const LCG_MULTIPLIER: u64 = 6364136223846793005;
         rng_state = rng_state.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
         (rng_state >> 56) as u8
     };
