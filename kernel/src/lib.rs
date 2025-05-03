@@ -2,37 +2,15 @@
 
 extern crate alloc;
 
-use curve25519_dalek::{constants, Scalar};
-use sha2::Digest as _;
-use ed25519_compact::ge_scalarmult_base;
 use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
-use rand_xoshiro::Xoroshiro128StarStar;
 use bs58;
-
-// fails
-fn sha512(input: &[u8]) -> [u8; 64] {
-    let mut hasher = sha2::Sha512::new();
-    hasher.update(input);
-    hasher.finalize().into()
-}
 
 // works
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = ed25519_compact::sha512::Hash::new();
     hasher.update(input);
     hasher.finalize()
-}
-
-// fails
-fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
-    let mut input = [0u8; 32];
-    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let scalar = Scalar::from_bytes_mod_order(input);
-    let point = constants::ED25519_BASEPOINT_TABLE * &scalar;
-    let compressed_point = point.compress();
-    let public_key_bytes = compressed_point.to_bytes();
-    public_key_bytes
 }
 
 // works
@@ -57,13 +35,12 @@ pub unsafe fn find_vanity_private_key(
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
     // read vanity prefix from host
-    let vanity_prefix = core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize);
+    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
     cuda_std::thread::sync_threads();
     
     // initialize rng + buffers + hasher + flag
     let idx = cuda_std::thread::index() as usize;
     let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
-    //let mut rng = Xoroshiro128StarStar::seed_from_u64(rng_seed + idx as u64);
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
     cuda_std::thread::sync_threads();
@@ -73,7 +50,7 @@ pub unsafe fn find_vanity_private_key(
     cuda_std::thread::sync_threads();
     
     // sha512 hash input
-    let mut hashed_private_key_bytes = sha512(&private_key[0..32]);
+    let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
     cuda_std::thread::sync_threads();
     
     // apply ed25519 clamping
@@ -96,12 +73,12 @@ pub unsafe fn find_vanity_private_key(
     // if match, copy results to host
     if matches {
         // copy results to host
-        let found_flag_slice = core::slice::from_raw_parts_mut(found_flag_ptr, 1);
-        let found_private_key = core::slice::from_raw_parts_mut(found_private_key_ptr, 32);
-        let found_public_key = core::slice::from_raw_parts_mut(found_public_key_ptr, 32);
-        let found_bs58_encoded_public_key = core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44);
+        let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_ptr, 1) };
+        let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
+        let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
+        let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44) };
         
-        let mut found_flag = &mut found_flag_slice[0];
+        let found_flag = &mut found_flag_slice[0];
         found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
         cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);
         
