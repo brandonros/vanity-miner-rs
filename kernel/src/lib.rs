@@ -3,7 +3,8 @@
 extern crate alloc;
 
 mod sha512;
-mod edwards25519;
+//mod edwards25519;
+mod edwards25519_v2;
 
 use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
@@ -20,7 +21,7 @@ fn sha512_compact(input: &[u8]) -> [u8; 64] {
 fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
     let mut input = [0u8; 32];
     input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let public_key_bytes = crate::edwards25519::ge_scalarmult_base(&input).to_bytes();
+    let public_key_bytes = crate::edwards25519_v2::ge_scalarmult_base(&input).to_bytes();
     public_key_bytes
 }
 

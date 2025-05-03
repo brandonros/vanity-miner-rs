@@ -31,9 +31,6 @@ pub enum Error {
     NonCanonical,
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
-
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -55,9 +52,8 @@ pub type fiat_25519_u1 = u8;
 pub type fiat_25519_i1 = i8;
 pub type fiat_25519_i2 = i8;
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_addcarryx_u51(
+#[inline(always)]
+fn fiat_25519_addcarryx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
     arg1: fiat_25519_u1,
@@ -71,9 +67,8 @@ pub fn fiat_25519_addcarryx_u51(
     *out2 = x3;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_subborrowx_u51(
+#[inline(always)]
+fn fiat_25519_subborrowx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
     arg1: fiat_25519_u1,
@@ -88,9 +83,8 @@ pub fn fiat_25519_subborrowx_u51(
     *out2 = ((0x0_i8.wrapping_sub((x2 as fiat_25519_i2))) as fiat_25519_u1);
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: u64) {
+#[inline(always)]
+fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: u64) {
     let x1: fiat_25519_u1 = (!(!arg1));
     let x2: u64 = (((((0x0_i8.wrapping_sub((x1 as fiat_25519_i2))) as fiat_25519_i1) as i128)
         & 0xffffffffffffffff_i128) as u64);
@@ -98,9 +92,8 @@ pub fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, ar
     *out1 = x3;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[4]).wrapping_mul(0x13)) as u128)));
     let x2: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[3]).wrapping_mul(0x13)) as u128)));
     let x3: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[2]).wrapping_mul(0x13)) as u128)));
@@ -165,9 +158,8 @@ pub fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5
     out1[4] = x44;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = ((arg1[4]).wrapping_mul(0x13));
     let x2: u64 = (x1.wrapping_mul(0x2));
     let x3: u64 = ((arg1[4]).wrapping_mul(0x2));
@@ -225,9 +217,8 @@ pub fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x42;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = (arg1[0]);
     let x2: u64 = ((x1 >> 51).wrapping_add((arg1[1])));
     let x3: u64 = ((x2 >> 51).wrapping_add((arg1[2])));
@@ -247,9 +238,8 @@ pub fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x12;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((arg1[0]).wrapping_add((arg2[0])));
     let x2: u64 = ((arg1[1]).wrapping_add((arg2[1])));
     let x3: u64 = ((arg1[2]).wrapping_add((arg2[2])));
@@ -262,9 +252,8 @@ pub fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((0xfffffffffffdau64.wrapping_add((arg1[0]))).wrapping_sub((arg2[0])));
     let x2: u64 = ((0xffffffffffffeu64.wrapping_add((arg1[1]))).wrapping_sub((arg2[1])));
     let x3: u64 = ((0xffffffffffffeu64.wrapping_add((arg1[2]))).wrapping_sub((arg2[2])));
@@ -277,9 +266,8 @@ pub fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_opp(out1: &mut [u64; 5], arg1: &[u64; 5]) {
+#[inline(always)]
+fn fiat_25519_opp(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = (0xfffffffffffdau64.wrapping_sub((arg1[0])));
     let x2: u64 = (0xffffffffffffeu64.wrapping_sub((arg1[1])));
     let x3: u64 = (0xffffffffffffeu64.wrapping_sub((arg1[2])));
@@ -292,9 +280,8 @@ pub fn fiat_25519_opp(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn fiat_25519_selectznz(
+#[inline(always)]
+fn fiat_25519_selectznz(
     out1: &mut [u64; 5],
     arg1: fiat_25519_u1,
     arg2: &[u64; 5],
@@ -317,7 +304,7 @@ pub fn fiat_25519_selectznz(
     out1[4] = x5;
 }
 
-pub fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
+fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     let mut x1: u64 = 0;
     let mut x2: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x1, &mut x2, 0x0, (arg1[0]), 0x7ffffffffffed);
@@ -466,8 +453,13 @@ impl PartialEq for Fe {
 }
 impl Eq for Fe {}
 
+#[address_space(constant)]
 pub static FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
+
+#[address_space(constant)]
 pub static FE_ONE: Fe = Fe([1, 0, 0, 0, 0]);
+
+#[address_space(constant)]
 pub static FE_SQRTM1: Fe = Fe([
     1718705420411056,
     234908883556509,
@@ -475,6 +467,8 @@ pub static FE_SQRTM1: Fe = Fe([
     2117202627021982,
     765476049583133,
 ]);
+
+#[address_space(constant)]
 pub(crate) static FE_D: Fe = Fe([
     929955233495203,
     466365720129213,
@@ -482,6 +476,8 @@ pub(crate) static FE_D: Fe = Fe([
     2033849074728123,
     1442794654840575,
 ]);
+
+#[address_space(constant)]
 pub(crate) static FE_D2: Fe = Fe([
     1859910466990425,
     932731440258426,
@@ -490,11 +486,7 @@ pub(crate) static FE_D2: Fe = Fe([
     633789495995903,
 ]);
 
-#[cfg(feature = "x25519")]
-pub(crate) static FE_CURVE25519_BASEPOINT: Fe = Fe([9, 0, 0, 0, 0]);
-
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
+#[inline(always)]
 fn load_8u(s: &[u8]) -> u64 {
     (s[0] as u64)
         | ((s[1] as u64) << 8)
@@ -506,27 +498,23 @@ fn load_8u(s: &[u8]) -> u64 {
         | ((s[7] as u64) << 56)
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn load_4u(s: &[u8]) -> u64 {
+#[inline(always)]
+fn load_4u(s: &[u8]) -> u64 {
     (s[0] as u64) | ((s[1] as u64) << 8) | ((s[2] as u64) << 16) | ((s[3] as u64) << 24)
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn load_4i(s: &[u8]) -> i64 {
+#[inline(always)]
+fn load_4i(s: &[u8]) -> i64 {
     load_4u(s) as i64
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn load_3u(s: &[u8]) -> u64 {
+#[inline(always)]
+fn load_3u(s: &[u8]) -> u64 {
     (s[0] as u64) | ((s[1] as u64) << 8) | ((s[2] as u64) << 16)
 }
 
-#[cfg_attr(feature = "opt_size", inline(never))]
-#[cfg_attr(not(feature = "opt_size"), inline)]
-pub fn load_3i(s: &[u8]) -> i64 {
+#[inline(always)]
+fn load_3i(s: &[u8]) -> i64 {
     load_3u(s) as i64
 }
 
@@ -567,7 +555,7 @@ impl Mul for Fe {
 }
 
 impl Fe {
-    pub fn from_bytes(s: &[u8]) -> Fe {
+    fn from_bytes(s: &[u8]) -> Fe {
         if s.len() != 32 {
             panic!("Invalid compressed length")
         }
@@ -581,20 +569,20 @@ impl Fe {
         h
     }
 
-    pub fn to_bytes(&self) -> [u8; 32] {
+    fn to_bytes(&self) -> [u8; 32] {
         let &Fe(es) = &self.carry();
         let mut s_ = [0u8; 32];
         fiat_25519_to_bytes(&mut s_, &es);
         s_
     }
 
-    pub fn carry(&self) -> Fe {
+    fn carry(&self) -> Fe {
         let mut h = Fe::default();
         fiat_25519_carry(&mut h.0, &self.0);
         h
     }
 
-    pub fn maybe_set(&mut self, other: &Fe, do_swap: u8) {
+    fn maybe_set(&mut self, other: &Fe, do_swap: u8) {
         let &mut Fe(f) = self;
         let &Fe(g) = other;
         let mut t = [0u64; 5];
@@ -602,19 +590,19 @@ impl Fe {
         self.0 = t
     }
 
-    pub fn square(&self) -> Fe {
+    fn square(&self) -> Fe {
         let &Fe(f) = &self;
         let mut h = Fe::default();
         fiat_25519_carry_square(&mut h.0, f);
         h
     }
 
-    pub fn square_and_double(&self) -> Fe {
+    fn square_and_double(&self) -> Fe {
         let h = self.square();
         (h + h)
     }
 
-    pub fn invert(&self) -> Fe {
+    fn invert(&self) -> Fe {
         let z1 = *self;
         let z2 = z1.square();
         let z8 = z2.square().square();
@@ -641,22 +629,22 @@ impl Fe {
         z_255_21
     }
 
-    pub fn is_zero(&self) -> bool {
+    fn is_zero(&self) -> bool {
         self.to_bytes().iter().fold(0, |acc, x| acc | x) == 0
     }
 
-    pub fn is_negative(&self) -> bool {
+    fn is_negative(&self) -> bool {
         (self.to_bytes()[0] & 1) != 0
     }
 
-    pub fn neg(&self) -> Fe {
+    fn neg(&self) -> Fe {
         let &Fe(f) = &self;
         let mut h = Fe::default();
         fiat_25519_opp(&mut h.0, f);
         h
     }
 
-    pub fn pow25523(&self) -> Fe {
+    fn pow25523(&self) -> Fe {
         let z2 = self.square();
         let z8 = (0..2).fold(z2, |x, _| x.square());
         let z9 = *self * z8;
@@ -683,43 +671,7 @@ impl Fe {
         z_252_3
     }
 
-    #[cfg(feature = "x25519")]
-    #[inline]
-    pub fn cswap2(a0: &mut Fe, b0: &mut Fe, a1: &mut Fe, b1: &mut Fe, c: u8) {
-        let mask: u64 = 0u64.wrapping_sub(c as _);
-        let mut x0 = *a0;
-        let mut x1 = *a1;
-        for i in 0..5 {
-            x0.0[i] ^= b0.0[i];
-            x1.0[i] ^= b1.0[i];
-        }
-        for i in 0..5 {
-            x0.0[i] &= mask;
-            x1.0[i] &= mask;
-        }
-        for i in 0..5 {
-            a0.0[i] ^= x0.0[i];
-            b0.0[i] ^= x0.0[i];
-            a1.0[i] ^= x1.0[i];
-            b1.0[i] ^= x1.0[i];
-        }
-    }
-
-    #[cfg(feature = "x25519")]
-    #[inline]
-    pub fn mul32(&self, n: u32) -> Fe {
-        let sn = n as u128;
-        let mut fe = Fe::default();
-        let mut x: u128 = 8;
-        for i in 0..5 {
-            x = self.0[i] as u128 * sn + (x >> 51);
-            fe.0[i] = (x as u64) & 0x7ffffffffffff;
-        }
-        fe.0[0] += (x >> 51) as u64 * 19;
-        fe
-    }
-
-    pub fn reject_noncanonical(s: &[u8]) -> Result<(), Error> {
+    fn reject_noncanonical(s: &[u8]) -> Result<(), Error> {
         if s.len() != 32 {
             panic!("Invalid compressed length")
         }
@@ -779,7 +731,7 @@ pub struct GeCached {
 }
 
 impl GeCached {
-    pub fn maybe_set(&mut self, other: &GeCached, do_swap: u8) {
+    fn maybe_set(&mut self, other: &GeCached, do_swap: u8) {
         self.y_plus_x.maybe_set(&other.y_plus_x, do_swap);
         self.y_minus_x.maybe_set(&other.y_minus_x, do_swap);
         self.z.maybe_set(&other.z, do_swap);
@@ -878,7 +830,7 @@ impl GeP2 {
     }
 
     #[allow(clippy::comparison_chain)]
-    pub fn double_scalarmult_vartime(a_scalar: &[u8], a_point: GeP3, b_scalar: &[u8]) -> GeP2 {
+    fn double_scalarmult_vartime(a_scalar: &[u8], a_point: GeP3, b_scalar: &[u8]) -> GeP2 {
         let aslide = GeP2::slide(a_scalar);
         let bslide = GeP2::slide(b_scalar);
 
@@ -936,7 +888,7 @@ impl GeP2 {
 }
 
 impl GeP3 {
-    pub fn from_bytes_negate_vartime(s: &[u8; 32]) -> Option<GeP3> {
+    fn from_bytes_negate_vartime(s: &[u8; 32]) -> Option<GeP3> {
         let y = Fe::from_bytes(s);
         let z = FE_ONE;
         let y_squared = y.square();
@@ -963,7 +915,7 @@ impl GeP3 {
         Some(GeP3 { x, y, z, t })
     }
 
-    pub fn from_bytes_vartime(s: &[u8; 32]) -> Option<GeP3> {
+    fn from_bytes_vartime(s: &[u8; 32]) -> Option<GeP3> {
         Self::from_bytes_negate_vartime(s).map(|p| GeP3 {
             x: p.x.neg(),
             y: p.y,
@@ -1011,7 +963,7 @@ impl GeP3 {
         bs
     }
 
-    pub fn has_small_order(&self) -> bool {
+    fn has_small_order(&self) -> bool {
         let recip = self.z.invert();
         let x = self.x * recip;
         let y = self.y * recip;
@@ -1153,7 +1105,7 @@ fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
     pc_cached
 }
 
-pub fn ge_scalarmult(scalar: &[u8], base: &GeP3) -> GeP3 {
+fn ge_scalarmult(scalar: &[u8], base: &GeP3) -> GeP3 {
     let pc = ge_precompute(base);
     let mut q = GeP3::zero();
     let mut pos = 252;
@@ -1179,6 +1131,7 @@ static BXP: [u8; 32] = [
     0x69, 0x5c, 0xdc, 0xd6, 0xfd, 0x31, 0xe2, 0xa4, 0xc0, 0xfe, 0x53, 0x6e, 0xcd, 0xd3, 0x36,
     0x69, 0x21,
 ];
+
 #[address_space(constant)]
 static BYP: [u8; 32] = [
     0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
@@ -1198,22 +1151,14 @@ pub fn ge_scalarmult_base(scalar: &[u8]) -> GeP3 {
     ge_scalarmult(scalar, &base)
 }
 
-#[cfg(feature = "x25519")]
-pub fn ge_to_x25519_vartime(s: &[u8; 32]) -> Option<[u8; 32]> {
-    let p = GeP3::from_bytes_vartime(s)?;
-    let yed = p.y;
-    let x_mont = (FE_ONE + yed) * ((FE_ONE - yed).invert());
-    Some(x_mont.to_bytes())
-}
-
-pub fn sc_reduce32(s: &mut [u8; 32]) {
+fn sc_reduce32(s: &mut [u8; 32]) {
     let mut t = [0u8; 64];
     t[0..32].copy_from_slice(s);
     sc_reduce(&mut t);
     s.copy_from_slice(&t[0..32]);
 }
 
-pub fn sc_reduce(s: &mut [u8]) {
+fn sc_reduce(s: &mut [u8]) {
     let mut s0: i64 = 2097151 & load_3i(s);
     let mut s1: i64 = 2097151 & (load_4i(&s[2..6]) >> 5);
     let mut s2: i64 = 2097151 & (load_3i(&s[5..8]) >> 2);
@@ -1517,74 +1462,7 @@ pub fn sc_reduce(s: &mut [u8]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-#[cfg(feature = "blind-keys")]
-pub fn sc_mul(a: &[u8], b: &[u8]) -> [u8; 32] {
-    let mut s = [0u8; 32];
-    sc_muladd(&mut s, a, b, &[0; 32]);
-    s
-}
-
-#[cfg(feature = "blind-keys")]
-pub fn sc_sq(s: &[u8]) -> [u8; 32] {
-    sc_mul(s, s)
-}
-
-#[cfg(feature = "blind-keys")]
-pub fn sc_sqmul(s: &[u8], n: usize, a: &[u8]) -> [u8; 32] {
-    let mut t = [0u8; 32];
-    t.copy_from_slice(s);
-    for _ in 0..n {
-        t = sc_sq(&t);
-    }
-    sc_mul(&t, a)
-}
-
-#[cfg(feature = "blind-keys")]
-pub fn sc_invert(s: &[u8; 32]) -> [u8; 32] {
-    let _10 = sc_sq(s);
-    let _11 = sc_mul(s, &_10);
-    let _100 = sc_mul(s, &_11);
-    let _1000 = sc_sq(&_100);
-    let _1010 = sc_mul(&_10, &_1000);
-    let _1011 = sc_mul(s, &_1010);
-    let _10000 = sc_sq(&_1000);
-    let _10110 = sc_sq(&_1011);
-    let _100000 = sc_mul(&_1010, &_10110);
-    let _100110 = sc_mul(&_10000, &_10110);
-    let _1000000 = sc_sq(&_100000);
-    let _1010000 = sc_mul(&_10000, &_1000000);
-    let _1010011 = sc_mul(&_11, &_1010000);
-    let _1100011 = sc_mul(&_10000, &_1010011);
-    let _1100111 = sc_mul(&_100, &_1100011);
-    let _1101011 = sc_mul(&_100, &_1100111);
-    let _10010011 = sc_mul(&_1000000, &_1010011);
-    let _10010111 = sc_mul(&_100, &_10010011);
-    let _10111101 = sc_mul(&_100110, &_10010111);
-    let _11010011 = sc_mul(&_10110, &_10111101);
-    let _11100111 = sc_mul(&_1010000, &_10010111);
-    let _11101011 = sc_mul(&_100, &_11100111);
-    let _11110101 = sc_mul(&_1010, &_11101011);
-
-    let mut recip = sc_mul(&_1011, &_11110101);
-    recip = sc_sqmul(&recip, 126, &_1010011);
-    recip = sc_sqmul(&recip, 9, &_10);
-    recip = sc_mul(&recip, &_11110101);
-    recip = sc_sqmul(&recip, 7, &_1100111);
-    recip = sc_sqmul(&recip, 9, &_11110101);
-    recip = sc_sqmul(&recip, 11, &_10111101);
-    recip = sc_sqmul(&recip, 8, &_11100111);
-    recip = sc_sqmul(&recip, 9, &_1101011);
-    recip = sc_sqmul(&recip, 6, &_1011);
-    recip = sc_sqmul(&recip, 14, &_10010011);
-    recip = sc_sqmul(&recip, 10, &_1100011);
-    recip = sc_sqmul(&recip, 9, &_10010111);
-    recip = sc_sqmul(&recip, 10, &_11110101);
-    recip = sc_sqmul(&recip, 8, &_11010011);
-    recip = sc_sqmul(&recip, 8, &_11101011);
-    recip
-}
-
-pub fn sc_muladd(s: &mut [u8], a: &[u8], b: &[u8], c: &[u8]) {
+fn sc_muladd(s: &mut [u8], a: &[u8], b: &[u8], c: &[u8]) {
     let a0 = 2097151 & load_3i(&a[0..3]);
     let a1 = 2097151 & (load_4i(&a[2..6]) >> 5);
     let a2 = 2097151 & (load_3i(&a[5..8]) >> 2);
@@ -2060,7 +1938,7 @@ pub fn sc_muladd(s: &mut [u8], a: &[u8], b: &[u8], c: &[u8]) {
     s[31] = (s11 >> 17) as u8;
 }
 
-pub fn sc_reject_noncanonical(s: &[u8]) -> Result<(), Error> {
+fn sc_reject_noncanonical(s: &[u8]) -> Result<(), Error> {
     static L: [u8; 32] = [
         0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde,
         0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -2088,7 +1966,7 @@ pub fn sc_reject_noncanonical(s: &[u8]) -> Result<(), Error> {
     }
 }
 
-pub fn is_identity(s: &[u8; 32]) -> bool {
+fn is_identity(s: &[u8; 32]) -> bool {
     let mut c = s[0] ^ 0x01;
     for i in 1..31 {
         c |= s[i];
@@ -2097,6 +1975,7 @@ pub fn is_identity(s: &[u8; 32]) -> bool {
     c == 0
 }
 
+#[address_space(constant)]
 static BI: [GePrecomp; 8] = [
     GePrecomp {
         y_plus_x: Fe([
