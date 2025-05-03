@@ -707,14 +707,27 @@ fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
     pc_cached
 }
 
-fn ge_scalarmult(scalar: &[u8], pc: &[GeCached; 16]) -> GeP3 {
+pub fn calculate_precompute() -> [GeCached; 16] {
+    let bx = Fe::from_bytes(&BXP);
+    let by = Fe::from_bytes(&BYP);
+    let base = GeP3 {
+        x: bx,
+        y: by,
+        z: FE_ONE,
+        t: bx * by,
+    };
+    let precomputed = ge_precompute(&base);
+    precomputed
+}
+
+pub fn ge_scalarmult(scalar: &[u8], precomputed: &[GeCached; 16]) -> GeP3 {
     let mut q = GeP3::zero();
     let mut pos = 252;
     loop {
         let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
-        let mut t = pc[0];
+        let mut t = precomputed[0];
         for i in 1..16 {
-            t.maybe_set(&pc[i], (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1);
+            t.maybe_set(&precomputed[i], (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1);
         }
         q = q.add(t).to_p3();
         if pos == 0 {
@@ -724,17 +737,4 @@ fn ge_scalarmult(scalar: &[u8], pc: &[GeCached; 16]) -> GeP3 {
         pos -= 4;
     }
     q
-}
-
-pub fn ge_scalarmult_base(scalar: &[u8]) -> GeP3 {
-    let bx = Fe::from_bytes(&BXP);
-    let by = Fe::from_bytes(&BYP);
-    let base = GeP3 {
-        x: bx,
-        y: by,
-        z: FE_ONE,
-        t: bx * by,
-    };
-    let pc = ge_precompute(&base);
-    ge_scalarmult(scalar, &pc)
 }
