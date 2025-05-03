@@ -6,8 +6,6 @@ mod sha512;
 mod edwards25519;
 mod precomputed_table;
 
-use rand_core::{SeedableRng, RngCore};
-use rand_xorshift::XorShiftRng;
 use bs58;
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
@@ -42,14 +40,20 @@ pub unsafe fn find_vanity_private_key(
     cuda_std::thread::sync_threads();
     
     // initialize rng + buffers + hasher + flag
-    let idx = cuda_std::thread::index() as usize;
-    let mut rng = XorShiftRng::seed_from_u64(rng_seed + idx as u64);
+    let thread_idx = cuda_std::thread::index() as usize;
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
     cuda_std::thread::sync_threads();
     
     // generate random input
-    rng.fill_bytes(&mut private_key[0..32]);
+    let mut state = thread_idx as u64 ^ rng_seed;
+    let mut generate_random_byte = || {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        (state >> 56) as u8
+    };
+    for i in 0..32 {
+        private_key[i] = generate_random_byte();
+    }
     cuda_std::thread::sync_threads();
     
     // sha512 hash input
