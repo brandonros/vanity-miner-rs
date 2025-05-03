@@ -707,8 +707,7 @@ fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
     pc_cached
 }
 
-fn ge_scalarmult(scalar: &[u8], base: &GeP3) -> GeP3 {
-    let pc = ge_precompute(base);
+fn ge_scalarmult(scalar: &[u8], pc: &[GeCached; 16]) -> GeP3 {
     let mut q = GeP3::zero();
     let mut pos = 252;
     loop {
@@ -736,5 +735,6 @@ pub fn ge_scalarmult_base(scalar: &[u8]) -> GeP3 {
         z: FE_ONE,
         t: bx * by,
     };
-    ge_scalarmult(scalar, &base)
+    let pc = ge_precompute(&base);
+    ge_scalarmult(scalar, &pc)
 }
