@@ -2,13 +2,15 @@
 
 extern crate alloc;
 
+mod sha512;
+
 use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
 use bs58;
 
 // works
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
-    let mut hasher = ed25519_compact::sha512::Hash::new();
+    let mut hasher = crate::sha512::Hash::new();
     hasher.update(input);
     hasher.finalize()
 }
