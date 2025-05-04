@@ -7,6 +7,7 @@ pub type fiat_25519_u1 = u8;
 pub type fiat_25519_i1 = i8;
 pub type fiat_25519_i2 = i8;
 
+#[cfg(target_endian = "little")]
 macro_rules! load_8u {
     ($s:expr, $offset:expr) => {
         ($s[$offset] as u64)
@@ -18,6 +19,31 @@ macro_rules! load_8u {
             | (($s[$offset + 6] as u64) << 48)
             | (($s[$offset + 7] as u64) << 56)
     };
+}
+
+#[cfg(target_endian = "big")]
+macro_rules! load_8u {
+    ($s:expr, $offset:expr) => {
+        ($s[$offset + 7] as u64)
+            | (($s[$offset + 6] as u64) << 8)
+            | (($s[$offset + 5] as u64) << 16)
+            | (($s[$offset + 4] as u64) << 24)
+            | (($s[$offset + 3] as u64) << 32)
+            | (($s[$offset + 2] as u64) << 40)
+            | (($s[$offset + 1] as u64) << 48)
+            | (($s[$offset] as u64) << 56)
+    };
+}
+
+fn load_8u(s: &[u8]) -> u64 {
+    (s[0] as u64)
+        | ((s[1] as u64) << 8)
+        | ((s[2] as u64) << 16)
+        | ((s[3] as u64) << 24)
+        | ((s[4] as u64) << 32)
+        | ((s[5] as u64) << 40)
+        | ((s[6] as u64) << 48)
+        | ((s[7] as u64) << 56)
 }
 
 #[inline(always)]
@@ -399,7 +425,21 @@ fn fiat_25519_selectznz(
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
-    const fn from_bytes_const(s: &[u8; 32]) -> Fe {
+    pub fn from_bytes(s: &[u8]) -> Fe {
+        if s.len() != 32 {
+            panic!("Invalid compressed length")
+        }
+        let mut h = Fe::default();
+        let mask = 0x7ffffffffffff;
+        h.0[0] = load_8u(&s[0..]) & mask;
+        h.0[1] = (load_8u(&s[6..]) >> 3) & mask;
+        h.0[2] = (load_8u(&s[12..]) >> 6) & mask;
+        h.0[3] = (load_8u(&s[19..]) >> 1) & mask;
+        h.0[4] = (load_8u(&s[24..]) >> 12) & mask;
+        h
+    }
+
+    pub const fn from_bytes_const(s: &[u8; 32]) -> Fe {
         let mut h = [0u64; 5];
         let mask = 0x7ffffffffffff;
         
@@ -418,7 +458,7 @@ impl Fe {
         h
     }
 
-    fn to_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(&self) -> [u8; 32] {
         let &Fe(es) = &self.carry();
         let mut s_ = [0u8; 32];
         fiat_25519_to_bytes(&mut s_, &es);
@@ -529,7 +569,7 @@ const FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
 
 const FE_ONE: Fe = Fe([1, 0, 0, 0, 0]);
 
-pub(crate) const FE_D2: Fe = Fe([
+const FE_D2: Fe = Fe([
     1859910466990425,
     932731440258426,
     1072319116312658,
@@ -668,10 +708,10 @@ impl GeP1P1 {
 
 #[derive(Clone, Copy, Default)]
 pub struct GeCached {
-    y_plus_x: Fe,
-    y_minus_x: Fe,
-    z: Fe,
-    t2d: Fe,
+    pub y_plus_x: Fe,
+    pub y_minus_x: Fe,
+    pub z: Fe,
+    pub t2d: Fe,
 }
 
 impl GeCached {
@@ -732,7 +772,39 @@ pub fn calculate_precompute() -> [GeCached; 16] {
     precomputed
 }
 
-pub fn ge_scalarmult(scalar: &[u8], precomputed: &[GeCached; 16]) -> GeP3 {
+pub fn ge_scalarmult_base(scalar: &[u8]) -> GeP3 {
+    let bx = Fe::from_bytes(&BXP);
+    let by = Fe::from_bytes(&BYP);
+    let base = GeP3 {
+        x: bx,
+        y: by,
+        z: FE_ONE,
+        t: bx * by,
+    };
+    ge_scalarmult(scalar, &base)
+}
+
+pub fn ge_scalarmult(scalar: &[u8], base: &GeP3) -> GeP3 {
+    let pc = ge_precompute(base);
+    let mut q = GeP3::zero();
+    let mut pos = 252;
+    loop {
+        let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
+        let mut t = pc[0];
+        for i in 1..16 {
+            t.maybe_set(&pc[i], (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1);
+        }
+        q = q.add(t).to_p3();
+        if pos == 0 {
+            break;
+        }
+        q = q.dbl().to_p3().dbl().to_p3().dbl().to_p3().dbl().to_p3();
+        pos -= 4;
+    }
+    q
+}
+
+pub fn ge_scalarmult_precomputed(scalar: &[u8], precomputed: &[GeCached; 16]) -> GeP3 {
     let mut q = GeP3::zero();
     let mut pos = 252;
     loop {
