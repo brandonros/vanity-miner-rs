@@ -37,10 +37,7 @@ pub unsafe fn find_vanity_private_key(
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
 ) {
-    // read vanity prefix from host
-    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
-
-    // generate random input for private key
+    // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
     let mut rng_state = thread_idx as u64 ^ rng_seed;
     let mut generate_random_bytes = || {
@@ -77,7 +74,10 @@ pub unsafe fn find_vanity_private_key(
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
     let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
-    
+
+    // read vanity prefix from host
+    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
+
     // check if public key starts with vanity prefix
     let mut matches = true;
     for i in 0..vanity_prefix_len {
