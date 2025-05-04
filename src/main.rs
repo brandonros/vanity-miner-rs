@@ -49,17 +49,19 @@ fn device_main(
         total_operations += operations_per_launch;
         let rng_seed: u64 = rng.r#gen::<u64>();
         
-        let mut found_flag = [0.0f32; 1];
+        let mut found_flag_slice = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
         let mut found_bs58_encoded_public_key = [0u8; 64];
+        let mut found_thread_idx_slice = [0u32; 1];
         
         let vanity_prefix_dev = vanity_prefix_bytes.as_dbuf()?;
-        let found_flag_dev = found_flag.as_dbuf()?;
+        let found_flag_slice_dev = found_flag_slice.as_dbuf()?;
         let found_private_key_dev = found_private_key.as_dbuf()?;
         let found_public_key_dev = found_public_key.as_dbuf()?;
         let found_bs58_encoded_public_key_dev = found_bs58_encoded_public_key.as_dbuf()?;    
-        
+        let found_thread_idx_slice_dev = found_thread_idx_slice.as_dbuf()?;
+
         // Launch the kernel
         unsafe {
             launch!(
@@ -68,10 +70,11 @@ fn device_main(
                     vanity_prefix_dev.as_device_ptr(),
                     vanity_prefix_len,
                     rng_seed,
-                    found_flag_dev.as_device_ptr(),
+                    found_flag_slice_dev.as_device_ptr(),
                     found_private_key_dev.as_device_ptr(),
                     found_public_key_dev.as_device_ptr(),
                     found_bs58_encoded_public_key_dev.as_device_ptr(),
+                    found_thread_idx_slice_dev.as_device_ptr(),
                 )
             )?;
         }
@@ -79,21 +82,23 @@ fn device_main(
         stream.synchronize()?;
 
         // Check if we found a match
-        found_flag_dev.copy_to(&mut found_flag)?;
+        found_flag_slice_dev.copy_to(&mut found_flag_slice)?;
         
-        if found_flag[0] != 0.0 {
+        if found_flag_slice[0] != 0.0 {
             // We found a match! Copy results back to host
             found_private_key_dev.copy_to(&mut found_private_key)?;
             found_public_key_dev.copy_to(&mut found_public_key)?;
             found_bs58_encoded_public_key_dev.copy_to(&mut found_bs58_encoded_public_key)?;
+            found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
 
             // print
+            let found_thread_idx = found_thread_idx_slice[0];
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
             let public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
-            println!("[{ordinal}] Found match: {public_key_string} {wallet_formatted_result}");
+            println!("[{ordinal}] Found match: {rng_seed} {found_thread_idx} {public_key_string} {wallet_formatted_result}");
 
             // increment stats
-            matches_found += found_flag[0] as usize;
+            matches_found += found_flag_slice[0] as usize;
             let elapsed = start_time.elapsed();
             let elapsed_seconds = elapsed.as_secs_f64();
             let launches_per_second = launches as f64 / elapsed_seconds;

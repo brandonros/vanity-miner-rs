@@ -28,8 +28,7 @@ fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     public_key_bytes
 }
 
-fn rng_generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
-    // Xoroshiro128StarStar
+fn xorshiro_generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
     // Initialize state with thread_idx and seed
     let mut s0 = thread_idx as u64 ^ rng_seed;
     let mut s1 = s0.wrapping_add(0x9E3779B97F4A7C15); // Use golden ratio for second part of state
@@ -75,14 +74,15 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_len: usize, 
     rng_seed: u64,
     // output
-    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_flag_slice_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
+    found_thread_idx_slice_ptr: *mut u32,
 ) {
     // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
-    let private_key = rng_generate_random_private_key(thread_idx, rng_seed);
+    let private_key = xorshiro_generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
     let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
@@ -111,11 +111,11 @@ pub unsafe fn find_vanity_private_key(
     
     // if match, copy found match to host
     if matches {
-        let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_ptr, 1) };
+        let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_slice_ptr, 1) };
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
         let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 64) };
-        
+        let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
         let found_flag = &mut found_flag_slice[0];
         found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
         cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);
@@ -124,6 +124,7 @@ pub unsafe fn find_vanity_private_key(
         found_private_key.copy_from_slice(&private_key[0..32]);
         found_public_key.copy_from_slice(&public_key_bytes[0..32]);
         found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
+        found_thread_idx_slice[0] = thread_idx as u32;
     }
 
     // sync threads
