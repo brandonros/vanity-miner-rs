@@ -7,6 +7,8 @@ mod ed25519;
 mod ed25519_precomputed_table;
 mod base58;
 
+const LCG_MULTIPLIER: u64 = 6364136223846793005;
+
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = crate::sha512::Hash::new();
     hasher.update(input);
@@ -15,7 +17,8 @@ fn sha512_compact(input: &[u8]) -> [u8; 64] {
 
 fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
     use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
-    let public_key_bytes = crate::ed25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE).to_bytes();
+    let public_key_point = crate::ed25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE);
+    let public_key_bytes = public_key_point.to_bytes();
     public_key_bytes
 }
 
@@ -34,20 +37,28 @@ pub unsafe fn find_vanity_private_key(
 ) {
     // read vanity prefix from host
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
-    
-    // initialize rng
-    let thread_idx = cuda_std::thread::index() as usize;
-    let mut rng_state = thread_idx as u64 ^ rng_seed;
 
     // generate random input for private key
-    const LCG_MULTIPLIER: u64 = 6364136223846793005;
-    let mut generate_random_byte = || {
+    let thread_idx = cuda_std::thread::index() as usize;
+    let mut rng_state = thread_idx as u64 ^ rng_seed;
+    let mut generate_random_bytes = || {
         rng_state = rng_state.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
-        (rng_state >> 56) as u8
+        [
+            (rng_state >> 56) as u8,
+            (rng_state >> 48) as u8,
+            (rng_state >> 40) as u8,
+            (rng_state >> 32) as u8,
+            (rng_state >> 24) as u8,
+            (rng_state >> 16) as u8,
+            (rng_state >> 8) as u8,
+            rng_state as u8
+        ]
     };
     let mut private_key = [0u8; 32];
-    for i in 0..32 {
-        private_key[i] = generate_random_byte();
+    for i in (0..32).step_by(8) {
+        let bytes = generate_random_bytes();
+        let end = core::cmp::min(i + 8, 32);
+        private_key[i..end].copy_from_slice(&bytes[0..(end - i)]);
     }
     
     // sha512 hash input
