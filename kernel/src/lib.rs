@@ -28,28 +28,42 @@ fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     public_key_bytes
 }
 
-fn lcg_generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
-    const LCG_MULTIPLIER: u64 = 6364136223846793005;
-    let mut rng_state = thread_idx as u64 ^ rng_seed;
-    let mut generate_random_bytes = || {
-        rng_state = rng_state.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
-        [
-            (rng_state >> 56) as u8,
-            (rng_state >> 48) as u8,
-            (rng_state >> 40) as u8,
-            (rng_state >> 32) as u8,
-            (rng_state >> 24) as u8,
-            (rng_state >> 16) as u8,
-            (rng_state >> 8) as u8,
-            rng_state as u8
-        ]
-    };
+fn rng_generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
+    // Xoroshiro128StarStar
+    // Initialize state with thread_idx and seed
+    let mut s0 = thread_idx as u64 ^ rng_seed;
+    let mut s1 = s0.wrapping_add(0x9E3779B97F4A7C15); // Use golden ratio for second part of state
+    
+    if s0 == 0 && s1 == 0 {
+        s0 = 1; // Avoid all-zero state
+    }
+    
     let mut private_key = [0u8; 32];
+    
     for i in (0..32).step_by(8) {
-        let bytes = generate_random_bytes();
+        // Xoroshiro128** algorithm
+        let result = s0.wrapping_mul(5).rotate_left(7).wrapping_mul(9);
+        
+        let bytes = [
+            (result >> 56) as u8,
+            (result >> 48) as u8,
+            (result >> 40) as u8,
+            (result >> 32) as u8,
+            (result >> 24) as u8,
+            (result >> 16) as u8,
+            (result >> 8) as u8,
+            result as u8
+        ];
+        
+        // State update
+        let s1_new = s1 ^ s0;
+        s0 = s0.rotate_left(24) ^ s1_new ^ (s1_new << 16);
+        s1 = s1_new.rotate_left(37);
+        
         let end = core::cmp::min(i + 8, 32);
         private_key[i..end].copy_from_slice(&bytes[0..(end - i)]);
     }
+    
     private_key
 }
 
@@ -68,7 +82,7 @@ pub unsafe fn find_vanity_private_key(
 ) {
     // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
-    let private_key = lcg_generate_random_private_key(thread_idx, rng_seed);
+    let private_key = rng_generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
     let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
