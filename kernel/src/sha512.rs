@@ -300,16 +300,16 @@ impl State {
 }
 
 #[derive(Copy, Clone)]
-pub struct Hash {
+pub struct Hasher {
     state: State,
     w: [u8; 128],
     r: usize,
     len: usize,
 }
 
-impl Hash {
-    pub fn new() -> Hash {
-        Hash {
+impl Hasher {
+    pub fn new() -> Hasher {
+        Hasher {
             state: State::new(),
             r: 0,
             w: [0u8; 128],
@@ -358,7 +358,7 @@ impl Hash {
     }
 }
 
-impl Default for Hash {
+impl Default for Hasher {
     fn default() -> Self {
         Self::new()
     }

@@ -10,14 +10,16 @@ mod base58;
 const LCG_MULTIPLIER: u64 = 6364136223846793005;
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
-    let mut hasher = crate::sha512::Hash::new();
+    use crate::sha512::Hasher;
+    let mut hasher = Hasher::new();
     hasher.update(input);
     hasher.finalize()
 }
 
 fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
     use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
-    let public_key_point = crate::ed25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE);
+    use crate::ed25519::ge_scalarmult;
+    let public_key_point = ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE);
     let public_key_bytes = public_key_point.to_bytes();
     public_key_bytes
 }
