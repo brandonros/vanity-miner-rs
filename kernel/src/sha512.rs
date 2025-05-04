@@ -205,23 +205,27 @@ impl W {
     #[inline(always)]
     fn F(&mut self, state: &mut State, i: usize, k: u64) {
         let t = &mut state.0;
-        t[(16 - i + 7) & 7] = t[(16 - i + 7) & 7]
-            .wrapping_add(Self::Sigma1(t[(16 - i + 4) & 7]))
-            .wrapping_add(Self::Ch(
-                t[(16 - i + 4) & 7],
-                t[(16 - i + 5) & 7],
-                t[(16 - i + 6) & 7],
-            ))
+        
+        // Pre-calculate all indices to improve readability
+        let idx_7 = (16 - i + 7) & 7;
+        let idx_6 = (16 - i + 6) & 7;
+        let idx_5 = (16 - i + 5) & 7;
+        let idx_4 = (16 - i + 4) & 7;
+        let idx_3 = (16 - i + 3) & 7;
+        let idx_2 = (16 - i + 2) & 7;
+        let idx_1 = (16 - i + 1) & 7;
+        let idx_0 = (16 - i + 0) & 7;
+        
+        // Update using pre-calculated indices
+        t[idx_7] = t[idx_7]
+            .wrapping_add(Self::Sigma1(t[idx_4]))
+            .wrapping_add(Self::Ch(t[idx_4], t[idx_5], t[idx_6]))
             .wrapping_add(k)
             .wrapping_add(self.0[i]);
-        t[(16 - i + 3) & 7] = t[(16 - i + 3) & 7].wrapping_add(t[(16 - i + 7) & 7]);
-        t[(16 - i + 7) & 7] = t[(16 - i + 7) & 7]
-            .wrapping_add(Self::Sigma0(t[(16 - i + 0) & 7]))
-            .wrapping_add(Self::Maj(
-                t[(16 - i + 0) & 7],
-                t[(16 - i + 1) & 7],
-                t[(16 - i + 2) & 7],
-            ));
+        t[idx_3] = t[idx_3].wrapping_add(t[idx_7]);
+        t[idx_7] = t[idx_7]
+            .wrapping_add(Self::Sigma0(t[idx_0]))
+            .wrapping_add(Self::Maj(t[idx_0], t[idx_1], t[idx_2]));
     }
 
     fn G(&mut self, state: &mut State, s: usize) {
