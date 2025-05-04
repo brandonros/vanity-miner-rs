@@ -87,9 +87,8 @@ pub unsafe fn find_vanity_private_key(
         }
     }
     
-    // if match, copy results to host
+    // if match, copy found match to host
     if matches {
-        // copy results to host
         let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_ptr, 1) };
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
@@ -104,5 +103,7 @@ pub unsafe fn find_vanity_private_key(
         found_public_key.copy_from_slice(&public_key_bytes[0..32]);
         found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
     }
+
+    // sync threads
     cuda_std::thread::sync_threads();
 }
