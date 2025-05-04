@@ -3,11 +3,9 @@
 extern crate alloc;
 
 mod sha512;
-mod edwards25519;
-mod precomputed_table;
-
-use bs58;
-use cuda_std::address_space; 
+mod ed25519;
+mod ed25519_precomputed_table;
+mod base58;
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = crate::sha512::Hash::new();
@@ -16,8 +14,8 @@ fn sha512_compact(input: &[u8]) -> [u8; 64] {
 }
 
 fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
-    use crate::precomputed_table::PRECOMPUTED_TABLE;
-    let public_key_bytes = crate::edwards25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE).to_bytes();
+    use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
+    let public_key_bytes = crate::ed25519::ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE).to_bytes();
     public_key_bytes
 }
 
@@ -65,7 +63,8 @@ pub unsafe fn find_vanity_private_key(
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 44];
-    bs58::encode(&public_key_bytes[0..32]).onto(&mut bs58_encoded_public_key[0..]).unwrap();
+    let encoded_public_key_len = base58::encode(&public_key_bytes, &mut bs58_encoded_public_key);
+    let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_public_key_len];
     
     // check if public key starts with vanity prefix
     let mut matches = true;

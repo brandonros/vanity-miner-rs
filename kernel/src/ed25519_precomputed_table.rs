@@ -1,6 +1,6 @@
 use cuda_std::address_space;
 
-use crate::edwards25519::GeCached;
+use crate::ed25519::GeCached;
 
 #[address_space(constant)]
 pub static PRECOMPUTED_TABLE_BYTES: [[[u8; 32]; 4]; 16] = [
