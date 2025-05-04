@@ -7,16 +7,14 @@ mod ed25519;
 mod ed25519_precomputed_table;
 mod base58;
 
-const LCG_MULTIPLIER: u64 = 6364136223846793005;
-
-fn sha512_compact(input: &[u8]) -> [u8; 64] {
+fn sha512_hash(input: &[u8]) -> [u8; 64] {
     use crate::sha512::Hasher;
     let mut hasher = Hasher::new();
     hasher.update(input);
     hasher.finalize()
 }
 
-fn derrive_public_key_compact(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
+fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
     use crate::ed25519::ge_scalarmult;
     let public_key_point = ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE);
@@ -24,21 +22,8 @@ fn derrive_public_key_compact(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     public_key_bytes
 }
 
-#[cuda_std::kernel]
-#[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn find_vanity_private_key(
-    // input
-    vanity_prefix_ptr: *const u8, 
-    vanity_prefix_len: usize, 
-    rng_seed: u64,
-    // output
-    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
-    found_private_key_ptr: *mut u8,
-    found_public_key_ptr: *mut u8,
-    found_bs58_encoded_public_key_ptr: *mut u8,
-) {
-    // generate random input for private key from thread index and rng seed
-    let thread_idx = cuda_std::thread::index() as usize;
+fn lcg_generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
+    const LCG_MULTIPLIER: u64 = 6364136223846793005;
     let mut rng_state = thread_idx as u64 ^ rng_seed;
     let mut generate_random_bytes = || {
         rng_state = rng_state.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
@@ -59,9 +44,28 @@ pub unsafe fn find_vanity_private_key(
         let end = core::cmp::min(i + 8, 32);
         private_key[i..end].copy_from_slice(&bytes[0..(end - i)]);
     }
+    private_key
+}
+
+#[cuda_std::kernel]
+#[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
+pub unsafe fn find_vanity_private_key(
+    // input
+    vanity_prefix_ptr: *const u8, 
+    vanity_prefix_len: usize, 
+    rng_seed: u64,
+    // output
+    found_flag_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_private_key_ptr: *mut u8,
+    found_public_key_ptr: *mut u8,
+    found_bs58_encoded_public_key_ptr: *mut u8,
+) {
+    // generate random input for private key from thread index and rng seed
+    let thread_idx = cuda_std::thread::index() as usize;
+    let private_key = lcg_generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
-    let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
+    let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
     
     // apply ed25519 clamping to hashed private key
     hashed_private_key_bytes[0] &= 0xF8;
@@ -69,7 +73,7 @@ pub unsafe fn find_vanity_private_key(
     hashed_private_key_bytes[31] |= 0x40;
     
     // calculate public key from hashed private key with ed25519 point multiplication
-    let public_key_bytes = derrive_public_key_compact(&hashed_private_key_bytes[0..32]);
+    let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes[0..32]);
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
