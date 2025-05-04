@@ -5,6 +5,7 @@ extern crate alloc;
 mod sha512;
 mod ed25519;
 mod ed25519_precomputed_table;
+mod base58;
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = crate::sha512::Hash::new();
@@ -62,12 +63,12 @@ pub unsafe fn find_vanity_private_key(
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
-    let _ = bs58::encode(public_key_bytes).onto_slice_unsafe(&mut bs58_encoded_public_key).unwrap();
+    let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
     
     // check if public key starts with vanity prefix
     let mut matches = true;
     for i in 0..vanity_prefix_len {
-        if bs58_encoded_public_key[i] != unsafe { vanity_prefix[i] } {
+        if bs58_encoded_public_key[i] != vanity_prefix[i] {
             matches = false;
             break;
         }

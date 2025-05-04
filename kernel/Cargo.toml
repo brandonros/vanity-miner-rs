@@ -8,7 +8,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-bs58 = { git = "https://github.com/brandonros/bs58-rs.git", rev = "616171845446384347de0a535cc3877f34b3a8bd", default-features = false }
 
 [build-dependencies]
 cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
