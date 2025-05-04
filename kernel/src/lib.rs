@@ -14,6 +14,12 @@ fn sha512_hash(input: &[u8]) -> [u8; 64] {
     hasher.finalize()
 }
 
+fn ed25519_clamp(hashed_private_key_bytes: &mut [u8]) {
+    hashed_private_key_bytes[0] &= 0xF8;
+    hashed_private_key_bytes[31] &= 0x7F;
+    hashed_private_key_bytes[31] |= 0x40;
+}
+
 fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
     use crate::ed25519::ge_scalarmult;
@@ -68,9 +74,7 @@ pub unsafe fn find_vanity_private_key(
     let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
     
     // apply ed25519 clamping to hashed private key
-    hashed_private_key_bytes[0] &= 0xF8;
-    hashed_private_key_bytes[31] &= 0x7F;
-    hashed_private_key_bytes[31] |= 0x40;
+    ed25519_clamp(&mut hashed_private_key_bytes);
     
     // calculate public key from hashed private key with ed25519 point multiplication
     let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes[0..32]);
@@ -110,4 +114,36 @@ pub unsafe fn find_vanity_private_key(
 
     // sync threads
     cuda_std::thread::sync_threads();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn should_hash_correctly() {
+        let private_key = [0x4e, 0x89, 0x41, 0xbc, 0xbe, 0x2e, 0x4a, 0x27, 0x55, 0xf2, 0xd3, 0xe3, 0xb9, 0xc4, 0xc6, 0x57, 0xf6, 0x3c, 0x7d, 0xe7, 0x79, 0xc1, 0x34, 0x91, 0x50, 0xc8, 0x09, 0xed, 0x44, 0x3a, 0x8b, 0x8c];
+
+        // sha512
+        let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
+        let expected = [0x1e, 0x8c, 0x16, 0x6d, 0x45, 0x3b, 0xe1, 0x47, 0xe4, 0x82, 0x39, 0x80, 0xd8, 0x36, 0x98, 0x30, 0x86, 0xc4, 0xc8, 0x1e, 0xec, 0x63, 0x71, 0xb8, 0x00, 0xc1, 0x34, 0x9d, 0xb6, 0x5d, 0xba, 0x4b, 0x1e, 0x0d, 0x01, 0x38, 0x5f, 0x63, 0x7f, 0xed, 0x97, 0x77, 0x61, 0x95, 0x1b, 0xa8, 0x75, 0x45, 0x37, 0x3c, 0x2b, 0x04, 0xb4, 0x31, 0xda, 0x60, 0x82, 0xf5, 0x4c, 0x39, 0x5f, 0xdf, 0x85, 0x10];
+        assert_eq!(hashed_private_key_bytes, expected);
+
+        // clamp
+        ed25519_clamp(&mut hashed_private_key_bytes);
+        assert_eq!(hashed_private_key_bytes[0], 0x18);
+        assert_eq!(hashed_private_key_bytes[31], 0x4b);
+        
+        // derive public key
+        let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes[0..32]);
+        let expected = [0x0a, 0xf7, 0x64, 0xbe, 0x9b, 0x67, 0x30, 0x71, 0xe9, 0xe3, 0xfd, 0x5e, 0xce, 0xfb, 0x1f, 0x33, 0x73, 0x2f, 0x44, 0xb6, 0x9b, 0x38, 0x5d, 0x0a, 0x94, 0xf6, 0x14, 0x73, 0xbb, 0xb9, 0xf6, 0xf6];
+        assert_eq!(public_key_bytes, expected);
+
+        // bs58 encode public key
+        let mut bs58_encoded_public_key = [0u8; 64];
+        let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
+        let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
+        let expected = b"jose1xrZkrKD4sXCvPwyhps7MEQSu7RpsVzPAs5fnc5";
+        assert_eq!(bs58_encoded_public_key, expected);
+    }
 }
