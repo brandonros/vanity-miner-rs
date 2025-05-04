@@ -63,16 +63,16 @@ pub unsafe fn find_vanity_private_key(
         private_key[i..end].copy_from_slice(&bytes[0..(end - i)]);
     }
     
-    // sha512 hash input
+    // sha512 hash private key
     let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
     
-    // apply ed25519 clamping
+    // apply ed25519 clamping to hashed private key
     hashed_private_key_bytes[0] &= 248;
     hashed_private_key_bytes[31] &= 127;
     hashed_private_key_bytes[31] |= 64;
     
-    // ed25519 private key -> public key (first 32 bytes only)
-    let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
+    // calculate public key from hashed private key with ed25519 point multiplication
+    let public_key_bytes = derrive_public_key_compact(&hashed_private_key_bytes[0..32]);
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
