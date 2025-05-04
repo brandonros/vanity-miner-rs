@@ -47,8 +47,8 @@ fn device_main(
     loop {
         launches += 1;
         total_operations += operations_per_launch;
-        //let rng_seed: u64 = rng.r#gen::<u64>();
-        let rng_seed: u64 = 3314977520786701659;
+        let rng_seed: u64 = rng.r#gen::<u64>();
+        //let rng_seed: u64 = 3314977520786701659;
         
         let mut found_flag_slice = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];

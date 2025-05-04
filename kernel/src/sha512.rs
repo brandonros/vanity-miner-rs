@@ -10,10 +10,7 @@
     clippy::unreadable_literal
 )]
 
-use cuda_std::address_space;
-
-#[address_space(constant)]
-static ROUND_CONSTANTS: [u64; 80] = [
+const ROUND_CONSTANTS: [u64; 80] = [
     0x428a2f98d728ae22,
     0x7137449123ef65cd,
     0xb5c0fbcfec4d3b2f,
@@ -96,8 +93,7 @@ static ROUND_CONSTANTS: [u64; 80] = [
     0x6c44198c4a475817,
 ];
 
-#[address_space(constant)]
-static INITIAL_STATE: [u64; 8] = [
+const INITIAL_STATE: [u64; 8] = [
     0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 
     0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
     0x510e527fade682d1, 0x9b05688c2b3e6c1f, 

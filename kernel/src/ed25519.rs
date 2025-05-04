@@ -1,7 +1,6 @@
 #![allow(unused_parens)]
 #![allow(non_camel_case_types)]
 
-use cuda_std::address_space;
 use core::ops::{Add, Sub, Mul};
 
 pub type fiat_25519_u1 = u8;
@@ -396,7 +395,7 @@ fn fiat_25519_selectznz(
     out1[4] = x5;
 }
 
-#[derive(Clone, Default, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
@@ -514,28 +513,23 @@ impl Mul for Fe {
     }
 }
 
-#[address_space(constant)]
-static BXP: [u8; 32] = [
+const BXP: [u8; 32] = [
     0x1a, 0xd5, 0x25, 0x8f, 0x60, 0x2d, 0x56, 0xc9, 0xb2, 0xa7, 0x25, 0x95, 0x60, 0xc7, 0x2c,
     0x69, 0x5c, 0xdc, 0xd6, 0xfd, 0x31, 0xe2, 0xa4, 0xc0, 0xfe, 0x53, 0x6e, 0xcd, 0xd3, 0x36,
     0x69, 0x21,
 ];
 
-#[address_space(constant)]
-static BYP: [u8; 32] = [
+const BYP: [u8; 32] = [
     0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
     0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
     0x66, 0x66,
 ];
 
-#[address_space(constant)]
-static FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
+const FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
 
-#[address_space(constant)]
-static FE_ONE: Fe = Fe([1, 0, 0, 0, 0]);
+const FE_ONE: Fe = Fe([1, 0, 0, 0, 0]);
 
-#[address_space(constant)]
-pub(crate) static FE_D2: Fe = Fe([
+pub(crate) const FE_D2: Fe = Fe([
     1859910466990425,
     932731440258426,
     1072319116312658,
@@ -543,7 +537,7 @@ pub(crate) static FE_D2: Fe = Fe([
     633789495995903,
 ]);
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct GeP1P1 {
     x: Fe,
     y: Fe,
