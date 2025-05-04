@@ -62,8 +62,8 @@ pub unsafe fn find_vanity_private_key(
     let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
     
     // bs58 encode public key
-    let mut bs58_encoded_public_key = [0u8; 44];
-    let _len = base58::encode(&public_key_bytes, &mut bs58_encoded_public_key);
+    let mut bs58_encoded_public_key = [0u8; 64];
+    let _ = bs58::encode(public_key_bytes).onto_slice_unsafe(&mut bs58_encoded_public_key).unwrap();
     
     // check if public key starts with vanity prefix
     let mut matches = true;

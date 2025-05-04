@@ -66,8 +66,8 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
 name = "bs58"
-version = "0.4.0"
-source = "git+https://github.com/brandonros/bs58-rs.git?rev=5926ef2e9eea308723e3e2c02b81a887e1cf45a0#5926ef2e9eea308723e3e2c02b81a887e1cf45a0"
+version = "0.5.1"
+source = "git+https://github.com/brandonros/bs58-rs.git?rev=616171845446384347de0a535cc3877f34b3a8bd#616171845446384347de0a535cc3877f34b3a8bd"
 dependencies = [
  "bytemuck",
 ]
