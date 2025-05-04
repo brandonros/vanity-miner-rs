@@ -137,28 +137,32 @@ mod test {
 
     #[test]
     fn should_hash_correctly() {
-        let private_key = [0x4e, 0x89, 0x41, 0xbc, 0xbe, 0x2e, 0x4a, 0x27, 0x55, 0xf2, 0xd3, 0xe3, 0xb9, 0xc4, 0xc6, 0x57, 0xf6, 0x3c, 0x7d, 0xe7, 0x79, 0xc1, 0x34, 0x91, 0x50, 0xc8, 0x09, 0xed, 0x44, 0x3a, 0x8b, 0x8c];
+        let rng_seed = 3314977520786701659;
+        let thread_idx = 13604434;
+        let private_key = xorshiro_generate_random_private_key(thread_idx, rng_seed);
+        let expected = b"\x1A\x3C\x0F\xD9\xC5\xA8\x4E\x8B\xE4\xA9\xD3\x36\x03\x69\xDE\x0C\xCE\x80\x01\x49\xDC\x2E\x5C\x05\xDB\xD5\xB0\xCD\x23\x24\x1B\x0E";
+        assert_eq!(private_key, *expected);
 
         // sha512
         let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
-        let expected = [0x1e, 0x8c, 0x16, 0x6d, 0x45, 0x3b, 0xe1, 0x47, 0xe4, 0x82, 0x39, 0x80, 0xd8, 0x36, 0x98, 0x30, 0x86, 0xc4, 0xc8, 0x1e, 0xec, 0x63, 0x71, 0xb8, 0x00, 0xc1, 0x34, 0x9d, 0xb6, 0x5d, 0xba, 0x4b, 0x1e, 0x0d, 0x01, 0x38, 0x5f, 0x63, 0x7f, 0xed, 0x97, 0x77, 0x61, 0x95, 0x1b, 0xa8, 0x75, 0x45, 0x37, 0x3c, 0x2b, 0x04, 0xb4, 0x31, 0xda, 0x60, 0x82, 0xf5, 0x4c, 0x39, 0x5f, 0xdf, 0x85, 0x10];
-        assert_eq!(hashed_private_key_bytes, expected);
+        let expected = b"\x6f\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49\xc5\x82\x2f\xd4\x62\x45\x4d\x7a\xd5\x98\x77\xb4\xe8\x4c\xd6\x65\x87\x36\x22\x28\x43\x07\x1d\xb8\x54\xbf\x28\xb7\x67\xb9\xa7\x65";
+        assert_eq!(hashed_private_key_bytes, *expected);
 
         // clamp
         ed25519_clamp(&mut hashed_private_key_bytes);
-        assert_eq!(hashed_private_key_bytes[0], 0x18);
-        assert_eq!(hashed_private_key_bytes[31], 0x4b);
+        assert_eq!(hashed_private_key_bytes[0], 0x68);
+        assert_eq!(hashed_private_key_bytes[31], 0x49);
         
         // derive public key
         let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes[0..32]);
-        let expected = [0x0a, 0xf7, 0x64, 0xbe, 0x9b, 0x67, 0x30, 0x71, 0xe9, 0xe3, 0xfd, 0x5e, 0xce, 0xfb, 0x1f, 0x33, 0x73, 0x2f, 0x44, 0xb6, 0x9b, 0x38, 0x5d, 0x0a, 0x94, 0xf6, 0x14, 0x73, 0xbb, 0xb9, 0xf6, 0xf6];
-        assert_eq!(public_key_bytes, expected);
+        let expected = b"\x0a\xf7\x64\xd3\x34\x40\x71\xf9\x99\xf7\x05\x20\xb3\x1c\xe9\xa4\x52\xf4\xcf\x44\x21\x19\xfe\xa8\x71\x6c\xd7\x55\x85\x11\x86\x30";
+        assert_eq!(public_key_bytes, *expected);
 
         // bs58 encode public key
         let mut bs58_encoded_public_key = [0u8; 64];
         let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
-        let expected = b"jose1xrZkrKD4sXCvPwyhps7MEQSu7RpsVzPAs5fnc5";
-        assert_eq!(bs58_encoded_public_key, expected);
+        let expected = b"josexCM7QB9psJfzZtvAzYWAjHb5LSCH594nvCvVSdu";
+        assert_eq!(bs58_encoded_public_key, *expected);
     }
 }
