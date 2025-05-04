@@ -16,7 +16,7 @@ fn sha512_compact(input: &[u8]) -> [u8; 64] {
     hasher.finalize()
 }
 
-fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
+fn derrive_public_key_compact(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
     use crate::ed25519_precomputed_table::PRECOMPUTED_TABLE;
     use crate::ed25519::ge_scalarmult;
     let public_key_point = ge_scalarmult(&hashed_private_key_bytes[0..32], &PRECOMPUTED_TABLE);
