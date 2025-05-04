@@ -5,7 +5,6 @@ extern crate alloc;
 mod sha512;
 mod ed25519;
 mod ed25519_precomputed_table;
-mod base58;
 
 fn sha512_compact(input: &[u8]) -> [u8; 64] {
     let mut hasher = crate::sha512::Hash::new();
