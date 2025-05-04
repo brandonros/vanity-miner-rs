@@ -83,44 +83,19 @@ pub unsafe fn find_vanity_private_key(
     // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
     let private_key = xorshiro_generate_random_private_key(thread_idx, rng_seed);
-    if thread_idx == 13604434 {
-        cuda_std::println!("private_key: {}", hex::encode(&private_key));
-        let expected =  b"\x1A\x3C\x0F\xD9\xC5\xA8\x4E\x8B\xE4\xA9\xD3\x36\x03\x69\xDE\x0C\xCE\x80\x01\x49\xDC\x2E\x5C\x05\xDB\xD5\xB0\xCD\x23\x24\x1B\x0E";
-        cuda_std::println!("match: {}", private_key == *expected);
-    }
     
     // sha512 hash private key
     let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
-    if thread_idx == 13604434 {
-        cuda_std::println!("hashed_private_key_bytes: {}", hex::encode(&hashed_private_key_bytes));
-        let expected = b"\x6f\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49\xc5\x82\x2f\xd4\x62\x45\x4d\x7a\xd5\x98\x77\xb4\xe8\x4c\xd6\x65\x87\x36\x22\x28\x43\x07\x1d\xb8\x54\xbf\x28\xb7\x67\xb9\xa7\x65";
-        cuda_std::println!("match: {}", hashed_private_key_bytes == *expected);
-    }
-    
+
     // apply ed25519 clamping to hashed private key
     ed25519_clamp(&mut hashed_private_key_bytes);
-    if thread_idx == 13604434 {
-        cuda_std::println!("clamped_hashed_private_key_bytes: {}", hex::encode(&hashed_private_key_bytes));
-        let expected = b"\x68\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49\xc5\x82\x2f\xd4\x62\x45\x4d\x7a\xd5\x98\x77\xb4\xe8\x4c\xd6\x65\x87\x36\x22\x28\x43\x07\x1d\xb8\x54\xbf\x28\xb7\x67\xb9\xa7\x65";;
-        cuda_std::println!("match: {}", hashed_private_key_bytes == *expected);
-    }
-    
+
     // calculate public key from hashed private key with ed25519 point multiplication
     let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes[0..32]);
-    if thread_idx == 13604434 {
-        cuda_std::println!("public_key_bytes: {}", hex::encode(&public_key_bytes));
-        let expected = b"\x0a\xf7\x64\xd3\x34\x40\x71\xf9\x99\xf7\x05\x20\xb3\x1c\xe9\xa4\x52\xf4\xcf\x44\x21\x19\xfe\xa8\x71\x6c\xd7\x55\x85\x11\x86\x30";
-        cuda_std::println!("match: {}", public_key_bytes == *expected);
-    }
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
     let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
-    if thread_idx == 13604434 {
-        cuda_std::println!("bs58_encoded_public_key: {}", hex::encode(&bs58_encoded_public_key[0..encoded_len]));
-        let expected = b"josexCM7QB9psJfzZtvAzYWAjHb5LSCH594nvCvVSdu";
-        cuda_std::println!("match: {}", bs58_encoded_public_key[0..encoded_len] == *expected);
-    }
 
     // read vanity prefix from host
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };

@@ -7,7 +7,6 @@ pub type fiat_25519_u1 = u8;
 pub type fiat_25519_i1 = i8;
 pub type fiat_25519_i2 = i8;
 
-#[cfg(target_endian = "little")]
 macro_rules! load_8u {
     ($s:expr, $offset:expr) => {
         ($s[$offset] as u64)
@@ -21,32 +20,7 @@ macro_rules! load_8u {
     };
 }
 
-#[cfg(target_endian = "big")]
-macro_rules! load_8u {
-    ($s:expr, $offset:expr) => {
-        ($s[$offset + 7] as u64)
-            | (($s[$offset + 6] as u64) << 8)
-            | (($s[$offset + 5] as u64) << 16)
-            | (($s[$offset + 4] as u64) << 24)
-            | (($s[$offset + 3] as u64) << 32)
-            | (($s[$offset + 2] as u64) << 40)
-            | (($s[$offset + 1] as u64) << 48)
-            | (($s[$offset] as u64) << 56)
-    };
-}
-
-fn load_8u(s: &[u8]) -> u64 {
-    (s[0] as u64)
-        | ((s[1] as u64) << 8)
-        | ((s[2] as u64) << 16)
-        | ((s[3] as u64) << 24)
-        | ((s[4] as u64) << 32)
-        | ((s[5] as u64) << 40)
-        | ((s[6] as u64) << 48)
-        | ((s[7] as u64) << 56)
-}
-
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_addcarryx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
@@ -61,7 +35,7 @@ fn fiat_25519_addcarryx_u51(
     *out2 = x3;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_subborrowx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
@@ -77,7 +51,7 @@ fn fiat_25519_subborrowx_u51(
     *out2 = ((0x0_i8.wrapping_sub((x2 as fiat_25519_i2))) as fiat_25519_u1);
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: u64) {
     let x1: fiat_25519_u1 = (!(!arg1));
     let x2: u64 = (((((0x0_i8.wrapping_sub((x1 as fiat_25519_i2))) as fiat_25519_i1) as i128)
@@ -223,7 +197,7 @@ fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     out1[31] = x91;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = (arg1[0]);
     let x2: u64 = ((x1 >> 51).wrapping_add((arg1[1])));
@@ -244,7 +218,7 @@ fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x12;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = ((arg1[4]).wrapping_mul(0x13));
     let x2: u64 = (x1.wrapping_mul(0x2));
@@ -303,7 +277,7 @@ fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x42;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((arg1[0]).wrapping_add((arg2[0])));
     let x2: u64 = ((arg1[1]).wrapping_add((arg2[1])));
@@ -317,7 +291,7 @@ fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((0xfffffffffffdau64.wrapping_add((arg1[0]))).wrapping_sub((arg2[0])));
     let x2: u64 = ((0xffffffffffffeu64.wrapping_add((arg1[1]))).wrapping_sub((arg2[1])));
@@ -331,7 +305,7 @@ fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[4]).wrapping_mul(0x13)) as u128)));
     let x2: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[3]).wrapping_mul(0x13)) as u128)));
@@ -397,7 +371,7 @@ fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x44;
 }
 
-#[inline(always)]
+//#[inline(always)]
 fn fiat_25519_selectznz(
     out1: &mut [u64; 5],
     arg1: fiat_25519_u1,
@@ -425,20 +399,6 @@ fn fiat_25519_selectznz(
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
-    pub fn from_bytes(s: &[u8]) -> Fe {
-        if s.len() != 32 {
-            panic!("Invalid compressed length")
-        }
-        let mut h = Fe::default();
-        let mask = 0x7ffffffffffff;
-        h.0[0] = load_8u(&s[0..]) & mask;
-        h.0[1] = (load_8u(&s[6..]) >> 3) & mask;
-        h.0[2] = (load_8u(&s[12..]) >> 6) & mask;
-        h.0[3] = (load_8u(&s[19..]) >> 1) & mask;
-        h.0[4] = (load_8u(&s[24..]) >> 12) & mask;
-        h
-    }
-
     pub const fn from_bytes_const(s: &[u8; 32]) -> Fe {
         let mut h = [0u64; 5];
         let mask = 0x7ffffffffffff;
@@ -552,18 +512,6 @@ impl Mul for Fe {
         h
     }
 }
-
-const BXP: [u8; 32] = [
-    0x1a, 0xd5, 0x25, 0x8f, 0x60, 0x2d, 0x56, 0xc9, 0xb2, 0xa7, 0x25, 0x95, 0x60, 0xc7, 0x2c,
-    0x69, 0x5c, 0xdc, 0xd6, 0xfd, 0x31, 0xe2, 0xa4, 0xc0, 0xfe, 0x53, 0x6e, 0xcd, 0xd3, 0x36,
-    0x69, 0x21,
-];
-
-const BYP: [u8; 32] = [
-    0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
-    0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
-    0x66, 0x66,
-];
 
 const FE_ZERO: Fe = Fe([0, 0, 0, 0, 0]);
 
@@ -730,78 +678,6 @@ impl GeCached {
             t2d: Fe::from_bytes_const(&s[3]),
         }
     }
-
-    pub fn to_bytes(&self) -> [[u8; 32]; 4] {
-        [
-            self.y_plus_x.to_bytes(),
-            self.y_minus_x.to_bytes(),
-            self.z.to_bytes(),
-            self.t2d.to_bytes(),
-        ]
-    }
-}
-
-fn ge_precompute(base: &GeP3) -> [GeCached; 16] {
-    let base_cached = base.to_cached();
-    let mut pc = [GeP3::zero(); 16];
-    pc[1] = *base;
-    for i in 2..16 {
-        pc[i] = if i % 2 == 0 {
-            pc[i / 2].dbl().to_p3()
-        } else {
-            pc[i - 1].add(base_cached).to_p3()
-        }
-    }
-    let mut pc_cached: [GeCached; 16] = Default::default();
-    for i in 0..16 {
-        pc_cached[i] = pc[i].to_cached();
-    }
-    pc_cached
-}
-
-pub fn calculate_precompute() -> [GeCached; 16] {
-    let bx = Fe::from_bytes_const(&BXP);
-    let by = Fe::from_bytes_const(&BYP);
-    let base = GeP3 {
-        x: bx,
-        y: by,
-        z: FE_ONE,
-        t: bx * by,
-    };
-    let precomputed = ge_precompute(&base);
-    precomputed
-}
-
-pub fn ge_scalarmult_base(scalar: &[u8]) -> GeP3 {
-    let bx = Fe::from_bytes(&BXP);
-    let by = Fe::from_bytes(&BYP);
-    let base = GeP3 {
-        x: bx,
-        y: by,
-        z: FE_ONE,
-        t: bx * by,
-    };
-    ge_scalarmult(scalar, &base)
-}
-
-pub fn ge_scalarmult(scalar: &[u8], base: &GeP3) -> GeP3 {
-    let pc = ge_precompute(base);
-    let mut q = GeP3::zero();
-    let mut pos = 252;
-    loop {
-        let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
-        let mut t = pc[0];
-        for i in 1..16 {
-            t.maybe_set(&pc[i], (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1);
-        }
-        q = q.add(t).to_p3();
-        if pos == 0 {
-            break;
-        }
-        q = q.dbl().to_p3().dbl().to_p3().dbl().to_p3().dbl().to_p3();
-        pos -= 4;
-    }
-    q
 }
 
 pub fn ge_scalarmult_precomputed(scalar: &[u8], precomputed: &[GeCached; 16]) -> GeP3 {
