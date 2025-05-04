@@ -65,12 +65,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
-name = "bs58"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
-
-[[package]]
 name = "build-helper"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,23 +199,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed25519-compact"
-version = "2.1.1"
-source = "git+https://github.com/brandonros/rust-ed25519-compact.git?rev=7605359ed8508d4cef3b958157ad41108261f8d1#7605359ed8508d4cef3b958157ad41108261f8d1"
-dependencies = [
- "cuda_std",
-]
-
-[[package]]
 name = "ed25519_vanity_kernel"
 version = "0.1.0"
 dependencies = [
- "bs58",
  "cuda_builder",
  "cuda_std",
- "ed25519-compact",
- "rand_core",
- "rand_xorshift",
 ]
 
 [[package]]
@@ -606,21 +588,6 @@ name = "r-efi"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74765f6d916ee2faa39bc8e68e4f3ed8949b48cccdac59983d287a7cb71ce9c5"
-
-[[package]]
-name = "rand_core"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
-
-[[package]]
-name = "rand_xorshift"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
-dependencies = [
- "rand_core",
-]
 
 [[package]]
 name = "redox_syscall"
