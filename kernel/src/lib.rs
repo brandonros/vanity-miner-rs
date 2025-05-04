@@ -63,8 +63,7 @@ pub unsafe fn find_vanity_private_key(
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 44];
-    let encoded_public_key_len = base58::encode(&public_key_bytes, &mut bs58_encoded_public_key);
-    let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_public_key_len];
+    let _len = base58::encode(&public_key_bytes, &mut bs58_encoded_public_key);
     
     // check if public key starts with vanity prefix
     let mut matches = true;
@@ -81,7 +80,7 @@ pub unsafe fn find_vanity_private_key(
         let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_ptr, 1) };
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
-        let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 44) };
+        let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 64) };
         
         let found_flag = &mut found_flag_slice[0];
         found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
@@ -90,7 +89,7 @@ pub unsafe fn find_vanity_private_key(
         // TODO: need to copy more than 1 single result
         found_private_key.copy_from_slice(&private_key[0..32]);
         found_public_key.copy_from_slice(&public_key_bytes[0..32]);
-        found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
+        found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
     }
     cuda_std::thread::sync_threads();
 }

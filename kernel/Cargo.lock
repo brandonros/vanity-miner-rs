@@ -65,6 +65,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
+name = "bs58"
+version = "0.4.0"
+source = "git+https://github.com/brandonros/bs58-rs.git?rev=5926ef2e9eea308723e3e2c02b81a887e1cf45a0#5926ef2e9eea308723e3e2c02b81a887e1cf45a0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "build-helper"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -72,6 +80,12 @@ checksum = "bdce191bf3fa4995ce948c8c83b4640a1745457a149e73c6db75b4ffe36aad5f"
 dependencies = [
  "semver 0.6.0",
 ]
+
+[[package]]
+name = "bytemuck"
+version = "1.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9134a6ef01ce4b366b50689c94f82c14bc72bc5d0386829828a2e2752ef7958c"
 
 [[package]]
 name = "cc"
@@ -202,6 +216,7 @@ dependencies = [
 name = "ed25519_vanity_kernel"
 version = "0.1.0"
 dependencies = [
+ "bs58",
  "cuda_builder",
  "cuda_std",
 ]

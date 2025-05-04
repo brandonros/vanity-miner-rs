@@ -52,7 +52,7 @@ fn device_main(
         let mut found_flag = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
-        let mut found_bs58_encoded_public_key = [0u8; 44];
+        let mut found_bs58_encoded_public_key = [0u8; 64];
         
         let vanity_prefix_dev = vanity_prefix_bytes.as_dbuf()?;
         let found_flag_dev = found_flag.as_dbuf()?;
