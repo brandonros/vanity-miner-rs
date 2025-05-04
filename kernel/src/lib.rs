@@ -117,14 +117,17 @@ pub unsafe fn find_vanity_private_key(
         let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 64) };
         let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
         let found_flag = &mut found_flag_slice[0];
+
+        // if first find, copy results to host
+        if found_flag.load(core::sync::atomic::Ordering::SeqCst) == 0.0 {
+            found_private_key.copy_from_slice(&private_key[0..32]);
+            found_public_key.copy_from_slice(&public_key_bytes[0..32]);
+            found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
+            found_thread_idx_slice[0] = thread_idx as u32;
+        }
+
         found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
-        cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);
-        
-        // TODO: need to copy more than 1 single result
-        found_private_key.copy_from_slice(&private_key[0..32]);
-        found_public_key.copy_from_slice(&public_key_bytes[0..32]);
-        found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
-        found_thread_idx_slice[0] = thread_idx as u32;
+        cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);   
     }
 
     // sync threads
@@ -149,7 +152,7 @@ mod test {
         assert_eq!(hashed_private_key_bytes, *expected);
 
         // clamp
-        ed25519_clamp(&mut hashed_private_key_bytes);
+        ed25519_clamp(&mut hashed_private_key_bytes[0..32]);
         assert_eq!(hashed_private_key_bytes[0], 0x68);
         assert_eq!(hashed_private_key_bytes[31], 0x49);
         
@@ -160,7 +163,7 @@ mod test {
 
         // bs58 encode public key
         let mut bs58_encoded_public_key = [0u8; 64];
-        let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
+        let encoded_len = base58::encode_into_limbs(&public_key_bytes[0..32], &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
         let expected = b"josexCM7QB9psJfzZtvAzYWAjHb5LSCH594nvCvVSdu";
         assert_eq!(bs58_encoded_public_key, *expected);
