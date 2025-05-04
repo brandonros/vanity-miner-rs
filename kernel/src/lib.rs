@@ -64,9 +64,9 @@ pub unsafe fn find_vanity_private_key(
     let mut hashed_private_key_bytes = sha512_compact(&private_key[0..32]);
     
     // apply ed25519 clamping to hashed private key
-    hashed_private_key_bytes[0] &= 248;
-    hashed_private_key_bytes[31] &= 127;
-    hashed_private_key_bytes[31] |= 64;
+    hashed_private_key_bytes[0] &= 0xF8;
+    hashed_private_key_bytes[31] &= 0x7F;
+    hashed_private_key_bytes[31] |= 0x40;
     
     // calculate public key from hashed private key with ed25519 point multiplication
     let public_key_bytes = derrive_public_key_compact(&hashed_private_key_bytes[0..32]);
