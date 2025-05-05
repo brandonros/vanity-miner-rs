@@ -224,6 +224,7 @@ impl W {
             .wrapping_add(Self::Maj(t[idx_0], t[idx_1], t[idx_2]));
     }
 
+    #[inline(always)]
     fn G(&mut self, state: &mut State, s: usize) {
         let rc = &ROUND_CONSTANTS[s * 16..];
         self.F(state, 0, rc[0]);
@@ -270,6 +271,7 @@ impl State {
         }
     }
 
+    #[inline(always)]
     fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = State([
             self.0[0], 

@@ -1,5 +1,5 @@
 use cust::device::Device;
-use cust::module::Module;
+use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;
 use cust::stream::{Stream, StreamFlags};
 use cust::util::SliceExt;
@@ -32,7 +32,9 @@ fn device_main(
     // Load the pre-compiled PTX that was generated during build
     println!("[{ordinal}] Loading module...");
     let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
-    let module = Module::from_ptx(ptx, &[])?;
+    let module = Module::from_ptx(ptx, &[
+        ModuleJitOption::MaxRegisters(256)
+    ])?;
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
     let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
 

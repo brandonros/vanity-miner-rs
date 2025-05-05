@@ -20,8 +20,8 @@ macro_rules! load_8u {
     };
 }
 
-#[inline(never)]
-pub fn fiat_25519_addcarryx_u51(
+#[inline(never)] // TODO: try to inline
+fn fiat_25519_addcarryx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
     arg1: fiat_25519_u1,
@@ -35,7 +35,7 @@ pub fn fiat_25519_addcarryx_u51(
     *out2 = x3;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_subborrowx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
@@ -51,7 +51,7 @@ fn fiat_25519_subborrowx_u51(
     *out2 = ((0x0_i8.wrapping_sub((x2 as fiat_25519_i2))) as fiat_25519_u1);
 }
 
-#[inline(never)]
+#[inline(always)] // TODO: try to inline
 fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: u64) {
     let x1: fiat_25519_u1 = (!(!arg1));
     let x2: u64 = (((((0x0_i8.wrapping_sub((x1 as fiat_25519_i2))) as fiat_25519_i1) as i128)
@@ -60,7 +60,7 @@ fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: 
     *out1 = x3;
 }
 
-#[inline(never)]
+#[inline(never)] // do not ever inline, it will corrupt
 fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     let mut x1: u64 = 0;
     let mut x2: fiat_25519_u1 = 0;
@@ -210,7 +210,7 @@ fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     out1[31] = x91;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = (arg1[0]);
     let x2: u64 = ((x1 >> 51).wrapping_add((arg1[1])));
@@ -231,7 +231,7 @@ fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x12;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = ((arg1[4]).wrapping_mul(0x13));
     let x2: u64 = (x1.wrapping_mul(0x2));
@@ -290,7 +290,7 @@ fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x42;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((arg1[0]).wrapping_add((arg2[0])));
     let x2: u64 = ((arg1[1]).wrapping_add((arg2[1])));
@@ -304,7 +304,7 @@ fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((0xfffffffffffdau64.wrapping_add((arg1[0]))).wrapping_sub((arg2[0])));
     let x2: u64 = ((0xffffffffffffeu64.wrapping_add((arg1[1]))).wrapping_sub((arg2[1])));
@@ -318,7 +318,7 @@ fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[4]).wrapping_mul(0x13)) as u128)));
     let x2: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[3]).wrapping_mul(0x13)) as u128)));
@@ -384,7 +384,7 @@ fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x44;
 }
 
-#[inline(never)]
+#[inline(never)] // TODO: try to inline
 fn fiat_25519_selectznz(
     out1: &mut [u64; 5],
     arg1: fiat_25519_u1,
@@ -409,7 +409,7 @@ fn fiat_25519_selectznz(
 }
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default)]
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
@@ -432,7 +432,6 @@ impl Fe {
         h
     }
 
-    // THE PROBLEM AT THE MOMENT
     pub fn to_bytes(&self) -> [u8; 32] {
         let &Fe(es) = &self.carry();
         let mut s_ = [0u8; 32];
@@ -492,15 +491,6 @@ impl Fe {
     }
 }
 
-impl core::fmt::Display for Fe {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        for i in 0..5 {
-            write!(f, "{:016x}", self.0[i])?;
-        }
-        Ok(())
-    }
-}
-
 impl Add for Fe {
     type Output = Fe;
 
@@ -552,28 +542,28 @@ const FE_D2: Fe = Fe([
 #[repr(C, align(16))]
 #[derive(Clone, Copy)]
 pub struct GeP1P1 {
-    pub x: Fe,
-    pub y: Fe,
-    pub z: Fe,
-    pub t: Fe,
+    x: Fe,
+    y: Fe,
+    z: Fe,
+    t: Fe,
 }
 
 #[repr(C, align(16))]
 
 #[derive(Clone, Copy)]
 pub struct GeP2 {
-    pub x: Fe,
-    pub y: Fe,
-    pub z: Fe,
+    x: Fe,
+    y: Fe,
+    z: Fe,
 }
 
 #[repr(C, align(16))]
 #[derive(Clone, Copy)]
 pub struct GeP3 {
-    pub x: Fe,
-    pub y: Fe,
-    pub z: Fe,
-    pub t: Fe,
+    x: Fe,
+    y: Fe,
+    z: Fe,
+    t: Fe,
 }
 
 impl GeP3 {
@@ -687,12 +677,12 @@ impl GeP1P1 {
 }
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy, Default, Debug)]
+#[derive(Clone, Copy, Default)]
 pub struct GeCached {
-    pub y_plus_x: Fe,
-    pub y_minus_x: Fe,
-    pub z: Fe,
-    pub t2d: Fe,
+    y_plus_x: Fe,
+    y_minus_x: Fe,
+    z: Fe,
+    t2d: Fe,
 }
 
 impl GeCached {
@@ -717,7 +707,7 @@ pub fn ge_scalarmult_precomputed(scalar: &[u8], precomputed: &[GeCached; 16]) ->
     let mut q = GeP3::zero();
     for pos in (0..=252).rev().step_by(4) {
         let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
-        let mut t = precomputed[0].clone();
+        let mut t = precomputed[0];
         for i in 1..16 {
             let other = &precomputed[i];
             let do_swap = (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1;

@@ -61,7 +61,7 @@ pub unsafe fn find_vanity_private_key(
 
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
-    let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
+    let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
 
     // check if public key starts with vanity prefix
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
