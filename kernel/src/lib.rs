@@ -44,8 +44,7 @@ pub unsafe fn find_vanity_private_key(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // generate random input for private key from thread index and rng seed
-    //let thread_idx = cuda_std::thread::index() as usize;
-    let thread_idx = 13604434;
+    let thread_idx = cuda_std::thread::index() as usize;
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
@@ -59,15 +58,13 @@ pub unsafe fn find_vanity_private_key(
 
     // calculate public key from hashed private key with ed25519 point multiplication
     let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes);
-    
+
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
     let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
 
-    // read vanity prefix from host
-    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
-
     // check if public key starts with vanity prefix
+    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
     let mut matches = true;
     for i in 0..vanity_prefix_len {
         if bs58_encoded_public_key[i] != vanity_prefix[i] {
@@ -96,9 +93,6 @@ pub unsafe fn find_vanity_private_key(
         found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
         cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);   
     }
-
-    // sync threads
-    cuda_std::thread::sync_threads();
 }
 
 #[cfg(test)]
@@ -133,6 +127,8 @@ mod test {
         let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes);
         // 0af764d3344071f9 9a f70520 73 1c f1 a452f4cf 42 61 19fea87 15 cd75585118630
         // 0af764d3344071f9 99 f70520 b3 1c e9 a452f4cf 44 21 19fea87 16 cd75585118630
+
+        // 0af764d3344071f999f70520b31ce9a452f4cf442119fea8716cd75585118630
         let expected = b"\x0a\xf7\x64\xd3\x34\x40\x71\xf9\x99\xf7\x05\x20\xb3\x1c\xe9\xa4\x52\xf4\xcf\x44\x21\x19\xfe\xa8\x71\x6c\xd7\x55\x85\x11\x86\x30";
         assert_eq!(public_key_bytes, *expected);
 

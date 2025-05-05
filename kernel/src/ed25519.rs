@@ -20,8 +20,8 @@ macro_rules! load_8u {
     };
 }
 
-//#[inline(always)]
-fn fiat_25519_addcarryx_u51(
+#[inline(never)]
+pub fn fiat_25519_addcarryx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
     arg1: fiat_25519_u1,
@@ -35,7 +35,7 @@ fn fiat_25519_addcarryx_u51(
     *out2 = x3;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_subborrowx_u51(
     out1: &mut u64,
     out2: &mut fiat_25519_u1,
@@ -51,7 +51,7 @@ fn fiat_25519_subborrowx_u51(
     *out2 = ((0x0_i8.wrapping_sub((x2 as fiat_25519_i2))) as fiat_25519_u1);
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: u64) {
     let x1: fiat_25519_u1 = (!(!arg1));
     let x2: u64 = (((((0x0_i8.wrapping_sub((x1 as fiat_25519_i2))) as fiat_25519_i1) as i128)
@@ -60,39 +60,51 @@ fn fiat_25519_cmovznz_u64(out1: &mut u64, arg1: fiat_25519_u1, arg2: u64, arg3: 
     *out1 = x3;
 }
 
+#[inline(never)]
 fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     let mut x1: u64 = 0;
     let mut x2: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x1, &mut x2, 0x0, (arg1[0]), 0x7ffffffffffed);
+
     let mut x3: u64 = 0;
     let mut x4: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x3, &mut x4, x2, (arg1[1]), 0x7ffffffffffff);
+    
     let mut x5: u64 = 0;
     let mut x6: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x5, &mut x6, x4, (arg1[2]), 0x7ffffffffffff);
+
     let mut x7: u64 = 0;
     let mut x8: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x7, &mut x8, x6, (arg1[3]), 0x7ffffffffffff);
+
     let mut x9: u64 = 0;
     let mut x10: fiat_25519_u1 = 0;
     fiat_25519_subborrowx_u51(&mut x9, &mut x10, x8, (arg1[4]), 0x7ffffffffffff);
+
     let mut x11: u64 = 0;
     fiat_25519_cmovznz_u64(&mut x11, x10, 0x0_u64, 0xffffffffffffffff);
+
     let mut x12: u64 = 0;
     let mut x13: fiat_25519_u1 = 0;
     fiat_25519_addcarryx_u51(&mut x12, &mut x13, 0x0, x1, (x11 & 0x7ffffffffffed));
+
     let mut x14: u64 = 0;
     let mut x15: fiat_25519_u1 = 0;
     fiat_25519_addcarryx_u51(&mut x14, &mut x15, x13, x3, (x11 & 0x7ffffffffffff));
+
     let mut x16: u64 = 0;
     let mut x17: fiat_25519_u1 = 0;
     fiat_25519_addcarryx_u51(&mut x16, &mut x17, x15, x5, (x11 & 0x7ffffffffffff));
+
     let mut x18: u64 = 0;
     let mut x19: fiat_25519_u1 = 0;
     fiat_25519_addcarryx_u51(&mut x18, &mut x19, x17, x7, (x11 & 0x7ffffffffffff));
+    
     let mut x20: u64 = 0;
     let mut x21: fiat_25519_u1 = 0;
     fiat_25519_addcarryx_u51(&mut x20, &mut x21, x19, x9, (x11 & 0x7ffffffffffff));
+
     let x22: u64 = (x20 << 4);
     let x23: u64 = (x18.wrapping_mul(0x2_u64));
     let x24: u64 = (x16 << 6);
@@ -163,6 +175,7 @@ fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     let x89: u64 = (x87 >> 8);
     let x90: u8 = ((x89 & 0xff_u64) as u8);
     let x91: u8 = ((x89 >> 8) as u8);
+
     out1[0] = x26;
     out1[1] = x28;
     out1[2] = x30;
@@ -197,7 +210,7 @@ fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     out1[31] = x91;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = (arg1[0]);
     let x2: u64 = ((x1 >> 51).wrapping_add((arg1[1])));
@@ -218,7 +231,7 @@ fn fiat_25519_carry(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x12;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     let x1: u64 = ((arg1[4]).wrapping_mul(0x13));
     let x2: u64 = (x1.wrapping_mul(0x2));
@@ -277,7 +290,7 @@ fn fiat_25519_carry_square(out1: &mut [u64; 5], arg1: &[u64; 5]) {
     out1[4] = x42;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((arg1[0]).wrapping_add((arg2[0])));
     let x2: u64 = ((arg1[1]).wrapping_add((arg2[1])));
@@ -291,7 +304,7 @@ fn fiat_25519_add(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u64 = ((0xfffffffffffdau64.wrapping_add((arg1[0]))).wrapping_sub((arg2[0])));
     let x2: u64 = ((0xffffffffffffeu64.wrapping_add((arg1[1]))).wrapping_sub((arg2[1])));
@@ -305,7 +318,7 @@ fn fiat_25519_sub(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x5;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     let x1: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[4]).wrapping_mul(0x13)) as u128)));
     let x2: u128 = (((arg1[4]) as u128).wrapping_mul((((arg2[3]).wrapping_mul(0x13)) as u128)));
@@ -371,7 +384,7 @@ fn fiat_25519_carry_mul(out1: &mut [u64; 5], arg1: &[u64; 5], arg2: &[u64; 5]) {
     out1[4] = x44;
 }
 
-//#[inline(always)]
+#[inline(never)]
 fn fiat_25519_selectznz(
     out1: &mut [u64; 5],
     arg1: fiat_25519_u1,
@@ -395,7 +408,8 @@ fn fiat_25519_selectznz(
     out1[4] = x5;
 }
 
-#[derive(Clone, Copy, Default)]
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Default, Debug)]
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
@@ -418,6 +432,7 @@ impl Fe {
         h
     }
 
+    // THE PROBLEM AT THE MOMENT
     pub fn to_bytes(&self) -> [u8; 32] {
         let &Fe(es) = &self.carry();
         let mut s_ = [0u8; 32];
@@ -425,8 +440,8 @@ impl Fe {
         s_
     }
 
-    fn is_negative(&self) -> bool {
-        (self.to_bytes()[0] & 1) != 0
+    fn is_negative(&self, bytes: &[u8; 32]) -> bool {
+        (bytes[0] & 1) != 0
     }
 
     fn invert(&self) -> Fe {
@@ -474,6 +489,15 @@ impl Fe {
         let mut t = [0u64; 5];
         fiat_25519_selectznz(&mut t, do_swap, &f, &g);
         self.0 = t
+    }
+}
+
+impl core::fmt::Display for Fe {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for i in 0..5 {
+            write!(f, "{:016x}", self.0[i])?;
+        }
+        Ok(())
     }
 }
 
@@ -525,27 +549,31 @@ const FE_D2: Fe = Fe([
     633789495995903,
 ]);
 
+#[repr(C, align(16))]
 #[derive(Clone, Copy)]
 pub struct GeP1P1 {
-    x: Fe,
-    y: Fe,
-    z: Fe,
-    t: Fe,
+    pub x: Fe,
+    pub y: Fe,
+    pub z: Fe,
+    pub t: Fe,
 }
+
+#[repr(C, align(16))]
 
 #[derive(Clone, Copy)]
 pub struct GeP2 {
-    x: Fe,
-    y: Fe,
-    z: Fe,
+    pub x: Fe,
+    pub y: Fe,
+    pub z: Fe,
 }
 
+#[repr(C, align(16))]
 #[derive(Clone, Copy)]
 pub struct GeP3 {
-    x: Fe,
-    y: Fe,
-    z: Fe,
-    t: Fe,
+    pub x: Fe,
+    pub y: Fe,
+    pub z: Fe,
+    pub t: Fe,
 }
 
 impl GeP3 {
@@ -571,8 +599,12 @@ impl GeP3 {
         let recip = self.z.invert();
         let x = self.x * recip;
         let y = self.y * recip;
-        let mut bs = y.to_bytes();
-        bs[31] ^= (if x.is_negative() { 1 } else { 0 }) << 7;
+        let x_bytes = x.to_bytes();
+        let x_is_negative = x.is_negative(&x_bytes);
+        let negative_flag = if x_is_negative { 1 } else { 0 };
+        let y_bytes = y.to_bytes();
+        let mut bs = y_bytes;
+        bs[31] ^= (negative_flag << 7);
         bs
     }
 
@@ -654,7 +686,8 @@ impl GeP1P1 {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[repr(C, align(16))]
+#[derive(Clone, Copy, Default, Debug)]
 pub struct GeCached {
     pub y_plus_x: Fe,
     pub y_minus_x: Fe,
@@ -663,13 +696,6 @@ pub struct GeCached {
 }
 
 impl GeCached {
-    fn maybe_set(&mut self, other: &GeCached, do_swap: u8) {
-        self.y_plus_x.maybe_set(&other.y_plus_x, do_swap);
-        self.y_minus_x.maybe_set(&other.y_minus_x, do_swap);
-        self.z.maybe_set(&other.z, do_swap);
-        self.t2d.maybe_set(&other.t2d, do_swap);
-    }
-
     pub const fn from_bytes_const(s: &[[u8; 32]; 4]) -> Self {
         GeCached {
             y_plus_x: Fe::from_bytes_const(&s[0]),
@@ -678,23 +704,33 @@ impl GeCached {
             t2d: Fe::from_bytes_const(&s[3]),
         }
     }
+
+    fn maybe_set(&mut self, other: &GeCached, do_swap: u8) {
+        self.y_plus_x.maybe_set(&other.y_plus_x, do_swap);
+        self.y_minus_x.maybe_set(&other.y_minus_x, do_swap);
+        self.z.maybe_set(&other.z, do_swap);
+        self.t2d.maybe_set(&other.t2d, do_swap);
+    }
 }
 
 pub fn ge_scalarmult_precomputed(scalar: &[u8], precomputed: &[GeCached; 16]) -> GeP3 {
     let mut q = GeP3::zero();
-    let mut pos = 252;
-    loop {
+    for pos in (0..=252).rev().step_by(4) {
         let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
-        let mut t = precomputed[0];
+        let mut t = precomputed[0].clone();
         for i in 1..16 {
-            t.maybe_set(&precomputed[i], (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1);
+            let other = &precomputed[i];
+            let do_swap = (((slot ^ i).wrapping_sub(1)) >> 8) as u8 & 1;
+            t.maybe_set(&other, do_swap);
         }
         q = q.add(t).to_p3();
         if pos == 0 {
             break;
         }
-        q = q.dbl().to_p3().dbl().to_p3().dbl().to_p3().dbl().to_p3();
-        pos -= 4;
+        q = q.dbl().to_p3();
+        q = q.dbl().to_p3();
+        q = q.dbl().to_p3();
+        q = q.dbl().to_p3();
     }
     q
 }

@@ -26,7 +26,8 @@ fn device_main(
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
     
     let device = Device::get_device(ordinal as u32)?;
-    let _ctx = Context::new(device)?;
+    let ctx = Context::new(device)?;
+    cust::context::CurrentContext::set_current(&ctx)?;
 
     // Load the pre-compiled PTX that was generated during build
     println!("[{ordinal}] Loading module...");
@@ -47,8 +48,7 @@ fn device_main(
     loop {
         launches += 1;
         total_operations += operations_per_launch;
-        //let rng_seed: u64 = rng.r#gen::<u64>();
-        let rng_seed: u64 = 3314977520786701659;
+        let rng_seed: u64 = rng.r#gen::<u64>();
         
         let mut found_flag_slice = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
