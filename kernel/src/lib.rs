@@ -1,6 +1,6 @@
 #![no_std]
 
-use ed25519::Ge;
+use ed25519::GeP3;
 
 extern crate alloc;
 
@@ -23,7 +23,7 @@ fn ed25519_clamp(hashed_private_key_bytes: &mut [u8]) {
 }
 
 fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
-    let public_key_point = Ge::ge_scalarmult_precomputed(&hashed_private_key_bytes);
+    let public_key_point = GeP3::ge_scalarmult_precomputed(&hashed_private_key_bytes);
     let public_key_bytes = public_key_point.to_bytes();
     public_key_bytes
 }

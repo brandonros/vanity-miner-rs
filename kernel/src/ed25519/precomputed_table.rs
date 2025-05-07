@@ -1,4 +1,4 @@
-use super::gecached::GeCached;
+use super::ge_cached::GeCached;
 
 pub const PRECOMPUTED_TABLE_BYTES: [[[u8; 32]; 4]; 16] = [
     [
