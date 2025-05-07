@@ -1,4 +1,4 @@
-use crate::ed25519::GeCached;
+use super::gecached::GeCached;
 
 pub const PRECOMPUTED_TABLE_BYTES: [[[u8; 32]; 4]; 16] = [
     [
