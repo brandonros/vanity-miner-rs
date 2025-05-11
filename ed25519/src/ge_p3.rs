@@ -11,7 +11,6 @@ use super::consts::*;
 use super::precomputed_table::PRECOMPUTED_TABLE;
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy)]
 pub struct GeP3 {
     x: Fe,
     y: Fe,
@@ -65,7 +64,10 @@ impl GeP3 {
     pub fn ge_scalarmult_precomputed(scalar: &[u8]) -> GeP3 {
         let mut q = GeP3::zero();
         for pos in (0..=252).rev().step_by(4) {
-            let slot = ((scalar[pos >> 3] >> (pos & 7)) & 15) as usize;
+            let byte_idx = pos >> 3;
+            let bit_shift = pos & 7;
+            let slot = ((scalar[byte_idx] >> bit_shift) & 15) as usize;
+
             let mut t = PRECOMPUTED_TABLE[0];
             for i in 1..16 {
                 let other = &PRECOMPUTED_TABLE[i];
@@ -100,7 +102,6 @@ impl Add<GeCached> for GeP3 {
         let y3 = a + b;
         let z3 = d + c;
         let t3 = d - c;
-
         GeP1P1::new(x3, y3, z3, t3)
     }
 }

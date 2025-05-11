@@ -1,7 +1,7 @@
 use super::fe::Fe;
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct GeCached {
     y_plus_x: Fe,
     y_minus_x: Fe,

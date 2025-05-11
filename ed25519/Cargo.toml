@@ -1,0 +1,10 @@
+[package]
+name = "ed25519"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hex = "0.4.3"

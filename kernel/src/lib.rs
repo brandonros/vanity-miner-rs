@@ -1,13 +1,12 @@
 #![no_std]
 
-use ed25519::GeP3;
-
 extern crate alloc;
 
 mod sha512;
-mod ed25519;
 mod base58;
 mod xorshiro;
+
+use ed25519::GeP3;
 
 fn sha512_hash(input: &[u8]) -> [u8; 64] {
     use crate::sha512::Hasher;
@@ -43,7 +42,12 @@ pub unsafe fn find_vanity_private_key(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // generate random input for private key from thread index and rng seed
-    let thread_idx = cuda_std::thread::index() as usize;
+    //let thread_idx = cuda_std::thread::index() as usize;
+    let thread_idx = 13604434;
+    if thread_idx != 13604434 {
+        return;
+    }
+
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key

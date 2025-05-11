@@ -2,7 +2,6 @@ use super::fe::Fe;
 use super::ge_p3::GeP3;
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy)]
 pub struct GeP1P1 {
     x: Fe,
     y: Fe,

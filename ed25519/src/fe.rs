@@ -7,10 +7,14 @@ use crate::load_8u;
 use super::fiat::*;
 
 #[repr(C, align(16))]
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Fe(pub [u64; 5]);
 
 impl Fe {
+    pub fn new(s: [u64; 5]) -> Self {
+        Self(s)
+    }
+
     pub const fn from_bytes_const(s: &[u8; 32]) -> Fe {
         let mut h = [0u64; 5];
         let mask = 0x7ffffffffffff;
@@ -25,7 +29,7 @@ impl Fe {
     }
 
     fn carry(&self) -> Fe {
-        let mut h = Fe::default();
+        let mut h = Fe::new([0; 5]);
         fiat_25519_carry(&mut h.0, &self.0);
         h
     }
@@ -70,14 +74,15 @@ impl Fe {
 
     pub fn square(&self) -> Fe {
         let &Fe(f) = &self;
-        let mut h = Fe::default();
+        let mut h = Fe::new([0; 5]);
         fiat_25519_carry_square(&mut h.0, f);
         h
     }
 
     pub fn square_and_double(&self) -> Fe {
         let h = self.square();
-        (h + h)
+        let h_clone = Fe::new(h.0);
+        (h + h_clone)
     }
 
     pub fn maybe_set(&mut self, other: &Fe, do_swap: u8) {
@@ -95,7 +100,7 @@ impl Add for Fe {
     fn add(self, _rhs: Fe) -> Fe {
         let Fe(f) = self;
         let Fe(g) = _rhs;
-        let mut h = Fe::default();
+        let mut h = Fe::new([0; 5]);
         fiat_25519_add(&mut h.0, &f, &g);
         h
     }
@@ -107,7 +112,7 @@ impl Sub for Fe {
     fn sub(self, _rhs: Fe) -> Fe {
         let Fe(f) = self;
         let Fe(g) = _rhs;
-        let mut h = Fe::default();
+        let mut h = Fe::new([0; 5]);
         fiat_25519_sub(&mut h.0, &f, &g);
         h.carry()
     }
@@ -119,7 +124,7 @@ impl Mul for Fe {
     fn mul(self, _rhs: Fe) -> Fe {
         let Fe(f) = self;
         let Fe(g) = _rhs;
-        let mut h = Fe::default();
+        let mut h = Fe::new([0; 5]);
         fiat_25519_carry_mul(&mut h.0, &f, &g);
         h
     }
