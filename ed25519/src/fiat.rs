@@ -52,7 +52,7 @@ pub fn fiat_25519_value_barrier_u64(a: u64) -> u64 {
     unsafe { *volatile_ptr }
 }
 
-#[inline(always)]
+#[inline(never)] // corrupt?
 pub fn fiat_25519_to_bytes(out1: &mut [u8; 32], arg1: &[u64; 5]) {
     let mut x1: u64 = 0;
     let mut x2: fiat_25519_u1 = 0;

@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 mod consts;
 mod fe;
 mod fiat;
