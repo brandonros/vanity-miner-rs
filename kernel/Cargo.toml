@@ -1,5 +1,5 @@
 [package]
-name = "ed25519_vanity_kernel"
+name = "kernel"
 version = "0.1.0"
 edition = "2024"
 
