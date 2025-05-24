@@ -33,7 +33,7 @@ ln -s /usr/bin/llvm-config-7 /usr/bin/llvm-config && \
 rm ./*.deb
 
 # install rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-03-02
 . "$HOME/.cargo/env"
 
 # build
