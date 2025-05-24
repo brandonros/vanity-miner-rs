@@ -11,15 +11,15 @@ use rand_xoshiro::Xoroshiro128StarStar;
 use bs58;
 
 // change me!
-pub const SHA512_COMPACT: bool = true;
-pub const ED25519_COMPACT: bool = true;
+pub const ED25519_COMPACT: bool = true; // true = works, false = IllegalAddress
+pub const SHA512_COMPACT: bool = true; // true = works, false = LaunchFailed
 
 fn sha512(input: &[u8]) -> [u8; 64] {
-    if SHA512_COMPACT { // works
+    if SHA512_COMPACT {
         let mut hasher = ed25519_compact::sha512::Hash::new();
         hasher.update(input);
         hasher.finalize()
-    } else { // fails
+    } else {
         let mut hasher = sha2::Sha512::new();
         hasher.update(input);
         hasher.finalize().into()
@@ -27,12 +27,12 @@ fn sha512(input: &[u8]) -> [u8; 64] {
 }
 
 fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
-    if ED25519_COMPACT { // works
+    if ED25519_COMPACT {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
         let public_key_bytes = ge_scalarmult_base(&input).to_bytes();
         public_key_bytes
-    } else { // fails
+    } else {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
         let scalar = Scalar::from_bytes_mod_order(input);
