@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "fab74552c00f1ecaf911a1fff9214f29ae028655" }
-ed25519-compact = { git = "https://github.com/brandonros/rust-ed25519-compact.git", rev = "7605359ed8508d4cef3b958157ad41108261f8d1", default-features = false, features = ["cuda"] }
+ed25519-compact = { git = "https://github.com/brandonros/rust-ed25519-compact.git", rev = "52e7b3cdea5836fc38c3a971ffbbc88c6bf2fa49", default-features = false, features = ["cuda"] }
 sha2 = { version = "0.10.8", default-features = false }
 curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "precomputed-tables"] }
 bs58 = { version = "0.5.1", default-features = false }
