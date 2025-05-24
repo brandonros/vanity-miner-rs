@@ -10,37 +10,37 @@ use rand_xorshift::XorShiftRng;
 use rand_xoshiro::Xoroshiro128StarStar;
 use bs58;
 
-// fails
+// change me!
+pub const SHA512_COMPACT: bool = true;
+pub const ED25519_COMPACT: bool = true;
+
 fn sha512(input: &[u8]) -> [u8; 64] {
-    let mut hasher = sha2::Sha512::new();
-    hasher.update(input);
-    hasher.finalize().into()
+    if SHA512_COMPACT { // works
+        let mut hasher = ed25519_compact::sha512::Hash::new();
+        hasher.update(input);
+        hasher.finalize()
+    } else { // fails
+        let mut hasher = sha2::Sha512::new();
+        hasher.update(input);
+        hasher.finalize().into()
+    }
 }
 
-// works
-fn sha512_compact(input: &[u8]) -> [u8; 64] {
-    let mut hasher = ed25519_compact::sha512::Hash::new();
-    hasher.update(input);
-    hasher.finalize()
-}
-
-// fails
 fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
-    let mut input = [0u8; 32];
-    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let scalar = Scalar::from_bytes_mod_order(input);
-    let point = constants::ED25519_BASEPOINT_TABLE * &scalar;
-    let compressed_point = point.compress();
-    let public_key_bytes = compressed_point.to_bytes();
-    public_key_bytes
-}
-
-// works
-fn derrive_public_key_compact(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
-    let mut input = [0u8; 32];
-    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let public_key_bytes = ge_scalarmult_base(&input).to_bytes();
-    public_key_bytes
+    if ED25519_COMPACT { // works
+        let mut input = [0u8; 32];
+        input.copy_from_slice(&hashed_private_key_bytes[0..32]);
+        let public_key_bytes = ge_scalarmult_base(&input).to_bytes();
+        public_key_bytes
+    } else { // fails
+        let mut input = [0u8; 32];
+        input.copy_from_slice(&hashed_private_key_bytes[0..32]);
+        let scalar = Scalar::from_bytes_mod_order(input);
+        let point = constants::ED25519_BASEPOINT_TABLE * &scalar;
+        let compressed_point = point.compress();
+        let public_key_bytes = compressed_point.to_bytes();
+        public_key_bytes
+    }
 }
 
 #[cuda_std::kernel]
@@ -82,7 +82,7 @@ pub unsafe fn find_vanity_private_key(
     cuda_std::thread::sync_threads();
     
     // ed25519 private key -> public key (first 32 bytes only)
-    let public_key_bytes = derrive_public_key_compact(hashed_private_key_bytes);
+    let public_key_bytes = derrive_public_key(hashed_private_key_bytes);
     cuda_std::thread::sync_threads();
     
     // bs58 encode public key
