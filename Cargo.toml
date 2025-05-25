@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5bfda9ad027bfe1829c5c7263908ec0ed124c528" }
 hex = "0.4.3"
 rand = "0.8"
 
 [build-dependencies]
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5bfda9ad027bfe1829c5c7263908ec0ed124c528" }
