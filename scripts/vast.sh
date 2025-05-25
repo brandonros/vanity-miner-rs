@@ -19,18 +19,27 @@ scp -P $PORT $USER@$HOST:~/.ssh/id_rsa.pub /tmp
 # add it
 gh ssh-key add /tmp/id_rsa.pub
 
-# install  dependencies
+# install dependencies
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-apt update && apt install -y pkg-config libssl-dev zlib1g-dev clang
-curl -sSf -L -O http://security.ubuntu.com/ubuntu/pool/universe/libf/libffi7/libffi7_3.3-5ubuntu1_amd64.deb && \
-curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7_7.0.1-12_amd64.deb && \
-curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-dev_7.0.1-12_amd64.deb && \
-curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/libllvm7_7.0.1-12_amd64.deb && \
-curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-runtime_7.0.1-12_amd64.deb && \
-apt-get install -y ./*.deb && \
-ln -s /usr/bin/llvm-config-7 /usr/bin/llvm-config && \
-rm ./*.deb
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-03-02
+apt update
+apt install -y pkg-config libssl-dev zlib1g-dev clang
+
+if [[ ! -f /usr/bin/llvm-config-7 ]]
+then
+  curl -sSf -L -O http://security.ubuntu.com/ubuntu/pool/universe/libf/libffi7/libffi7_3.3-5ubuntu1_amd64.deb && \
+  curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7_7.0.1-12_amd64.deb && \
+  curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-dev_7.0.1-12_amd64.deb && \
+  curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/libllvm7_7.0.1-12_amd64.deb && \
+  curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-runtime_7.0.1-12_amd64.deb && \
+  apt-get install -y ./*.deb && \
+  ln -s /usr/bin/llvm-config-7 /usr/bin/llvm-config && \
+  rm ./*.deb
+fi
+
+if [[ ! -f ~/.cargo/env ]]
+then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-03-02
+fi
 EOF
 
 # build
@@ -49,4 +58,10 @@ export LLVM_LINK_STATIC="1"
 export RUST_LOG="info"
 export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
 cargo build --release
+EOF
+
+# run
+ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
+pushd ed25519-vanity-rs
+./target/release/ed25519_vanity aa 128 128
 EOF
