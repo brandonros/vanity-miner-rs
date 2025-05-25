@@ -3,11 +3,11 @@ use curve25519_dalek::backend::serial::curve_models::AffineNielsPoint;
 use curve25519_dalek::edwards::EdwardsBasepointTable;
 use curve25519_dalek::window::LookupTable;
 
-#[cuda_std::address_space(global)]
+#[cuda_std::address_space(global)] // without this, the kernel will cause IllegalAddress
 pub static ED25519_BASEPOINT_TABLE: &'static EdwardsBasepointTable =
     &ED25519_BASEPOINT_TABLE_INNER;
 
-#[cuda_std::address_space(global)]
+#[cuda_std::address_space(global)] // without this, the kernel will cause IllegalAddress
 pub static ED25519_BASEPOINT_TABLE_INNER: EdwardsBasepointTable = EdwardsBasepointTable([
     LookupTable([
         AffineNielsPoint {

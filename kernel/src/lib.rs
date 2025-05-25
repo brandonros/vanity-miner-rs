@@ -10,7 +10,6 @@ use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
 
 // change me!
-pub const ED25519_COMPACT: bool = false; // true = works, false = IllegalAddress
 pub const SHA512_COMPACT: bool = true; // true = works, false = LaunchFailed
 
 fn sha512(input: &[u8]) -> [u8; 64] {
@@ -25,64 +24,15 @@ fn sha512(input: &[u8]) -> [u8; 64] {
     }
 }
 
-fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32]) {
-    if ED25519_COMPACT {
-        let mut input = [0u8; 32];
-        input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-        let public_key_bytes = ed25519_compact::ge_scalarmult_base(&input).to_bytes();
-        output.copy_from_slice(&public_key_bytes[0..32]);
-    } else {
-        let mut input = [0u8; 32];
-        input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-        //cuda_std::println!("input: {:02x?}", input);
-
-        // 1
-        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
-        //cuda_std::println!("scalar: {:?}", scalar);
-
-        // 2
-        let point = precomputed_table::ED25519_BASEPOINT_TABLE * &scalar;
-        //cuda_std::println!("point: {:?}", point);
-
-        // 3
-        let recip = point.Z.invert();
-        //cuda_std::println!("recip: {:?}", recip);
-
-        // 4
-        let x = &point.X * &recip;
-        //cuda_std::println!("x: {:?}", x);
-
-        // 5
-        let y = &point.Y * &recip;
-        //cuda_std::println!("y: {:?}", y);
-
-        // 6
-        let mut s = y.as_bytes();
-        //cuda_std::println!("s: {:?}", s);
-
-        // 7
-        let x_bytes = x.as_bytes();
-        //cuda_std::println!("x_bytes: {:?}", x_bytes);
-
-        // 8
-        let x_is_negative = x_bytes[0] & 1;
-        //cuda_std::println!("x_is_negative: {:?}", x_is_negative);
-
-        // 9
-        s[31] ^= x_is_negative << 7;
-        //cuda_std::println!("s: {:?}", s);
-
-        // 10
-        let compressed_point = curve25519_dalek::edwards::CompressedEdwardsY(s);
-        //cuda_std::println!("compressed_point: {:?}", compressed_point);
-
-        // 11
-        let public_key_bytes = compressed_point.to_bytes();
-        //cuda_std::println!("public_key_bytes: {:?}", public_key_bytes);
-
-        // 12
-        output.copy_from_slice(&public_key_bytes[0..32]);
-    }
+fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
+    let mut input = [0u8; 32];
+    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
+    // do not use the ED25519_BASEPOINT_TABLE in curve25519_dalek, it will cause IllegalAddress
+    let point = precomputed_table::ED25519_BASEPOINT_TABLE * &scalar;
+    let compressed_point = point.compress();
+    let public_key_bytes = compressed_point.to_bytes();
+    public_key_bytes
 }
 
 #[cuda_std::kernel]
@@ -120,8 +70,7 @@ pub unsafe fn find_vanity_private_key(
     hashed_private_key_bytes[31] = (hashed_private_key_bytes[31] & 127) | 64;
     
     // ed25519 private key -> public key (first 32 bytes only)
-    let mut public_key_bytes = [0u8; 32];
-    derrive_public_key(hashed_private_key_bytes, &mut public_key_bytes);
+    let public_key_bytes = derrive_public_key(hashed_private_key_bytes);
     
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
