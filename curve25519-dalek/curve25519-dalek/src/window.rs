@@ -44,7 +44,7 @@ macro_rules! impl_lookup_table {
         /// still technically possible.  It would be nice to prevent direct
         /// access to the table.
         #[derive(Copy, Clone)]
-        pub struct $name<T>(pub(crate) [T; $size]);
+        pub struct $name<T>(pub [T; $size]);
 
         impl<T> $name<T>
         where

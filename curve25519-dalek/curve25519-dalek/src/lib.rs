@@ -97,10 +97,10 @@ pub(crate) mod field;
 #[cfg(docsrs)]
 pub mod backend;
 #[cfg(not(docsrs))]
-pub(crate) mod backend;
+pub mod backend;
 
 // Generic code for window lookups
-pub(crate) mod window;
+pub mod window;
 
 pub use crate::{
     edwards::EdwardsPoint, montgomery::MontgomeryPoint, ristretto::RistrettoPoint, scalar::Scalar,

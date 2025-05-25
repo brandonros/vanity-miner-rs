@@ -1,9 +1,9 @@
 use curve25519_dalek::backend::serial::u64::field::FieldElement51;
+use curve25519_dalek::backend::serial::curve_models::AffineNielsPoint;
 use curve25519_dalek::edwards::EdwardsBasepointTable;
-use curve25519_dalek::edwards::AffineNielsPoint;
-use curve25519_dalek::edwards::LookupTable;
+use curve25519_dalek::window::LookupTable;
 
-static ED25519_BASEPOINT_TABLE: EdwardsBasepointTable = EdwardsBasepointTable([
+pub static ED25519_BASEPOINT_TABLE: EdwardsBasepointTable = EdwardsBasepointTable([
     LookupTable([
         AffineNielsPoint {
             y_plus_x: FieldElement51::from_limbs([

@@ -168,7 +168,7 @@ impl ConditionallySelectable for FieldElement51 {
 }
 
 impl FieldElement51 {
-    pub(crate) const fn from_limbs(limbs: [u64; 5]) -> FieldElement51 {
+    pub const fn from_limbs(limbs: [u64; 5]) -> FieldElement51 {
         FieldElement51(fiat_25519_tight_field_element(limbs))
     }
 
