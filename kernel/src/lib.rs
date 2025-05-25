@@ -35,7 +35,7 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32])
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
         cuda_std::println!("input: {:02x?}", input);
         let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
-        cuda_std::println!("scalar: {:?}", scalar);
+        /*cuda_std::println!("scalar: {:?}", scalar);
         let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
         cuda_std::println!("point: {:?}", point);
         let recip = point.Z.invert();
@@ -56,7 +56,7 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32])
         cuda_std::println!("compressed_point: {:?}", compressed_point);
         let public_key_bytes = compressed_point.to_bytes();
         cuda_std::println!("public_key_bytes: {:?}", public_key_bytes);
-        output.copy_from_slice(&public_key_bytes[0..32]);
+        output.copy_from_slice(&public_key_bytes[0..32]);*/
     }
 }
 
