@@ -50,7 +50,7 @@ then
 fi
 pushd ed25519-vanity-rs
 git fetch
-git checkout no-compact
+git checkout --force no-compact
 git reset --hard origin/no-compact
 . $HOME/.cargo/env
 export LLVM_CONFIG="llvm-config-7"
