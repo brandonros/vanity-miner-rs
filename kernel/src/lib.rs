@@ -33,46 +33,54 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32])
     } else {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-        cuda_std::println!("input: {:02x?}", input);
+        //cuda_std::println!("input: {:02x?}", input);
 
         // 1
         let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
-        cuda_std::println!("scalar: {:?}", scalar);
+        //cuda_std::println!("scalar: {:?}", scalar);
 
         // 2
         let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
-        cuda_std::println!("point: {:?}", point);
+        //cuda_std::println!("point: {:?}", point);
 
         // 3
-        /*let recip = point.Z.invert();
-        cuda_std::println!("recip: {:?}", recip);
+        let recip = point.Z.invert();
+        //cuda_std::println!("recip: {:?}", recip);
 
         // 4
         let x = &point.X * &recip;
-        cuda_std::println!("x: {:?}", x);
+        //cuda_std::println!("x: {:?}", x);
 
         // 5
         let y = &point.Y * &recip;
-        cuda_std::println!("y: {:?}", y);
+        //cuda_std::println!("y: {:?}", y);
 
         // 6
         let mut s = y.as_bytes();
-        cuda_std::println!("s: {:?}", s);
+        //cuda_std::println!("s: {:?}", s);
 
         // 7
         let x_bytes = x.as_bytes();
-        cuda_std::println!("x_bytes: {:?}", x_bytes);
+        //cuda_std::println!("x_bytes: {:?}", x_bytes);
 
         // 8
         let x_is_negative = x_bytes[0] & 1;
-        cuda_std::println!("x_is_negative: {:?}", x_is_negative);
+        //cuda_std::println!("x_is_negative: {:?}", x_is_negative);
+
+        // 9
         s[31] ^= x_is_negative << 7;
-        cuda_std::println!("s: {:?}", s);
+        //cuda_std::println!("s: {:?}", s);
+
+        // 10
         let compressed_point = curve25519_dalek::edwards::CompressedEdwardsY(s);
-        cuda_std::println!("compressed_point: {:?}", compressed_point);
+        //cuda_std::println!("compressed_point: {:?}", compressed_point);
+
+        // 11
         let public_key_bytes = compressed_point.to_bytes();
-        cuda_std::println!("public_key_bytes: {:?}", public_key_bytes);
-        output.copy_from_slice(&public_key_bytes[0..32]);*/
+        //cuda_std::println!("public_key_bytes: {:?}", public_key_bytes);
+
+        // 12
+        output.copy_from_slice(&public_key_bytes[0..32]);
     }
 }
 
