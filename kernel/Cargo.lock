@@ -259,13 +259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed25519-compact"
-version = "2.1.1"
-dependencies = [
- "cuda_std",
-]
-
-[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -427,7 +420,6 @@ dependencies = [
  "cuda_builder",
  "cuda_std",
  "curve25519-dalek",
- "ed25519-compact",
  "rand_core",
  "rand_xorshift",
  "rand_xoshiro",

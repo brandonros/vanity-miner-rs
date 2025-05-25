@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod base58;
+mod sha512;
 mod precomputed_table;
 
 use sha2::Digest as _;
@@ -14,7 +15,7 @@ pub const SHA512_COMPACT: bool = true; // true = works, false = LaunchFailed
 
 fn sha512(input: &[u8]) -> [u8; 64] {
     if SHA512_COMPACT {
-        let mut hasher = ed25519_compact::sha512::Hash::new();
+        let mut hasher = sha512::Hash::new();
         hasher.update(input);
         hasher.finalize()
     } else {
