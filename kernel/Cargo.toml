@@ -7,8 +7,8 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "3b3e0497227c913cadf54310f18e4eda8b10f5e3" }
-curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "dbc56e18f6f68383295678d261c0e846722a6fe8", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
+cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "5c453288e39eed68697c3a689f7adf14a3a93ef3", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
 
 [build-dependencies]
-cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "3b3e0497227c913cadf54310f18e4eda8b10f5e3" }
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
