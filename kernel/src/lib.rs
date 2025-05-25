@@ -2,10 +2,11 @@
 
 extern crate alloc;
 
+mod base58;
+
 use sha2::Digest as _;
 use rand_core::{SeedableRng, RngCore};
 use rand_xorshift::XorShiftRng;
-use bs58;
 
 // change me!
 pub const ED25519_COMPACT: bool = false; // true = works, false = IllegalAddress
@@ -23,12 +24,12 @@ fn sha512(input: &[u8]) -> [u8; 64] {
     }
 }
 
-fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
+fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32]) {
     if ED25519_COMPACT {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
         let public_key_bytes = ed25519_compact::ge_scalarmult_base(&input).to_bytes();
-        public_key_bytes
+        output.copy_from_slice(&public_key_bytes[0..32]);
     } else {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
@@ -44,8 +45,7 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
         s[31] ^= x_is_negative << 7;
         let compressed_point = curve25519_dalek::edwards::CompressedEdwardsY(s);
         let public_key_bytes = compressed_point.to_bytes();
-        //public_key_bytes // if you try to return this, IllegalAddress
-        [0u8; 32] // if you return this, everything else above it passes?
+        output.copy_from_slice(&public_key_bytes[0..32]);
     }
 }
 
@@ -72,32 +72,29 @@ pub unsafe fn find_vanity_private_key(
     //let mut rng = Xoroshiro128StarStar::seed_from_u64(rng_seed + idx as u64);
     let mut private_key = [0u8; 32];
     let mut bs58_encoded_public_key = [0u8; 44];
-    cuda_std::thread::sync_threads();
     
     // generate random input
     rng.fill_bytes(&mut private_key[0..32]);
-    cuda_std::thread::sync_threads();
     
     // sha512 hash input
     let mut hashed_private_key_bytes = sha512(&private_key[0..32]);
-    cuda_std::thread::sync_threads();
     
     // apply ed25519 clamping
     hashed_private_key_bytes[0] &= 248;
     hashed_private_key_bytes[31] = (hashed_private_key_bytes[31] & 127) | 64;
-    cuda_std::thread::sync_threads();
     
     // ed25519 private key -> public key (first 32 bytes only)
-    let public_key_bytes = derrive_public_key(hashed_private_key_bytes);
-    cuda_std::thread::sync_threads();
+    cuda_std::println!("hashed_private_key_bytes: {:02x?}", hashed_private_key_bytes);
+    let mut public_key_bytes = [0u8; 32];
+    derrive_public_key(hashed_private_key_bytes, &mut public_key_bytes);
+    //cuda_std::println!("public_key_bytes: {}", public_key_bytes[0]); // if you uncomment this, IllegalAddress
     
     // bs58 encode public key
-    bs58::encode(&public_key_bytes[0..32]).onto(&mut bs58_encoded_public_key[0..]).unwrap();
-    cuda_std::thread::sync_threads();
+    let mut bs58_encoded_public_key = [0u8; 64];
+    //let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
     
     // check if public key starts with vanity prefix
-    let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
-    cuda_std::thread::sync_threads();
+    /*let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
     
     // if match, copy results to host
     if matches {
@@ -115,6 +112,5 @@ pub unsafe fn find_vanity_private_key(
         found_private_key.copy_from_slice(&private_key[0..32]);
         found_public_key.copy_from_slice(&public_key_bytes[0..32]);
         found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
-    }
-    cuda_std::thread::sync_threads();
+    }*/
 }
