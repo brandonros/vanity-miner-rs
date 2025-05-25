@@ -21,8 +21,7 @@ gh ssh-key add /tmp/id_rsa.pub
 
 # install dependencies
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-if ! dpkg -l | grep -q "^ii  pkg-config "
-then
+if ! which pkg-config >/dev/null 2>&1; then
   apt update
   apt install -y pkg-config libssl-dev zlib1g-dev clang
 fi
