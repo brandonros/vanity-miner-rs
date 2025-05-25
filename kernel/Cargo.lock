@@ -156,7 +156,7 @@ dependencies = [
 [[package]]
 name = "cuda_builder"
 version = "0.3.0"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "nvvm",
  "rustc_codegen_nvvm",
@@ -167,7 +167,7 @@ dependencies = [
 [[package]]
 name = "cuda_std"
 version = "0.2.2"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "bitflags",
  "cuda_std_macros",
@@ -179,7 +179,7 @@ dependencies = [
 [[package]]
 name = "cuda_std_macros"
 version = "0.2.0"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -241,7 +241,7 @@ dependencies = [
 [[package]]
 name = "cust_raw"
 version = "0.11.3"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "bimap",
  "bindgen",
@@ -580,7 +580,7 @@ dependencies = [
 [[package]]
 name = "nvvm"
 version = "0.1.1"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "cust_raw",
 ]
@@ -770,7 +770,7 @@ checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 [[package]]
 name = "rustc_codegen_nvvm"
 version = "0.3.0"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "bitflags",
  "build-helper",
@@ -794,7 +794,7 @@ dependencies = [
 [[package]]
 name = "rustc_codegen_nvvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=fab74552c00f1ecaf911a1fff9214f29ae028655#fab74552c00f1ecaf911a1fff9214f29ae028655"
+source = "git+https://github.com/LegNeato/Rust-CUDA.git?rev=efd57d0472c356412e5d6342c98870605823dafa#efd57d0472c356412e5d6342c98870605823dafa"
 dependencies = [
  "proc-macro2",
  "quote",

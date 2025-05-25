@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod base58;
+mod precomputed_table;
 
 use sha2::Digest as _;
 use rand_core::{SeedableRng, RngCore};
