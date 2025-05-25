@@ -98,7 +98,7 @@ impl FieldElement {
     /// # Return
     ///
     /// If negative, return `Choice(1)`.  Otherwise, return `Choice(0)`.
-    pub(crate) fn is_negative(&self) -> Choice {
+    pub fn is_negative(&self) -> Choice {
         let bytes = self.as_bytes();
         (bytes[0] & 1).into()
     }
@@ -203,7 +203,7 @@ impl FieldElement {
     /// This function returns zero on input zero.
     #[rustfmt::skip] // keep alignment of explanatory comments
     #[allow(clippy::let_and_return)]
-    pub(crate) fn invert(&self) -> FieldElement {
+    pub fn invert(&self) -> FieldElement {
         // The bits of p-2 = 2^255 -19 -2 are 11010111111...11.
         //
         //                                 nonzero bits of exponent
