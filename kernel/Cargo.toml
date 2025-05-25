@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "3b3e0497227c913cadf54310f18e4eda8b10f5e3" }
 sha2 = { version = "0.10.8", default-features = false }
-curve25519-dalek = { path = "../curve25519-dalek/curve25519-dalek", default-features = false, features = ["alloc", "precomputed-tables"] }
+curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "dbc56e18f6f68383295678d261c0e846722a6fe8", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
 rand_core = { version = "0.9.3" }
 rand_xorshift = { version = "0.4.0", default-features = false }
 rand_xoshiro = { version = "0.7.0", default-features = false }
