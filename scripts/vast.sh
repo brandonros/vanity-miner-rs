@@ -21,8 +21,11 @@ gh ssh-key add /tmp/id_rsa.pub
 
 # install dependencies
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-apt update
-apt install -y pkg-config libssl-dev zlib1g-dev clang
+if ! dpkg -l | grep -q "^ii  pkg-config "
+then
+  apt update
+  apt install -y pkg-config libssl-dev zlib1g-dev clang
+fi
 
 if [[ ! -f /usr/bin/llvm-config-7 ]]
 then
