@@ -952,7 +952,7 @@ macro_rules! impl_basepoint_table {
         /// add the carry bit onto an additional coefficient.
         #[derive(Clone)]
         #[repr(transparent)]
-        pub struct $name(pub(crate) [$table<AffineNielsPoint>; 32]);
+        pub struct $name(pub [$table<AffineNielsPoint>; 32]);
 
         impl BasepointTable for $name {
             type Point = $point;
