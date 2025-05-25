@@ -40,11 +40,11 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64], output: &mut [u8; 32])
         cuda_std::println!("scalar: {:?}", scalar);
 
         // 2
-        /*let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
+        let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
         cuda_std::println!("point: {:?}", point);
 
         // 3
-        let recip = point.Z.invert();
+        /*let recip = point.Z.invert();
         cuda_std::println!("recip: {:?}", recip);
 
         // 4
