@@ -9,7 +9,7 @@ use rand_xoshiro::Xoroshiro128StarStar;
 use bs58;
 
 // change me!
-pub const ED25519_COMPACT: bool = true; // true = works, false = IllegalAddress
+pub const ED25519_COMPACT: bool = false; // true = works, false = IllegalAddress
 pub const SHA512_COMPACT: bool = true; // true = works, false = LaunchFailed
 
 fn sha512(input: &[u8]) -> [u8; 64] {
@@ -34,8 +34,8 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
         let mut input = [0u8; 32];
         input.copy_from_slice(&hashed_private_key_bytes[0..32]);
         let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
-        let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
-        /*let compressed_point = point.compress();
+        /*let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
+        let compressed_point = point.compress();
         let public_key_bytes = compressed_point.to_bytes();
         public_key_bytes*/
         [0u8; 32]
