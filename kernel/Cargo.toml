@@ -1,5 +1,5 @@
 [package]
-name = "ed25519_vanity_kernel"
+name = "kernel"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,8 +7,8 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-ed25519 = { path = "../ed25519" }
+cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "3b3e0497227c913cadf54310f18e4eda8b10f5e3" }
+curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "dbc56e18f6f68383295678d261c0e846722a6fe8", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
 
 [build-dependencies]
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "3b3e0497227c913cadf54310f18e4eda8b10f5e3" }

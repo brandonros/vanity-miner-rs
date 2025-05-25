@@ -6,8 +6,6 @@ mod sha512;
 mod base58;
 mod xorshiro;
 
-use ed25519::GeP3;
-
 fn sha512_hash(input: &[u8]) -> [u8; 64] {
     use crate::sha512::Hasher;
     let mut hasher = Hasher::new();
@@ -22,8 +20,12 @@ fn ed25519_clamp(hashed_private_key_bytes: &mut [u8]) {
 }
 
 fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
-    let public_key_point = GeP3::ge_scalarmult_precomputed(&hashed_private_key_bytes);
-    let public_key_bytes = public_key_point.to_bytes();
+    let mut input = [0u8; 32];
+    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
+    let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
+    let compressed_point = point.compress();
+    let public_key_bytes = compressed_point.to_bytes();
     public_key_bytes
 }
 
@@ -42,11 +44,7 @@ pub unsafe fn find_vanity_private_key(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // generate random input for private key from thread index and rng seed
-    //let thread_idx = cuda_std::thread::index() as usize;
-    let thread_idx = 13604434;
-    if thread_idx != 13604434 {
-        return;
-    }
+    let thread_idx = cuda_std::thread::index() as usize;
 
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
