@@ -2,6 +2,7 @@
 .github
 .vscode
 target
+scripts
 .gitignore
 Dockerfile.build
 README.md

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-PORT=32356
-HOST=ssh7.vast.ai
+PORT=35456
+HOST=ssh3.vast.ai
 USER=root
 
 # generate key
@@ -52,18 +52,14 @@ then
 fi
 pushd ed25519-vanity-rs
 git fetch
-git checkout --force no-compact
-git reset --hard origin/no-compact
+git checkout --force master
+git reset --hard origin/master
 . $HOME/.cargo/env
-export LLVM_CONFIG="llvm-config-7"
-export LLVM_LINK_STATIC="1"
-export RUST_LOG="info"
-export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
 cargo build --release
 EOF
 
 # run
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 pushd ed25519-vanity-rs
-./target/release/ed25519_vanity aa 8192 256
+./target/release/ed25519_vanity jose 16384 256
 EOF
