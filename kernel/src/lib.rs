@@ -120,18 +120,15 @@ pub unsafe fn find_vanity_private_key(
     hashed_private_key_bytes[31] = (hashed_private_key_bytes[31] & 127) | 64;
     
     // ed25519 private key -> public key (first 32 bytes only)
-    cuda_std::println!("hashed_private_key_bytes: {:02x?}", hashed_private_key_bytes);
     let mut public_key_bytes = [0u8; 32];
     derrive_public_key(hashed_private_key_bytes, &mut public_key_bytes);
-    cuda_std::println!("public_key_bytes: {:02x?}", public_key_bytes);
-    //cuda_std::println!("public_key_bytes: {}", public_key_bytes[0]); // if you uncomment this, IllegalAddress
     
     // bs58 encode public key
-   // let mut bs58_encoded_public_key = [0u8; 64];
-    //let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
+    let mut bs58_encoded_public_key = [0u8; 64];
+    let _encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
     
     // check if public key starts with vanity prefix
-    /*let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
+    let matches = bs58_encoded_public_key[0..vanity_prefix_len] == *vanity_prefix;
     
     // if match, copy results to host
     if matches {
@@ -149,5 +146,5 @@ pub unsafe fn find_vanity_private_key(
         found_private_key.copy_from_slice(&private_key[0..32]);
         found_public_key.copy_from_slice(&public_key_bytes[0..32]);
         found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..44]);
-    }*/
+    }
 }
