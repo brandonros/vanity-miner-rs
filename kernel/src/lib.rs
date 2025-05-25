@@ -124,12 +124,7 @@ mod test {
         assert_eq!(hashed_private_key_bytes, *expected);
         
         // derive public key
-        // 686dc4b5c87f2b57e02704bc828e944dbe9386b1173fa77fa6ad9d88d773c849
         let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes);
-        // 0af764d3344071f9 9a f70520 73 1c f1 a452f4cf 42 61 19fea87 15 cd75585118630
-        // 0af764d3344071f9 99 f70520 b3 1c e9 a452f4cf 44 21 19fea87 16 cd75585118630
-
-        // 0af764d3344071f999f70520b31ce9a452f4cf442119fea8716cd75585118630
         let expected = b"\x0a\xf7\x64\xd3\x34\x40\x71\xf9\x99\xf7\x05\x20\xb3\x1c\xe9\xa4\x52\xf4\xcf\x44\x21\x19\xfe\xa8\x71\x6c\xd7\x55\x85\x11\x86\x30";
         assert_eq!(public_key_bytes, *expected);
 
