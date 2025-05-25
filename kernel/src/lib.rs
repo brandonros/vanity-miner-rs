@@ -35,18 +35,17 @@ fn derrive_public_key(hashed_private_key_bytes: [u8; 64]) -> [u8; 32] {
         let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
         let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
         let recip = point.Z.invert();
-        /*let compressed_point = {
-            let recip = point.Z.invert();
-            let x = &point.X * &recip;
-            let y = &point.Y * &recip;
-            let mut s: [u8; 32];
-            s = y.as_bytes();
-            s[31] ^= x.is_negative().unwrap_u8() << 7;
-            curve25519_dalek::edwards::CompressedEdwardsY(s)
-        };
+        let x = &point.X * &recip;
+        let y = &point.Y * &recip;
+        let mut s: [u8; 32];
+        s = y.as_bytes();
+        let x_bytes = x.as_bytes();
+        let x_is_negative = x_bytes[0] & 1;
+        s[31] ^= x_is_negative << 7;
+        let compressed_point = curve25519_dalek::edwards::CompressedEdwardsY(s);
         let public_key_bytes = compressed_point.to_bytes();
-        public_key_bytes*/
-        [0u8; 32]
+        //public_key_bytes // if you try to return this, IllegalAddress
+        [0u8; 32] // if you return this, everything else above it passes?
     }
 }
 
