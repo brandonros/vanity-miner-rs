@@ -104,7 +104,8 @@ fn device_main(
             let found_thread_idx = found_thread_idx_slice[0];
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
             let encoded_public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
-            println!("[{ordinal}] First match: seed = {rng_seed} thread_idx = {found_thread_idx} encoded_public_key = {encoded_public_key_string} wallet = {wallet_formatted_result}");
+            println!("[{ordinal}] First match: seed = {rng_seed} thread_idx = {found_thread_idx} encoded_public_key = {encoded_public_key_string}");
+            println!("[{ordinal}] First match: public_key = {} private_key = {} wallet = {}", hex::encode(found_public_key), hex::encode(found_private_key), wallet_formatted_result);
 
             // Print stats using global counters
             global_stats.print_stats(
