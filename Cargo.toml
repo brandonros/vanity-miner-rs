@@ -10,7 +10,7 @@ rand = "0.8"
 
 [build-dependencies]
 # christian's branch
-#cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "9026816330a8745df7bf1bf9f7ad21889f7375f0" }
+cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # normal
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+#cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

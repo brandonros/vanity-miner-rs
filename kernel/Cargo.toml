@@ -8,9 +8,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # christian's branch
-#cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "9026816330a8745df7bf1bf9f7ad21889f7375f0" }
-#curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "precomputed-tables"] }
+cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
+curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "precomputed-tables"] }
 
 # normal
-cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "5c453288e39eed68697c3a689f7adf14a3a93ef3", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
+#cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+#curve25519-dalek = { git = "https://github.com/brandonros/curve25519-dalek.git", rev = "5c453288e39eed68697c3a689f7adf14a3a93ef3", default-features = false, features = ["alloc", "precomputed-tables", "cuda"] }
