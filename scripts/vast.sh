@@ -1,7 +1,7 @@
 #!/bin/bash
 
-PORT=35456
-HOST=ssh3.vast.ai
+PORT=23458
+HOST=ssh9.vast.ai
 USER=root
 
 # generate key
@@ -16,7 +16,7 @@ EOF
 # copy it
 scp -P $PORT $USER@$HOST:~/.ssh/id_rsa.pub /tmp
 
-# add it
+# add it to github
 gh ssh-key add /tmp/id_rsa.pub
 
 # install dependencies
@@ -26,6 +26,7 @@ if ! which pkg-config >/dev/null 2>&1; then
   apt install -y pkg-config libssl-dev zlib1g-dev clang
 fi
 
+# llvm-7
 if [[ ! -f /usr/bin/llvm-config-7 ]]
 then
   curl -sSf -L -O http://security.ubuntu.com/ubuntu/pool/universe/libf/libffi7/libffi7_3.3-5ubuntu1_amd64.deb && \
@@ -38,6 +39,7 @@ then
   rm ./*.deb
 fi
 
+# rust
 if [[ ! -f ~/.cargo/env ]]
 then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly-2025-03-02
@@ -46,14 +48,19 @@ EOF
 
 # build
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
+# clone
 if [[ ! -d ed25519-vanity-rs ]]
 then
   GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone git@github.com:brandonros/ed25519-vanity-rs.git
 fi
+
+# checkout
 pushd ed25519-vanity-rs
 git fetch
 git checkout --force master
 git reset --hard origin/master
+
+# build
 . $HOME/.cargo/env
 cargo build --release
 EOF
@@ -61,5 +68,5 @@ EOF
 # run
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 pushd ed25519-vanity-rs
-./target/release/ed25519_vanity jose 16384 256
+./target/release/ed25519_vanity aa 16384 256
 EOF

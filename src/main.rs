@@ -10,6 +10,9 @@ use cust::{launch, CudaFlags};
 use rand::Rng;
 use std::time::Instant;
 use std::error::Error;
+use std::sync::Arc;
+
+use crate::stats::GlobalStats;
 
 fn device_main(
     ordinal: usize, 
