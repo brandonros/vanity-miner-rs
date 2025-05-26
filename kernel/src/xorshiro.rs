@@ -1,5 +1,6 @@
 pub fn generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
-    // Initialize state with thread_idx and seed
+    
+    /*// Initialize state with thread_idx and seed
     let mut s0 = thread_idx as u64 ^ rng_seed;
     let mut s1 = s0.wrapping_add(0x9E3779B97F4A7C15); // Use golden ratio for second part of state
     
@@ -33,5 +34,12 @@ pub fn generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32]
         private_key[i..end].copy_from_slice(&bytes[0..(end - i)]);
     }
     
-    private_key
+    private_key*/
+
+    use rand_core::{SeedableRng, RngCore};
+    use rand_xoshiro::Xoroshiro128StarStar;
+    let mut private_key = [0u8; 32];
+    let mut rng = Xoroshiro128StarStar::seed_from_u64(rng_seed);
+    let mut input = [0u8; 32];
+    rng.fill_bytes(&mut input);
 }
