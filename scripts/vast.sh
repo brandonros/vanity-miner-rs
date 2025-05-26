@@ -1,10 +1,8 @@
 #!/bin/bash
 
-PORT=13360
-HOST=ssh4.vast.ai
+PORT=29756
+HOST=ssh3.vast.ai
 USER=root
-
-ssh -p $PORT $USER@$HOST
 
 # generate key
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
