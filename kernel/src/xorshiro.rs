@@ -1,4 +1,4 @@
-const USE_CRATE: bool = false;
+const USE_CRATE: bool = true;
 
 pub fn generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32] {
     if USE_CRATE {
