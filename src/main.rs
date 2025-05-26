@@ -101,8 +101,9 @@ fn device_main(
 
             // Format results
             let found_thread_idx = found_thread_idx_slice[0];
-            let encoded_public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
-            println!("[{ordinal}] First match: seed = {rng_seed} thread_idx = {found_thread_idx} encoded_public_key = {encoded_public_key_string}");
+            let found_bs58_encoded_public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
+            println!("[{ordinal}] First match: seed = {rng_seed} thread_idx = {found_thread_idx}");
+            println!("[{ordinal}] First match: encoded_public_key = {found_bs58_encoded_public_key_string}");
             println!("[{ordinal}] First match: public_key = {}", hex::encode(found_public_key));
             println!("[{ordinal}] First match: private_key = {}", hex::encode(found_private_key));
             println!("[{ordinal}] First match: wallet = {}", hex::encode([found_private_key, found_public_key].concat()));

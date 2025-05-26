@@ -68,5 +68,5 @@ EOF
 # run
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 pushd ed25519-vanity-rs
-./target/release/ed25519_vanity APRiLP 8192 256
+./target/release/ed25519_vanity APRiLPE 8192 256
 EOF

@@ -5,7 +5,6 @@ use std::time::Instant;
 
 pub struct GlobalStats {
     num_devices: usize,
-    launches: AtomicUsize,
     matches_found: AtomicUsize,
     total_operations: AtomicU64,
     start_time: Instant,
@@ -15,7 +14,6 @@ impl GlobalStats {
     pub fn new(num_devices: usize) -> Self {
         Self {
             num_devices,
-            launches: AtomicUsize::new(0),
             matches_found: AtomicUsize::new(0),
             total_operations: AtomicU64::new(0),
             start_time: Instant::now(),
@@ -23,7 +21,6 @@ impl GlobalStats {
     }
 
     pub fn add_launch(&self, operations: usize) {
-        self.launches.fetch_add(1, Ordering::Relaxed);
         self.total_operations.fetch_add(operations as u64, Ordering::Relaxed);
     }
 
@@ -32,7 +29,6 @@ impl GlobalStats {
     }
 
     pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
-        let launches = self.launches.load(Ordering::Relaxed);
         let matches = self.matches_found.load(Ordering::Relaxed);
         let operations = self.total_operations.load(Ordering::Relaxed);
         
