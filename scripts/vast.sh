@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PORT=29756
+PORT=30508
 HOST=ssh3.vast.ai
 USER=root
 

@@ -39,8 +39,15 @@ impl GlobalStats {
         let launches_per_second = launches as f64 / elapsed_seconds;
         let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
         let matches_per_second = matches as f64 / elapsed_seconds;
+        
+        // Calculate operations per match
+        let operations_per_match = if matches > 0 {
+            operations as f64 / matches as f64
+        } else {
+            f64::INFINITY // or you could use 0.0 or handle this case differently
+        };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} total launches, {operations} total operations");
+        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec, {operations_per_match:.0} ops/match) with {launches} total launches, {operations} total operations");
     }
 }
