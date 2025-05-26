@@ -38,7 +38,6 @@ impl GlobalStats {
         
         let elapsed = self.start_time.elapsed();
         let elapsed_seconds = elapsed.as_secs_f64();
-        let launches_per_second = launches as f64 / elapsed_seconds;
         let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
         let device_operations_per_second = operations as f64 / elapsed_seconds / self.num_devices as f64 / 1_000_000.0;
         let matches_per_second = matches as f64 / elapsed_seconds;
