@@ -49,6 +49,6 @@ impl GlobalStats {
         };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.2}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.0}M ops/match)");
+        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.0}M ops/match)");
     }
 }
