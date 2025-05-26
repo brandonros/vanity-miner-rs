@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Found {} CUDA devices", num_devices);
 
     // Initialize global stats
-    let global_stats = Arc::new(GlobalStats::new());
+    let global_stats = Arc::new(GlobalStats::new(num_devices));
 
     // start threads
     let mut handles = Vec::new();

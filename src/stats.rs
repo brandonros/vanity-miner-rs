@@ -4,6 +4,7 @@ use std::sync::atomic::AtomicUsize;
 use std::time::Instant;
 
 pub struct GlobalStats {
+    num_devices: usize,
     launches: AtomicUsize,
     matches_found: AtomicUsize,
     total_operations: AtomicU64,
@@ -11,8 +12,9 @@ pub struct GlobalStats {
 }
 
 impl GlobalStats {
-    pub fn new() -> Self {
+    pub fn new(num_devices: usize) -> Self {
         Self {
+            num_devices,
             launches: AtomicUsize::new(0),
             matches_found: AtomicUsize::new(0),
             total_operations: AtomicU64::new(0),
@@ -38,14 +40,15 @@ impl GlobalStats {
         let elapsed_seconds = elapsed.as_secs_f64();
         let launches_per_second = launches as f64 / elapsed_seconds;
         let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
+        let device_operations_per_second = operations as f64 / elapsed_seconds / self.num_devices as f64 / 1_000_000.0;
         let matches_per_second = matches as f64 / elapsed_seconds;
         let operations_per_match = if matches > 0 {
-            operations as f64 / matches as f64
+            operations as f64 / matches as f64 / 1_000_000.0
         } else {
             0.0
         };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec, {operations_per_match:.0} ops/match) with {launches} total launches, {operations} total operations");
+        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.0}M ops/match) with {launches} total launches, {operations} total operations");
     }
 }
