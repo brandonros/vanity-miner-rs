@@ -1,0 +1,42 @@
+pub struct GlobalStats {
+    launches: AtomicUsize,
+    matches_found: AtomicUsize,
+    total_operations: AtomicU64,
+    start_time: Instant,
+}
+
+impl GlobalStats {
+    pub fn new() -> Self {
+        Self {
+            launches: AtomicUsize::new(0),
+            matches_found: AtomicUsize::new(0),
+            total_operations: AtomicU64::new(0),
+            start_time: Instant::now(),
+        }
+    }
+
+    fn add_launch(&self, operations: usize) {
+        self.launches.fetch_add(1, Ordering::Relaxed);
+        self.total_operations.fetch_add(operations as u64, Ordering::Relaxed);
+    }
+
+    fn add_matches(&self, matches: usize) {
+        self.matches_found.fetch_add(matches, Ordering::Relaxed);
+    }
+
+    fn print_stats(&self, device_id: usize, matches_this_launch: f32, public_key: &str, wallet: &str, seed: u64, thread_idx: u32) {
+        let launches = self.launches.load(Ordering::Relaxed);
+        let matches = self.matches_found.load(Ordering::Relaxed);
+        let operations = self.total_operations.load(Ordering::Relaxed);
+        
+        let elapsed = self.start_time.elapsed();
+        let elapsed_seconds = elapsed.as_secs_f64();
+        let launches_per_second = launches as f64 / elapsed_seconds;
+        let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
+        let matches_per_second = matches as f64 / elapsed_seconds;
+
+        println!("[{device_id}] Found {matches_this_launch} matches this launch");
+        println!("[{device_id}] First match: seed = {seed} thread_idx = {thread_idx} public_key = {public_key} wallet = {wallet}");
+        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} total launches, {operations} total operations");
+    }
+}

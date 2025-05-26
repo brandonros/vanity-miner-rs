@@ -1,3 +1,5 @@
+mod stats;
+
 use cust::device::Device;
 use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;
@@ -13,7 +15,8 @@ fn device_main(
     ordinal: usize, 
     vanity_prefix: String, 
     blocks_per_grid: usize, 
-    threads_per_block: usize
+    threads_per_block: usize,
+    global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // check if the vanity prefix contains any of the forbidden characters
     assert!(vanity_prefix.contains("l") == false); // lowercase L
@@ -51,7 +54,6 @@ fn device_main(
         launches += 1;
         total_operations += operations_per_launch;
         let rng_seed: u64 = rng.r#gen::<u64>();
-        //let rng_seed: u64 = 3314977520786701659;
         
         let mut found_flag_slice = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
@@ -85,6 +87,9 @@ fn device_main(
 
         stream.synchronize()?;
 
+        // increment stats
+        global_stats.add_launch(operations_per_launch);
+
         // Check if we found a match
         found_flag_slice_dev.copy_to(&mut found_flag_slice)?;
         
@@ -95,20 +100,22 @@ fn device_main(
             found_bs58_encoded_public_key_dev.copy_to(&mut found_bs58_encoded_public_key)?;
             found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
 
-            // print
+            global_stats.add_matches(found_flag_slice[0] as usize);
+
+            // Format results
             let found_thread_idx = found_thread_idx_slice[0];
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
             let public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
-            println!("[{ordinal}] Found match: {rng_seed} {found_thread_idx} {public_key_string} {wallet_formatted_result}");
 
-            // increment stats
-            matches_found += found_flag_slice[0] as usize;
-            let elapsed = start_time.elapsed();
-            let elapsed_seconds = elapsed.as_secs_f64();
-            let launches_per_second = launches as f64 / elapsed_seconds;
-            let operations_per_second = total_operations as f64 / elapsed_seconds / 1_000_000.00;
-            let matches_per_second = matches_found as f64 / elapsed_seconds;
-            println!("[{ordinal}] Found {matches_found} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} launches {total_operations} operations {operations_per_launch} ops/launch {blocks_per_grid} blocks/grid {threads_per_block} threads/block");
+            // Print stats using global counters
+            global_stats.print_stats(
+                ordinal,
+                found_flag_slice[0],
+                &public_key_string,
+                &wallet_formatted_result,
+                rng_seed,
+                found_thread_idx
+            );
         }
     }
 }
@@ -121,16 +128,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let threads_per_block = args[3].parse::<usize>().unwrap();
 
     // Initialize CUDA context and get default stream
-    
     cust::init(CudaFlags::empty())?;
     let num_devices = Device::num_devices()?;
     println!("Found {} CUDA devices", num_devices);
 
+    // Initialize global stats
+    let global_stats = Arc::new(GlobalStats::new());
+
+    // start threads
     let mut handles = Vec::new();
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let vanity_prefix_clone = vanity_prefix.clone();
-        let handle = std::thread::spawn(move || device_main(i, vanity_prefix_clone, blocks_per_grid, threads_per_block));
+        let stats_clone = Arc::clone(&global_stats);
+        let handle = std::thread::spawn(move || device_main(
+            i,
+            vanity_prefix_clone,
+            blocks_per_grid,
+            threads_per_block,
+            stats_clone
+        ));
         handles.push(handle);
     }
     for handle in handles {
