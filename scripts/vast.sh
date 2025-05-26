@@ -1,7 +1,7 @@
 #!/bin/bash
 
-PORT=30508
-HOST=ssh3.vast.ai
+PORT=30618
+HOST=ssh5.vast.ai
 USER=root
 
 # generate key
