@@ -29,7 +29,7 @@ impl GlobalStats {
         self.matches_found.fetch_add(matches, Ordering::Relaxed);
     }
 
-    pub fn print_stats(&self, device_id: usize, matches_this_launch: f32, public_key: &str, wallet: &str, seed: u64, thread_idx: u32) {
+    pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
         let launches = self.launches.load(Ordering::Relaxed);
         let matches = self.matches_found.load(Ordering::Relaxed);
         let operations = self.total_operations.load(Ordering::Relaxed);
@@ -41,7 +41,6 @@ impl GlobalStats {
         let matches_per_second = matches as f64 / elapsed_seconds;
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] First match: seed = {seed} thread_idx = {thread_idx} public_key = {public_key} wallet = {wallet}");
         println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({matches_per_second:.6} matches/sec, {launches_per_second:.2} launches/sec, {operations_per_second:.2}M ops/sec) with {launches} total launches, {operations} total operations");
     }
 }

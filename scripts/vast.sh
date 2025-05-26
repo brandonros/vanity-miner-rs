@@ -4,6 +4,8 @@ PORT=13360
 HOST=ssh4.vast.ai
 USER=root
 
+ssh -p $PORT $USER@$HOST
+
 # generate key
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 if [[ ! -f ~/.ssh/id_rsa ]]
@@ -68,5 +70,5 @@ EOF
 # run
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 pushd ed25519-vanity-rs
-./target/release/ed25519_vanity aa 16384 256
+./target/release/ed25519_vanity aa 8192 256
 EOF

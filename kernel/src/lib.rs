@@ -37,7 +37,7 @@ pub unsafe fn find_vanity_private_key(
     vanity_prefix_len: usize, 
     rng_seed: u64,
     // output
-    found_flag_slice_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_bs58_encoded_public_key_ptr: *mut u8,
@@ -76,22 +76,22 @@ pub unsafe fn find_vanity_private_key(
     
     // if match, copy found match to host
     if matches {
-        let found_flag_slice = unsafe { core::slice::from_raw_parts_mut(found_flag_slice_ptr, 1) };
+        let found_matches_slice = unsafe { core::slice::from_raw_parts_mut(found_matches_slice_ptr, 1) };
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
         let found_bs58_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_bs58_encoded_public_key_ptr, 64) };
         let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
-        let found_flag = &mut found_flag_slice[0];
+        let found_matches = &mut found_matches_slice[0];
 
         // if first find, copy results to host
-        if found_flag.load(core::sync::atomic::Ordering::SeqCst) == 0.0 {
+        if found_matches.load(core::sync::atomic::Ordering::SeqCst) == 0.0 {
             found_private_key.copy_from_slice(&private_key[0..32]);
             found_public_key.copy_from_slice(&public_key_bytes[0..32]);
             found_bs58_encoded_public_key.copy_from_slice(&bs58_encoded_public_key[0..64]);
             found_thread_idx_slice[0] = thread_idx as u32;
         }
 
-        found_flag.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
+        found_matches.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
         cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);   
     }
 }

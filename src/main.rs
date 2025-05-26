@@ -52,14 +52,14 @@ fn device_main(
     loop {
         let rng_seed: u64 = rng.r#gen::<u64>();
         
-        let mut found_flag_slice = [0.0f32; 1];
+        let mut found_matches_slice = [0.0f32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
         let mut found_bs58_encoded_public_key = [0u8; 64];
         let mut found_thread_idx_slice = [0u32; 1];
         
         let vanity_prefix_dev = vanity_prefix_bytes.as_dbuf()?;
-        let found_flag_slice_dev = found_flag_slice.as_dbuf()?;
+        let found_matches_slice_dev = found_matches_slice.as_dbuf()?;
         let found_private_key_dev = found_private_key.as_dbuf()?;
         let found_public_key_dev = found_public_key.as_dbuf()?;
         let found_bs58_encoded_public_key_dev = found_bs58_encoded_public_key.as_dbuf()?;    
@@ -73,7 +73,7 @@ fn device_main(
                     vanity_prefix_dev.as_device_ptr(),
                     vanity_prefix_len,
                     rng_seed,
-                    found_flag_slice_dev.as_device_ptr(),
+                    found_matches_slice_dev.as_device_ptr(),
                     found_private_key_dev.as_device_ptr(),
                     found_public_key_dev.as_device_ptr(),
                     found_bs58_encoded_public_key_dev.as_device_ptr(),
@@ -88,30 +88,28 @@ fn device_main(
         global_stats.add_launch(operations_per_launch);
 
         // Check if we found a match
-        found_flag_slice_dev.copy_to(&mut found_flag_slice)?;
+        found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
         
-        if found_flag_slice[0] != 0.0 {
+        let found_matches = found_matches_slice[0];
+        if found_matches != 0.0 {
             // We found a match! Copy results back to host
             found_private_key_dev.copy_to(&mut found_private_key)?;
             found_public_key_dev.copy_to(&mut found_public_key)?;
             found_bs58_encoded_public_key_dev.copy_to(&mut found_bs58_encoded_public_key)?;
             found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
 
-            global_stats.add_matches(found_flag_slice[0] as usize);
+            global_stats.add_matches(found_matches as usize);
 
             // Format results
             let found_thread_idx = found_thread_idx_slice[0];
             let wallet_formatted_result = hex::encode([found_private_key, found_public_key].concat());
-            let public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
+            let encoded_public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
+            println!("[{ordinal}] First match: seed = {rng_seed} thread_idx = {found_thread_idx} encoded_public_key = {encoded_public_key_string} wallet = {wallet_formatted_result}");
 
             // Print stats using global counters
             global_stats.print_stats(
                 ordinal,
-                found_flag_slice[0],
-                &public_key_string,
-                &wallet_formatted_result,
-                rng_seed,
-                found_thread_idx
+                found_matches,
             );
         }
     }
