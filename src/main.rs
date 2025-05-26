@@ -44,18 +44,12 @@ fn device_main(
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
     let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
 
-    let mut launches = 0;
     let operations_per_launch = blocks_per_grid * threads_per_block;
     println!("[{ordinal}] Starting search loop...");
 
     let mut rng = rand::thread_rng();
-    let start_time = Instant::now();
-    let mut matches_found = 0;
-    let mut total_operations = 0;
 
     loop {
-        launches += 1;
-        total_operations += operations_per_launch;
         let rng_seed: u64 = rng.r#gen::<u64>();
         
         let mut found_flag_slice = [0.0f32; 1];
