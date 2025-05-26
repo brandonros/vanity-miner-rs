@@ -40,6 +40,6 @@ pub fn generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32]
     use rand_xoshiro::Xoroshiro128StarStar;
     let mut private_key = [0u8; 32];
     let mut rng = Xoroshiro128StarStar::seed_from_u64(rng_seed);
-    let mut input = [0u8; 32];
-    rng.fill_bytes(&mut input);
+    rng.fill_bytes(&mut private_key);
+    private_key
 }
