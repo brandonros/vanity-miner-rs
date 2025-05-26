@@ -8,7 +8,6 @@ use cust::util::SliceExt;
 use cust::memory::CopyDestination;
 use cust::{launch, CudaFlags};
 use rand::Rng;
-use std::time::Instant;
 use std::error::Error;
 use std::sync::Arc;
 
