@@ -20,16 +20,16 @@ impl GlobalStats {
         }
     }
 
-    fn add_launch(&self, operations: usize) {
+    pub fn add_launch(&self, operations: usize) {
         self.launches.fetch_add(1, Ordering::Relaxed);
         self.total_operations.fetch_add(operations as u64, Ordering::Relaxed);
     }
 
-    fn add_matches(&self, matches: usize) {
+    pub fn add_matches(&self, matches: usize) {
         self.matches_found.fetch_add(matches, Ordering::Relaxed);
     }
 
-    fn print_stats(&self, device_id: usize, matches_this_launch: f32, public_key: &str, wallet: &str, seed: u64, thread_idx: u32) {
+    pub fn print_stats(&self, device_id: usize, matches_this_launch: f32, public_key: &str, wallet: &str, seed: u64, thread_idx: u32) {
         let launches = self.launches.load(Ordering::Relaxed);
         let matches = self.matches_found.load(Ordering::Relaxed);
         let operations = self.total_operations.load(Ordering::Relaxed);
