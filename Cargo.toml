@@ -4,12 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-#cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "6a3b08bfaa3c3441f7e3d8a522ad444d794e35b5" }
-cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "9026816330a8745df7bf1bf9f7ad21889f7375f0" }
+#cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 hex = "0.4.3"
 rand = "0.8"
 
 [build-dependencies]
-#cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "6a3b08bfaa3c3441f7e3d8a522ad444d794e35b5" }
-
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "9026816330a8745df7bf1bf9f7ad21889f7375f0" }
+#cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
