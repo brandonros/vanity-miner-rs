@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PORT=32190
+PORT=10452
 HOST=ssh2.vast.ai
 USER=root
 
@@ -68,5 +68,5 @@ EOF
 # run
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
 pushd ed25519-vanity-rs
-./target/release/ed25519_vanity aaa 16384 256
+./target/release/ed25519_vanity aa aa
 EOF
