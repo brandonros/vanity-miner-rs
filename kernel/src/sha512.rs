@@ -10,7 +10,8 @@
     clippy::unreadable_literal
 )]
 
-const ROUND_CONSTANTS: [u64; 80] = [
+#[cuda_std::address_space(constant)]
+static ROUND_CONSTANTS: [u64; 80] = [
     0x428a2f98d728ae22,
     0x7137449123ef65cd,
     0xb5c0fbcfec4d3b2f,
@@ -93,7 +94,8 @@ const ROUND_CONSTANTS: [u64; 80] = [
     0x6c44198c4a475817,
 ];
 
-const INITIAL_STATE: [u64; 8] = [
+#[cuda_std::address_space(constant)]
+static INITIAL_STATE: [u64; 8] = [
     0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 
     0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
     0x510e527fade682d1, 0x9b05688c2b3e6c1f, 
@@ -102,15 +104,16 @@ const INITIAL_STATE: [u64; 8] = [
 
 #[inline(always)]
 fn load_be(base: &[u8], offset: usize) -> u64 {
-    let addr = &base[offset..];
-    (addr[7] as u64)
-        | (addr[6] as u64) << 8
-        | (addr[5] as u64) << 16
-        | (addr[4] as u64) << 24
-        | (addr[3] as u64) << 32
-        | (addr[2] as u64) << 40
-        | (addr[1] as u64) << 48
-        | (addr[0] as u64) << 56
+    u64::from_be_bytes([
+        base[offset + 0], 
+        base[offset + 1], 
+        base[offset + 2], 
+        base[offset + 3],
+        base[offset + 4],
+        base[offset + 5],
+        base[offset + 6],
+        base[offset + 7]
+    ])
 }
 
 #[inline(always)]
@@ -134,8 +137,8 @@ impl W {
     #[inline(always)]
     fn new(input: &[u8]) -> Self {
         let mut w = [0u64; 16];
-        for (i, e) in w.iter_mut().enumerate() {
-            *e = load_be(input, i * 8)
+        for i in 0..16 {
+            w[i] = load_be(input, i * 8);
         }
         W(w)
     }
@@ -237,12 +240,12 @@ impl State {
 
     #[inline(always)]
     fn store(&self, out: &mut [u8]) {
-        for (i, &e) in self.0.iter().enumerate() {
-            store_be(out, i * 8, e);
+        for i in 0..8 {
+            store_be(out, i * 8, self.0[i]);
         }
     }
 
-    #[inline(always)]
+    /*#[inline(always)]
     fn blocks(&mut self, mut input: &[u8]) -> usize {
         let mut t = State([
             self.0[0], 
@@ -266,6 +269,66 @@ impl State {
             input = &input[128..];
             inlen -= 128;
         }
+        inlen
+    }*/
+
+    #[inline(always)]
+    fn blocks(&mut self, mut input: &[u8]) -> usize {
+        // Load state into local variables (register hints)
+        let mut a = self.0[0];
+        let mut b = self.0[1]; 
+        let mut c = self.0[2];
+        let mut d = self.0[3];
+        let mut e = self.0[4];
+        let mut f = self.0[5];
+        let mut g = self.0[6];
+        let mut h = self.0[7];
+        
+        let mut inlen = input.len();
+        while inlen >= 128 {
+            // Process block with register variables instead of array
+            let mut w = W::new(input);
+            
+            // Save original values for later addition
+            let orig_a = a; let orig_b = b; let orig_c = c; let orig_d = d;
+            let orig_e = e; let orig_f = f; let orig_g = g; let orig_h = h;
+            
+            // Main computation loops - now working with registers
+            for round in 0..5 {
+                for i in 0..16 {
+                    // Manual SHA-512 round function using register variables
+                    let rc = ROUND_CONSTANTS[round * 16 + i];
+                    let wi = w.0[i];
+                    
+                    let temp1 = h
+                        .wrapping_add(W::Sigma1(e))
+                        .wrapping_add(W::Ch(e, f, g))
+                        .wrapping_add(rc)
+                        .wrapping_add(wi);
+                        
+                    let temp2 = W::Sigma0(a).wrapping_add(W::Maj(a, b, c));
+                    
+                    // Rotate the register variables
+                    h = g; g = f; f = e; e = d.wrapping_add(temp1);
+                    d = c; c = b; b = a; a = temp1.wrapping_add(temp2);
+                }
+                w.expand();
+            }
+            
+            // Add back original values
+            a = a.wrapping_add(orig_a); b = b.wrapping_add(orig_b);
+            c = c.wrapping_add(orig_c); d = d.wrapping_add(orig_d);
+            e = e.wrapping_add(orig_e); f = f.wrapping_add(orig_f);
+            g = g.wrapping_add(orig_g); h = h.wrapping_add(orig_h);
+            
+            input = &input[128..];
+            inlen -= 128;
+        }
+        
+        // Store register variables back to state
+        self.0[0] = a; self.0[1] = b; self.0[2] = c; self.0[3] = d;
+        self.0[4] = e; self.0[5] = f; self.0[6] = g; self.0[7] = h;
+        
         inlen
     }
 }

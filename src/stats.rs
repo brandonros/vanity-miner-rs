@@ -51,7 +51,8 @@ impl GlobalStats {
     }
 
     pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
-        let vanity_length = self.vanity_length;
+        let vanity_prefix_length = self.vanity_prefix_length;
+        let vanity_suffix_length = self.vanity_suffix_length;
         let matches = self.matches_found.load(Ordering::Relaxed);
         let operations = self.total_operations.load(Ordering::Relaxed);
         let start_time = self.start_time.load(Ordering::Relaxed);
