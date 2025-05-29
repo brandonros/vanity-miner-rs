@@ -114,8 +114,6 @@ fn device_main(
             found_bs58_encoded_public_key_dev.copy_to(&mut found_bs58_encoded_public_key)?;
             found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
 
-            global_stats.add_matches(found_matches as usize);
-
             // Format results
             let found_thread_idx = found_thread_idx_slice[0];
             let found_bs58_encoded_public_key_string = String::from_utf8(found_bs58_encoded_public_key.to_vec()).unwrap();
@@ -126,6 +124,7 @@ fn device_main(
             println!("[{ordinal}] First match: wallet = {}", hex::encode([found_private_key, found_public_key].concat()));
 
             // Print stats using global counters
+            global_stats.add_matches(found_matches as usize);
             global_stats.print_stats(
                 ordinal,
                 found_matches,

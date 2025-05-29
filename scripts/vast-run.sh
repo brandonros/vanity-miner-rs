@@ -12,5 +12,5 @@ then
   curl -L -O https://github.com/brandonros/ed25519-vanity-rs/releases/download/1.0.0/ed25519_vanity
   chmod +x ed25519_vanity
 fi
-./ed25519_vanity aa aa
+./ed25519_vanity Vin niV
 EOF

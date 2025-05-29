@@ -7,14 +7,15 @@ use std::time::UNIX_EPOCH;
 
 pub struct GlobalStats {
     num_devices: usize,
-    vanity_length: usize,
+    vanity_prefix_length: usize,
+    vanity_suffix_length: usize,
     matches_found: AtomicUsize,
     total_operations: AtomicU64,
     start_time: AtomicU64,
 }
 
 impl GlobalStats {
-    pub fn new(num_devices: usize, vanity_length: usize) -> Self {
+    pub fn new(num_devices: usize, vanity_prefix_length: usize, vanity_suffix_length: usize) -> Self {
         let now_nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -22,7 +23,8 @@ impl GlobalStats {
 
         Self {
             num_devices,
-            vanity_length,
+            vanity_prefix_length,
+            vanity_suffix_length,
             matches_found: AtomicUsize::new(0),
             total_operations: AtomicU64::new(0),
             start_time: AtomicU64::new(now_nanos),
@@ -76,6 +78,7 @@ impl GlobalStats {
         };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS (vanity_length: {vanity_length}): Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
+        println!("[{device_id}] vanity_prefix_length: {vanity_prefix_length} vanity_suffix_length: {vanity_suffix_length}");
+        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
     }
 }

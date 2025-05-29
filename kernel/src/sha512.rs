@@ -131,6 +131,7 @@ struct W([u64; 16]);
 struct State([u64; 8]);
 
 impl W {
+    #[inline(always)]
     fn new(input: &[u8]) -> Self {
         let mut w = [0u64; 16];
         for (i, e) in w.iter_mut().enumerate() {
@@ -180,22 +181,9 @@ impl W {
 
     #[inline(always)]
     fn expand(&mut self) {
-        self.M(0, (0 + 14) & 15, (0 + 9) & 15, (0 + 1) & 15);
-        self.M(1, (1 + 14) & 15, (1 + 9) & 15, (1 + 1) & 15);
-        self.M(2, (2 + 14) & 15, (2 + 9) & 15, (2 + 1) & 15);
-        self.M(3, (3 + 14) & 15, (3 + 9) & 15, (3 + 1) & 15);
-        self.M(4, (4 + 14) & 15, (4 + 9) & 15, (4 + 1) & 15);
-        self.M(5, (5 + 14) & 15, (5 + 9) & 15, (5 + 1) & 15);
-        self.M(6, (6 + 14) & 15, (6 + 9) & 15, (6 + 1) & 15);
-        self.M(7, (7 + 14) & 15, (7 + 9) & 15, (7 + 1) & 15);
-        self.M(8, (8 + 14) & 15, (8 + 9) & 15, (8 + 1) & 15);
-        self.M(9, (9 + 14) & 15, (9 + 9) & 15, (9 + 1) & 15);
-        self.M(10, (10 + 14) & 15, (10 + 9) & 15, (10 + 1) & 15);
-        self.M(11, (11 + 14) & 15, (11 + 9) & 15, (11 + 1) & 15);
-        self.M(12, (12 + 14) & 15, (12 + 9) & 15, (12 + 1) & 15);
-        self.M(13, (13 + 14) & 15, (13 + 9) & 15, (13 + 1) & 15);
-        self.M(14, (14 + 14) & 15, (14 + 9) & 15, (14 + 1) & 15);
-        self.M(15, (15 + 14) & 15, (15 + 9) & 15, (15 + 1) & 15);
+        for i in 0..16 {
+            self.M(i, (i + 14) & 15, (i + 9) & 15, (i + 1) & 15);
+        }
     }
 
     #[inline(always)]
@@ -227,22 +215,9 @@ impl W {
     #[inline(always)]
     fn G(&mut self, state: &mut State, s: usize) {
         let rc = &ROUND_CONSTANTS[s * 16..];
-        self.F(state, 0, rc[0]);
-        self.F(state, 1, rc[1]);
-        self.F(state, 2, rc[2]);
-        self.F(state, 3, rc[3]);
-        self.F(state, 4, rc[4]);
-        self.F(state, 5, rc[5]);
-        self.F(state, 6, rc[6]);
-        self.F(state, 7, rc[7]);
-        self.F(state, 8, rc[8]);
-        self.F(state, 9, rc[9]);
-        self.F(state, 10, rc[10]);
-        self.F(state, 11, rc[11]);
-        self.F(state, 12, rc[12]);
-        self.F(state, 13, rc[13]);
-        self.F(state, 14, rc[14]);
-        self.F(state, 15, rc[15]);
+        for i in 0..16 {
+            self.F(state, i, rc[i]);
+        }
     }
 }
 
@@ -255,16 +230,12 @@ impl State {
     fn add(&mut self, x: &State) {
         let sx = &mut self.0;
         let ex = &x.0;
-        sx[0] = sx[0].wrapping_add(ex[0]);
-        sx[1] = sx[1].wrapping_add(ex[1]);
-        sx[2] = sx[2].wrapping_add(ex[2]);
-        sx[3] = sx[3].wrapping_add(ex[3]);
-        sx[4] = sx[4].wrapping_add(ex[4]);
-        sx[5] = sx[5].wrapping_add(ex[5]);
-        sx[6] = sx[6].wrapping_add(ex[6]);
-        sx[7] = sx[7].wrapping_add(ex[7]);
+        for i in 0..8 {
+            sx[i] = sx[i].wrapping_add(ex[i]);
+        }
     }
 
+    #[inline(always)]
     fn store(&self, out: &mut [u8]) {
         for (i, &e) in self.0.iter().enumerate() {
             store_be(out, i * 8, e);
@@ -286,15 +257,10 @@ impl State {
         let mut inlen = input.len();
         while inlen >= 128 {
             let mut w = W::new(input);
-            w.G(&mut t, 0);
-            w.expand();
-            w.G(&mut t, 1);
-            w.expand();
-            w.G(&mut t, 2);
-            w.expand();
-            w.G(&mut t, 3);
-            w.expand();
-            w.G(&mut t, 4);
+            for i in 0..5 {
+                w.G(&mut t, i);
+                w.expand();
+            }
             t.add(self);
             self.0 = t.0;
             input = &input[128..];

@@ -2,8 +2,8 @@
 
 set -e
 
-PORT=10540
-HOST=ssh5.vast.ai
+PORT=10562
+HOST=ssh8.vast.ai
 USER=root
 
 # generate key
