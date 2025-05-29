@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::stats::GlobalStats;
 
-fn validate_vanity_prefix(vanity_prefix: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     let invalid_characters = [
         "l", // lowercase L
         "I", // uppercase I
@@ -21,8 +21,8 @@ fn validate_vanity_prefix(vanity_prefix: &str) -> Result<(), Box<dyn Error + Sen
         "O" // uppercase O
     ];
     for invalid_character in invalid_characters {
-        if vanity_prefix.contains(invalid_character) == true {
-            return Err(format!("vanity prefix contains invalid character: {}", invalid_character).into());
+        if base58_string.contains(invalid_character) == true {
+            return Err(format!("base58 string contains invalid character: {}", invalid_character).into());
         }
     }
     Ok(())
@@ -31,6 +31,7 @@ fn validate_vanity_prefix(vanity_prefix: &str) -> Result<(), Box<dyn Error + Sen
 fn device_main(
     ordinal: usize, 
     vanity_prefix: String, 
+    vanity_suffix: String,
     blocks_per_grid: usize, 
     threads_per_block: usize,
     global_stats: Arc<GlobalStats>
@@ -38,6 +39,10 @@ fn device_main(
     // convert the vanity prefix to a byte array
     let vanity_prefix_bytes = vanity_prefix.as_bytes();
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
+
+    // convert the vanity suffix to a byte array
+    let vanity_suffix_bytes = vanity_suffix.as_bytes();
+    let vanity_suffix_len: usize = vanity_suffix_bytes.len();
     
     let device = Device::get_device(ordinal as u32)?;
     let ctx = Context::new(device)?;
@@ -67,6 +72,7 @@ fn device_main(
         let mut found_thread_idx_slice = [0u32; 1];
         
         let vanity_prefix_dev = vanity_prefix_bytes.as_dbuf()?;
+        let vanity_suffix_dev = vanity_suffix_bytes.as_dbuf()?;
         let found_matches_slice_dev = found_matches_slice.as_dbuf()?;
         let found_private_key_dev = found_private_key.as_dbuf()?;
         let found_public_key_dev = found_public_key.as_dbuf()?;
@@ -80,6 +86,8 @@ fn device_main(
                 find_vanity_private_key<<<blocks_per_grid as u32, threads_per_block as u32, 0, stream>>>(
                     vanity_prefix_dev.as_device_ptr(),
                     vanity_prefix_len,
+                    vanity_suffix_dev.as_device_ptr(),
+                    vanity_suffix_len,
                     rng_seed,
                     found_matches_slice_dev.as_device_ptr(),
                     found_private_key_dev.as_device_ptr(),
@@ -130,11 +138,13 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Define the vanity prefix we're looking for
     let args = std::env::args().collect::<Vec<String>>();
     let vanity_prefix = args[1].to_string();
-    let blocks_per_grid = args[2].parse::<usize>().unwrap();
-    let threads_per_block = args[3].parse::<usize>().unwrap();
+    let vanity_suffix = args[2].to_string();    
+    let blocks_per_grid = args[3].parse::<usize>().unwrap();
+    let threads_per_block = args[4].parse::<usize>().unwrap();
 
-    // check if the vanity prefix contains any of the forbidden characters
-    validate_vanity_prefix(&vanity_prefix)?;
+    // check if the vanity prefix or suffix contains any of the forbidden characters
+    validate_base58_string(&vanity_prefix)?;
+    validate_base58_string(&vanity_suffix)?;
 
     // Initialize CUDA context and get default stream
     cust::init(CudaFlags::empty())?;
@@ -149,10 +159,12 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let vanity_prefix_clone = vanity_prefix.clone();
+        let vanity_suffix_clone = vanity_suffix.clone();
         let stats_clone = Arc::clone(&global_stats);
         handles.push(std::thread::spawn(move || device_main(
             i,
             vanity_prefix_clone,
+            vanity_suffix_clone,
             blocks_per_grid,
             threads_per_block,
             stats_clone

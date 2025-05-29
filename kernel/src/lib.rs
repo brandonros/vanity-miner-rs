@@ -42,6 +42,8 @@ pub unsafe fn find_vanity_private_key(
     // input
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 
+    vanity_suffix_ptr: *const u8,
+    vanity_suffix_len: usize,
     rng_seed: u64,
     // output
     found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
@@ -52,7 +54,6 @@ pub unsafe fn find_vanity_private_key(
 ) {
     // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
-
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
@@ -73,9 +74,16 @@ pub unsafe fn find_vanity_private_key(
 
     // check if public key starts with vanity prefix
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
+    let vanity_suffix = unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len as usize) };
     let mut matches = true;
     for i in 0..vanity_prefix_len {
         if bs58_encoded_public_key[i] != vanity_prefix[i] {
+            matches = false;
+            break;
+        }
+    }
+    for i in 0..vanity_suffix_len {
+        if bs58_encoded_public_key[64 - vanity_suffix_len + i] != vanity_suffix[i] {
             matches = false;
             break;
         }
