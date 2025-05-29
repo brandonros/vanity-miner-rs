@@ -137,10 +137,14 @@ fn device_main(
 fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Define the vanity prefix we're looking for
     let args = std::env::args().collect::<Vec<String>>();
+    if args.len() != 3 {
+        println!("Usage: {} <vanity_prefix> <vanity_suffix>", args[0]);
+        std::process::exit(1);
+    }
     let vanity_prefix = args[1].to_string();
     let vanity_suffix = args[2].to_string();    
-    let blocks_per_grid = args[3].parse::<usize>().unwrap();
-    let threads_per_block = args[4].parse::<usize>().unwrap();
+    let blocks_per_grid = 16384;
+    let threads_per_block = 256;
 
     // check if the vanity prefix or suffix contains any of the forbidden characters
     validate_base58_string(&vanity_prefix)?;
