@@ -1,23 +1,43 @@
 use std::sync::atomic::Ordering;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::AtomicUsize;
-use std::time::Instant;
+use std::time::Duration;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 pub struct GlobalStats {
     num_devices: usize,
+    vanity_length: usize,
     matches_found: AtomicUsize,
     total_operations: AtomicU64,
-    start_time: Instant,
+    start_time: AtomicU64,
 }
 
 impl GlobalStats {
-    pub fn new(num_devices: usize) -> Self {
+    pub fn new(num_devices: usize, vanity_length: usize) -> Self {
+        let now_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
         Self {
             num_devices,
+            vanity_length,
             matches_found: AtomicUsize::new(0),
             total_operations: AtomicU64::new(0),
-            start_time: Instant::now(),
+            start_time: AtomicU64::new(now_nanos),
         }
+    }
+
+    pub fn reset(&self) {
+        self.matches_found.store(0, Ordering::Relaxed);
+        self.total_operations.store(0, Ordering::Relaxed);
+
+        let now_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        self.start_time.store(now_nanos, Ordering::Relaxed)
     }
 
     pub fn add_launch(&self, operations: usize) {
@@ -29,10 +49,17 @@ impl GlobalStats {
     }
 
     pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
+        let vanity_length = self.vanity_length;
         let matches = self.matches_found.load(Ordering::Relaxed);
         let operations = self.total_operations.load(Ordering::Relaxed);
-        
-        let elapsed = self.start_time.elapsed();
+        let start_time = self.start_time.load(Ordering::Relaxed);
+
+        let current_time_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let elapsed_nanos = current_time_nanos - start_time;
+        let elapsed = Duration::from_nanos(elapsed_nanos);
         let elapsed_seconds = elapsed.as_secs_f64();
         let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
         let device_operations_per_second = operations as f64 / elapsed_seconds / self.num_devices as f64 / 1_000_000.0;
@@ -49,6 +76,6 @@ impl GlobalStats {
         };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.0}M ops/match)");
+        println!("[{device_id}] GLOBAL STATS (vanity_length: {vanity_length}): Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
     }
 }

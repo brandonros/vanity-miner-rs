@@ -13,6 +13,21 @@ use std::sync::Arc;
 
 use crate::stats::GlobalStats;
 
+fn validate_vanity_prefix(vanity_prefix: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let invalid_characters = [
+        "l", // lowercase L
+        "I", // uppercase I
+        "0", // zero
+        "O" // uppercase O
+    ];
+    for invalid_character in invalid_characters {
+        if vanity_prefix.contains(invalid_character) == true {
+            return Err(format!("vanity prefix contains invalid character: {}", invalid_character).into());
+        }
+    }
+    Ok(())
+}
+
 fn device_main(
     ordinal: usize, 
     vanity_prefix: String, 
@@ -20,12 +35,6 @@ fn device_main(
     threads_per_block: usize,
     global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // check if the vanity prefix contains any of the forbidden characters
-    assert!(vanity_prefix.contains("l") == false); // lowercase L
-    assert!(vanity_prefix.contains("I") == false); // uppercase i
-    assert!(vanity_prefix.contains("0") == false); // zero
-    assert!(vanity_prefix.contains("O") == false); // uppercase o
-
     // convert the vanity prefix to a byte array
     let vanity_prefix_bytes = vanity_prefix.as_bytes();
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
@@ -117,12 +126,15 @@ fn device_main(
     }
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Define the vanity prefix we're looking for
     let args = std::env::args().collect::<Vec<String>>();
     let vanity_prefix = args[1].to_string();
     let blocks_per_grid = args[2].parse::<usize>().unwrap();
     let threads_per_block = args[3].parse::<usize>().unwrap();
+
+    // check if the vanity prefix contains any of the forbidden characters
+    validate_vanity_prefix(&vanity_prefix)?;
 
     // Initialize CUDA context and get default stream
     cust::init(CudaFlags::empty())?;
@@ -130,23 +142,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Found {} CUDA devices", num_devices);
 
     // Initialize global stats
-    let global_stats = Arc::new(GlobalStats::new(num_devices as usize));
+    let global_stats = Arc::new(GlobalStats::new(num_devices as usize, vanity_prefix.len()));
 
-    // start threads
+    // start device threads
     let mut handles = Vec::new();
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let vanity_prefix_clone = vanity_prefix.clone();
         let stats_clone = Arc::clone(&global_stats);
-        let handle = std::thread::spawn(move || device_main(
+        handles.push(std::thread::spawn(move || device_main(
             i,
             vanity_prefix_clone,
             blocks_per_grid,
             threads_per_block,
             stats_clone
-        ));
-        handles.push(handle);
+        )));
     }
+
+    // spawn warmup reset stats thread
+    let stats_clone = Arc::clone(&global_stats);
+    handles.push(std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        println!("Resetting stats");
+        stats_clone.reset();
+        Ok(())
+    }));
+
+    // wait for all device threads to finish
     for handle in handles {
         handle.join().unwrap().unwrap();
     }
