@@ -2,23 +2,15 @@
 
 extern crate alloc;
 
-mod sha512;
 mod base58;
 mod xorshiro;
 
 fn sha512_hash(input: &[u8]) -> [u8; 64] {
-    use crate::sha512::Hasher;
-    let mut hasher = Hasher::new();
-    hasher.update(input);
-    hasher.finalize()
-}
-
-/*fn sha512_hash(input: &[u8]) -> [u8; 64] {
     use sha2::{Digest, Sha512};
     let mut hasher = Sha512::new();
     hasher.update(input);
     hasher.finalize().into()
-}*/
+}
 
 fn ed25519_clamp(hashed_private_key_bytes: &mut [u8]) {
     hashed_private_key_bytes[0] &= 248;
