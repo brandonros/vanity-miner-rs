@@ -84,11 +84,13 @@ fn device_main(
             launch!(
                 // slices are passed as two parameters, the pointer and the length.
                 find_vanity_private_key<<<blocks_per_grid as u32, threads_per_block as u32, 0, stream>>>(
+                    // input
                     vanity_prefix_dev.as_device_ptr(),
                     vanity_prefix_len,
                     vanity_suffix_dev.as_device_ptr(),
                     vanity_suffix_len,
                     rng_seed,
+                    // output
                     found_matches_slice_dev.as_device_ptr(),
                     found_private_key_dev.as_device_ptr(),
                     found_public_key_dev.as_device_ptr(),

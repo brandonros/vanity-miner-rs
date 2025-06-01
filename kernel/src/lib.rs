@@ -78,6 +78,7 @@ pub unsafe fn find_vanity_private_key(
             found_thread_idx_slice[0] = thread_idx as u32;
         }
 
+        // increment number of found matches
         found_matches.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
         cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);   
     }
@@ -87,7 +88,7 @@ pub unsafe fn find_vanity_private_key(
 mod test {
     use super::*;
 
-    #[test]
+    /*#[test]
     fn should_hash_correctly() {
         /*let rng_seed = 3314977520786701659;
         let thread_idx = 13604434;
@@ -123,5 +124,49 @@ mod test {
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
         let expected = b"josexCM7QB9psJfzZtvAzYWAjHb5LSCH594nvCvVSdu";
         assert_eq!(bs58_encoded_public_key, *expected);
+    }*/
+
+    #[test]
+    fn should_hash_correctly() {
+        // xorshio
+        let rng_seed = 9420780813034434518;
+        let thread_idx = 4100498;
+        let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
+        let expected = hex::decode("d93c794e38e45c30741cf6c6b140883a7ad289c6e44136fdc2d42196f266ca3f").unwrap();
+        assert_eq!(private_key, *expected);
+
+        // sha512
+        let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
+        let expected = hex::decode("cd37fdb51662747b0fdb6452ce3f03fc4c13b94dcda334820afc1e124000319fbea278894406ee6719c7ccfb379ab5629fecb272a068a05de008dd70f5ab3d9e").unwrap();
+        assert_eq!(hashed_private_key_bytes, *expected);
+
+        // reduce
+        let mut hashed_private_key_32 = [0u8; 32];
+        hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
+        let expected = hex::decode("cd37fdb51662747b0fdb6452ce3f03fc4c13b94dcda334820afc1e124000319f").unwrap();
+        assert_eq!(hashed_private_key_32, *expected);
+
+        // clamp
+        ed25519::ed25519_clamp(&mut hashed_private_key_32);
+        let expected = hex::decode("c837fdb51662747b0fdb6452ce3f03fc4c13b94dcda334820afc1e124000315f").unwrap();
+        assert_eq!(hashed_private_key_32, *expected);
+
+        // derive public key
+        let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_32);
+        let expected = hex::decode("626228f6d55ce7225636b045b311bbc1e1cbb95f767d70ed8ea6166b9ee3cfba").unwrap();
+        assert_eq!(public_key_bytes, *expected);
+
+        // bs58 encode public key
+        let mut bs58_encoded_public_key = [0u8; 64];
+        let encoded_len = base58::encode_into_limbs(&public_key_bytes[0..32], &mut bs58_encoded_public_key);
+        let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
+        let expected = hex::decode("3764336d58434b794d427a624d34575762697078425651373954713959667355446a4b67384e61434b6b7068").unwrap();
+        assert_eq!(*bs58_encoded_public_key, *expected);
+
+        // utf8
+        use alloc::string::String;
+        let bs58_encoded_public_key_string = String::from_utf8(bs58_encoded_public_key.to_vec()).unwrap();
+        let expected = "7d3mXCKyMBzbM4WWbipxBVQ79Tq9YfsUDjKg8NaCKkph";
+        assert_eq!(bs58_encoded_public_key_string, expected);
     }
 }
