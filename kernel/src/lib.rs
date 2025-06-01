@@ -86,41 +86,41 @@ mod test {
     use super::*;
 
     #[test]
-    fn should_hash_correctly_387357874134630424_2755802() {
+    fn should_hash_correctly() {
         // xorshio
-        let rng_seed = 387357874134630424;
-        let thread_idx = 2755802;
+        let rng_seed = 13504263145228025097;
+        let thread_idx = 2995343;
         let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
-        let expected = hex::decode("2dddc675f7dc652066be3101c58d79bfdbc535784fa67ea7acb35861a2f30a0a").unwrap();
+        let expected = hex::decode("61a314b0183724ea0e5f237584cb76092e253b99783d846a5b10db155128eafd").unwrap();
         assert_eq!(private_key, *expected);
 
         // sha512
         let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
-        let expected = hex::decode("1a710ef882e2967ee517fdea799e9fb6a508530ed16757d0a29086170d4f0d8d9e23b3a2e634100cac9021b8bd8c401a1fdc2de0e0070af4c57fa0a546a16b4b").unwrap();
+        let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb0f5b8817a8e43510f83333417178f2f59fdc3c723199303a5f9be71af2f7b664").unwrap();
         assert_eq!(hashed_private_key_bytes, *expected);
 
         // reduce
         let mut hashed_private_key_32 = [0u8; 32];
         hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
-        let expected = hex::decode("1a710ef882e2967ee517fdea799e9fb6a508530ed16757d0a29086170d4f0d8d").unwrap();
+        let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb").unwrap();
         assert_eq!(hashed_private_key_32, *expected);
 
         // derive public key
         let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_32);
-        let expected = hex::decode("625e8c3953df5b05609358fcaff3fee9df0c572d4834a1c1975604cea3107be5").unwrap();
+        let expected = hex::decode("0af764c1b6133a3a0abd7ef9c853791b687ce1e235f9dc8466d886da314dbea7").unwrap();
         assert_eq!(public_key_bytes, *expected);
 
         // bs58 encode public key
         let mut bs58_encoded_public_key = [0u8; 64];
         let encoded_len = base58::encode_into_limbs(&public_key_bytes[0..32], &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
-        let expected = hex::decode("37637a61454366754b363832614634464452737a5a3661396e3439416871766e7643746948597259484c4265").unwrap();
+        let expected = hex::decode("6a6f7365413875757746426a58707558423879453233437845756d596758336a486251677753627166504c").unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
 
         // utf8
         use alloc::string::String;
         let bs58_encoded_public_key_string = String::from_utf8(bs58_encoded_public_key.to_vec()).unwrap();
-        let expected = "7czaECfuK682aF4FDRszZ6a9n49AhqvnvCtiHYrYHLBe";
+        let expected = "joseA8uuwFBjXpuXB8yE23CxEumYgX3jHbQgwSbqfPL";
         assert_eq!(bs58_encoded_public_key_string, expected);
     }
 }
