@@ -1,3 +1,5 @@
+use seq_macro::seq;
+
 const K: [u64; 80] = [
     0x428a2f98d728ae22, 0x7137449123ef65cd, 0xb5c0fbcfec4d3b2f, 0xe9b5dba58189dbbc,
     0x3956c25bf348b538, 0x59f111f1b605d019, 0x923f82a4af194f9b, 0xab1c5ed5da6d8118,
@@ -79,12 +81,12 @@ fn sha512_32bytes_u64(input: [u64; 4]) -> [u64; 8] {
     w[15] = 256; // Lower 64 bits of length (32 bytes = 256 bits)
     
     // Extend the first 16 words into the remaining 64 words
-    for i in 16..80 {
-        w[i] = small_sigma1(w[i - 2])
-            .wrapping_add(w[i - 7])
-            .wrapping_add(small_sigma0(w[i - 15]))
-            .wrapping_add(w[i - 16]);
-    }
+    seq!(N in 16..80 {
+        w[N] = small_sigma1(w[N - 2])
+            .wrapping_add(w[N - 7])
+            .wrapping_add(small_sigma0(w[N - 15]))
+            .wrapping_add(w[N - 16]);
+    });
     
     // Initialize working variables
     let mut a = H0[0];
@@ -97,12 +99,12 @@ fn sha512_32bytes_u64(input: [u64; 4]) -> [u64; 8] {
     let mut h = H0[7];
     
     // Main loop - 80 rounds
-    for i in 0..80 {
+    seq!(ROUND in 0..80 {
         let t1 = h
             .wrapping_add(big_sigma1(e))
             .wrapping_add(ch(e, f, g))
-            .wrapping_add(K[i])
-            .wrapping_add(w[i]);
+            .wrapping_add(K[ROUND])
+            .wrapping_add(w[ROUND]);
         
         let t2 = big_sigma0(a).wrapping_add(maj(a, b, c));
         
@@ -114,7 +116,7 @@ fn sha512_32bytes_u64(input: [u64; 4]) -> [u64; 8] {
         c = b;
         b = a;
         a = t1.wrapping_add(t2);
-    }
+    });
     
     // Add this chunk's hash to the result so far
     [
@@ -132,27 +134,27 @@ fn sha512_32bytes_u64(input: [u64; 4]) -> [u64; 8] {
 /// Convert hash output back to bytes
 fn hash_to_bytes(hash: [u64; 8]) -> [u8; 64] {
     let mut output = [0u8; 64];
-    for i in 0..8 {
-        let bytes = hash[i].to_be_bytes();
-        output[i * 8..(i + 1) * 8].copy_from_slice(&bytes);
-    }
+    seq!(I in 0..8 {
+        let bytes = hash[I].to_be_bytes();
+        output[I * 8..(I + 1) * 8].copy_from_slice(&bytes);
+    });
     output
 }
 
 fn input_to_u64(input: &[u8; 32]) -> [u64; 4] {
     let mut u64_input = [0u64; 4];
-    for i in 0..4 {
-        u64_input[i] = u64::from_le_bytes([
-            input[i * 8],
-            input[i * 8 + 1],
-            input[i * 8 + 2],
-            input[i * 8 + 3],
-            input[i * 8 + 4],
-            input[i * 8 + 5],
-            input[i * 8 + 6],
-            input[i * 8 + 7],
+    seq!(I in 0..4 {
+        u64_input[I] = u64::from_le_bytes([
+            input[I * 8],
+            input[I * 8 + 1],
+            input[I * 8 + 2],
+            input[I * 8 + 3],
+            input[I * 8 + 4],
+            input[I * 8 + 5],
+            input[I * 8 + 6],
+            input[I * 8 + 7],
         ]);
-    }
+    });
     u64_input
 }
 
