@@ -4,6 +4,7 @@ extern crate alloc;
 
 mod sha512;
 mod base58;
+mod base58_v2;
 mod xorshiro;
 mod ed25519;
 
@@ -30,16 +31,13 @@ pub unsafe fn find_vanity_private_key(
     // sha512 hash private key
     let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
 
-    // take first 32 bytes of hashed private key
-    let mut hashed_private_key_32 = [0u8; 32];
-    hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
-
     // calculate public key from hashed private key with ed25519 point multiplication
-    let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_32);
+    let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_bytes);
 
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
-    let encoded_len = base58::encode_into_limbs(&public_key_bytes, &mut bs58_encoded_public_key);
+    let encoded_len = base58::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
+    //let encoded_len = base58_v2::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
 
     // check if public key starts with vanity prefix
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };
@@ -77,7 +75,7 @@ pub unsafe fn find_vanity_private_key(
 
         // increment number of found matches
         found_matches.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
-        cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);   
+        cuda_std::atomic::mid::device_thread_fence(core::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -99,20 +97,14 @@ mod test {
         let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb0f5b8817a8e43510f83333417178f2f59fdc3c723199303a5f9be71af2f7b664").unwrap();
         assert_eq!(hashed_private_key_bytes, *expected);
 
-        // reduce
-        let mut hashed_private_key_32 = [0u8; 32];
-        hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
-        let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb").unwrap();
-        assert_eq!(hashed_private_key_32, *expected);
-
         // derive public key
-        let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_32);
+        let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_bytes);
         let expected = hex::decode("0af764c1b6133a3a0abd7ef9c853791b687ce1e235f9dc8466d886da314dbea7").unwrap();
         assert_eq!(public_key_bytes, *expected);
 
         // bs58 encode public key
         let mut bs58_encoded_public_key = [0u8; 64];
-        let encoded_len = base58::encode_into_limbs(&public_key_bytes[0..32], &mut bs58_encoded_public_key);
+        let encoded_len = base58::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
         let expected = hex::decode("6a6f7365413875757746426a58707558423879453233437845756d596758336a486251677753627166504c").unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
