@@ -131,7 +131,6 @@ fn sha512_32bytes_u64(input: [u64; 4]) -> [u64; 8] {
     ]
 }
 
-/// Convert hash output back to bytes
 fn hash_to_bytes(hash: [u64; 8]) -> [u8; 64] {
     let mut output = [0u8; 64];
     seq!(I in 0..8 {

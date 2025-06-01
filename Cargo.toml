@@ -10,12 +10,18 @@ rand = "0.8"
 # christan's branch
 #cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
+# my branch
+cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11fa97e1dab4a8baac8e5d4a576561c9a00" }
+
 # normal
-cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+#cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
 
 [build-dependencies]
 # christian's branch
 #cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
+# my branch
+cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11fa97e1dab4a8baac8e5d4a576561c9a00" }
+
 # normal
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+#cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }

@@ -12,7 +12,6 @@ fn main() {
         env::set_var("LLVM_CONFIG", "llvm-config-7");
         env::set_var("LLVM_LINK_STATIC", "1");
         env::set_var("RUST_LOG", "info");
-        env::set_var("RUSTFLAGS", "--cfg sha2_backend=\"soft-compact\"");
 
         let cuda_lib_path = "/usr/local/cuda/nvvm/lib64/";
         match env::var("LD_LIBRARY_PATH") {
