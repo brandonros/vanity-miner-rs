@@ -5,24 +5,7 @@ extern crate alloc;
 mod sha512;
 mod base58;
 mod xorshiro;
-
-fn sha512_hash(input: &[u8; 32]) -> [u8; 64] {
-    sha512::sha512_32bytes_from_bytes(input)
-}
-
-fn ed25519_clamp(mut hashed_private_key_bytes: [u8; 32]) {
-    hashed_private_key_bytes[0] &= 248;
-    hashed_private_key_bytes[31] &= 63;
-    hashed_private_key_bytes[31] |= 64;
-}
-
-fn ed25519_derive_public_key(hashed_private_key_bytes: [u8; 32]) -> [u8; 32] {
-    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(hashed_private_key_bytes);
-    let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
-    let compressed_point = point.compress();
-    let public_key_bytes = compressed_point.to_bytes();
-    public_key_bytes
-}
+mod ed25519;
 
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
@@ -45,17 +28,17 @@ pub unsafe fn find_vanity_private_key(
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
-    let hashed_private_key_bytes = sha512_hash(&private_key);
+    let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
 
     // take first 32 bytes of hashed private key
     let mut hashed_private_key_32 = [0u8; 32];
     hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
 
     // apply ed25519 clamping to hashed private key
-    ed25519_clamp(hashed_private_key_32);
+    ed25519::ed25519_clamp(hashed_private_key_32);
 
     // calculate public key from hashed private key with ed25519 point multiplication
-    let public_key_bytes = ed25519_derive_public_key(hashed_private_key_32);
+    let public_key_bytes = ed25519::ed25519_derive_public_key(hashed_private_key_32);
 
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
@@ -113,22 +96,23 @@ mod test {
         assert_eq!(private_key, *expected);
 
         // sha512
-        let mut hashed_private_key_bytes = sha512_hash(&private_key[0..32]);
+        let mut hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
         let expected = b"\x6f\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49\xc5\x82\x2f\xd4\x62\x45\x4d\x7a\xd5\x98\x77\xb4\xe8\x4c\xd6\x65\x87\x36\x22\x28\x43\x07\x1d\xb8\x54\xbf\x28\xb7\x67\xb9\xa7\x65";
         assert_eq!(hashed_private_key_bytes, *expected);
 
         // reduce
-        let mut hashed_private_key_bytes = &mut hashed_private_key_bytes[0..32];
+        let mut hashed_private_key_32 = [0u8; 32];
+        hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
         let expected = b"\x6f\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49";
-        assert_eq!(hashed_private_key_bytes, *expected);
+        assert_eq!(hashed_private_key_32, *expected);
 
         // clamp
-        ed25519_clamp(&mut hashed_private_key_bytes);
+        ed25519::ed25519_clamp(hashed_private_key_32);
         let expected = b"\x68\x6d\xc4\xb5\xc8\x7f\x2b\x57\xe0\x27\x04\xbc\x82\x8e\x94\x4d\xbe\x93\x86\xb1\x17\x3f\xa7\x7f\xa6\xad\x9d\x88\xd7\x73\xc8\x49";
-        assert_eq!(hashed_private_key_bytes, *expected);
+        assert_eq!(hashed_private_key_32, *expected);
         
         // derive public key
-        let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes);
+        let public_key_bytes = ed25519::ed25519_derive_public_key(hashed_private_key_32);
         let expected = b"\x0a\xf7\x64\xd3\x34\x40\x71\xf9\x99\xf7\x05\x20\xb3\x1c\xe9\xa4\x52\xf4\xcf\x44\x21\x19\xfe\xa8\x71\x6c\xd7\x55\x85\x11\x86\x30";
         assert_eq!(public_key_bytes, *expected);
 
