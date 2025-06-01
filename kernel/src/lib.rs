@@ -2,26 +2,22 @@
 
 extern crate alloc;
 
+mod sha512;
 mod base58;
 mod xorshiro;
 
-fn sha512_hash(input: &[u8]) -> [u8; 64] {
-    use sha2::{Digest, Sha512};
-    let mut hasher = Sha512::new();
-    hasher.update(input);
-    hasher.finalize().into()
+fn sha512_hash(input: &[u8; 32]) -> [u8; 64] {
+    sha512::sha512_32bytes_from_bytes(input)
 }
 
-fn ed25519_clamp(hashed_private_key_bytes: &mut [u8]) {
+fn ed25519_clamp(mut hashed_private_key_bytes: [u8; 32]) {
     hashed_private_key_bytes[0] &= 248;
     hashed_private_key_bytes[31] &= 63;
     hashed_private_key_bytes[31] |= 64;
 }
 
-fn ed25519_derive_public_key(hashed_private_key_bytes: &[u8]) -> [u8; 32] {
-    let mut input = [0u8; 32];
-    input.copy_from_slice(&hashed_private_key_bytes[0..32]);
-    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
+fn ed25519_derive_public_key(hashed_private_key_bytes: [u8; 32]) -> [u8; 32] {
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(hashed_private_key_bytes);
     let point = curve25519_dalek::constants::ED25519_BASEPOINT_TABLE * &scalar;
     let compressed_point = point.compress();
     let public_key_bytes = compressed_point.to_bytes();
@@ -49,16 +45,17 @@ pub unsafe fn find_vanity_private_key(
     let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
-    let mut hashed_private_key_bytes = sha512_hash(&private_key);
+    let hashed_private_key_bytes = sha512_hash(&private_key);
 
     // take first 32 bytes of hashed private key
-    let mut hashed_private_key_bytes = &mut hashed_private_key_bytes[0..32];
+    let mut hashed_private_key_32 = [0u8; 32];
+    hashed_private_key_32.copy_from_slice(&hashed_private_key_bytes[0..32]);
 
     // apply ed25519 clamping to hashed private key
-    ed25519_clamp(&mut hashed_private_key_bytes);
+    ed25519_clamp(hashed_private_key_32);
 
     // calculate public key from hashed private key with ed25519 point multiplication
-    let public_key_bytes = ed25519_derive_public_key(&hashed_private_key_bytes);
+    let public_key_bytes = ed25519_derive_public_key(hashed_private_key_32);
 
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
