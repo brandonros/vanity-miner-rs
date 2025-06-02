@@ -42,8 +42,8 @@ impl GlobalStats {
     pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
         let vanity_prefix_length = self.vanity_prefix_length;
         let vanity_suffix_length = self.vanity_suffix_length;
-        let matches = self.matches_found.load(Ordering::Relaxed);
-        let operations = self.total_operations.load(Ordering::Relaxed);
+        let matches_found = self.matches_found.load(Ordering::Relaxed);
+        let total_operations = self.total_operations.load(Ordering::Relaxed);
         let start_time = self.start_time.load(Ordering::Relaxed);
 
         let current_time_nanos = SystemTime::now()
@@ -53,21 +53,22 @@ impl GlobalStats {
         let elapsed_nanos = current_time_nanos - start_time;
         let elapsed = Duration::from_nanos(elapsed_nanos);
         let elapsed_seconds = elapsed.as_secs_f64();
-        let operations_per_second = operations as f64 / elapsed_seconds / 1_000_000.0;
-        let device_operations_per_second = operations as f64 / elapsed_seconds / self.num_devices as f64 / 1_000_000.0;
-        let matches_per_second = matches as f64 / elapsed_seconds;
+        let operations_per_second = total_operations as f64 / elapsed_seconds / 1_000_000.0;
+        let device_operations_per_second = total_operations as f64 / elapsed_seconds / self.num_devices as f64 / 1_000_000.0;
+        let matches_per_second = matches_found as f64 / elapsed_seconds;
         let match_eta = if matches_per_second > 0.0 {
             1.0 / matches_per_second
         } else {
             0.0
         };
-        let operations_per_match = if matches > 0 {
-            operations as f64 / matches as f64 / 1_000_000.0
+        let operations_per_match = if matches_found > 0 {
+            total_operations as f64 / matches_found as f64 / 1_000_000.0
         } else {
             0.0
         };
+        let formatted_total_operations = total_operations as f64 / 1_000_000.0;
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS ({vanity_prefix_length} prefix length, {vanity_suffix_length} suffix length): Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
+        println!("[{device_id}] GLOBAL STATS ({vanity_prefix_length} prefix length, {vanity_suffix_length} suffix length): Found {matches_found} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match, {formatted_total_operations:.2}M ops)");
     }
 }
