@@ -144,7 +144,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     let vanity_prefix = args[1].to_string();
     let vanity_suffix = args[2].to_string();    
-    let blocks_per_grid = 16384;
+    let blocks_per_grid = 1024;
     let threads_per_block = 256;
 
     // check if the vanity prefix or suffix contains any of the forbidden characters
@@ -179,15 +179,6 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             stats_clone
         )));
     }
-
-    // spawn warmup reset stats thread
-    let stats_clone = Arc::clone(&global_stats);
-    handles.push(std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_secs(20));
-        println!("Resetting stats");
-        stats_clone.reset();
-        Ok(())
-    }));
 
     // wait for all device threads to finish
     for handle in handles {

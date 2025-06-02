@@ -3,12 +3,12 @@ Ed25519 vanity generator with CUDA in Rust
 
 ## Benchmark results
 
-* RTX5090: 100m operations/sec
+### GeForce RTX 4060 Max-Q
 
 ```
-[0] GLOBAL STATS (vanity_length: 1): Found 151612 matches in 11.34s (0.000075s/match, 13367.518279 matches/sec, 13.31M ops/sec, 13.31M ops/sec/device, 0.0010M ops/match)
-[0] GLOBAL STATS (vanity_length: 2): Found 2635 matches in 11.45s (0.004346s/match, 230.094896 matches/sec, 13.55M ops/sec, 13.55M ops/sec/device, 0.0589M ops/match
-[0] GLOBAL STATS (vanity_length: 3): Found 37 matches in 11.45s (0.309542s/match, 3.230577 matches/sec, 13.55M ops/sec, 13.55M ops/sec/device, 4.1943M ops/match)
-[0] GLOBAL STATS (vanity_length: 4): Found 2 matches in 10.56s (5.282434s/match, 0.189307 matches/sec, 13.50M ops/sec, 13.50M ops/sec/device, 71.3032M ops/match)
-[0] GLOBAL STATS (vanity_length: 5): Found 1 matches in 303.20s (303.196929s/match, 0.003298 matches/sec, 13.21M ops/sec, 13.21M ops/sec/device, 4005.5603M ops/match)
+[0] GLOBAL STATS (1 prefix length, 0 suffix length): Found 851103 matches in 62.27s (0.000073s/match, 13668.399847 matches/sec, 13.65M ops/sec, 13.65M ops/sec/device, 0.0010M ops/match)
+[0] GLOBAL STATS (2 prefix length, 0 suffix length): Found 6734 matches in 28.60s (0.004248s/match, 235.413664 matches/sec, 13.75M ops/sec, 13.75M ops/sec/device, 0.0584M ops/match)
+[0] GLOBAL STATS (3 prefix length, 0 suffix length): Found 63 matches in 16.75s (0.265877s/match, 3.761134 matches/sec, 13.82M ops/sec, 13.82M ops/sec/device, 3.6742M ops/match)
+[0] GLOBAL STATS (4 prefix length, 0 suffix length): Found 2 matches in 20.60s (10.299815s/match, 0.097089 matches/sec, 13.82M ops/sec, 13.82M ops/sec/device, 142.3442M ops/match)
+[0] GLOBAL STATS (5 prefix length, 0 suffix length): Found 1 matches in 60.86s (60.863319s/match, 0.016430 matches/sec, 13.84M ops/sec, 13.84M ops/sec/device, 842.5308M ops/match)
 ```

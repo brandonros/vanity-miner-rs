@@ -1,6 +1,7 @@
+use seq_macro::seq;
+
 const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const MAX_REQUIRED_LIMBS: usize = 10;
-const INPUT_BYTES_PER_LIMB: usize = 4;
 const DIGITS_PER_LIMB: usize = 5; // log_58(2^32) ≈ 5.462
 const NEXT_LIMB_DIVISOR: u64 = 58_u64.pow(DIGITS_PER_LIMB as u32); // 58^5 = 656,356,768
 const DIVISORS: [u64; DIGITS_PER_LIMB] = {
@@ -30,8 +31,21 @@ pub fn base58_encode(input: &[u8; 32], output: &mut [u8]) -> usize {
     let mut limbs = [0u32; MAX_REQUIRED_LIMBS];
     let mut limb_count = 0;
 
-    for chunk in input.chunks(INPUT_BYTES_PER_LIMB) {
-        let carry = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as u64;
+    let chunks = [
+        u32::from_be_bytes([input[0], input[1], input[2], input[3]]),
+        u32::from_be_bytes([input[4], input[5], input[6], input[7]]),
+        u32::from_be_bytes([input[8], input[9], input[10], input[11]]),
+        u32::from_be_bytes([input[12], input[13], input[14], input[15]]),
+        u32::from_be_bytes([input[16], input[17], input[18], input[19]]),
+        u32::from_be_bytes([input[20], input[21], input[22], input[23]]),
+        u32::from_be_bytes([input[24], input[25], input[26], input[27]]),
+        u32::from_be_bytes([input[28], input[29], input[30], input[31]]),
+    ];
+
+    seq!(I in 0..8 {
+        // Convert chunk to single value using bit manipulation
+        let chunk = chunks[I];
+        let carry = chunk as u64;
         let mut remaining_carry = carry;
 
         // Update existing limbs
@@ -52,7 +66,7 @@ pub fn base58_encode(input: &[u8; 32], output: &mut [u8]) -> usize {
                 limb_count += 1;
             }
         }
-    }
+    });
 
     // Convert limbs to bytes in Base58 format
     let mut temp_output = [0u8; 64];

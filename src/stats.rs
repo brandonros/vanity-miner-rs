@@ -31,17 +31,6 @@ impl GlobalStats {
         }
     }
 
-    pub fn reset(&self) {
-        self.matches_found.store(0, Ordering::Relaxed);
-        self.total_operations.store(0, Ordering::Relaxed);
-
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-        self.start_time.store(now_nanos, Ordering::Relaxed)
-    }
-
     pub fn add_launch(&self, operations: usize) {
         self.total_operations.fetch_add(operations as u64, Ordering::Relaxed);
     }
@@ -79,7 +68,6 @@ impl GlobalStats {
         };
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] vanity_prefix_length: {vanity_prefix_length} vanity_suffix_length: {vanity_suffix_length}");
-        println!("[{device_id}] GLOBAL STATS: Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
+        println!("[{device_id}] GLOBAL STATS ({vanity_prefix_length} prefix length, {vanity_suffix_length} suffix length): Found {matches} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.2}M ops/sec/device, {operations_per_match:.4}M ops/match)");
     }
 }
