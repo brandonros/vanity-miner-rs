@@ -12,3 +12,9 @@ Ed25519 vanity generator with CUDA in Rust
 [0] GLOBAL STATS (4 prefix length, 0 suffix length): Found 2 matches in 20.60s (10.299815s/match, 0.097089 matches/sec, 13.82M ops/sec, 13.82M ops/sec/device, 142.3442M ops/match)
 [0] GLOBAL STATS (5 prefix length, 0 suffix length): Found 1 matches in 60.86s (60.863319s/match, 0.016430 matches/sec, 13.84M ops/sec, 13.84M ops/sec/device, 842.5308M ops/match)
 ```
+
+### GeForce RTX 5090
+
+```
+[0] GLOBAL STATS (6 prefix length, 0 suffix length): Found 1 matches in 457.23s (457.230337s/match, 0.002187 matches/sec, 400.70M ops/sec, 100.18M ops/sec/device, 183212.4416M ops/match)
+```
