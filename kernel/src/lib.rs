@@ -4,7 +4,6 @@ extern crate alloc;
 
 mod sha512;
 mod base58;
-mod base58_v2;
 mod xorshiro;
 mod ed25519;
 
@@ -37,7 +36,6 @@ pub unsafe fn find_vanity_private_key(
     // bs58 encode public key
     let mut bs58_encoded_public_key = [0u8; 64];
     let encoded_len = base58::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
-    //let encoded_len = base58_v2::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
 
     // check if public key starts with vanity prefix
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len as usize) };

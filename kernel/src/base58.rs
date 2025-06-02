@@ -1,74 +1,98 @@
-use seq_macro::seq;
+const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const MAX_REQUIRED_LIMBS: usize = 10;
+const INPUT_BYTES_PER_LIMB: usize = 4;
+const DIGITS_PER_LIMB: usize = 5; // log_58(2^32) ≈ 5.462
+const NEXT_LIMB_DIVISOR: u64 = 58_u64.pow(DIGITS_PER_LIMB as u32); // 58^5 = 656,356,768
+const DIVISORS: [u64; DIGITS_PER_LIMB] = {
+    let mut divs = [0u64; DIGITS_PER_LIMB];
+    let mut val = 1u64;
+    let mut i = 0;
+    while i < DIGITS_PER_LIMB {
+        divs[i] = val;
+        val *= 58;
+        i += 1;
+    }
+    divs
+};
 
-// Base58 alphabet (Bitcoin/IPFS standard)
-const ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-/// Maximum output length for 32-byte input
-/// log(256^32) / log(58) ≈ 43.67, so 44 characters max
-const MAX_OUTPUT_LEN: usize = 44;
-
-// Use direct division instead of lookup tables for u32 limbs
-// Good balance between performance and memory efficiency
-
-/// Check if the big integer is zero (u32 version)
-#[inline(always)]
-fn is_zero(num: &[u32; 8]) -> bool {
-    num.iter().all(|&x| x == 0)
-}
-
-#[inline(always)]
-fn div_by_58(num: &mut [u32; 8]) -> u32 {
-    let mut remainder = 0u64;
-    
-    // Process from most significant to least significant
-    seq!(I in 0..8 {
-        let temp = remainder * (1u64 << 32) + (num[I] as u64); // remainder * 2^32 + limb
-        num[I] = (temp / 58) as u32;
-        remainder = temp % 58;
-    });
-    
-    remainder as u32
-}
-
-/// Convert 32 bytes to 8 u32 limbs (big-endian)
-#[inline(always)]
-fn bytes_to_u32_limbs(input: &[u8; 32]) -> [u32; 8] {
-    let mut limbs = [0u32; 8];
-    seq!(I in 0..8 {
-        limbs[I] = u32::from_be_bytes([
-            input[I * 4], input[I * 4 + 1], input[I * 4 + 2], input[I * 4 + 3]
-        ]);
-    });
-    limbs
-}
-
-/// Version using u32 limbs (8 limbs for 32-byte input)
 pub fn base58_encode(input: &[u8; 32], output: &mut [u8]) -> usize {
-    // Count leading zeros for proper padding
-    let num_leading_zeros = input.iter().take_while(|&&b| b == 0).count();
+    // Count leading zeros in advance
+    let mut num_leading_zeros = 0;
+    for &byte in input.iter() {
+        if byte == 0 {
+            num_leading_zeros += 1;
+        } else {
+            break;
+        }
+    }
+
+    // Process input in chunks of bytes
+    let mut limbs = [0u32; MAX_REQUIRED_LIMBS];
+    let mut limb_count = 0;
+
+    for chunk in input.chunks(INPUT_BYTES_PER_LIMB) {
+        let carry = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]) as u64;
+        let mut remaining_carry = carry;
+
+        // Update existing limbs
+        for i in 0..limb_count {
+            remaining_carry += (limbs[i] as u64) << 32;
+            limbs[i] = (remaining_carry % NEXT_LIMB_DIVISOR) as u32;
+            remaining_carry /= NEXT_LIMB_DIVISOR;
+        }
+
+        // Add new limbs - unrolled for common cases
+        if remaining_carry > 0 && limb_count < MAX_REQUIRED_LIMBS {
+            limbs[limb_count] = (remaining_carry % NEXT_LIMB_DIVISOR) as u32;
+            remaining_carry /= NEXT_LIMB_DIVISOR;
+            limb_count += 1;
+            
+            if remaining_carry > 0 && limb_count < MAX_REQUIRED_LIMBS {
+                limbs[limb_count] = remaining_carry as u32;
+                limb_count += 1;
+            }
+        }
+    }
+
+    // Convert limbs to bytes in Base58 format
+    let mut temp_output = [0u8; 64];
     
-    // Convert input bytes to u32 limbs
-    let mut num = bytes_to_u32_limbs(input);
-    
-    // Perform base conversion by repeated division
-    let mut result_len = 0;
-    let mut temp_output = [0u8; MAX_OUTPUT_LEN];
-    
-    while !is_zero(&num) {
-        let remainder = div_by_58(&mut num);
-        temp_output[result_len] = ALPHABET[remainder as usize];
+    for idx in (0..limb_count).rev() {
+        let limb_value = limbs[idx] as u64;
+        let output_offset = idx * DIGITS_PER_LIMB;
+
+        // Extract Base58 digits using precomputed divisors
+        for i in 0..DIGITS_PER_LIMB {
+            let temp = limb_value / DIVISORS[i];
+            let temp = temp % 58;
+            temp_output[output_offset + i] = temp as u8;
+        }
+    }
+
+    // Scale for remainder and apply alphabet
+    let mut result_len = limb_count * DIGITS_PER_LIMB;
+
+    // Trim leading zeros in the result
+    while result_len > 0 && temp_output[result_len - 1] == 0 {
+        result_len -= 1;
+    }
+
+    // Add a zero byte for each leading zero in the input
+    for _ in 0..num_leading_zeros {
+        temp_output[result_len] = 0;
         result_len += 1;
     }
-    
-    // Add leading '1's for leading zero bytes
-    for i in 0..num_leading_zeros {
-        output[i] = b'1';
+
+    // Apply alphabet encoding
+    for val in &mut temp_output[..result_len] {
+        *val = BASE58_ALPHABET[*val as usize];
     }
-    
-    // Reverse the digits
-    for i in 0..result_len {
-        output[num_leading_zeros + i] = temp_output[result_len - 1 - i];
-    }
-    
-    num_leading_zeros + result_len
+
+    // Reverse the result
+    temp_output[..result_len].reverse();
+
+    // Copy to output
+    output[..result_len].copy_from_slice(&temp_output[..result_len]);
+
+    result_len
 }

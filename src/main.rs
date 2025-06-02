@@ -52,7 +52,7 @@ fn device_main(
     println!("[{ordinal}] Loading module...");
     let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
     let module = Module::from_ptx(ptx, &[
-        ModuleJitOption::MaxRegisters(256)
+        ModuleJitOption::MaxRegisters(256),
     ])?;
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
     let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
