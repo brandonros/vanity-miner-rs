@@ -4,7 +4,7 @@ extern crate alloc;
 
 mod sha512;
 mod base58;
-mod xorshiro;
+mod xoroshiro;
 mod ed25519;
 
 #[cuda_std::kernel]
@@ -25,7 +25,7 @@ pub unsafe fn find_vanity_private_key(
 ) {
     // generate random input for private key from thread index and rng seed
     let thread_idx = cuda_std::thread::index() as usize;
-    let private_key = xorshiro::generate_random_private_key(thread_idx, rng_seed);
+    let private_key = xoroshiro::generate_random_private_key(thread_idx, rng_seed);
     
     // sha512 hash private key
     let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
