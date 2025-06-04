@@ -60,9 +60,9 @@ fn device_main(
     let blocks_per_sm = 128;
     let threads_per_block = 256;
     let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
-
     let operations_per_launch = blocks_per_grid * threads_per_block;
-    println!("[{ordinal}] Starting search loop...");
+
+    println!("[{ordinal}] Starting search loop ({} blocks per grid, {} threads per block, {} operations per launch)", blocks_per_grid, threads_per_block, operations_per_launch);
 
     let mut rng = rand::thread_rng();
 
