@@ -32,8 +32,6 @@ fn device_main(
     ordinal: usize, 
     vanity_prefix: String, 
     vanity_suffix: String,
-    blocks_per_grid: usize, 
-    threads_per_block: usize,
     global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // convert the vanity prefix to a byte array
@@ -56,6 +54,12 @@ fn device_main(
     ])?;
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
     let find_vanity_private_key = module.get_function("find_vanity_private_key")?;
+
+    // get the number of streaming multiprocessors
+    let number_of_streaming_multiprocessors = device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
+    let blocks_per_sm = 128;
+    let threads_per_block = 256;
+    let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
 
     let operations_per_launch = blocks_per_grid * threads_per_block;
     println!("[{ordinal}] Starting search loop...");
@@ -144,10 +148,6 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     let vanity_prefix = args[1].to_string();
     let vanity_suffix = args[2].to_string();    
-    let number_of_streaming_multiprocessors = 24;
-    let blocks_per_sm = 128;
-    let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
-    let threads_per_block = 256;
 
     // check if the vanity prefix or suffix contains any of the forbidden characters
     validate_base58_string(&vanity_prefix)?;
@@ -176,8 +176,6 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             i,
             vanity_prefix_clone,
             vanity_suffix_clone,
-            blocks_per_grid,
-            threads_per_block,
             stats_clone
         )));
     }
