@@ -144,7 +144,9 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
     let vanity_prefix = args[1].to_string();
     let vanity_suffix = args[2].to_string();    
-    let blocks_per_grid = 1024;
+    let number_of_streaming_multiprocessors = 24;
+    let blocks_per_sm = 128;
+    let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
     let threads_per_block = 256;
 
     // check if the vanity prefix or suffix contains any of the forbidden characters
