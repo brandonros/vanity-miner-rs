@@ -1,6 +1,7 @@
 use seq_macro::seq;
 
 const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+const NUM_CHUNKS: usize = 8;
 const MAX_REQUIRED_LIMBS: usize = 10;
 const DIGITS_PER_LIMB: usize = 5; // log_58(2^32) ≈ 5.462
 const NEXT_LIMB_DIVISOR: u64 = 58_u64.pow(DIGITS_PER_LIMB as u32); // 58^5 = 656,356,768
