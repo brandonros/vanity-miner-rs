@@ -17,6 +17,3 @@ cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11
 
 # normal
 #cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
-
-[dev-dependencies]
-hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
