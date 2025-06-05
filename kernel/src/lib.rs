@@ -2,15 +2,9 @@
 
 extern crate alloc;
 
-mod sha512;
-mod base58;
-mod xoroshiro;
-mod ed25519;
-mod vanity;
-
 /// Handle the infrastructure concerns when a match is found
 unsafe fn handle_match_found(
-    result: vanity::VanityKeyResult,
+    result: logic::VanityKeyResult,
     thread_idx: usize,
     found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
@@ -59,7 +53,7 @@ pub unsafe fn find_vanity_private_key(
     let thread_idx = cuda_std::thread::index() as usize;
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len) };
     let vanity_suffix = unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) };
-    let request = vanity::VanityKeyRequest {
+    let request = logic::VanityKeyRequest {
         prefix: vanity_prefix,
         suffix: vanity_suffix,
         thread_idx,
@@ -67,7 +61,7 @@ pub unsafe fn find_vanity_private_key(
     };
     
     // Call pure business logic
-    let result = vanity::generate_and_check_vanity_key(&request);
+    let result = logic::generate_and_check_vanity_key(&request);
     
     // Handle result (adapter layer)
     if result.matches {
@@ -93,18 +87,18 @@ mod test {
     fn should_hash_correctly() {
         // sha512
         let private_key: [u8; 32] = hex::decode("61a314b0183724ea0e5f237584cb76092e253b99783d846a5b10db155128eafd").unwrap().try_into().unwrap();
-        let hashed_private_key_bytes = sha512::sha512_32bytes_from_bytes(&private_key);
+        let hashed_private_key_bytes = logic::sha512_32bytes_from_bytes(&private_key);
         let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb0f5b8817a8e43510f83333417178f2f59fdc3c723199303a5f9be71af2f7b664").unwrap();
         assert_eq!(hashed_private_key_bytes, *expected);
 
         // derive public key
-        let public_key_bytes = ed25519::ed25519_derive_public_key(&hashed_private_key_bytes);
+        let public_key_bytes = logic::ed25519_derive_public_key(&hashed_private_key_bytes);
         let expected = hex::decode("0af764c1b6133a3a0abd7ef9c853791b687ce1e235f9dc8466d886da314dbea7").unwrap();
         assert_eq!(public_key_bytes, *expected);
 
         // bs58 encode public key
         let mut bs58_encoded_public_key = [0u8; 64];
-        let encoded_len = base58::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
+        let encoded_len = logic::base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
         let expected = hex::decode("6a6f7365413875757746426a58707558423879453233437845756d596758336a486251677753627166504c").unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
