@@ -23,7 +23,6 @@ fn cpu_worker_thread(
     vanity_prefix: String,
     vanity_suffix: String,
     global_stats: Arc<GlobalStats>,
-    stop_flag: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut rng = rand::thread_rng();
     let vanity_prefix_bytes = vanity_prefix.as_bytes();
@@ -34,7 +33,7 @@ fn cpu_worker_thread(
     
     println!("[CPU-{}] Starting CPU worker thread", thread_id);
     
-    while !stop_flag.load(Ordering::Relaxed) {
+    loop {
         let rng_seed: u64 = rng.r#gen();
         let start_time = Instant::now();
         let mut batch_matches = 0;
@@ -75,13 +74,6 @@ fn cpu_worker_thread(
             global_stats.add_matches(batch_matches);
             global_stats.print_stats(thread_id, batch_matches as f32);
         }
-        
-        // Periodic stats update even without matches
-        if thread_idx % (batch_size * 100) == 0 {
-            let duration = start_time.elapsed();
-            let keys_per_sec = batch_size as f64 / duration.as_secs_f64();
-            println!("[CPU-{}] Performance: {:.0} keys/sec", thread_id, keys_per_sec);
-        }
     }
     
     Ok(())
@@ -95,7 +87,6 @@ fn cpu_main(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Starting CPU mode with {} threads", num_threads);
     
-    let stop_flag = Arc::new(AtomicBool::new(false));
     let mut handles = Vec::new();
     
     // Start CPU worker threads
@@ -103,7 +94,6 @@ fn cpu_main(
         let vanity_prefix_clone = vanity_prefix.clone();
         let vanity_suffix_clone = vanity_suffix.clone();
         let stats_clone = Arc::clone(&global_stats);
-        let stop_flag_clone = Arc::clone(&stop_flag);
         
         handles.push(std::thread::spawn(move || {
             cpu_worker_thread(
@@ -111,7 +101,6 @@ fn cpu_main(
                 vanity_prefix_clone,
                 vanity_suffix_clone,
                 stats_clone,
-                stop_flag_clone,
             )
         }));
     }
@@ -133,10 +122,10 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     
     let vanity_prefix = args[1].to_string();
     let vanity_suffix = args[2].to_string();
-    let num_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
-
     validate_base58_string(&vanity_prefix)?;
     validate_base58_string(&vanity_suffix)?;
+
+    let num_threads = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
 
     let global_stats = Arc::new(GlobalStats::new(
         num_threads,
