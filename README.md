@@ -18,3 +18,9 @@ Ed25519 vanity generator with CUDA in Rust
 ```
 [0] GLOBAL STATS (6 prefix length, 0 suffix length): Found 1 matches in 457.23s (457.230337s/match, 0.002187 matches/sec, 400.70M ops/sec, 100.18M ops/sec/device, 183212.4416M ops/match)
 ```
+
+### Apple M4 (CPU)
+
+```
+[0] GLOBAL STATS (3 prefix length, 0 suffix length): Found 1 matches in 8.36s (8.355963s/match, 0.119675 matches/sec, 0.37M ops/sec, 0.04M ops/sec/device, 3.1300M ops/match, 3.13M ops)
+```

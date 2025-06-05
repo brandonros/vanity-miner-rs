@@ -3,8 +3,6 @@ mod stats;
 use rand::Rng;
 use std::error::Error;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
 
 use crate::stats::GlobalStats;
 
@@ -28,54 +26,38 @@ fn cpu_worker_thread(
     let vanity_prefix_bytes = vanity_prefix.as_bytes();
     let vanity_suffix_bytes = vanity_suffix.as_bytes();
     
-    let batch_size = 10000; // Process in batches for better stats reporting
-    let mut thread_idx = thread_id * 1_000_000; // Spread thread indices apart
-    
     println!("[CPU-{}] Starting CPU worker thread", thread_id);
     
     loop {
         let rng_seed: u64 = rng.r#gen();
-        let start_time = Instant::now();
-        let mut batch_matches = 0;
         
-        // Process a batch of keys
-        for i in 0..batch_size {
-            let request = logic::VanityKeyRequest {
-                prefix: vanity_prefix_bytes,
-                suffix: vanity_suffix_bytes,
-                thread_idx: thread_idx + i,
-                rng_seed: rng_seed.wrapping_add(i as u64),
-            };
+        let request = logic::VanityKeyRequest {
+            prefix: vanity_prefix_bytes,
+            suffix: vanity_suffix_bytes,
+            thread_idx: thread_id,
+            rng_seed: rng_seed
+        };
+        
+        let result = logic::generate_and_check_vanity_key(&request);
+
+        global_stats.add_launch(1);
+        
+        if result.matches {
+            let encoded_str = std::str::from_utf8(&result.encoded_public_key[0..result.encoded_len])
+                .unwrap_or("invalid_utf8");
             
-            let result = logic::generate_and_check_vanity_key(&request);
-            
-            if result.matches {
-                batch_matches += 1;
-                
-                // Print first match details
-                if batch_matches == 1 {
-                    let encoded_str = std::str::from_utf8(&result.encoded_public_key[0..result.encoded_len])
-                        .unwrap_or("invalid_utf8");
-                    
-                    println!("[CPU-{}] First match: thread_idx = {}", thread_id, thread_idx + i);
-                    println!("[CPU-{}] First match: encoded_public_key = {}", thread_id, encoded_str);
-                    println!("[CPU-{}] First match: public_key = {}", thread_id, hex::encode(result.public_key));
-                    println!("[CPU-{}] First match: private_key = {}", thread_id, hex::encode(result.private_key));
-                    println!("[CPU-{}] First match: wallet = {}", thread_id, hex::encode([result.private_key, result.public_key].concat()));
-                }
-            }
-        }
-        
-        thread_idx += batch_size;
-        
-        // Update global stats
-        global_stats.add_launch(batch_size);
-        if batch_matches > 0 {
-            global_stats.add_matches(batch_matches);
-            global_stats.print_stats(thread_id, batch_matches as f32);
-        }
+            println!("[CPU-{}] First match: thread_idx = {}", thread_id, thread_id);
+            println!("[CPU-{}] First match: encoded_public_key = {}", thread_id, encoded_str);
+            println!("[CPU-{}] First match: public_key = {}", thread_id, hex::encode(result.public_key));
+            println!("[CPU-{}] First match: hashed_private_key = {}", thread_id, hex::encode(result.hashed_private_key));                    
+            println!("[CPU-{}] First match: private_key = {}", thread_id, hex::encode(result.private_key));
+            println!("[CPU-{}] First match: wallet = {}", thread_id, hex::encode([result.private_key, result.public_key].concat()));
+
+            global_stats.add_matches(1);
+            global_stats.print_stats(thread_id, 1.0);
+        }    
     }
-    
+
     Ok(())
 }
 
