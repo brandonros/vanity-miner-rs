@@ -1,0 +1,9 @@
+[package]
+name = "cpu_runner"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+logic = { path = "../logic" }
+hex = "0.4.3"
+rand = "0.8"

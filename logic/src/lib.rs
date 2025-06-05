@@ -14,7 +14,6 @@ pub use base58::*;
 pub use ed25519::*;
 pub use sha512::*;
 
-
 #[cfg(test)]
 mod test {
     use super::*;
