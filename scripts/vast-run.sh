@@ -2,8 +2,8 @@
 
 set -e
 
-PORT=39920
-HOST=ssh4.vast.ai
+PORT=10178
+HOST=ssh2.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
@@ -14,6 +14,6 @@ then
 fi
 export BLOCKS_PER_SM="1024"
 export THREADS_PER_BLOCK="256"
-killall gpu_runner
-./gpu_runner shallenge brandonros 00000000000343368f85da942374a09773be369d7603b0370abee5388f2ea845
+killall gpu_runner || true
+./gpu_runner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 EOF

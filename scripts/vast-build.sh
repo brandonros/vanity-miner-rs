@@ -68,5 +68,5 @@ git reset --hard origin/master
 # build
 pushd gpu_runner
 cargo build --release
-./gpu_runner shallenge brandonros 00000000000ff33fa389320e4c9ab736a6bfe9ed9a1ac2be8ef480380cec2a99
+./gpu_runner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 EOF

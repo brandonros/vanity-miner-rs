@@ -3,10 +3,10 @@ use seq_macro::seq;
 use crate::sha256;
 use crate::xoroshiro;
 
-pub struct ShallengeRequest {
-    pub username: &'static [u8],
+pub struct ShallengeRequest<'a> {
+    pub username: &'a [u8],
     pub username_len: usize,
-    pub target_hash: &'static [u8; 32],
+    pub target_hash: &'a [u8; 32],
     pub thread_idx: usize,
     pub rng_seed: u64,
 }
