@@ -117,6 +117,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+
+[[package]]
 name = "crc32fast"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -211,16 +215,6 @@ dependencies = [
  "bimap",
  "bindgen",
  "cc",
-]
-
-[[package]]
-name = "ed25519_vanity"
-version = "0.1.0"
-dependencies = [
- "cuda_builder",
- "cust",
- "hex",
- "rand",
 ]
 
 [[package]]
@@ -321,6 +315,17 @@ name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
+
+[[package]]
+name = "gpu_runner"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "cuda_builder",
+ "cust",
+ "hex",
+ "rand",
+]
 
 [[package]]
 name = "hashbrown"

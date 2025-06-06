@@ -62,13 +62,11 @@ git fetch
 git checkout --force master
 git reset --hard origin/master
 
-# build
+# set up environment
 . $HOME/.cargo/env
-cargo build --release
-EOF
 
-# run
-ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-pushd ed25519-vanity-rs
-./target/release/ed25519_vanity aa aa
+# build
+pushd gpu_runner
+cargo build --release
+./gpu_runner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 EOF

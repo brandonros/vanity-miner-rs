@@ -2,15 +2,18 @@
 
 set -e
 
-PORT=27992
-HOST=ssh4.vast.ai
+PORT=10178
+HOST=ssh2.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-if [[ ! -f ed25519_vanity ]]
+if [[ ! -f gpu_runner ]]
 then
-  curl -L -O https://github.com/brandonros/ed25519-vanity-rs/releases/download/1.1.0/ed25519_vanity
-  chmod +x ed25519_vanity
+  curl -L -O https://github.com/brandonros/ed25519-vanity-rs/releases/download/1.3.0/gpu_runner
+  chmod +x gpu_runner
 fi
-./ed25519_vanity Muffin ""
+export BLOCKS_PER_SM="1024"
+export THREADS_PER_BLOCK="256"
+killall gpu_runner || true
+./gpu_runner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 EOF

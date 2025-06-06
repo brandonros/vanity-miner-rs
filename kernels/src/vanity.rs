@@ -1,9 +1,5 @@
-#![no_std]
-
-extern crate alloc;
-
 /// Handle the infrastructure concerns when a match is found
-unsafe fn handle_match_found(
+unsafe fn handle_vanity_match_found(
     result: logic::VanityKeyResult,
     thread_idx: usize,
     found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
@@ -66,7 +62,7 @@ pub unsafe fn find_vanity_private_key(
     // Handle result (adapter layer)
     if result.matches {
         unsafe { 
-            handle_match_found(
+            handle_vanity_match_found(
                 result,
                 thread_idx,
                 found_matches_slice_ptr,

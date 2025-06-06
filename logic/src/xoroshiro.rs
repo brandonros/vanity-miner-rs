@@ -1,6 +1,8 @@
 use rand_core::{SeedableRng, RngCore};
 use rand_xoshiro::Xoroshiro128StarStar;
 
+const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
 fn splitmix64(mut x: u64) -> u64 {
     x = x.wrapping_add(0x9e3779b97f4a7c15u64);
     x = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9u64);
@@ -14,4 +16,13 @@ pub fn generate_random_private_key(thread_idx: usize, rng_seed: u64) -> [u8; 32]
     let mut rng = Xoroshiro128StarStar::seed_from_u64(mixed_seed);
     rng.fill_bytes(&mut private_key);
     private_key
+}
+
+pub fn generate_base64_nonce(thread_idx: usize, rng_seed: u64, nonce: &mut [u8]) {
+    let mixed_seed = splitmix64(rng_seed.wrapping_add(thread_idx as u64));
+    let mut rng = Xoroshiro128StarStar::seed_from_u64(mixed_seed);
+    for byte in nonce.iter_mut() {
+        let idx = (rng.next_u32() % 64) as usize;
+        *byte = BASE64_CHARS[idx];
+    }
 }

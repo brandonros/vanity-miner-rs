@@ -7,12 +7,16 @@ mod xoroshiro;
 mod base58;
 mod ed25519;
 mod sha512;
+mod sha256;
+mod shallenge;
 
 pub use vanity::*;
 pub use xoroshiro::*;
 pub use base58::*;
 pub use ed25519::*;
 pub use sha512::*;
+pub use sha256::*;
+pub use shallenge::*;
 
 #[cfg(test)]
 mod test {
