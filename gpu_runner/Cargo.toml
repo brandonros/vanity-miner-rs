@@ -1,11 +1,12 @@
 [package]
-name = "ed25519_vanity"
+name = "gpu_runner"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 hex = "0.4.3"
 rand = "0.8"
+common = { path = "../common" }
 
 # christan's branch
 #cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }

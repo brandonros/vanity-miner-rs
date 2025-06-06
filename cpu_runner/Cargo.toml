@@ -5,5 +5,6 @@ edition = "2024"
 
 [dependencies]
 logic = { path = "../logic" }
+common = { path = "../common" }
 hex = "0.4.3"
 rand = "0.8"

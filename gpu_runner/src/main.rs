@@ -1,5 +1,3 @@
-mod stats;
-
 use cust::device::Device;
 use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;
@@ -11,7 +9,7 @@ use rand::Rng;
 use std::error::Error;
 use std::sync::Arc;
 
-use crate::stats::GlobalStats;
+use common::GlobalStats;
 
 fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     let invalid_characters = [
