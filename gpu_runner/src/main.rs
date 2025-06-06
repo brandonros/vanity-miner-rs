@@ -7,7 +7,7 @@ use cust::memory::CopyDestination;
 use cust::{launch, CudaFlags};
 use rand::Rng;
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use common::GlobalStats;
 
@@ -15,6 +15,31 @@ use common::GlobalStats;
 enum Mode {
     Vanity { prefix: String, suffix: String },
     Shallenge { username: String, target_hash: String },
+}
+
+// Shared state for the best hash found so far (copied from CPU runner)
+struct SharedBestHash {
+    hash: [u8; 32],
+}
+
+impl SharedBestHash {
+    fn new(initial_hash: [u8; 32]) -> Self {
+        Self { hash: initial_hash }
+    }
+    
+    fn update_if_better(&mut self, new_hash: [u8; 32]) -> bool {
+        // Compare hashes lexicographically (smaller is better)
+        if new_hash < self.hash {
+            self.hash = new_hash;
+            true
+        } else {
+            false
+        }
+    }
+    
+    fn get_current(&self) -> [u8; 32] {
+        self.hash
+    }
 }
 
 fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -126,14 +151,12 @@ fn device_main_vanity(
 fn device_main_shallenge(
     ordinal: usize, 
     username: String,
-    target_hash: Vec<u8>,
+    shared_best_hash: Arc<RwLock<SharedBestHash>>,
     module: &Module,
     global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let username_bytes = username.as_bytes();
     let username_len: usize = username_bytes.len();
-    let mut target_hash_array = [0u8; 32];
-    target_hash_array.copy_from_slice(&target_hash);
     
     let device = Device::get_device(ordinal as u32)?;
     let ctx = Context::new(device)?;
@@ -151,10 +174,15 @@ fn device_main_shallenge(
     println!("[{ordinal}] Starting shallenge search loop ({} blocks per grid, {} threads per block, {} operations per launch)", blocks_per_grid, threads_per_block, operations_per_launch);
 
     let mut rng = rand::thread_rng();
-    let mut current_best_hash = target_hash_array;
 
     loop {
         let rng_seed: u64 = rng.r#gen::<u64>();
+        
+        // Get the current best hash (with minimal lock time)
+        let current_target = {
+            let best_hash_guard = shared_best_hash.read().unwrap();
+            best_hash_guard.get_current()
+        };
         
         let mut found_matches_slice = [0.0f32; 1];
         let mut found_hash = [0u8; 32];
@@ -163,7 +191,7 @@ fn device_main_shallenge(
         let mut found_thread_idx_slice = [0u32; 1];
         
         let username_dev = username_bytes.as_dbuf()?;
-        let target_hash_dev = current_best_hash.as_dbuf()?;
+        let target_hash_dev = current_target.as_dbuf()?;
         let found_matches_slice_dev = found_matches_slice.as_dbuf()?;
         let found_hash_dev = found_hash.as_dbuf()?;
         let found_nonce_dev = found_nonce.as_dbuf()?;
@@ -202,16 +230,21 @@ fn device_main_shallenge(
             let nonce_len = found_nonce_len[0];
             let nonce_string = String::from_utf8(found_nonce[..nonce_len].to_vec()).unwrap();
             
-            println!("[{ordinal}] Better hash found: seed = {rng_seed} thread_idx = {found_thread_idx}");
-            println!("[{ordinal}] Better hash: {}", hex::encode(found_hash));
-            println!("[{ordinal}] Better nonce: {}", nonce_string);
-            println!("[{ordinal}] Challenge string: {}/{}", username, nonce_string);
+            // Try to update the global best hash
+            let was_global_best = {
+                let mut best_hash_guard = shared_best_hash.write().unwrap();
+                best_hash_guard.update_if_better(found_hash)
+            };
+            
+            if was_global_best {
+                println!("[{ordinal}] NEW GLOBAL BEST found: seed = {rng_seed} thread_idx = {found_thread_idx}");
+                println!("[{ordinal}] NEW GLOBAL BEST hash: {}", hex::encode(found_hash));
+                println!("[{ordinal}] NEW GLOBAL BEST nonce: {}", nonce_string);
+                println!("[{ordinal}] Challenge string: {}/{}", username, nonce_string);
 
-            // Update our target to the new best hash
-            current_best_hash = found_hash;
-
-            global_stats.add_matches(found_matches as usize);
-            global_stats.print_stats(ordinal, found_matches);
+                global_stats.add_matches(found_matches as usize);
+                global_stats.print_stats(ordinal, found_matches);
+            }
         }
     }
 }
@@ -219,6 +252,7 @@ fn device_main_shallenge(
 fn device_main(
     ordinal: usize, 
     mode: Mode,
+    shared_best_hash: Option<Arc<RwLock<SharedBestHash>>>,
     global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let device = Device::get_device(ordinal as u32)?;
@@ -235,9 +269,9 @@ fn device_main(
         Mode::Vanity { prefix, suffix } => {
             device_main_vanity(ordinal, prefix, suffix, &module, global_stats)
         }
-        Mode::Shallenge { username, target_hash } => {
-            let target_hash_bytes = validate_hex_string(&target_hash)?;
-            device_main_shallenge(ordinal, username, target_hash_bytes, &module, global_stats)
+        Mode::Shallenge { username, .. } => {
+            let shared_best_hash = shared_best_hash.expect("SharedBestHash required for shallenge mode");
+            device_main_shallenge(ordinal, username, shared_best_hash, &module, global_stats)
         }
     }
 }
@@ -279,14 +313,36 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         )),
     };
 
+    // Create shared state for shallenge mode
+    let shared_best_hash = match &mode {
+        Mode::Vanity { .. } => None,
+        Mode::Shallenge { target_hash, .. } => {
+            let target_hash_bytes = validate_hex_string(target_hash)?;
+            let mut initial_target = [0u8; 32];
+            initial_target.copy_from_slice(&target_hash_bytes);
+            Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))
+        }
+    };
+
+    match &mode {
+        Mode::Vanity { prefix, suffix } => {
+            println!("Searching for vanity key with prefix '{}' and suffix '{}'", prefix, suffix);
+        }
+        Mode::Shallenge { username, target_hash } => {
+            println!("Starting shallenge for username '{}' with target hash '{}'", username, target_hash);
+        }
+    }
+
     let mut handles = Vec::new();
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let mode_clone = mode.clone();
+        let shared_best_hash_clone = shared_best_hash.clone();
         let stats_clone = Arc::clone(&global_stats);
         handles.push(std::thread::spawn(move || device_main(
             i,
             mode_clone,
+            shared_best_hash_clone,
             stats_clone
         )));
     }
