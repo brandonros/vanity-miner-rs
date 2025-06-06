@@ -55,7 +55,7 @@ fn device_main_vanity(
 
     let number_of_streaming_multiprocessors = device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
     let blocks_per_sm = std::env::var("BLOCKS_PER_SM").unwrap_or("128".to_string()).parse::<usize>().unwrap();
-    let threads_per_block = std::env::var("THREADS_PER_BLOCK").unwrap_or("256".to_string()).parse::<usize>().unwrap();;
+    let threads_per_block = std::env::var("THREADS_PER_BLOCK").unwrap_or("256".to_string()).parse::<usize>().unwrap();
     let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
     let operations_per_launch = blocks_per_grid * threads_per_block;
 
@@ -144,7 +144,7 @@ fn device_main_shallenge(
 
     let number_of_streaming_multiprocessors = device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
     let blocks_per_sm = std::env::var("BLOCKS_PER_SM").unwrap_or("128".to_string()).parse::<usize>().unwrap();
-    let threads_per_block = std::env::var("THREADS_PER_BLOCK").unwrap_or("256".to_string()).parse::<usize>().unwrap();;
+    let threads_per_block = std::env::var("THREADS_PER_BLOCK").unwrap_or("256".to_string()).parse::<usize>().unwrap();
     let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
     let operations_per_launch = blocks_per_grid * threads_per_block;
 
