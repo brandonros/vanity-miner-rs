@@ -27,6 +27,6 @@ COPY . /app
 WORKDIR /app
 
 # Build the project
-RUN . "$HOME/.cargo/env" && cargo build --release
+RUN . "$HOME/.cargo/env" && cd gpu_runner && cargo build --release
 
 # The binary will be in /app/target/release/
