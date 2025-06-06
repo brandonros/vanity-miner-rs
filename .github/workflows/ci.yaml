@@ -51,7 +51,6 @@ jobs:
           
           # Copy the binary
           docker cp $CONTAINER_ID:/app/gpu_runner/target/release/gpu_runner ./artifacts/
-          
           echo "Copied to artifacts directory"
           
           # Remove the container
