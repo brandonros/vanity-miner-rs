@@ -46,7 +46,7 @@ fn device_main(
 
     // Load the pre-compiled PTX that was generated during build
     println!("[{ordinal}] Loading module...");
-    let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernel.ptx"));
+    let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernels.ptx"));
     let module = Module::from_ptx(ptx, &[
         ModuleJitOption::MaxRegisters(256),
     ])?;
