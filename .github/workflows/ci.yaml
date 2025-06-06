@@ -46,22 +46,13 @@ jobs:
           # Create a container from the image
           CONTAINER_ID=$(docker create rust-cuda-builder)
           
-          # Extract the binary name from Cargo.toml (assumes it's the package name)
-          BINARY_NAME=$(grep -m 1 "name" Cargo.toml | cut -d '"' -f 2)
-          if [ -z "$BINARY_NAME" ]
-          then
-            exit 1
-          fi
-
-          echo "Binary name: $BINARY_NAME"
-          
           # Create output directory
           mkdir -p artifacts
           
           # Copy the binary
-          docker cp $CONTAINER_ID:/app/gpu_runner/target/release/$BINARY_NAME ./artifacts/
+          docker cp $CONTAINER_ID:/app/gpu_runner/target/release/gpu_runner ./artifacts/
           
-          echo "Copied $BINARY_NAME to artifacts directory"
+          echo "Copied to artifacts directory"
           
           # Remove the container
           docker rm $CONTAINER_ID
