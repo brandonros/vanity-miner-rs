@@ -153,7 +153,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sha256_empty_like() {
+    fn test_sha256() {
         // Test with 32 zero bytes
         let input: [u8; 32] = "brandonros/000000000000000000000".as_bytes().try_into().unwrap();
         let result = sha256_32bytes_from_bytes(&input);
