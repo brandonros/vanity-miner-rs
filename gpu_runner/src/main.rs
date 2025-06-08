@@ -260,7 +260,9 @@ fn device_main(
     cust::context::CurrentContext::set_current(&ctx)?;
 
     println!("[{ordinal}] Loading module...");
-    let ptx = include_str!(concat!(env!("OUT_DIR"), "/kernels.ptx"));
+    let ptx_path = std::path::Path::new("kernels.ptx");
+    let ptx = std::fs::read_to_string(ptx_path)
+        .map_err(|e| format!("Failed to read PTX file: {}", e))?;
     let module = Module::from_ptx(ptx, &[
         ModuleJitOption::MaxRegisters(256),
     ])?;
