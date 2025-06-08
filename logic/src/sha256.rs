@@ -53,7 +53,7 @@ const fn small_sigma1(x: u32) -> u32 {
     rotr32(x, 17) ^ rotr32(x, 19) ^ (x >> 10)
 }
 
-fn sha256_32bytes_u32(input: [u32; 8]) -> [u32; 8] {
+fn sha256_32(input: [u32; 8]) -> [u32; 8] {
     // Message schedule array - we need 64 words for SHA-256
     let mut w = [0u32; 64];
     
@@ -68,6 +68,94 @@ fn sha256_32bytes_u32(input: [u32; 8]) -> [u32; 8] {
     // w[9] through w[13] are already zero
     w[14] = 0; // Upper 32 bits of length (always 0 for our use case)
     w[15] = 256; // Lower 32 bits of length (32 bytes = 256 bits)
+    
+    // Extend the first 16 words into the remaining 48 words
+    seq!(N in 16..64 {
+        w[N] = small_sigma1(w[N - 2])
+            .wrapping_add(w[N - 7])
+            .wrapping_add(small_sigma0(w[N - 15]))
+            .wrapping_add(w[N - 16]);
+    });
+    
+    // Initialize working variables
+    let mut a = H0[0];
+    let mut b = H0[1];
+    let mut c = H0[2];
+    let mut d = H0[3];
+    let mut e = H0[4];
+    let mut f = H0[5];
+    let mut g = H0[6];
+    let mut h = H0[7];
+    
+    // Main loop - 64 rounds
+    seq!(ROUND in 0..64 {
+        let t1 = h
+            .wrapping_add(big_sigma1(e))
+            .wrapping_add(ch(e, f, g))
+            .wrapping_add(K[ROUND])
+            .wrapping_add(w[ROUND]);
+        
+        let t2 = big_sigma0(a).wrapping_add(maj(a, b, c));
+        
+        h = g;
+        g = f;
+        f = e;
+        e = d.wrapping_add(t1);
+        d = c;
+        c = b;
+        b = a;
+        a = t1.wrapping_add(t2);
+    });
+    
+    // Add this chunk's hash to the result so far
+    [
+        H0[0].wrapping_add(a),
+        H0[1].wrapping_add(b),
+        H0[2].wrapping_add(c),
+        H0[3].wrapping_add(d),
+        H0[4].wrapping_add(e),
+        H0[5].wrapping_add(f),
+        H0[6].wrapping_add(g),
+        H0[7].wrapping_add(h),
+    ]
+}
+
+fn sha256_variable_length(input: &[u8]) -> [u32; 8] {
+    // Message schedule array - we need 64 words for SHA-256
+    let mut w = [0u32; 64];
+    
+    let input_len = input.len();
+    let input_bits = input_len * 8;
+    
+    // Convert bytes to u32 words (big-endian)
+    let full_words = input_len / 4;
+    for i in 0..full_words {
+        w[i] = u32::from_be_bytes([
+            input[i * 4],
+            input[i * 4 + 1], 
+            input[i * 4 + 2],
+            input[i * 4 + 3]
+        ]);
+    }
+    
+    // Handle remaining bytes (if input length is not multiple of 4)
+    let remaining_bytes = input_len % 4;
+    if remaining_bytes > 0 {
+        let mut last_word = [0u8; 4];
+        for i in 0..remaining_bytes {
+            last_word[i] = input[full_words * 4 + i];
+        }
+        // Add the padding bit (0x80) right after the last byte
+        last_word[remaining_bytes] = 0x80;
+        w[full_words] = u32::from_be_bytes(last_word);
+    } else {
+        // If input is exactly multiple of 4, add padding in next word
+        w[full_words] = 0x80000000;
+    }
+    
+    // Add length at the end (last 64 bits = words 14 and 15)
+    w[14] = 0; // Upper 32 bits of length (always 0 for inputs < 2^32 bits)
+    w[15] = input_bits as u32; // Lower 32 bits of length
     
     // Extend the first 16 words into the remaining 48 words
     seq!(N in 16..64 {
@@ -142,10 +230,20 @@ fn input_to_u32(input: &[u8; 32]) -> [u32; 8] {
     u32_input
 }
 
-pub fn sha256_32bytes_from_bytes(input: &[u8; 32]) -> [u8; 32] {
+pub fn sha256_32_from_bytes(input: &[u8; 32]) -> [u8; 32] {
     let u32_input = input_to_u32(input);
-    let u32_output = sha256_32bytes_u32(u32_input);
+    let u32_output = sha256_32(u32_input);
     hash_to_bytes(u32_output)
+}
+
+pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
+    let hash_words = sha256_variable_length(input);
+    let mut result = [0u8; 32];
+    for (i, word) in hash_words.iter().enumerate() {
+        let bytes = word.to_be_bytes();
+        result[i * 4..i * 4 + 4].copy_from_slice(&bytes);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -156,7 +254,7 @@ mod tests {
     fn test_sha256() {
         // Test with 32 zero bytes
         let input: [u8; 32] = "brandonros/000000000000000000000".as_bytes().try_into().unwrap();
-        let result = sha256_32bytes_from_bytes(&input);
+        let result = sha256_32_from_bytes(&input);
         let expected: [u8; 32] = hex::decode("f7a41dae1196282f0a544a8c7f1bbf61bda79307dc424c0d9febd27b08e1bf78").unwrap().try_into().unwrap();
         assert_eq!(result, expected);
     }

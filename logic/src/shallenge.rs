@@ -42,7 +42,7 @@ pub fn shallenge(username: &[u8], username_len: usize, nonce: &[u8], nonce_len: 
     input[pos..pos + nonce_len].copy_from_slice(&nonce[..nonce_len]);
     
     // Hash only the used portion
-    sha256::sha256_32bytes_from_bytes(&input)
+    sha256::sha256_32_from_bytes(&input)
 }
 
 pub fn test_nonce(

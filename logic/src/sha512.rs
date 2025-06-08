@@ -162,3 +162,15 @@ pub fn sha512_32bytes_from_bytes(input: &[u8; 32]) -> [u8; 64] {
     let u64_output = sha512_32bytes_u64(u64_input);
     hash_to_bytes(u64_output)
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn should_hash_correctly() {
+        // sha512
+        let private_key: [u8; 32] = hex::decode("61a314b0183724ea0e5f237584cb76092e253b99783d846a5b10db155128eafd").unwrap().try_into().unwrap();
+        let hashed_private_key_bytes = crate::sha512_32bytes_from_bytes(&private_key);
+        let expected = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb0f5b8817a8e43510f83333417178f2f59fdc3c723199303a5f9be71af2f7b664").unwrap();
+        assert_eq!(hashed_private_key_bytes, *expected);
+    }
+}
