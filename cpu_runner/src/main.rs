@@ -1,8 +1,6 @@
-mod validation;
 mod solana;
 mod bitcoin;
 mod shallenge;
-mod shared_best_hash;
 
 use std::error::Error;
 use std::sync::Arc;
@@ -29,7 +27,7 @@ fn cpu_main(
             bitcoin::cpu_main_bitcoin_vanity(num_threads, prefix, suffix, global_stats)
         }
         Mode::Shallenge { username, target_hash } => {
-            let target_hash_bytes = validation::validate_hex_string(&target_hash)?;
+            let target_hash_bytes = common::validate_hex_string(&target_hash)?;
             shallenge::cpu_main_shallenge(num_threads, username, target_hash_bytes, global_stats)
         }
     }
@@ -42,20 +40,20 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         let vanity_prefix = args[2].clone();
         let vanity_suffix = args[3].clone();
         if vanity_prefix.len() > 0 {
-            validation::validate_base58_string(&vanity_prefix)?;
+            common::validate_base58_string(&vanity_prefix)?;
         }
         if vanity_suffix.len() > 0 {
-            validation::validate_base58_string(&vanity_suffix)?;
+            common::validate_base58_string(&vanity_suffix)?;
         }
         Mode::SolanaVanity { prefix: vanity_prefix, suffix: vanity_suffix }
     } else if args.len() == 4 && args[1] == "bitcoin-vanity" {
         let vanity_prefix = args[2].clone();
         let vanity_suffix = args[3].clone();
         if vanity_prefix.len() > 0 {
-            validation::validate_bech32_string(&vanity_prefix)?;
+            common::validate_bech32_string(&vanity_prefix)?;
         }
         if vanity_suffix.len() > 0 {
-            validation::validate_bech32_string(&vanity_suffix)?;
+            common::validate_bech32_string(&vanity_suffix)?;
         }
         Mode::BitcoinVanity { prefix: vanity_prefix, suffix: vanity_suffix }
     } else if args.len() == 4 && args[1] == "shallenge" {

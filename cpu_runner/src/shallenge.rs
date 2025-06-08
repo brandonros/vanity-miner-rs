@@ -1,10 +1,8 @@
 use std::error::Error;
 use std::sync::{Arc, RwLock};
-
-use common::GlobalStats;
 use rand::Rng as _;
-
-use crate::shared_best_hash::SharedBestHash;
+use common::GlobalStats;
+use common::SharedBestHash;
 
 fn cpu_worker_thread_shallenge(
     thread_id: usize,
