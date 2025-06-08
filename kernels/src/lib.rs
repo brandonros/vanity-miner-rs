@@ -2,8 +2,8 @@
 
 extern crate alloc;
 
-mod vanity;
+mod solana_vanity;
 mod shallenge;
 
-pub use vanity::*;
+pub use solana_vanity::*;
 pub use shallenge::*;

@@ -80,3 +80,36 @@ pub fn generate_and_check_solana_vanity_key(request: &SolanaVanityKeyRequest) ->
         matches,
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn should_generate_and_check_solana_vanity_key_correctly() {
+        // Arrange
+        let prefix = b"aa";  // Example prefix
+        let suffix = b""; // Example suffix
+        let request = SolanaVanityKeyRequest {
+            prefix,
+            suffix,
+            thread_idx: 5,
+            rng_seed: 8574998174529019819,
+        };
+
+        // Act
+        let result = generate_and_check_solana_vanity_key(&request);
+
+        // Assert
+        assert_eq!(result.matches, true);
+        assert_eq!(
+            result.private_key, 
+            <[u8; 32]>::try_from(
+                hex::decode("d32ef33913a75aada4fc64d153de08338e169234f3432cc0294510df9fd0ccf8")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
+        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"aaLs2GEHDEajV3kgXsr7FPDRc4mcKVJLQDXnWWcyJCr");   
+    }
+}

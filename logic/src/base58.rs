@@ -106,9 +106,15 @@ pub fn base58_encode_32(input: &[u8; 32], output: &mut [u8; 64]) -> usize {
     result_len
 }
 
-pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
-    const MAX_REQUIRED_LIMBS_25: usize = 8; // Sufficient for 25 bytes
-
+pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
+    // Calculate required limbs based on input length
+    // Each byte adds ~1.37 base58 digits, so we need more limbs for longer inputs
+    let max_required_limbs = (input.len() * 2 + 7) / 8; // Conservative estimate
+    
+    // Use a reasonable maximum to avoid stack overflow
+    const MAX_LIMBS: usize = 16; // Should handle up to ~64 bytes of input
+    assert!(max_required_limbs <= MAX_LIMBS, "Input too large for base58 encoding");
+    
     // Count leading zeros in advance
     let mut num_leading_zeros = 0;
     for &byte in input.iter() {
@@ -120,10 +126,7 @@ pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
     }
 
     // Process input bytes through big integer arithmetic
-    // We'll process all 25 bytes by treating the input as a big-endian number
-
-    // Process input in chunks of bytes
-    let mut limbs = [0u32; MAX_REQUIRED_LIMBS_25];
+    let mut limbs = [0u32; MAX_LIMBS];
     let mut limb_count = 0;
     
     // Process each byte individually to avoid padding issues
@@ -139,7 +142,7 @@ pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
         }
 
         // Add new limbs if needed
-        while remaining_carry > 0 && limb_count < MAX_REQUIRED_LIMBS_25 {
+        while remaining_carry > 0 && limb_count < MAX_LIMBS {
             limbs[limb_count] = (remaining_carry % NEXT_LIMB_DIVISOR) as u32;
             remaining_carry = remaining_carry / NEXT_LIMB_DIVISOR;
             limb_count += 1;
@@ -151,6 +154,11 @@ pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
         let limb_value = limbs[idx] as u64;
         let output_offset = idx * DIGITS_PER_LIMB;
 
+        // Make sure we don't write beyond output buffer
+        if output_offset + DIGITS_PER_LIMB > output.len() {
+            break;
+        }
+
         // Extract Base58 digits using precomputed divisors
         for i in 0..DIGITS_PER_LIMB {
             let temp = (limb_value / DIVISORS[i]) % 58;
@@ -160,6 +168,9 @@ pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
 
     // Scale for remainder and apply alphabet
     let mut result_len = limb_count * DIGITS_PER_LIMB;
+    
+    // Ensure we don't exceed output buffer
+    result_len = result_len.min(output.len());
 
     // Trim leading zeros in the result
     while result_len > 0 && output[result_len - 1] == 0 {
@@ -168,6 +179,9 @@ pub fn base58_encode_25(input: &[u8; 25], output: &mut [u8; 64]) -> usize {
 
     // Add a zero byte for each leading zero in the input
     for _ in 0..num_leading_zeros {
+        if result_len >= output.len() {
+            break; // Prevent buffer overflow
+        }
         output[result_len] = 0;
         result_len += 1;
     }
@@ -201,7 +215,7 @@ mod test {
     fn should_encode_25_correctly() {
         let public_key_bytes: [u8; 25] = hex::decode("0AF764C1B6133A3A0ABD7EF9C853791B687CE1E235F9DC8466").unwrap().try_into().unwrap();
         let mut bs58_encoded_public_key = [0u8; 64];
-        let encoded_len = base58_encode_25(&public_key_bytes, &mut bs58_encoded_public_key);
+        let encoded_len = base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
         let expected = hex::decode("355177385441616239385172516D796D637A7A78776B5A7A61634D444C344D654548").unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
