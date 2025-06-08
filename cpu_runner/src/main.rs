@@ -41,14 +41,22 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mode = if args.len() == 4 && args[1] == "solana-vanity" {
         let vanity_prefix = args[2].clone();
         let vanity_suffix = args[3].clone();
-        validation::validate_base58_string(&vanity_prefix)?;
-        validation::validate_base58_string(&vanity_suffix)?;
+        if vanity_prefix.len() > 0 {
+            validation::validate_base58_string(&vanity_prefix)?;
+        }
+        if vanity_suffix.len() > 0 {
+            validation::validate_base58_string(&vanity_suffix)?;
+        }
         Mode::SolanaVanity { prefix: vanity_prefix, suffix: vanity_suffix }
     } else if args.len() == 4 && args[1] == "bitcoin-vanity" {
         let vanity_prefix = args[2].clone();
         let vanity_suffix = args[3].clone();
-        validation::validate_base58_string(&vanity_prefix)?;
-        validation::validate_base58_string(&vanity_suffix)?;
+        if vanity_prefix.len() > 0 {
+            validation::validate_bech32_string(&vanity_prefix)?;
+        }
+        if vanity_suffix.len() > 0 {
+            validation::validate_bech32_string(&vanity_suffix)?;
+        }
         Mode::BitcoinVanity { prefix: vanity_prefix, suffix: vanity_suffix }
     } else if args.len() == 4 && args[1] == "shallenge" {
         let username = args[2].clone();
