@@ -39,7 +39,7 @@ impl GlobalStats {
         self.matches_found.fetch_add(matches, Ordering::Relaxed);
     }
 
-    pub fn print_stats(&self, device_id: usize, matches_this_launch: f32) {
+    pub fn print_stats(&self, device_id: usize, matches_this_launch: u32) {
         let vanity_prefix_length = self.vanity_prefix_length;
         let vanity_suffix_length = self.vanity_suffix_length;
         let matches_found = self.matches_found.load(Ordering::Relaxed);
