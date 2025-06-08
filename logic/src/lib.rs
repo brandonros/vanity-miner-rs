@@ -6,16 +6,20 @@ mod vanity;
 mod xoroshiro;
 mod base58;
 mod ed25519;
-mod sha512;
+mod secp256k1;
 mod sha256;
+mod sha512;
+mod ripemd160;
 mod shallenge;
 
 pub use vanity::*;
 pub use xoroshiro::*;
 pub use base58::*;
 pub use ed25519::*;
-pub use sha512::*;
+pub use secp256k1::*;
 pub use sha256::*;
+pub use sha512::*;
+pub use ripemd160::*;
 pub use shallenge::*;
 
 #[cfg(test)]
