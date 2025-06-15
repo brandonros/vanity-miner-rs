@@ -11,8 +11,8 @@ fn cpu_worker_thread_ethereum_vanity(
     global_stats: Arc<GlobalStats>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut rng = rand::thread_rng();
-    let vanity_prefix_bytes = vanity_prefix.as_bytes();
-    let vanity_suffix_bytes = vanity_suffix.as_bytes();
+    let vanity_prefix_bytes = hex::decode(vanity_prefix)?;
+    let vanity_suffix_bytes = hex::decode(vanity_suffix)?;
     
     println!("[CPU-{}] Starting CPU vanity worker thread", thread_id);
     
@@ -20,8 +20,8 @@ fn cpu_worker_thread_ethereum_vanity(
         let rng_seed: u64 = rng.r#gen();
         
         let request = logic::EthereumVanityKeyRequest {
-            prefix: vanity_prefix_bytes,
-            suffix: vanity_suffix_bytes,
+            prefix: &vanity_prefix_bytes,
+            suffix: &vanity_suffix_bytes,
             thread_idx: thread_id,
             rng_seed: rng_seed
         };
@@ -31,12 +31,11 @@ fn cpu_worker_thread_ethereum_vanity(
         global_stats.add_launch(1);
         
         if result.matches {
-            let encoded_address_str = std::str::from_utf8(&result.encoded_address)
-                .unwrap_or("invalid_utf8");
+            let encoded_address_str = hex::encode(result.address);
             
             println!("[CPU-{}] Vanity match: rng_seed = {}", thread_id, rng_seed);
             println!("[CPU-{}] Vanity match: thread_idx = {}", thread_id, thread_id);
-            println!("[CPU-{}] Vanity match: address = {}", thread_id, encoded_address_str);
+            println!("[CPU-{}] Vanity match: address = 0x{}", thread_id, encoded_address_str);
             println!("[CPU-{}] Vanity match: public_key = {}", thread_id, hex::encode(result.public_key));
             println!("[CPU-{}] Vanity match: private_key = 0x{}", thread_id, hex::encode(result.private_key));
             println!("[CPU-{}] Vanity match: wallet = 0x{}", thread_id, hex::encode(result.private_key)); // Same as private key

@@ -14,33 +14,33 @@ pub struct EthereumVanityKeyResult {
     pub private_key: [u8; 32],
     pub public_key: [u8; 64],           // uncompressed secp256k1 public key (without 0x04 prefix)
     pub address: [u8; 20],              // last 20 bytes of keccak256(public_key)
-    pub encoded_address: [u8; 42],      // hex encoded address with 0x prefix
     pub matches: bool,
 }
 
 /// Pure function for matching logic - same as Solana
 fn check_vanity_match(
-    encoded_key: &[u8],
-    encoded_len: usize,
+    address: &[u8; 20],
     prefix: &[u8],
     suffix: &[u8],
 ) -> bool {
+    let address_len = 20;
+    
     // Check prefix
-    if prefix.len() > encoded_len {
+    if prefix.len() > address_len {
         return false;
     }
     for i in 0..prefix.len() {
-        if encoded_key[i] != prefix[i] {
+        if address[i] != prefix[i] {
             return false;
         }
     }
     
     // Check suffix
-    if suffix.len() > encoded_len {
+    if suffix.len() > address_len {
         return false;
     }
     for i in 0..suffix.len() {
-        if encoded_key[encoded_len - suffix.len() + i] != suffix[i] {
+        if address[address_len - suffix.len() + i] != suffix[i] {
             return false;
         }
     }
@@ -69,23 +69,13 @@ pub fn generate_and_check_ethereum_vanity_key(request: &EthereumVanityKeyRequest
     let mut address = [0u8; 20];
     address.copy_from_slice(&public_key_hash[12..]);
     
-    // Encode address as hex with 0x prefix (initially lowercase)
-    let mut encoded_address = [0u8; 42];
-    encoded_address[0] = b'0';
-    encoded_address[1] = b'x';
-    
-    // Use hex crate to encode the address
-    let hex_string = hex::encode(&address);
-    encoded_address[2..42].copy_from_slice(hex_string.as_bytes());
-    
-    // Check if matches vanity criteria
-    let matches = check_vanity_match(&encoded_address, encoded_address.len(), request.prefix, request.suffix);
+    // Check if matches vanity criteria (no hex encoding needed!)
+    let matches = check_vanity_match(&address, request.prefix, request.suffix);
     
     EthereumVanityKeyResult {
         private_key,
         public_key,
         address,
-        encoded_address,
         matches,
     }
 }
@@ -97,8 +87,8 @@ mod test {
     #[test]
     fn should_generate_and_check_ethereum_vanity_key_correctly() {
         // Arrange
-        let prefix = b"0x55";  // Example prefix
-        let suffix = b""; // Example suffix
+        let prefix = &[0x55];  // Example prefix
+        let suffix = &[]; // Example suffix
         let request = EthereumVanityKeyRequest {
             prefix,
             suffix,
@@ -126,7 +116,14 @@ mod test {
                     .as_slice()
             ).unwrap()
         );
-        assert_eq!(result.encoded_address, *b"0x55e56b7b70dc37a7a1419e1e84ea4e6e237ef602");
+        assert_eq!(
+            result.address, 
+            <[u8; 20]>::try_from(
+                hex::decode("55e56b7b70dc37a7a1419e1e84ea4e6e237ef602")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
         assert_eq!(result.matches, true);
     }
 }
