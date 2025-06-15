@@ -13,7 +13,17 @@ logic = { path = "../logic" }
 #cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "1f79d0c132de7077ab9c3cbee35d206d3e148ce2" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "32d42e3a585ebd62a7d01a7203ac43b0a27ef03a" }
 
 # normal
 #cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
+
+[build-dependencies]
+# christian's branch
+#cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
+
+# my branch
+cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "32d42e3a585ebd62a7d01a7203ac43b0a27ef03a" }
+
+# normal
+#cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }

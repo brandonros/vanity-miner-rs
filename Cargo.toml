@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = [
+  "common",
+  "cpu_runner",
+  "gpu_runner",
+  "kernels",
+  "logic"
+]
+
+[patch.crates-io]
+zeroize = { git = "https://github.com/brandonros/utils", branch = "nvptx64-support" }

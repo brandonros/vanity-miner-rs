@@ -45,17 +45,17 @@ fn device_main(
 
     match mode {
         Mode::SolanaVanity { prefix, suffix } => {
-            device_main_solana_vanity(ordinal, prefix, suffix, &module, global_stats)
+            solana::device_main_solana_vanity(ordinal, prefix, suffix, &module, global_stats)
         }
         Mode::BitcoinVanity { prefix, suffix } => {
-            device_main_bitcoin_vanity(ordinal, prefix, suffix, &module, global_stats)
+            bitcoin::device_main_bitcoin_vanity(ordinal, prefix, suffix, &module, global_stats)
         }
         Mode::EthereumVanity { prefix, suffix } => {
-            device_main_ethereum_vanity(ordinal, prefix, suffix, &module, global_stats)
+            ethereum::device_main_ethereum_vanity(ordinal, prefix, suffix, &module, global_stats)
         }
         Mode::Shallenge { username, .. } => {
             let shared_best_hash = shared_best_hash.expect("SharedBestHash required for shallenge mode");
-            device_main_shallenge(ordinal, username, shared_best_hash, &module, global_stats)
+            shallenge::device_main_shallenge(ordinal, username, shared_best_hash, &module, global_stats)
         }
     }
 }
@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         Mode::BitcoinVanity { .. } => None,
         Mode::EthereumVanity { .. } => None,
         Mode::Shallenge { target_hash, .. } => {
-            let target_hash_bytes = common::validate_hex_string(target_hash)?;
+            let target_hash_bytes = hex::decode(target_hash)?;
             let mut initial_target = [0u8; 32];
             initial_target.copy_from_slice(&target_hash_bytes);
             Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))

@@ -1,4 +1,18 @@
-fn device_main_shallenge(
+use cust::device::Device;
+use cust::module::{Module, ModuleJitOption};
+use cust::prelude::Context;
+use cust::stream::{Stream, StreamFlags};
+use cust::util::SliceExt;
+use cust::memory::CopyDestination;
+use cust::{launch, CudaFlags};
+use rand::Rng;
+use std::error::Error;
+use std::sync::{Arc, RwLock};
+
+use common::GlobalStats;
+use common::SharedBestHash;
+
+pub fn device_main_shallenge(
     ordinal: usize, 
     username: String,
     shared_best_hash: Arc<RwLock<SharedBestHash>>,
