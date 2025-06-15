@@ -1,23 +1,28 @@
-use secp256k1::{Secp256k1, SecretKey, PublicKey};
+use crate::error::Error;
 
-pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], secp256k1::Error> {
-    let secp = Secp256k1::new();
-    
+pub mod constants;
+pub mod field_element;
+pub mod error;
+pub mod secret_key;
+pub mod public_key;
+pub mod point;
+
+// Your existing functions using the new implementation
+pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], Error> {    
     // Create secret key (validates it's in valid range)
-    let secret_key = SecretKey::from_slice(private_key_bytes)?;
+    let secret_key = secret_key::SecretKey::from_slice(private_key_bytes)?;
     
     // Derive public key
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+    let public_key = public_key::PublicKey::from_secret_key(&secret_key);
     
     // Return compressed format (33 bytes)
     Ok(public_key.serialize())
 }
 
 // For uncompressed format (65 bytes) - needed for Ethereum
-pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], secp256k1::Error> {
-    let secp = Secp256k1::new();
-    let secret_key = SecretKey::from_slice(private_key_bytes)?;
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], Error> {
+    let secret_key = secret_key::SecretKey::from_slice(private_key_bytes)?;
+    let public_key = public_key::PublicKey::from_secret_key(&secret_key);
     
     // Return uncompressed format
     Ok(public_key.serialize_uncompressed())
