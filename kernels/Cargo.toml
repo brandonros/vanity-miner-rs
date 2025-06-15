@@ -8,24 +8,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 logic = { path = "../logic" }
-
-# christian's branch
-#cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
-
-# my branch
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a27aa486493857d400d695396cd2966192d" }
-
-# normal
-#cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
+cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 
 [build-dependencies]
 env_logger = "0.10"
-
-# christian's branch
-#cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
-
-# my branch
-cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a27aa486493857d400d695396cd2966192d" }
-
-# normal
-#cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
