@@ -12,6 +12,6 @@ members = [
 zeroize = { git = "https://github.com/brandonros/utils", branch = "nvptx64-support" }
 
 [patch."https://github.com/Rust-GPU/Rust-CUDA.git"]
-cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a27aa486493857d400d695396cd2966192d" }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a27aa486493857d400d695396cd2966192d" }
-cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a27aa486493857d400d695396cd2966192d" }
+cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "17125288d217b33f7ba3675a35bfde5c401e2363" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "17125288d217b33f7ba3675a35bfde5c401e2363" }
+cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "17125288d217b33f7ba3675a35bfde5c401e2363" }

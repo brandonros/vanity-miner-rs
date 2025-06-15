@@ -9,7 +9,3 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 logic = { path = "../logic" }
 cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-
-[build-dependencies]
-env_logger = "0.10"
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
