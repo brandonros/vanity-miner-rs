@@ -50,7 +50,8 @@ jobs:
           mkdir -p artifacts
           
           # Copy the binary
-          docker cp $CONTAINER_ID:/app/gpu_runner/target/release/gpu_runner ./artifacts/
+          docker cp $CONTAINER_ID:/app/target/release/gpu_runner ./artifacts/
+          docker cp $CONTAINER_ID:/app/target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/
           echo "Copied to artifacts directory"
           
           # Remove the container
