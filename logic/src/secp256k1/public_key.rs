@@ -2,7 +2,6 @@ use super::point::Point;
 use super::error::Error;
 use super::secret_key::SecretKey;
 use super::field_element::FieldElement;
-use super::constants;
 
 // Public key wrapper
 #[derive(Debug, Clone, Copy)]
