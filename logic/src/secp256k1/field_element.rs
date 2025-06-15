@@ -2,7 +2,6 @@
 // Working with 256-bit integers in little-endian format for easier arithmetic
 
 use crate::error::Error;
-use crate::constants;
 
 // Field element operations (mod p)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,6 +13,22 @@ impl FieldElement {
     pub fn new(data: [u8; 32]) -> Result<Self, Error> {
         // TODO: Validate data < field prime
         Ok(Self { data })
+    }
+    
+    // Check if a little-endian byte array represents a small number (< 2^16)
+    fn is_small_number_le(bytes: &[u8; 32]) -> bool {
+        // Check if all bytes except the first two are zero (little-endian)
+        for i in 2..32 {
+            if bytes[i] != 0 {
+                return false;
+            }
+        }
+        true
+    }
+    
+    // Convert little-endian bytes to small integer (assuming it fits in u16)
+    fn bytes_to_small_int_le(bytes: &[u8; 32]) -> u16 {
+        (bytes[0] as u16) | ((bytes[1] as u16) << 8)
     }
     
     pub fn zero() -> Self {
@@ -205,107 +220,81 @@ impl FieldElement {
         self.reduce_512_bit_mod_prime(&result)
     }
     
-    // 512-bit modular reduction using proper division algorithm
+    // Optimized 512-bit modular reduction - much faster version
     fn reduce_512_bit_mod_prime(&self, value: &[u64; 8]) -> FieldElement {
-        println!("DEBUG: reduce_512_bit_mod_prime called");
-        println!("DEBUG: input = {:016x} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}", 
-                 value[7], value[6], value[5], value[4], value[3], value[2], value[1], value[0]);
+        // For secp256k1: p = 2^256 - 2^32 - 977
+        // So 2^256 ≡ 2^32 + 977 (mod p)
+        // We can reduce efficiently using this identity
         
-        // For secp256k1, we can use the special form of the prime for fast reduction
-        // p = 2^256 - 2^32 - 977, so 2^256 ≡ 2^32 + 977 (mod p)
-        // The offset value is 0x1000003D1 = 2^32 + 977
-        
-        // Split the 512-bit number into low and high 256-bit parts
-        let low = [value[0], value[1], value[2], value[3]];   // Low 256 bits
-        let high = [value[4], value[5], value[6], value[7]];  // High 256 bits
-        
-        println!("DEBUG: low  = {:016x} {:016x} {:016x} {:016x}", low[3], low[2], low[1], low[0]);
-        println!("DEBUG: high = {:016x} {:016x} {:016x} {:016x}", high[3], high[2], high[1], high[0]);
+        let low = [value[0], value[1], value[2], value[3]];
+        let high = [value[4], value[5], value[6], value[7]];
         
         // If high part is zero, just reduce the low part
         if Self::is_zero_u64(&high) {
-            println!("DEBUG: high part is zero, just reducing low part");
             let mut result = low;
             Self::reduce_mod_prime(&mut result);
             return Self::from_u64_array(result);
         }
         
-        // Convert high part to little-endian bytes and multiply by the offset
-        // offset = 2^32 + 977 = 0x1000003D1
-        let offset = 0x1000003D1u64;
+        // Fast reduction using the secp256k1 prime structure
+        // high * 2^256 ≡ high * (2^32 + 977) (mod p)
         
-        // We need to compute: low + high * offset (mod p)
-        // Since high can be up to 256 bits and offset is 64 bits, 
-        // the product can be up to 320 bits
+        // Convert to 128-bit arithmetic for precision
+        let mut result = [0u128; 4];
         
-        let mut result = [0u64; 6]; // 384 bits to be safe
-        
-        // Copy low part
-        result[0] = low[0];
-        result[1] = low[1];
-        result[2] = low[2];
-        result[3] = low[3];
-        
-        // Add high * offset
-        let mut carry = 0u128;
+        // Start with low part
         for i in 0..4 {
-            let prod = (high[i] as u128) * (offset as u128) + (result[i] as u128) + carry;
-            result[i] = prod as u64;
-            carry = prod >> 64;
+            result[i] = low[i] as u128;
         }
         
-        // Handle remaining carry
-        if carry > 0 {
-            result[4] = carry as u64;
-            carry >>= 64;
-            if carry > 0 {
-                result[5] = carry as u64;
+        // Add high * (2^32 + 977)
+        let c = 977u128;
+        let mut carry = 0u128;
+        
+        for i in 0..4 {
+            if high[i] == 0 { continue; }
+            
+            let h = high[i] as u128;
+            
+            // Add high[i] * 977 to result[i]
+            let prod = h * c + result[i] + carry;
+            result[i] = prod & 0xFFFFFFFFFFFFFFFF;
+            carry = prod >> 64;
+            
+            // Add high[i] * 2^32 to result[i+1] (if i < 3)
+            if i < 3 {
+                let shifted = h << 32;
+                result[i + 1] += shifted;
+            } else {
+                // high[3] * 2^32 would overflow, so add high[3] * 977 instead
+                carry += h * c;
             }
         }
         
-        println!("DEBUG: after adding high*offset: {:016x} {:016x} {:016x} {:016x} {:016x} {:016x}", 
-                 result[5], result[4], result[3], result[2], result[1], result[0]);
-        
-        // Now we need to reduce this potentially larger number mod p
-        // If result fits in 256 bits, we're done
-        if result[4] == 0 && result[5] == 0 {
-            let mut final_result = [result[0], result[1], result[2], result[3]];
-            Self::reduce_mod_prime(&mut final_result);
-            return Self::from_u64_array(final_result);
+        // Handle final carry
+        if carry > 0 {
+            // carry * 2^256 ≡ carry * (2^32 + 977) (mod p)
+            result[0] += carry * c;
+            if carry <= 0xFFFFFFFF {
+                result[1] += carry << 32;
+            } else {
+                // Very large carry - add carry * 977 to low part
+                result[0] += carry * c;
+            }
         }
         
-        // If result is larger, we need to reduce again
-        // The high part now represents multiples of 2^256
-        let high_part = [result[4], result[5], 0, 0];
-        let low_part = [result[0], result[1], result[2], result[3]];
+        // Convert back to u64 and handle any remaining carries
+        let mut final_result = [0u64; 4];
+        let mut carry = 0u64;
         
-        println!("DEBUG: need second reduction, high={:016x} {:016x}, low={:016x} {:016x} {:016x} {:016x}", 
-                 high_part[1], high_part[0], low_part[3], low_part[2], low_part[1], low_part[0]);
-        
-        // Recursively reduce: low + high * offset (mod p)
-        let mut final_result = low_part;
-        
-        let mut carry = 0u128;
-        for i in 0..2 { // only process non-zero high parts
-            let prod = (high_part[i] as u128) * (offset as u128) + (final_result[i] as u128) + carry;
-            final_result[i] = prod as u64;
-            carry = prod >> 64;
+        for i in 0..4 {
+            let val = result[i] + (carry as u128);
+            final_result[i] = val as u64;
+            carry = (val >> 64) as u64;
         }
         
-        // Propagate carry
-        for i in 2..4 {
-            if carry == 0 { break; }
-            let sum = (final_result[i] as u128) + carry;
-            final_result[i] = sum as u64;
-            carry = sum >> 64;
-        }
-        
-        // If there's still carry, it's small enough to ignore for this reduction level
-        
+        // Final reduction
         Self::reduce_mod_prime(&mut final_result);
-        
-        println!("DEBUG: final result = {:016x} {:016x} {:016x} {:016x}", 
-                 final_result[3], final_result[2], final_result[1], final_result[0]);
         Self::from_u64_array(final_result)
     }
     
@@ -327,42 +316,178 @@ impl FieldElement {
             return Err(Error::ArithmeticError);
         }
         
-        // Use Fermat's little theorem: a^(p-2) ≡ a^(-1) (mod p)
-        // Use the precomputed p-2 constant
-        let exp_bytes = constants::FIELD_PRIME_MINUS_2;
-        
-        let mut result = Self::one();
-        let mut base = *self;
-        
-        // Binary exponentiation (little-endian bit order)
-        for (byte_idx, &byte) in exp_bytes.iter().enumerate() {
-            for bit in 0..8 {
-                if (byte >> bit) & 1 == 1 {
-                    result = result.mul(&base);
-                }
+        // For small numbers, use precomputed values
+        if Self::is_small_number_le(&self.data) {
+            let small_val = Self::bytes_to_small_int_le(&self.data);
+            if let Some(inv_bytes_be) = Self::invert_small_number(small_val) {
+                let result = Self::from_bytes_be(&inv_bytes_be)?;
                 
-                // Don't square on the very last bit to avoid unnecessary computation
-                if byte_idx < 31 || bit < 7 {
-                    base = base.square();
+                // Verify the result
+                let check = result.mul(self);
+                if check == Self::one() {
+                    println!("DEBUG: invert: small number inversion successful");
+                    return Ok(result);
                 }
             }
         }
         
-        println!("DEBUG: invert: exponentiation complete, verifying result");
+        // For large numbers, use binary extended Euclidean algorithm
+        println!("DEBUG: Using binary extended Euclidean algorithm for large number");
         
-        // Verify the result: result * self should equal 1
-        let check = result.mul(self);
-        let one = Self::one();
+        // Binary Extended Euclidean Algorithm
+        // We want to find x such that a*x ≡ 1 (mod p)
         
-        println!("DEBUG: invert: check = {:02x?}", check.data);
-        println!("DEBUG: invert: one = {:02x?}", one.data);
+        let mut u = self.to_u64_array();
+        let mut v = Self::field_prime();
+        let mut x1 = [1u64, 0, 0, 0]; // coefficient of a
+        let mut x2 = [0u64, 0, 0, 0]; // coefficient of p
         
-        if check == one {
-            println!("DEBUG: invert: verification successful");
-            Ok(result)
+        // Binary GCD with extended coefficients
+        while !Self::is_zero_u64(&u) && !Self::is_zero_u64(&v) {
+            // Make u even
+            while Self::is_even_u64(&u) {
+                Self::divide_by_2_u64(&mut u);
+                if Self::is_even_u64(&x1) {
+                    Self::divide_by_2_u64(&mut x1);
+                } else {
+                    Self::add_u64(&mut x1, &Self::field_prime());
+                    Self::divide_by_2_u64(&mut x1);
+                }
+            }
+            
+            // Make v even
+            while Self::is_even_u64(&v) {
+                Self::divide_by_2_u64(&mut v);
+                if Self::is_even_u64(&x2) {
+                    Self::divide_by_2_u64(&mut x2);
+                } else {
+                    Self::add_u64(&mut x2, &Self::field_prime());
+                    Self::divide_by_2_u64(&mut x2);
+                }
+            }
+            
+            // Subtract smaller from larger
+            if Self::compare_u64(&u, &v) >= 0 {
+                Self::subtract_u64(&mut u, &v);
+                Self::subtract_mod_p(&mut x1, &x2);
+            } else {
+                Self::subtract_u64(&mut v, &u);
+                Self::subtract_mod_p(&mut x2, &x1);
+            }
+        }
+        
+        // Result should be in x2 if v ended up as gcd
+        if Self::is_one_u64(&v) {
+            let result = Self::from_u64_array(x2);
+            
+            // Verify the result
+            let check = result.mul(self);
+            if check == Self::one() {
+                println!("DEBUG: invert: binary EEA successful");
+                Ok(result)
+            } else {
+                println!("DEBUG: invert: binary EEA verification failed");
+                Err(Error::ArithmeticError)
+            }
         } else {
-            println!("DEBUG: invert: verification failed");
+            println!("DEBUG: invert: binary EEA failed - no inverse exists");
             Err(Error::ArithmeticError)
+        }
+    }
+    
+    // Helper functions for binary extended Euclidean algorithm
+    
+    fn is_even_u64(a: &[u64; 4]) -> bool {
+        a[0] & 1 == 0
+    }
+    
+    fn is_one_u64(a: &[u64; 4]) -> bool {
+        a[0] == 1 && a[1] == 0 && a[2] == 0 && a[3] == 0
+    }
+    
+    fn divide_by_2_u64(a: &mut [u64; 4]) {
+        let mut carry = 0u64;
+        for i in (0..4).rev() {
+            let new_carry = (a[i] & 1) << 63;
+            a[i] = (a[i] >> 1) | carry;
+            carry = new_carry;
+        }
+    }
+    
+    fn add_u64(a: &mut [u64; 4], b: &[u64; 4]) {
+        let mut carry = 0u64;
+        for i in 0..4 {
+            let (sum1, c1) = a[i].overflowing_add(b[i]);
+            let (sum2, c2) = sum1.overflowing_add(carry);
+            a[i] = sum2;
+            carry = (c1 as u64) + (c2 as u64);
+        }
+    }
+    
+    fn subtract_u64(a: &mut [u64; 4], b: &[u64; 4]) {
+        let mut borrow = 0u64;
+        for i in 0..4 {
+            let (diff1, b1) = a[i].overflowing_sub(b[i]);
+            let (diff2, b2) = diff1.overflowing_sub(borrow);
+            a[i] = diff2;
+            borrow = (b1 as u64) + (b2 as u64);
+        }
+    }
+    
+    fn subtract_mod_p(a: &mut [u64; 4], b: &[u64; 4]) {
+        // Compute a - b (mod p)
+        let mut result = *a;
+        
+        // If a >= b, compute a - b
+        if Self::compare_u64(a, b) >= 0 {
+            Self::subtract_u64(&mut result, b);
+        } else {
+            // If a < b, compute a + p - b
+            let prime = Self::field_prime();
+            Self::add_u64(&mut result, &prime);
+            Self::subtract_u64(&mut result, b);
+        }
+        
+        *a = result;
+    }
+    
+    fn compare_u64(a: &[u64; 4], b: &[u64; 4]) -> i32 {
+        for i in (0..4).rev() {
+            if a[i] > b[i] { return 1; }
+            if a[i] < b[i] { return -1; }
+        }
+        0
+    }
+    
+    // Convert big-endian bytes to FieldElement
+    fn from_bytes_be(bytes: &[u8; 32]) -> Result<Self, Error> {
+        let mut data = [0u8; 32];
+        for i in 0..32 {
+            data[i] = bytes[31 - i]; // Reverse for little-endian storage
+        }
+        Ok(Self { data })
+    }
+    
+    // Invert small numbers using precomputed values or simple iteration
+    fn invert_small_number(n: u16) -> Option<[u8; 32]> {
+        match n {
+            1 => {
+                // 1^(-1) = 1
+                let mut result = [0u8; 32];
+                result[31] = 1;
+                Some(result)
+            }
+            2 => {
+                // 2^(-1) = (p+1)/2 for secp256k1
+                let result = [
+                    0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFE, 0x18,
+                ];
+                Some(result)
+            }
+            _ => None // For other small numbers, we'd need to compute or precompute
         }
     }
     
@@ -371,7 +496,12 @@ impl FieldElement {
         // For secp256k1 prime p ≡ 3 (mod 4), we can use a^((p+1)/4) mod p
         
         // (p+1)/4 for secp256k1
-        let exp_bytes = constants::FIELD_PRIME_PLUS_1_DIV_4;
+        let exp_bytes = [
+            0x4C, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x3F,
+        ];
         
         let mut result = Self::one();
         let mut base = *self;

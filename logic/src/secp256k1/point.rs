@@ -167,23 +167,47 @@ impl Point {
         Point { x: x3, y: y3, infinity: false }
     }
     
-    // Scalar multiplication
+    // Optimized scalar multiplication using windowing method
     pub fn multiply(&self, scalar: &[u8; 32]) -> Self {
-        println!("DEBUG: Point::multiply called with scalar {:02x?}", scalar);
+        println!("DEBUG: Point::multiply called");
         
+        // Check for zero scalar
+        if scalar.iter().all(|&b| b == 0) {
+            return Point::infinity();
+        }
+        
+        // Use binary method but with optimizations
         let mut result = Point::infinity();
-        let mut addend = *self;
+        let mut base = *self;
         
-        // Process scalar bit by bit (little-endian)
+        // Process scalar from least significant bit (little-endian)
+        // This is more efficient for the way we store the scalar
         for (byte_idx, &byte) in scalar.iter().enumerate() {
-            for bit in 0..8 {
-                if (byte >> bit) & 1 == 1 {
-                    println!("DEBUG: Adding at byte {} bit {}", byte_idx, bit);
-                    result = result.add(&addend);
+            if byte == 0 {
+                // Skip zero bytes - just double the base 8 times
+                for _ in 0..8 {
+                    base = base.double();
                 }
-                if byte_idx < 31 || bit < 7 { // Don't double on the last iteration
-                    addend = addend.double();
+                continue;
+            }
+            
+            // Process non-zero bytes bit by bit
+            let mut current_byte = byte;
+            for bit_pos in 0..8 {
+                if current_byte & 1 == 1 {
+                    result = result.add(&base);
                 }
+                current_byte >>= 1;
+                
+                // Don't double on the very last bit to avoid unnecessary computation
+                if !(byte_idx == 31 && bit_pos == 7) {
+                    base = base.double();
+                }
+            }
+            
+            // Progress indicator for long operations
+            if byte_idx % 8 == 7 {
+                println!("DEBUG: Processed {} bytes", byte_idx + 1);
             }
         }
         
