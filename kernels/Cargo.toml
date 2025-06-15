@@ -19,6 +19,8 @@ cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47ca0a2
 #cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
 
 [build-dependencies]
+env_logger = "0.10"
+
 # christian's branch
 #cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
@@ -27,6 +29,3 @@ cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "47c
 
 # normal
 #cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
-
-[dev-dependencies]
-env_logger = "0.10"
