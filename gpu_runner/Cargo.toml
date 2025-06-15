@@ -12,7 +12,7 @@ common = { path = "../common" }
 #cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11fa97e1dab4a8baac8e5d4a576561c9a00" }
+cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "1f79d0c132de7077ab9c3cbee35d206d3e148ce2" }
 
 # normal
 #cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
@@ -22,7 +22,7 @@ cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11fa97
 #cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "caaef11fa97e1dab4a8baac8e5d4a576561c9a00" }
+cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "1f79d0c132de7077ab9c3cbee35d206d3e148ce2" }
 
 # normal
 #cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }

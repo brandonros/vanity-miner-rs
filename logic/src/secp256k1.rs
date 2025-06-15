@@ -1,26 +1,51 @@
-use secp256k1::{Secp256k1, SecretKey, PublicKey};
+use k256::SecretKey;
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 
-pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], secp256k1::Error> {
-    let secp = Secp256k1::new();
-    
-    // Create secret key (validates it's in valid range)
-    let secret_key = SecretKey::from_slice(private_key_bytes)?;
-    
-    // Derive public key
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-    
-    // Return compressed format (33 bytes)
-    Ok(public_key.serialize())
+#[derive(Debug)]
+pub enum Error {
+    InvalidSecretKey,
 }
 
-// For uncompressed format (65 bytes) - needed for Ethereum
-pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], secp256k1::Error> {
-    let secp = Secp256k1::new();
-    let secret_key = SecretKey::from_slice(private_key_bytes)?;
-    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+impl From<k256::elliptic_curve::Error> for Error {
+    fn from(_: k256::elliptic_curve::Error) -> Self {
+        Error::InvalidSecretKey
+    }
+}
+
+pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], Error> {
+    // Create secret key from bytes (validates it's in valid range)
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into())?;
     
-    // Return uncompressed format
-    Ok(public_key.serialize_uncompressed())
+    // Derive public key
+    let public_key = secret_key.public_key();
+    
+    // Get compressed point (33 bytes: 0x02/0x03 prefix + 32 bytes x-coordinate)
+    let encoded_point = public_key.to_encoded_point(true); // true = compressed
+    let compressed_bytes = encoded_point.as_bytes();
+    
+    // Convert to fixed-size array
+    let mut result = [0u8; 33];
+    result.copy_from_slice(compressed_bytes);
+    
+    Ok(result)
+}
+
+pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], Error> {
+    // Create secret key from bytes
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into())?;
+    
+    // Derive public key
+    let public_key = secret_key.public_key();
+    
+    // Get uncompressed point (65 bytes: 0x04 prefix + 32 bytes x + 32 bytes y)
+    let encoded_point = public_key.to_encoded_point(false); // false = uncompressed
+    let uncompressed_bytes = encoded_point.as_bytes();
+    
+    // Convert to fixed-size array
+    let mut result = [0u8; 65];
+    result.copy_from_slice(uncompressed_bytes);
+    
+    Ok(result)
 }
 
 #[cfg(test)]
