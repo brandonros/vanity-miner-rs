@@ -10,17 +10,19 @@ curl -L -O https://apt.llvm.org/llvm.sh && \
 chmod +x llvm.sh && \
 ./llvm.sh 19
 
-# install rust
-curl -sSf -L https://sh.rustup.rs | bash -s -- -y
-export PATH="/root/.cargo/bin:${PATH}"
-
 # install layer 2 depdencncies
 DEBIAN_FRONTEND=noninteractive apt-get -qq -y install git pkg-config libssl-dev libpolly-19-dev zlib1g-dev libzstd-dev
+
+# install rust
+curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2025-03-02 --profile complete
+export PATH="/root/.cargo/bin:${PATH}"
 
 # clone + build repo
 export LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LD_LIBRARY_PATH}"
 export LLVM_LINK_STATIC=1
+export RUST_LOG=debug
+export RUSTC_LOG=debug
 
-git clone https://github.com/brandonros/vanity-miner-rs.git
-cd vanity-miner-rs/kernels
-cargo build --release
+git clone https://github.com/brandonros/vanity-miner-rs.git && \
+cd vanity-miner-rs/kernels && \
+cargo build --release --verbose

@@ -12,7 +12,7 @@ common = { path = "../common" }
 #cust = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "6bfe464305515e7bd2c5db724cca711a01759683" }
+cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "6cdb9e5b7be9fa610ad141f5c6e6aa37ee9eef21" }
 
 # normal
 #cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
