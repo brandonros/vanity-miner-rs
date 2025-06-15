@@ -25,4 +25,4 @@ export RUSTC_LOG=debug
 
 git clone https://github.com/brandonros/vanity-miner-rs.git && \
 cd vanity-miner-rs/kernels && \
-cargo build --release --verbose
+cargo build --release --verbose -j1
