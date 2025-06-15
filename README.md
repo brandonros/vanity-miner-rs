@@ -1,6 +1,13 @@
 # ed25519-vanity-rs
 Ed25519 vanity generator with CUDA in Rust
 
+## How to build
+
+```shell
+export PATH="/home/brandon/llvm-build/llvm-19-debug/bin:$PATH"
+export LIBCLANG_PATH="/home/brandon/llvm-build/llvm-19-debug/lib/libclang.so"
+```
+
 ## Benchmark results
 
 ### GeForce RTX 4060 Max-Q
