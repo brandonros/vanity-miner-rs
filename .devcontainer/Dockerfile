@@ -25,5 +25,4 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LD_LIBRARY_PATH}"
 ENV LLVM_LINK_STATIC=1
 ENV RUST_LOG=info
 
-# ln -s /opt/llvm-19-debug/bin/llvm-config /usr/bin/llvm-config 
 # export PATH="/opt/llvm-19-debug/bin:$PATH"

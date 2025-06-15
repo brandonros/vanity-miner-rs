@@ -36,17 +36,12 @@
       ],
       "settings": {
         "rust-analyzer.cargo.features": "all",
-        "rust-analyzer.checkOnSave.command": "clippy"
+        "rust-analyzer.checkOnSave": true,
+        "rust-analyzer.check.command": "clippy"
       }
     }
   },
   "forwardPorts": [],
-  "postCreateCommand": [
-    "cp -r /tmp/.ssh-localhost /root/.ssh",
-    "chmod 700 /root/.ssh",
-    "chmod 600 /root/.ssh/id_* 2>/dev/null || true",
-    "chmod 644 /root/.ssh/*.pub 2>/dev/null || true",
-    "rustc --version && nvcc --version"
-  ],
+  "postCreateCommand": "rustc --version && nvcc --version",
   "remoteUser": "root"
 }

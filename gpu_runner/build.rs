@@ -10,7 +10,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../logic");
 
     unsafe {
-        env::set_var("LLVM_CONFIG", "llvm-config-7");
+        env::set_var("LLVM_CONFIG", "llvm-config-19");
         env::set_var("LLVM_LINK_STATIC", "1");
         env::set_var("RUST_LOG", "info");
 
