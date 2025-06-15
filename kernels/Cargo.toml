@@ -13,7 +13,7 @@ logic = { path = "../logic" }
 #cuda_std = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "32d42e3a585ebd62a7d01a7203ac43b0a27ef03a" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "6bfe464305515e7bd2c5db724cca711a01759683" }
 
 # normal
 #cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
@@ -23,7 +23,10 @@ cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "32d42e3
 #cuda_builder = { git = "https://github.com/LegNeato/Rust-CUDA.git", rev = "5f81c65950166abd48cd3b94b01564538a281008" }
 
 # my branch
-cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "32d42e3a585ebd62a7d01a7203ac43b0a27ef03a" }
+cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "6bfe464305515e7bd2c5db724cca711a01759683" }
 
 # normal
 #cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", rev = "afb147ed51fbb14b758e10a0a24dbc2311a52b82" }
+
+[dev-dependencies]
+env_logger = "0.10"
