@@ -7,6 +7,7 @@ edition = "2024"
 hex = "0.4.3"
 rand = "0.8"
 common = { path = "../common" }
+logic = { path = "../logic" }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 
 [build-dependencies]

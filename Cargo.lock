@@ -533,6 +533,7 @@ dependencies = [
  "cuda_builder",
  "cust",
  "hex",
+ "logic",
  "rand",
 ]
 

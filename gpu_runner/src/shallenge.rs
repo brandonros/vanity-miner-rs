@@ -48,7 +48,7 @@ pub fn device_main_shallenge(
             best_hash_guard.get_current()
         };
         
-        let mut found_matches_slice = [0u32; 1];
+        let mut found_matches_slice = [0.0f32; 1];
         let mut found_hash = [0u8; 32];
         let mut found_nonce = [0u8; 64];
         let mut found_nonce_len = [0usize; 1];
@@ -84,7 +84,7 @@ pub fn device_main_shallenge(
         found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
         
         let found_matches = found_matches_slice[0];
-        if found_matches != 0 {
+        if found_matches != 0.0 {
             found_hash_dev.copy_to(&mut found_hash)?;
             found_nonce_dev.copy_to(&mut found_nonce)?;
             found_nonce_len_dev.copy_to(&mut found_nonce_len)?;
@@ -107,7 +107,7 @@ pub fn device_main_shallenge(
                 println!("[{ordinal}] Challenge string: {}/{}", username, nonce_string);
 
                 global_stats.add_matches(found_matches as usize);
-                global_stats.print_stats(ordinal, found_matches);
+                global_stats.print_stats(ordinal, found_matches as u32);
             }
         }
     }
