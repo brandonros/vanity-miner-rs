@@ -1,5 +1,5 @@
-# ed25519-vanity-rs
-Ed25519 vanity generator with CUDA in Rust
+# vanity-miner-rs
+GPU-accelerated vanity address generator for multiple blockchains
 
 ## How to build
 
