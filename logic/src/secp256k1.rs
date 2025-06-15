@@ -1,4 +1,4 @@
-/*use k256::SecretKey;
+use k256::SecretKey;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 
 #[derive(Debug)]
@@ -46,16 +46,6 @@ pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) ->
     result.copy_from_slice(uncompressed_bytes);
     
     Ok(result)
-}*/
-
-use alloc::boxed::Box;
-
-pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], Box<dyn core::error::Error>> {
-    todo!()
-}
-
-pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], Box<dyn core::error::Error>> {
-    todo!()
 }
 
 #[cfg(test)]

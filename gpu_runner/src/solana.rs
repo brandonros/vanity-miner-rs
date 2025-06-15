@@ -1,13 +1,13 @@
 use cust::device::Device;
-use cust::module::{Module, ModuleJitOption};
+use cust::module::Module;
 use cust::prelude::Context;
 use cust::stream::{Stream, StreamFlags};
 use cust::util::SliceExt;
 use cust::memory::CopyDestination;
-use cust::{launch, CudaFlags};
+use cust::launch;
 use rand::Rng;
 use std::error::Error;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use common::GlobalStats;
 

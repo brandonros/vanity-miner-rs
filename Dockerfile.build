@@ -1,18 +1,24 @@
-FROM nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04
+FROM docker.io/nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04
 
-# Install system dependencies
-RUN apt update && apt install -y pkg-config libssl-dev zlib1g-dev clang curl
+# install base dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install curl lsb-release wget software-properties-common gnupg
 
-# TODO: install llvm-19
+# install llvm 19
+RUN curl -L -O https://apt.llvm.org/llvm.sh && \
+    chmod +x llvm.sh && \
+    ./llvm.sh 19
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# install layer 2 depdencncies
+RUN DEBIAN_FRONTEND=noninteractive apt-get -qq -y install git pkg-config libssl-dev libpolly-19-dev zlib1g-dev libzstd-dev
 
-# Set environment variables for the build
-ENV LLVM_CONFIG="llvm-config-19" \
-LLVM_LINK_STATIC="1" \
-RUST_LOG="info" \
-LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64/"
+# install rust
+RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain nightly-2025-03-02 --profile complete
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# set compliation flags
+ENV LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LD_LIBRARY_PATH}"
+ENV LLVM_LINK_STATIC=1
 
 # Copy source code into the image
 COPY . /app
@@ -21,4 +27,5 @@ WORKDIR /app
 # Build the project
 RUN . "$HOME/.cargo/env" && cd gpu_runner && cargo build --release
 
-# The binary will be in /app/target/release/
+# The binary will be /app/target/release/gpu_runner
+# The PTX will be /app/target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx
