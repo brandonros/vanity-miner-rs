@@ -10,11 +10,11 @@ pub fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error +
     Ok(())
 }
 
-pub fn validate_hex_string(hex_string: &str) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
-    if hex_string.len() != 64 {
-        return Err("Hash must be 64 hex characters (32 bytes)".into());
+pub fn validate_hex_string(hex_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    match hex::decode(hex_string) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Invalid hex string: {}", e).into()),
     }
-    hex::decode(hex_string).map_err(|e| format!("Invalid hex string: {}", e).into())
 }
 
 const BECH32_CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
