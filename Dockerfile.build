@@ -4,9 +4,10 @@ FROM docker.io/nvidia/cuda:12.9.0-cudnn-devel-ubuntu24.04
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -qq -y install curl lsb-release wget software-properties-common gnupg
 
-# install llvm 19
+# install llvm 7 and 19
 RUN curl -L -O https://apt.llvm.org/llvm.sh && \
     chmod +x llvm.sh && \
+    ./llvm.sh 7 && \
     ./llvm.sh 19
 
 # install layer 2 depdencncies
@@ -25,7 +26,7 @@ COPY . /app
 WORKDIR /app
 
 # Build the project
-RUN . "$HOME/.cargo/env" && cargo -p gpu_runner build --release
+RUN . "$HOME/.cargo/env" && cargo build --release -p gpu_runner
 
 # The binary will be /app/target/release/gpu_runner
 # The PTX will be /app/target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx
