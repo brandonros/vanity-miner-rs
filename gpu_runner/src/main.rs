@@ -32,7 +32,8 @@ fn device_main(
     cust::context::CurrentContext::set_current(&ctx)?;
 
     println!("[{ordinal}] Loading module...");
-    let ptx_path = std::path::Path::new("kernels.ptx");
+    let ptx_path = std::env::var("PTX_PATH")
+        .map_err(|_| "PTX_PATH environment variable is required")?;
     let ptx = std::fs::read_to_string(ptx_path)
         .map_err(|e| format!("Failed to read PTX file: {}", e))?;
     let module = Module::from_ptx(ptx, &[
