@@ -23,7 +23,7 @@ unsafe fn handle_shallenge_match_found(
     found_thread_idx_slice[0] = thread_idx as u32;
 
     // Increment number of found matches
-    found_matches.fetch_add(1.0, core::sync::atomic::Ordering::SeqCst);
+    found_matches.fetch_add(1.0, core::sync::atomic::Ordering::Relaxed);
     
     // TODO: do we need device_fence here?
 }
