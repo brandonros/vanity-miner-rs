@@ -6,6 +6,7 @@ RUN apt-get update && \
 
 # install llvm 7
 WORKDIR /data/llvm7
+RUN DEBIAN_FRONTEND=noninteractive apt-get -qq -y install clang
 RUN curl -sSf -L -O http://security.ubuntu.com/ubuntu/pool/universe/libf/libffi7/libffi7_3.3-5ubuntu1_amd64.deb && \
     curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7_7.0.1-12_amd64.deb && \
     curl -sSf -L -O http://mirrors.kernel.org/ubuntu/pool/universe/l/llvm-toolchain-7/llvm-7-dev_7.0.1-12_amd64.deb && \
