@@ -11,4 +11,4 @@ logic = { path = "../logic" }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
 
 [build-dependencies]
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git", features = ["nvvm-v7"] }
