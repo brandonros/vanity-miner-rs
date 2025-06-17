@@ -5,7 +5,9 @@ unsafe fn handle_bitcoin_vanity_match_found(
     found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
+    found_public_key_hash_ptr: *mut u8,
     found_encoded_public_key_ptr: *mut u8,
+    found_encoded_len_slice_ptr: *mut u32,
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     let found_matches_slice = unsafe { core::slice::from_raw_parts_mut(found_matches_slice_ptr, 1) };
@@ -14,13 +16,17 @@ unsafe fn handle_bitcoin_vanity_match_found(
     // If first find, copy results to host
     if found_matches.load(core::sync::atomic::Ordering::Relaxed) == 0.0 {
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
-        let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
+        let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 33) };
+        let found_public_key_hash = unsafe { core::slice::from_raw_parts_mut(found_public_key_hash_ptr, 20) };
         let found_encoded_public_key = unsafe { core::slice::from_raw_parts_mut(found_encoded_public_key_ptr, 64) };
+        let found_encoded_len_slice = unsafe { core::slice::from_raw_parts_mut(found_encoded_len_slice_ptr, 1) };
         let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
 
         found_private_key.copy_from_slice(&result.private_key);
         found_public_key.copy_from_slice(&result.public_key);
+        found_public_key_hash.copy_from_slice(&result.public_key_hash);
         found_encoded_public_key.copy_from_slice(&result.encoded_public_key);
+        found_encoded_len_slice[0] = result.encoded_len as u32;
         found_thread_idx_slice[0] = thread_idx as u32;
     }
 
@@ -43,7 +49,9 @@ pub unsafe fn find_bitcoin_vanity_private_key(
     found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
+    found_public_key_hash_ptr: *mut u8,
     found_encoded_public_key_ptr: *mut u8,
+    found_encoded_len_slice_ptr: *mut u32,
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // Prepare request
@@ -69,7 +77,9 @@ pub unsafe fn find_bitcoin_vanity_private_key(
                 found_matches_slice_ptr,
                 found_private_key_ptr,
                 found_public_key_ptr,
+                found_public_key_hash_ptr,
                 found_encoded_public_key_ptr,
+                found_encoded_len_slice_ptr,
                 found_thread_idx_slice_ptr,
             );
         }

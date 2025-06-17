@@ -14,8 +14,8 @@ unsafe fn handle_ethereum_vanity_match_found(
     // If first find, copy results to host
     if found_matches.load(core::sync::atomic::Ordering::Relaxed) == 0.0 {
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
-        let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 32) };
-        let found_address = unsafe { core::slice::from_raw_parts_mut(found_address_ptr, 64) };
+        let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 64) };
+        let found_address = unsafe { core::slice::from_raw_parts_mut(found_address_ptr, 20) };
         let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
 
         found_private_key.copy_from_slice(&result.private_key);
