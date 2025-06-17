@@ -38,7 +38,7 @@ COPY . /app
 WORKDIR /app
 
 # Build the project
-RUN . "$HOME/.cargo/env" && cargo build --release -p gpu_runner -j1
+RUN . "$HOME/.cargo/env" && cargo build --release -p gpu_runner
 
 # The binary will be /app/target/release/gpu_runner
 # The PTX will be /app/target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx

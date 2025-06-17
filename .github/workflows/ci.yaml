@@ -7,7 +7,7 @@ on:
 
 jobs:
   setup:
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-latest
     outputs:
       repo_name: ${{ steps.repo_name.outputs.lowercase }}
     steps:
@@ -17,7 +17,7 @@ jobs:
 
   build:
     needs: setup
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
