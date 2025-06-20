@@ -25,12 +25,19 @@ fn add_nvvm_ir_version<'ctx, 'module>(context: &'ctx Context, module: &'module M
     module.add_global_metadata("nvvmir.version", &version_metadata).unwrap();
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() != 2 {
+        eprintln!("Usage: {} <filename>", args[0]);
+        std::process::exit(1);
+    }
+    
     // create context
     let context = Context::create();
 
     // load riscv64gc-unknown-none-elf llvm ir
-    let hash = "7817138ea07dbe8e";
-    let risc_ir = fs::read(format!("/Users/brandon/.cargo/target/riscv64gc-unknown-none-elf/release/deps/kernels-{}.ll", hash))?;
+    let filename = args[1].clone();
+    let risc_ir = fs::read(filename)?;
     let risc_memory_buffer = MemoryBuffer::create_from_memory_range(&risc_ir, "risc_ir");
     let risc_module = context.create_module_from_ir(risc_memory_buffer)?;
 
