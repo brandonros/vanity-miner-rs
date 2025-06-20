@@ -27,7 +27,7 @@ unsafe fn handle_bitcoin_vanity_match_found(
         found_private_key.copy_from_slice(&result.private_key);
         found_public_key.copy_from_slice(&result.public_key);
         found_public_key_hash.copy_from_slice(&result.public_key_hash);
-        found_encoded_public_key.copy_from_slice(&result.encoded_public_key);
+        found_encoded_public_key[..result.encoded_len].copy_from_slice(&result.encoded_public_key[..result.encoded_len]);
         found_encoded_len_slice[0] = result.encoded_len as u32;
         found_thread_idx_slice[0] = thread_idx as u32;
     }

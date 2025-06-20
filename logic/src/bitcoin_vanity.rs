@@ -63,8 +63,7 @@ pub fn generate_and_check_bitcoin_vanity_key(request: &BitcoinVanityKeyRequest) 
     );
     
     // Derive public key (compressed secp256k1)
-    let public_key = secp256k1::secp256k1_derive_public_key(&private_key)
-        .unwrap_or([0u8; 33]); // Handle error case
+    let public_key = secp256k1::secp256k1_derive_public_key(&private_key);
     
     // Hash public key: RIPEMD160(SHA256(public_key))
     let sha256_hash = sha256::sha256_from_bytes(&public_key);

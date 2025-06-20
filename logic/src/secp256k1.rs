@@ -1,20 +1,9 @@
 use k256::SecretKey;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 
-#[derive(Debug)]
-pub enum Error {
-    InvalidSecretKey,
-}
-
-impl From<k256::elliptic_curve::Error> for Error {
-    fn from(_: k256::elliptic_curve::Error) -> Self {
-        Error::InvalidSecretKey
-    }
-}
-
-pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 33], Error> {
+pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> [u8; 33] {
     // Create secret key from bytes (validates it's in valid range)
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into())?;
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
     
     // Derive public key
     let public_key = secret_key.public_key();
@@ -27,12 +16,12 @@ pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Result<[u8; 
     let mut result = [0u8; 33];
     result.copy_from_slice(compressed_bytes);
     
-    Ok(result)
+    result
 }
 
-pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> Result<[u8; 65], Error> {
+pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> [u8; 65] {
     // Create secret key from bytes
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into())?;
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
     
     // Derive public key
     let public_key = secret_key.public_key();
@@ -45,7 +34,7 @@ pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) ->
     let mut result = [0u8; 65];
     result.copy_from_slice(uncompressed_bytes);
     
-    Ok(result)
+    result
 }
 
 #[cfg(test)]
@@ -56,7 +45,7 @@ mod test {
     fn should_derive_compressed_public_key_correctly() {
         // Test vector from Bitcoin's secp256k1 implementation
         let private_key_bytes: [u8; 32] = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb").unwrap().try_into().unwrap();
-        let public_key_bytes = secp256k1_derive_public_key(&private_key_bytes).unwrap();
+        let public_key_bytes = secp256k1_derive_public_key(&private_key_bytes);
         
         // Expected compressed public key (33 bytes, starts with 0x02 or 0x03)
         let expected: [u8; 33] = hex::decode("039163ab449d4b90de13ce60b504bfc27a4aed378c1f8338686156b91445637c8d").unwrap().try_into().unwrap();
@@ -67,7 +56,7 @@ mod test {
     fn should_derive_uncompressed_public_key_correctly() {
         // Same private key as above
         let private_key_bytes: [u8; 32] = hex::decode("152d53723da4203478574b153143a7eaa921a8d82c629517d6b18949f0111abb").unwrap().try_into().unwrap();
-        let public_key_bytes = secp256k1_derive_public_key_uncompressed(&private_key_bytes).unwrap();
+        let public_key_bytes = secp256k1_derive_public_key_uncompressed(&private_key_bytes);
         
         // Expected uncompressed public key (65 bytes, starts with 0x04)
         let expected: [u8; 65] = hex::decode("049163ab449d4b90de13ce60b504bfc27a4aed378c1f8338686156b91445637c8d33272b79994dae54da4011cc3e3491ccdf3bd3fd92978a00873727f99beb4375").unwrap().try_into().unwrap();

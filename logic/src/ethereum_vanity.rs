@@ -57,8 +57,7 @@ pub fn generate_and_check_ethereum_vanity_key(request: &EthereumVanityKeyRequest
     );
     
     // Derive uncompressed public key (65 bytes total, but we skip the 0x04 prefix)
-    let full_public_key = secp256k1::secp256k1_derive_public_key_uncompressed(&private_key)
-        .unwrap_or([0u8; 65]); // Handle error case
+    let full_public_key = secp256k1::secp256k1_derive_public_key_uncompressed(&private_key);
     
     // Extract the 64-byte public key (skip 0x04 prefix)
     let mut public_key = [0u8; 64];

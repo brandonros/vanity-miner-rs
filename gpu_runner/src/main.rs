@@ -39,6 +39,7 @@ fn device_main(
     let module = Module::from_ptx(ptx, &[
         ModuleJitOption::MaxRegisters(256),
     ])?;
+    println!("[{ordinal}] Module loaded");
 
     match mode {
         Mode::SolanaVanity { prefix, suffix } => {
