@@ -30,7 +30,7 @@ unsafe fn handle_shallenge_match_found(
 
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn find_better_shallenge_nonce(
+pub unsafe fn kernel_find_better_shallenge_nonce(
     // input
     username_ptr: *const u8,
     username_len: usize,

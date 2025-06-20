@@ -27,7 +27,7 @@ pub fn device_main_shallenge(
     cust::context::CurrentContext::set_current(&ctx)?;
     
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
-    let find_better_shallenge_nonce = module.get_function("find_better_shallenge_nonce")?;
+    let find_better_shallenge_nonce = module.get_function("kernel_find_better_shallenge_nonce")?;
 
     let number_of_streaming_multiprocessors = device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
     let blocks_per_sm = std::env::var("BLOCKS_PER_SM").unwrap_or("128".to_string()).parse::<usize>().unwrap();

@@ -38,7 +38,7 @@ unsafe fn handle_bitcoin_vanity_match_found(
 
 #[cuda_std::kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn find_bitcoin_vanity_private_key(
+pub unsafe fn kernel_find_bitcoin_vanity_private_key(
     // input
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 

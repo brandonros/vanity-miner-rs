@@ -1653,4 +1653,4 @@ dependencies = [
 [[package]]
 name = "zeroize"
 version = "1.9.0"
-source = "git+https://github.com/brandonros/utils?branch=nvptx64-support#6e1f92720fd6e0d6f1d5b475e641e7c248346ea8"
+source = "git+https://github.com/brandonros/utils?rev=4c9734e1ae4a6cb61db4693f9d164866f084ca97#4c9734e1ae4a6cb61db4693f9d164866f084ca97"
