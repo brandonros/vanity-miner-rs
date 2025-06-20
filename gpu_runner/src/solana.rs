@@ -80,7 +80,7 @@ pub fn device_main_solana_vanity(
         found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
         
         let found_matches = found_matches_slice[0];
-        if found_matches != 0.0 {
+        if found_matches != 0 {
             found_private_key_dev.copy_to(&mut found_private_key)?;
             found_public_key_dev.copy_to(&mut found_public_key)?;
             found_encoded_public_key_dev.copy_to(&mut found_encoded_public_key)?;
