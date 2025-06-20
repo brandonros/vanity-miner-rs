@@ -1,8 +1,10 @@
+use cuda_std::atomic::intrinsics::atomic_fetch_add_relaxed_u32_device;
+
 /// Handle the infrastructure concerns when a better hash is found
 unsafe fn handle_shallenge_match_found(
     result: logic::ShallengeResult,
     thread_idx: usize,
-    found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_matches_slice_ptr: *mut u32,
     found_hash_ptr: *mut u8,
     found_nonce_ptr: *mut u8,
     found_nonce_len_ptr: *mut usize,
@@ -23,7 +25,7 @@ unsafe fn handle_shallenge_match_found(
     found_thread_idx_slice[0] = thread_idx as u32;
 
     // Increment number of found matches
-    found_matches.fetch_add(1.0, core::sync::atomic::Ordering::Relaxed);
+    unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 1) };
     
     // TODO: do we need device_fence here?
 }
@@ -37,7 +39,7 @@ pub unsafe fn kernel_find_better_shallenge_nonce(
     target_hash_ptr: *const u8,
     rng_seed: u64,
     // output
-    found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_matches_slice_ptr: *mut u32,
     found_hash_ptr: *mut u8,
     found_nonce_ptr: *mut u8,
     found_nonce_len_ptr: *mut usize,

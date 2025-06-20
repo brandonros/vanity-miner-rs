@@ -43,7 +43,7 @@ pub fn device_main_solana_vanity(
     loop {
         let rng_seed: u64 = rng.r#gen::<u64>();
         
-        let mut found_matches_slice = [0.0f32; 1];
+        let mut found_matches_slice = [0u32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 32];
         let mut found_encoded_public_key = [0u8; 64];

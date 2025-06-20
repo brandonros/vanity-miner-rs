@@ -45,7 +45,7 @@ pub fn device_main_ethereum_vanity(
     loop {
         let rng_seed: u64 = rng.r#gen::<u64>();
         
-        let mut found_matches_slice = [0.0f32; 1];
+        let mut found_matches_slice = [0u32; 1];
         let mut found_private_key = [0u8; 32];
         let mut found_public_key = [0u8; 64]; // Ethereum uncompressed public key is 64 bytes
         let mut found_address = [0u8; 20]; // Ethereum address is 20 bytes
@@ -82,7 +82,7 @@ pub fn device_main_ethereum_vanity(
         found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
         
         let found_matches = found_matches_slice[0];
-        if found_matches != 0.0 {
+        if found_matches != 0 {
             found_private_key_dev.copy_to(&mut found_private_key)?;
             found_public_key_dev.copy_to(&mut found_public_key)?;
             found_address_dev.copy_to(&mut found_address)?;

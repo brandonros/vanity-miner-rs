@@ -1,8 +1,10 @@
+use cuda_std::atomic::intrinsics::atomic_fetch_add_relaxed_u32_device;
+
 /// Handle the infrastructure concerns when a match is found
 unsafe fn handle_ethereum_vanity_match_found(
     result: logic::EthereumVanityKeyResult,
     thread_idx: usize,
-    found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_matches_slice_ptr: *mut u32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_address_ptr: *mut u8,
@@ -12,7 +14,7 @@ unsafe fn handle_ethereum_vanity_match_found(
     let found_matches = &mut found_matches_slice[0];
 
     // If first find, copy results to host
-    if found_matches.load(core::sync::atomic::Ordering::Relaxed) == 0.0 {
+    if unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 0) } == 0 {
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 64) };
         let found_address = unsafe { core::slice::from_raw_parts_mut(found_address_ptr, 20) };
@@ -25,7 +27,7 @@ unsafe fn handle_ethereum_vanity_match_found(
     }
 
     // Increment number of found matches
-    found_matches.fetch_add(1.0, core::sync::atomic::Ordering::Relaxed);
+    unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 1) };
 
     // TODO: do we need device_fence here?
 }
@@ -40,7 +42,7 @@ pub unsafe fn kernel_find_ethereum_vanity_private_key(
     vanity_suffix_len: usize,
     rng_seed: u64,
     // output
-    found_matches_slice_ptr: *mut cuda_std::atomic::AtomicF32,
+    found_matches_slice_ptr: *mut u32,
     found_private_key_ptr: *mut u8,
     found_public_key_ptr: *mut u8,
     found_address_ptr: *mut u8,
