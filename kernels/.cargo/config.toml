@@ -1,0 +1,9 @@
+[build]
+target = "riscv64gc-unknown-none-elf"
+
+[target.riscv64gc-unknown-none-elf]
+rustflags = [
+  "--emit=llvm-ir,llvm-bc",
+  "-C", "lto=fat",
+  "-C", "embed-bitcode=yes"
+]

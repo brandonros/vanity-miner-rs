@@ -1,4 +1,4 @@
-use cuda_std::atomic::intrinsics::atomic_fetch_add_relaxed_u32_device;
+use crate::{atomic, utilities};
 
 /// Handle the infrastructure concerns when a better hash is found
 unsafe fn handle_shallenge_match_found(
@@ -25,14 +25,15 @@ unsafe fn handle_shallenge_match_found(
     found_thread_idx_slice[0] = thread_idx as u32;
 
     // Increment number of found matches
-    unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 1) };
+    unsafe { atomic::atomic_add_u32(found_matches, 1) };
     
     // TODO: do we need device_fence here?
 }
 
-#[cuda_std::kernel]
+// TODO: kernel
+#[unsafe(no_mangle)]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn kernel_find_better_shallenge_nonce(
+pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
     // input
     username_ptr: *const u8,
     username_len: usize,
@@ -46,7 +47,7 @@ pub unsafe fn kernel_find_better_shallenge_nonce(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // Prepare request
-    let thread_idx = cuda_std::thread::index() as usize;
+    let thread_idx = utilities::get_thread_idx();
     let username = unsafe { core::slice::from_raw_parts(username_ptr, username_len) };
     let target_hash_slice = unsafe { core::slice::from_raw_parts(target_hash_ptr, 32) };
     let target_hash: &[u8; 32] = unsafe { &*(target_hash_slice.as_ptr() as *const [u8; 32]) };

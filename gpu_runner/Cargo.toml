@@ -9,6 +9,3 @@ rand = "0.8"
 common = { path = "../common" }
 logic = { path = "../logic" }
 cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-
-[build-dependencies]
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

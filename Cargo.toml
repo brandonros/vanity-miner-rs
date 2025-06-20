@@ -11,11 +11,6 @@ members = [
 [patch.crates-io]
 zeroize = { git = "https://github.com/brandonros/utils", rev = "4c9734e1ae4a6cb61db4693f9d164866f084ca97" }
 
-#[patch."https://github.com/Rust-GPU/Rust-CUDA.git"]
-#cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "52791ef418ed844aa7d740a86a027fd4cb774909" }
-#cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "52791ef418ed844aa7d740a86a027fd4cb774909" }
-#cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "52791ef418ed844aa7d740a86a027fd4cb774909" }
-
 [profile.dev]
 panic = "abort"
 
