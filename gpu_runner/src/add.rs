@@ -5,9 +5,7 @@ use cust::stream::{Stream, StreamFlags};
 use cust::util::SliceExt;
 use cust::memory::CopyDestination;
 use cust::launch;
-use rand::Rng;
 use std::error::Error;
-use std::sync::Arc;
 
 pub fn device_main_add(
     ordinal: usize, 
@@ -41,10 +39,10 @@ pub fn device_main_add(
     // Prepare output buffer
     let mut output = vec![0.0f32; data_len];
     
-    // Transfer data to GPU
-    let input_a_dev = input_a.as_dbuf()?;
-    let input_b_dev = input_b.as_dbuf()?;
-    let output_dev = output.as_dbuf()?;
+    // Transfer data to GPU using SliceExt
+    let input_a_dev = input_a.as_slice().as_dbuf()?;
+    let input_b_dev = input_b.as_slice().as_dbuf()?;
+    let output_dev = output.as_slice().as_dbuf()?;
 
     // Launch kernel
     unsafe {
@@ -53,7 +51,6 @@ pub fn device_main_add(
                 input_a_dev.as_device_ptr(),
                 input_b_dev.as_device_ptr(),
                 output_dev.as_device_ptr(),
-                data_len
             )
         )?;
     }
