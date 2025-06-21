@@ -43,7 +43,11 @@ int main(int argc, char* argv[]) {
     // Prepare architecture option
     char arch_option[64];
     snprintf(arch_option, sizeof(arch_option), "-arch=%s", argv[3]);
-    const char* options[] = {arch_option};
+    const char* options[] = {
+        arch_option,
+        "-opt=3",
+    };
+    int num_options = sizeof(options) / sizeof(options[0]);
 
     // Create NVVM program
     fprintf(stderr, "Creating NVVM program\n");
@@ -102,7 +106,7 @@ int main(int argc, char* argv[]) {
 
     // Verify the program before compilation
     fprintf(stderr, "Verifying program with arch: %s\n", argv[3]);
-    result = nvvmVerifyProgram(prog, 1, options);
+    result = nvvmVerifyProgram(prog, num_options, options);
     if (result != NVVM_SUCCESS) {
         fprintf(stderr, "Error verifying program: %d\n", result);
         
@@ -124,7 +128,7 @@ int main(int argc, char* argv[]) {
 
     // Compile to PTX
     fprintf(stderr, "Compiling program with arch: %s\n", argv[3]);
-    result = nvvmCompileProgram(prog, 1, options);
+    result = nvvmCompileProgram(prog, num_options, options);
     if (result != NVVM_SUCCESS) {
         fprintf(stderr, "Error compiling program: %d\n", result);
         

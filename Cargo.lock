@@ -456,9 +456,6 @@ dependencies = [
 [[package]]
 name = "kernels"
 version = "0.1.0"
-dependencies = [
- "logic",
-]
 
 [[package]]
 name = "lazy_static"

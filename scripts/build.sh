@@ -34,6 +34,9 @@ popd
 llvm-as-19 /tmp/output.ll -o /tmp/output.bc
 llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc
 
+# strip
+opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
+
 # compile the .bc files to .ptx
 pushd nvvm_compiler
 make
@@ -48,6 +51,7 @@ nvcc -fatbin -arch=$PHYSICAL_ARCH -o /tmp/output.fatbin /tmp/output.ptx
 
 # copy back
 pushd nvvm_compiler
+cp $LL_FILE build/
 cp /tmp/output.ptx build/
 cp /tmp/output.cubin build/
 cp /tmp/output.fatbin build/
