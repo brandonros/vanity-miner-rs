@@ -9,26 +9,29 @@ PHYSICAL_ARCH=sm_120 # rtx5090 blackwell
 # clean
 cargo clean
 
-# build kernels to get the .ll file
+# build kernels to get the riscv .ll file
 pushd kernels
 cargo build --target riscv64gc-unknown-none-elf -p kernels --release
 popd
 
-# find the .ll file
-LL_FILE=$(find $CARGO_TARGET_DIR/riscv64gc-unknown-none-elf/release/deps/kernels-* -type f -name "*.ll")
-if [ -z "$LL_FILE" ]; then
+# find the riscv .ll file
+RISCV_LL_FILE=$(find $CARGO_TARGET_DIR/riscv64gc-unknown-none-elf/release/deps/kernels-* -type f -name "*.ll")
+if [ -z "$RISCV_LL_FILE" ]; then
     echo "No .ll file found"
     exit 1
 fi
 
 # replace uwtable attributes due to riscv core being built with unwind and not being recompiled despite panic = "abort" flag?
-sed -i 's/ uwtable //g' $LL_FILE
-sed -i 's/ uwtable//g' $LL_FILE
+sed -i 's/ uwtable //g' $RISCV_LL_FILE
+sed -i 's/ uwtable//g' $RISCV_LL_FILE
 
 # transpile riscv .ll to nvptx64 .ll
 pushd transpiler
-cargo run --release -- $LL_FILE
+cargo run --release -- $RISCV_LL_FILE
 popd
+
+# mark kernels as ptx_kernel
+sed -i 's/define dso_local void @kernel_/define dso_local ptx_kernel void @kernel_/g' /tmp/output.ll
 
 # convert the .ll files to .bc files
 llvm-as-19 /tmp/output.ll -o /tmp/output.bc
@@ -39,6 +42,7 @@ opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
 
 # compile the .bc files to .ptx
 pushd nvvm_compiler
+make clean
 make
 ./build/nvvm_compiler /tmp/output.bc /tmp/libintrinsics.bc $VIRTUAL_ARCH > /tmp/output.ptx
 popd
@@ -51,7 +55,8 @@ nvcc -fatbin -arch=$PHYSICAL_ARCH -o /tmp/output.fatbin /tmp/output.ptx
 
 # copy back
 pushd nvvm_compiler
-cp $LL_FILE build/
+cp $RISCV_LL_FILE build/
+cp /tmp/output.ll build/
 cp /tmp/output.ptx build/
 cp /tmp/output.cubin build/
 cp /tmp/output.fatbin build/

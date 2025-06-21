@@ -2,12 +2,12 @@
 
 set -e
 
-PORT=24534
-HOST=ssh2.vast.ai
+PORT=33882
+HOST=ssh6.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION=1.8.0
+VERSION=1.9.0
 
 rm -f gpu_runner
 if [[ ! -f gpu_runner ]]
@@ -20,5 +20,5 @@ export BLOCKS_PER_SM="1024"
 export THREADS_PER_BLOCK="256"
 export PTX_PATH="kernels.ptx"
 killall gpu_runner || true
-./gpu_runner solana-vanity aaa ""
+./gpu_runner add
 EOF
