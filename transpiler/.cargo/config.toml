@@ -1,0 +1,2 @@
+[build]
+rustflags = ["-L", "/Users/brandon/Applications/zstd/1.5.7/lib"]
