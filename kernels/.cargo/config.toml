@@ -3,7 +3,7 @@ target = "riscv64gc-unknown-none-elf"
 
 [target.riscv64gc-unknown-none-elf]
 rustflags = [
-  "--emit=llvm-ir,llvm-bc",
+  "--emit=llvm-ir",
   "-C", "lto=fat",
   "-C", "embed-bitcode=yes"
 ]

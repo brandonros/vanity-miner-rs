@@ -1,10 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <nvvm.h>
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <input.bc> <libintrinsics.bc>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <input.bc> <libintrinsics.bc> <arch>\n", argv[0]);
+        fprintf(stderr, "Example: %s input.bc libintrinsics.bc compute_75\n", argv[0]);
         return 1;
     }
     
@@ -37,6 +39,11 @@ int main(int argc, char* argv[]) {
     char* libintrinsics = malloc(libintrinsics_size);
     fread(libintrinsics, 1, libintrinsics_size, libintrinsics_file);
     fclose(libintrinsics_file);
+
+    // Prepare architecture option
+    char arch_option[64];
+    snprintf(arch_option, sizeof(arch_option), "-arch=%s", argv[3]);
+    const char* options[] = {arch_option};
 
     // Create NVVM program
     fprintf(stderr, "Creating NVVM program\n");
@@ -94,8 +101,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Verify the program before compilation
-    fprintf(stderr, "Verifying program\n");
-    const char* options[] = {"-arch=compute_120"};
+    fprintf(stderr, "Verifying program with arch: %s\n", argv[3]);
     result = nvvmVerifyProgram(prog, 1, options);
     if (result != NVVM_SUCCESS) {
         fprintf(stderr, "Error verifying program: %d\n", result);
@@ -117,7 +123,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Compile to PTX
-    fprintf(stderr, "Compiling program\n");
+    fprintf(stderr, "Compiling program with arch: %s\n", argv[3]);
     result = nvvmCompileProgram(prog, 1, options);
     if (result != NVVM_SUCCESS) {
         fprintf(stderr, "Error compiling program: %d\n", result);
@@ -168,6 +174,7 @@ int main(int argc, char* argv[]) {
     // Optional: Write stats to stderr so they don't interfere with PTX output
     fprintf(stderr, "Successfully compiled LLVM bitcode to PTX!\n");
     fprintf(stderr, "Input: %s (%zu bytes)\n", argv[1], bitcode_size);
+    fprintf(stderr, "Architecture: %s\n", argv[3]);
     fprintf(stderr, "Output: PTX (%zu bytes)\n", ptx_size - 1);
 
     // Clean up

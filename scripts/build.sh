@@ -1,11 +1,17 @@
 #!/bin/bash
 
+set -e
+
+# set architecture
+VIRTUAL_ARCH=compute_120 # rtx5090 blackwell
+PHYSICAL_ARCH=sm_120 # rtx5090 blackwell
+
 # clean
 cargo clean
 
-# build kernels
+# build kernels to get the .ll file
 pushd kernels
-cargo build --target riscv64gc-unknown-none-elf --release || exit 1
+cargo build --target riscv64gc-unknown-none-elf --release
 popd
 
 # find the .ll file
@@ -19,19 +25,30 @@ fi
 sed -i 's/ uwtable //g' $LL_FILE
 sed -i 's/ uwtable//g' $LL_FILE
 
-# generate the .ll file
+# transpile riscv .ll to nvptx64 .ll
 pushd transpiler
-cargo run --release -- $LL_FILE || exit 1
+cargo run --release -- $LL_FILE
 popd
 
 # convert the .ll files to .bc files
-llvm-as-19 /tmp/output.ll -o /tmp/output.bc || exit 1
-llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc || exit 1
+llvm-as-19 /tmp/output.ll -o /tmp/output.bc
+llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc
 
-# compile the .bc files
+# compile the .bc files to .ptx
 pushd nvvm_compiler
-make || exit 1
-./build/nvvm_compiler /tmp/output.bc /tmp/libintrinsics.bc > /tmp/output.ptx || exit 1
-#ptxas -arch=sm_120 -o /tmp/output.cubin /tmp/output.ptx || exit 1
-#nvcc -fatbin -arch=sm_120 -o /tmp/output.fatbin /tmp/output.ptx || exit 1
+make
+./build/nvvm_compiler /tmp/output.bc /tmp/libintrinsics.bc $VIRTUAL_ARCH > /tmp/output.ptx
+popd
+
+# compile the .ptx to .cubin and .fatbin
+echo "assembling .ptx to .cubin"
+ptxas -arch=$PHYSICAL_ARCH -o /tmp/output.cubin /tmp/output.ptx
+echo "assembling .ptx to .fatbin"
+nvcc -fatbin -arch=$PHYSICAL_ARCH -o /tmp/output.fatbin /tmp/output.ptx
+
+# copy back
+pushd nvvm_compiler
+cp /tmp/output.ptx build/
+cp /tmp/output.cubin build/
+cp /tmp/output.fatbin build/
 popd

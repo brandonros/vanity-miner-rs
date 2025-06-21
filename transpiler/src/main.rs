@@ -59,10 +59,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let llvm_ir = ptx_module.print_to_string().to_string();
     fs::write("/tmp/output.ll", llvm_ir).expect("Unable to write file");
     println!("LLVM IR written to output.ll");
-
-    // Write to .bc file
-    assert_eq!(ptx_module.write_bitcode_to_path("/tmp/output.bc"), true);
-    println!("LLVM bitcode written to output.bc");
     
     Ok(())
 }
