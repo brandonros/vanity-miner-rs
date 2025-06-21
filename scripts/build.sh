@@ -4,8 +4,8 @@
 cargo clean
 
 # build kernels
-pushd ../kernels
-cargo build --release || exit 1
+pushd kernels
+cargo build --target riscv64gc-unknown-none-elf --release || exit 1
 popd
 
 # find the .ll file
@@ -15,21 +15,23 @@ if [ -z "$LL_FILE" ]; then
     exit 1
 fi
 
-# replace uwtable attributes with no_uwtable attributes due to riscv core being built with unwind?
+# replace uwtable attributes due to riscv core being built with unwind and not being recompiled despite panic = "abort" flag?
 sed -i 's/ uwtable //g' $LL_FILE
 sed -i 's/ uwtable//g' $LL_FILE
 
 # generate the .ll file
+pushd transpiler
 cargo run --release -- $LL_FILE || exit 1
+popd
 
 # convert the .ll files to .bc files
 llvm-as-19 /tmp/output.ll -o /tmp/output.bc || exit 1
-llvm-as-19 assets/libintrinsics.ll -o /tmp/libintrinsics.bc || exit 1
+llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc || exit 1
 
 # compile the .bc files
-pushd ../nvvm_compiler
+pushd nvvm_compiler
 make || exit 1
 ./build/nvvm_compiler /tmp/output.bc /tmp/libintrinsics.bc > /tmp/output.ptx || exit 1
-ptxas -arch=sm_120 -o /tmp/output.cubin /tmp/output.ptx || exit 1
-nvcc -fatbin -arch=sm_120 -o /tmp/output.fatbin /tmp/output.ptx || exit 1
+#ptxas -arch=sm_120 -o /tmp/output.cubin /tmp/output.ptx || exit 1
+#nvcc -fatbin -arch=sm_120 -o /tmp/output.fatbin /tmp/output.ptx || exit 1
 popd
