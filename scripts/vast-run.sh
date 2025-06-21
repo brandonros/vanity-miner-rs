@@ -2,12 +2,13 @@
 
 set -e
 
-PORT=13580
-HOST=ssh4.vast.ai
+PORT=24534
+HOST=ssh2.vast.ai
 USER=root
-VERSION=1.8.0
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
+VERSION=1.8.0
+
 rm -f gpu_runner
 if [[ ! -f gpu_runner ]]
 then
