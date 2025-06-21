@@ -8,6 +8,8 @@ use cust::device::Device;
 use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;
 use cust::CudaFlags;
+use backtrace::Backtrace;
+
 use std::error::Error;
 use std::sync::{Arc, RwLock};
 
@@ -64,6 +66,12 @@ fn device_main(
 }
 
 fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    std::panic::set_hook(Box::new(|panic_info| {
+        let backtrace = Backtrace::new();
+        eprintln!("Thread panicked: {}", panic_info);
+        eprintln!("Backtrace:\n{:?}", backtrace);
+    }));
+
     let args = std::env::args().collect::<Vec<String>>();
     
     let mode = if args.len() == 2 && args[1] == "add" {
@@ -159,6 +167,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
     };
 
+    // log
     match &mode {
         Mode::Add => {
             println!("Running add mode");
@@ -177,22 +186,50 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
     }
 
+    // spawn threads
     let mut handles = Vec::new();
     for i in 0..num_devices as usize {
         println!("Starting device {}", i);
         let mode_clone = mode.clone();
         let shared_best_hash_clone = shared_best_hash.clone();
         let stats_clone = Arc::clone(&global_stats);
-        handles.push(std::thread::spawn(move || device_main(
-            i,
-            mode_clone,
-            shared_best_hash_clone,
-            stats_clone
-        )));
+        handles.push(std::thread::spawn(move || -> Result<(), Box<dyn Error + Send + Sync>> {
+            // Wrap the device_main call to capture any errors with context
+            device_main(i, mode_clone, shared_best_hash_clone, stats_clone)
+                .map_err(|e| {
+                    let bt = Backtrace::new();
+                    eprintln!("Error in device {}: {}", i, e);
+                    eprintln!("Backtrace:\n{:?}", bt);
+                    e
+                })
+        }));
     }
 
-    for handle in handles {
-        handle.join().unwrap().unwrap();
+    // wait for threads
+    for (i, handle) in handles.into_iter().enumerate() {
+        match handle.join() {
+            Ok(result) => {
+                if let Err(e) = result {
+                    eprintln!("Device {} returned error: {}", i, e);
+                    return Err(e);
+                }
+            }
+            Err(panic_payload) => {
+                eprintln!("Device {} thread panicked!", i);
+                
+                // Try to extract panic message
+                let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "Unknown panic".to_string()
+                };
+                
+                eprintln!("Panic message: {}", panic_msg);
+                return Err(format!("Device {} panicked: {}", i, panic_msg).into());
+            }
+        }
     }
 
     Ok(())
