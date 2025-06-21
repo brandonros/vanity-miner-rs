@@ -11,7 +11,7 @@ cargo clean
 
 # build kernels to get the .ll file
 pushd kernels
-cargo build --target riscv64gc-unknown-none-elf --release
+cargo build --target riscv64gc-unknown-none-elf -p kernels --release
 popd
 
 # find the .ll file

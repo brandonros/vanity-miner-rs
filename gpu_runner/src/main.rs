@@ -19,9 +19,7 @@ fn device_main(
         .map_err(|_| "CUBIN_PATH environment variable is required")?;
     let cubin = std::fs::read(cubin_path)
         .map_err(|e| format!("Failed to read CUBIN file: {}", e))?;
-    let module = Module::from_cubin(cubin, &[
-        ModuleJitOption::MaxRegisters(256),
-    ])?;
+    let module = Module::from_cubin(cubin, &[])?;
     println!("[{ordinal}] Module loaded");
 
     add::device_main_add(ordinal, &module)
