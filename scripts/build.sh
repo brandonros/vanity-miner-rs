@@ -33,11 +33,11 @@ popd
 # mark kernels as ptx_kernel
 sed -i 's/define dso_local void @kernel_/define dso_local ptx_kernel void @kernel_/g' /tmp/output.ll
 
-# convert the .ll files to .bc files
+# convert the ptx .ll files to .bc files
 llvm-as-19 /tmp/output.ll -o /tmp/output.bc
 llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc
 
-# strip
+# strip debug info out of the .bc file
 opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
 
 # compile the .bc files to .ptx

@@ -2,8 +2,8 @@
 
 set -e
 
-PORT=33882
-HOST=ssh6.vast.ai
+PORT=35954
+HOST=ssh8.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
