@@ -1,3 +1,4 @@
+mod add;
 mod solana;
 mod bitcoin;
 mod shallenge;
@@ -15,6 +16,7 @@ use common::SharedBestHash;
 
 #[derive(Debug, Clone)]
 enum Mode {
+    Add,
     SolanaVanity { prefix: String, suffix: String },
     BitcoinVanity { prefix: String, suffix: String },
     EthereumVanity { prefix: String, suffix: String },
@@ -42,6 +44,9 @@ fn device_main(
     println!("[{ordinal}] Module loaded");
 
     match mode {
+        Mode::Add => {
+            add::device_main_add(ordinal, &module)
+        }
         Mode::SolanaVanity { prefix, suffix } => {
             solana::device_main_solana_vanity(ordinal, prefix, suffix, &module, global_stats)
         }
@@ -61,7 +66,9 @@ fn device_main(
 fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let args = std::env::args().collect::<Vec<String>>();
     
-    let mode = if args.len() == 4 && args[1] == "solana-vanity" {
+    let mode = if args.len() == 2 && args[1] == "add" {
+        Mode::Add
+    } else if args.len() == 4 && args[1] == "solana-vanity" {
         let vanity_prefix = args[2].clone();
         let vanity_suffix = args[3].clone();
         if vanity_prefix.len() > 0 {
@@ -98,6 +105,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         Mode::Shallenge { username, target_hash }
     } else {
         println!("Usage:");
+        println!("  {} add", args[0]);
         println!("  {} solana-vanity <prefix> <suffix>", args[0]);
         println!("  {} bitcoin-vanity <prefix> <suffix>", args[0]);
         println!("  {} ethereum-vanity <prefix> <suffix>", args[0]);
@@ -130,10 +138,16 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
             username.len(),
             0 // No suffix for shallenge
         )),
+        Mode::Add => Arc::new(GlobalStats::new(
+            num_devices as usize, 
+            0, // No prefix for add
+            0 // No suffix for add
+        )),
     };
 
     // Create shared state for shallenge mode
     let shared_best_hash = match &mode {
+        Mode::Add => None,
         Mode::SolanaVanity { .. } => None,
         Mode::BitcoinVanity { .. } => None,
         Mode::EthereumVanity { .. } => None,
@@ -146,6 +160,9 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     };
 
     match &mode {
+        Mode::Add => {
+            println!("Running add mode");
+        }
         Mode::SolanaVanity { prefix, suffix } => {
             println!("Searching for solana vanity key with prefix '{}' and suffix '{}'", prefix, suffix);
         }
