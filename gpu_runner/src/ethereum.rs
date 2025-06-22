@@ -18,11 +18,11 @@ pub fn device_main_ethereum_vanity(
     module: &Module,
     global_stats: Arc<GlobalStats>
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let vanity_prefix_bytes = hex::decode(vanity_prefix)?;
-    let vanity_prefix_bytes = vanity_prefix_bytes.as_slice();
+    let vanity_prefix_vec = hex::decode(vanity_prefix)?;
+    let vanity_prefix_bytes = vanity_prefix_vec.as_slice();
     let vanity_prefix_len: usize = vanity_prefix_bytes.len();
-    let vanity_suffix_bytes = hex::decode(vanity_suffix)?;
-    let vanity_suffix_bytes = vanity_suffix_bytes.as_slice();
+    let vanity_suffix_vec = hex::decode(vanity_suffix)?;
+    let vanity_suffix_bytes = vanity_suffix_vec.as_slice();
     let vanity_suffix_len: usize = vanity_suffix_bytes.len();
     
     let device = Device::get_device(ordinal as u32)?;
