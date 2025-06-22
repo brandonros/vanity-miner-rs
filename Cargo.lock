@@ -464,7 +464,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ir_retargeter"
+name = "ir_adapter"
 version = "0.1.0"
 dependencies = [
  "inkwell",
