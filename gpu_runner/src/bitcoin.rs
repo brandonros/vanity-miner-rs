@@ -1,6 +1,7 @@
 use cust::device::Device;
 use cust::module::Module;
 use cust::prelude::Context;
+use cust::context::ResourceLimit;
 use cust::stream::{Stream, StreamFlags};
 use cust::util::SliceExt;
 use cust::memory::CopyDestination;
@@ -26,6 +27,12 @@ pub fn device_main_bitcoin_vanity(
     let device = Device::get_device(ordinal as u32)?;
     let ctx = Context::new(device)?;
     cust::context::CurrentContext::set_current(&ctx)?;
+
+    // optionally override stack size
+    if let Some(stack_size) = std::env::var("STACK_SIZE").ok() {
+        let stack_size = stack_size.parse::<usize>().unwrap();
+        cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack_size)?;
+    }
     
     let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
     let find_bitcoin_vanity_private_key = module.get_function("kernel_find_bitcoin_vanity_private_key")?;
