@@ -27,7 +27,7 @@ sed -i 's/ uwtable//g' $RISCV_LL_FILE
 
 # transpile riscv .ll to nvptx64 .ll
 PTX_LL_FILE=/tmp/output.ll
-pushd transpiler
+pushd ir_adapter
 cargo run --release -- $RISCV_LL_FILE $PTX_LL_FILE
 popd
 
@@ -36,7 +36,7 @@ sed -i 's/define dso_local void @kernel_/define dso_local ptx_kernel void @kerne
 
 # convert the ptx .ll files to .bc files
 llvm-as-19 $PTX_LL_FILE -o /tmp/output.bc
-llvm-as-19 transpiler/assets/libintrinsics.ll -o /tmp/libintrinsics.bc
+llvm-as-19 ir_adapter/assets/libintrinsics.ll -o /tmp/libintrinsics.bc
 
 # strip debug info out of the .bc file
 opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc

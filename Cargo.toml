@@ -6,7 +6,7 @@ members = [
   "gpu_runner",
   "kernels",
   "logic",
-  "transpiler",
+  "ir_retargeter",
   "nvvm_compiler",
 ]
 

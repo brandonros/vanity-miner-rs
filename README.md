@@ -20,3 +20,12 @@ cd /mnt
 ./scripts/build.sh
 container system stop
 ```
+
+## RISC-V Build Pipeline
+
+* no_std Rust (specifically 1.86.0 because it was built against LLVM 19) targeting riscv64gc-unknown-none-elf due to its simplicity in instruction set
+* make it emit LLVM IR instead of an actual binary
+* Adapt the RISC-V LLVM IR to "NVPTX64 compatiable LLVM IR"
+* assemble the LLVM IR to LLVM bitcode
+* feed the NVPTX64 LLVM bitcode to new CUDA toolkit 12.9 libNVVM which adds support for LLVM19 for Blackwell (previous architectures only support LLVM v7 which is very old) to get Nvidia's PTX (Parallel Thread Execution)
+* feed the PTX to `ptxas` to get CUBIN SaSS (Streaming ASSembler)
