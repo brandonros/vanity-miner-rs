@@ -27,5 +27,5 @@ ENV CARGO_TARGET_DIR="/root/.cargo/target"
 RUN rustup target add riscv64gc-unknown-none-elf
 
 # set build paramters
-ENV LIBRARY_PATH=/usr/local/cuda/nvvm/lib64:$LIBRARY_PATH
+ENV LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LIBRARY_PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LD_LIBRARY_PATH}"
