@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4-cores
     permissions:
       contents: read
       packages: read
@@ -24,9 +24,9 @@ jobs:
         run: |
           # Pull the pre-built builder image
           docker pull ghcr.io/brandonros/cuda-12-9-rust-builder:latest
+          docker run --
           
-          # Run the custom build script inside the container
-          docker run --rm \
+          # Run the custom build script inside the containerrm \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             ghcr.io/brandonros/cuda-12-9-rust-builder:latest \
