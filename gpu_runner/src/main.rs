@@ -36,13 +36,23 @@ fn device_main(
     cust::context::CurrentContext::set_current(&ctx)?;
 
     println!("[{ordinal}] Loading module...");
-    let ptx_path = std::env::var("PTX_PATH")
-        .map_err(|_| "PTX_PATH environment variable is required")?;
-    let ptx = std::fs::read_to_string(ptx_path)
-        .map_err(|e| format!("Failed to read PTX file: {}", e))?;
-    let module = Module::from_ptx(ptx, &[
-        ModuleJitOption::MaxRegisters(256),
-    ])?;
+    let module = {
+        let cubin_path = std::env::var("CUBIN_PATH");
+        let ptx_path = std::env::var("PTX_PATH");
+        if let Ok(cubin_path) = cubin_path {
+            let cubin = std::fs::read(cubin_path)
+                .map_err(|e| format!("Failed to read CUBIN file: {}", e))?;
+            Module::from_cubin(cubin, &[])?
+        } else if let Ok(ptx_path) = ptx_path {
+            let ptx = std::fs::read_to_string(ptx_path)
+                .map_err(|e| format!("Failed to read PTX file: {}", e))?;
+            Module::from_ptx(ptx, &[
+                ModuleJitOption::MaxRegisters(256),
+            ])
+        } else {
+            return Err("CUBIN_PATH or PTX_PATH environment variable is required".into());
+        }
+    };
     println!("[{ordinal}] Module loaded");
 
     match mode {
