@@ -58,6 +58,7 @@ ptxas -arch=$PHYSICAL_ARCH -o /tmp/output.cubin /tmp/output.ptx
 
 # copy back
 pushd nvvm_compiler
+cp $CARGO_TARGET_DIR/release/gpu_runner build/
 cp $RISCV_LL_FILE build/
 cp $PTX_LL_FILE build/
 cp /tmp/output.ptx build/

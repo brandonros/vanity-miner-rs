@@ -38,10 +38,8 @@ jobs:
           mkdir -p artifacts
           
           # Copy the built artifacts from the build script output
-          cp nvvm_compiler/build/output.cubin ./artifacts/ 2>/dev/null || true
-          
-          # Copy any release binaries if they exist
-          find $CARGO_TARGET_DIR/release -type f -executable -name "gpu_runner" -exec cp {} ./artifacts/ \; 2>/dev/null || true
+          cp nvvm_compiler/build/output.cubin ./artifacts/
+          cp nvvm_compiler/build/gpu_runner ./artifacts/
           
           echo "Copied build artifacts to artifacts directory"
       
