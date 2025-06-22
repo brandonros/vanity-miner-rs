@@ -16,7 +16,7 @@ unsafe fn handle_bitcoin_vanity_match_found(
     let found_matches = &mut found_matches_slice[0];
 
     // If first find, copy results to host
-    if unsafe { atomic::atomic_add_u32(found_matches_slice_ptr, 0) } == 0 {
+    if unsafe { atomic::atomic_add_u32(found_matches, 0) } == 0 {
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 33) };
         let found_public_key_hash = unsafe { core::slice::from_raw_parts_mut(found_public_key_hash_ptr, 20) };
