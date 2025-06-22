@@ -43,6 +43,7 @@ opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
 
 # compile the .bc files to .ptx
 pushd nvvm_compiler
+mkdir -p build
 cargo run --release -- /tmp/output.bc /tmp/libintrinsics.bc $VIRTUAL_ARCH > /tmp/output.ptx
 popd
 

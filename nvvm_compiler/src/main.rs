@@ -1,7 +1,9 @@
+#![allow(non_camel_case_types)]
+
 use std::env;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::ffi::{CString, CStr};
+use std::ffi::CString;
 use std::ptr;
 use std::os::raw::{c_char, c_int, c_void};
 
