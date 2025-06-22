@@ -6,7 +6,8 @@ members = [
   "gpu_runner",
   "kernels",
   "logic",
-  "transpiler"
+  "transpiler",
+  "nvvm_compiler",
 ]
 
 [patch.crates-io]

@@ -615,6 +615,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nvvm_compiler"
+version = "0.1.0"
+
+[[package]]
 name = "object"
 version = "0.36.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

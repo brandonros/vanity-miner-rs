@@ -27,17 +27,18 @@ fn add_nvvm_ir_version<'ctx, 'module>(context: &'ctx Context, module: &'module M
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() != 2 {
-        eprintln!("Usage: {} <filename>", args[0]);
+    if args.len() != 3 {
+        eprintln!("Usage: {} <riscv_filename> <ptx_filename>", args[0]);
         std::process::exit(1);
     }
+    let risc_filename = args[1].clone();
+    let ptx_filename = args[2].clone();
     
     // create context
     let context = Context::create();
 
     // load riscv64gc-unknown-none-elf llvm ir
-    let filename = args[1].clone();
-    let risc_ir = fs::read(filename)?;
+    let risc_ir = fs::read(risc_filename)?;
     let risc_memory_buffer = MemoryBuffer::create_from_memory_range(&risc_ir, "risc_ir");
     let risc_module = context.create_module_from_ir(risc_memory_buffer)?;
 
@@ -57,8 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Write to .ll file
     let llvm_ir = ptx_module.print_to_string().to_string();
-    fs::write("/tmp/output.ll", llvm_ir).expect("Unable to write file");
-    println!("LLVM IR written to output.ll");
+    fs::write(&ptx_filename, llvm_ir).expect("Unable to write file");
+    println!("LLVM IR written to {}", ptx_filename);
     
     Ok(())
 }
