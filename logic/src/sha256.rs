@@ -239,10 +239,10 @@ pub fn sha256_32_from_bytes(input: &[u8; 32]) -> [u8; 32] {
 pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
     let hash_words = sha256_variable_length(input);
     let mut result = [0u8; 32];
-    for (i, word) in hash_words.iter().enumerate() {
-        let bytes = word.to_be_bytes();
-        result[i * 4..i * 4 + 4].copy_from_slice(&bytes);
-    }
+    seq!(N in 0..8 {
+        let bytes = hash_words[N].to_be_bytes();
+        result[N * 4..N * 4 + 4].copy_from_slice(&bytes);
+    });
     result
 }
 

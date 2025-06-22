@@ -33,6 +33,6 @@ export BLOCKS_PER_SM="256"
 export THREADS_PER_BLOCK="256"
 export STACK_SIZE="8192"
 export CUBIN_PATH="output.cubin"
-#./gpu_runner bitcoin-vanity bc1qqqqqq ""
-./gpu_runner ethereum-vanity 55555555 ""
+./gpu_runner bitcoin-vanity bc1qqqqqq ""
+#./gpu_runner ethereum-vanity 55555555 ""
 EOF
