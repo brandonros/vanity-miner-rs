@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest-4-cores
+  compile:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: read
