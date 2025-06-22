@@ -1,0 +1,50 @@
+name: compile
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull builder image and build project
+        run: |
+          # Pull the pre-built builder image
+          docker pull ghcr.io/brandonros/cuda-12-9-rust-builder:latest
+          
+          # Run the custom build script inside the container
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ghcr.io/brandonros/cuda-12-9-rust-builder:latest \
+            bash scripts/build.sh
+          
+          # Create output directory
+          mkdir -p artifacts
+          
+          # Copy the built artifacts from the build script output
+          cp nvvm_compiler/build/output.cubin ./artifacts/ 2>/dev/null || true
+          
+          # Copy any release binaries if they exist
+          find target/release -type f -executable -name "gpu_runner" -exec cp {} ./artifacts/ \; 2>/dev/null || true
+          
+          echo "Copied build artifacts to artifacts directory"
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu_runner
+          path: artifacts/

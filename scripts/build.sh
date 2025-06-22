@@ -9,6 +9,11 @@ PHYSICAL_ARCH=sm_120
 # clean
 cargo clean
 
+# build runner
+pushd gpu_runner
+cargo build --release
+popd
+
 # build kernels to get the riscv .ll file
 pushd kernels
 cargo build --target riscv64gc-unknown-none-elf -p kernels --release
