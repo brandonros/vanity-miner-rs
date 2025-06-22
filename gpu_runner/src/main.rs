@@ -48,7 +48,7 @@ fn device_main(
                 .map_err(|e| format!("Failed to read PTX file: {}", e))?;
             Module::from_ptx(ptx, &[
                 ModuleJitOption::MaxRegisters(256),
-            ])
+            ])?
         } else {
             return Err("CUBIN_PATH or PTX_PATH environment variable is required".into());
         }
