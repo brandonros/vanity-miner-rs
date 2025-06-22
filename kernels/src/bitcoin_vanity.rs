@@ -1,4 +1,4 @@
-use cuda_std::atomic::intrinsics::atomic_fetch_add_relaxed_u32_device;
+use crate::{atomic, utilities};
 
 /// Handle the infrastructure concerns when a match is found
 unsafe fn handle_bitcoin_vanity_match_found(
@@ -16,7 +16,7 @@ unsafe fn handle_bitcoin_vanity_match_found(
     let found_matches = &mut found_matches_slice[0];
 
     // If first find, copy results to host
-    if unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 0) } == 0 {
+    if unsafe { atomic::atomic_add_u32(found_matches, 0) } == 0 {
         let found_private_key = unsafe { core::slice::from_raw_parts_mut(found_private_key_ptr, 32) };
         let found_public_key = unsafe { core::slice::from_raw_parts_mut(found_public_key_ptr, 33) };
         let found_public_key_hash = unsafe { core::slice::from_raw_parts_mut(found_public_key_hash_ptr, 20) };
@@ -33,14 +33,15 @@ unsafe fn handle_bitcoin_vanity_match_found(
     }
 
     // Increment number of found matches
-    unsafe { atomic_fetch_add_relaxed_u32_device(found_matches, 1) };
+    unsafe { atomic::atomic_add_u32(found_matches, 1) };
 
     // TODO: do we need device_fence here?
 }
 
-#[cuda_std::kernel]
+// TODO: kernel
+#[unsafe(no_mangle)]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe fn kernel_find_bitcoin_vanity_private_key(
+pub unsafe extern "C" fn kernel_find_bitcoin_vanity_private_key(
     // input
     vanity_prefix_ptr: *const u8, 
     vanity_prefix_len: usize, 
@@ -57,7 +58,7 @@ pub unsafe fn kernel_find_bitcoin_vanity_private_key(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // Prepare request
-    let thread_idx = cuda_std::thread::index() as usize;
+    let thread_idx = utilities::get_thread_idx();
     let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len) };
     let vanity_suffix = unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) };
     let request = logic::BitcoinVanityKeyRequest {

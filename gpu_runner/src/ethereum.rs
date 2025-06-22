@@ -1,5 +1,6 @@
 use cust::device::Device;
 use cust::module::Module;
+use cust::context::ResourceLimit;
 use cust::prelude::Context;
 use cust::context::ResourceLimit;
 use cust::stream::{Stream, StreamFlags};

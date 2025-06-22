@@ -9,7 +9,4 @@ rand = "0.8"
 backtrace = "0.3"
 common = { path = "../common" }
 logic = { path = "../logic" }
-cust = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
-
-[build-dependencies]
-cuda_builder = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }
+cust = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "10cbfd2bb8fbe54b42b891b270da821512c56409" }

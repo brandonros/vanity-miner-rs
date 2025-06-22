@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["staticlib"]
 
 [dependencies]
 logic = { path = "../logic" }
-cuda_std = { git = "https://github.com/Rust-GPU/Rust-CUDA.git" }

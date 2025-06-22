@@ -1,0 +1,7 @@
+[package]
+name = "transpiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+inkwell = { git = "https://github.com/brandonros/inkwell", rev = "28eca69a39abc81383c1481ee2bb88836c5d1143", features = ["llvm19-1"] }
