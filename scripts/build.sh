@@ -47,11 +47,9 @@ make
 ./build/nvvm_compiler /tmp/output.bc /tmp/libintrinsics.bc $VIRTUAL_ARCH > /tmp/output.ptx
 popd
 
-# compile the .ptx to .cubin and .fatbin
+# compile the .ptx to .cubin
 echo "assembling .ptx to .cubin"
 ptxas -arch=$PHYSICAL_ARCH -o /tmp/output.cubin /tmp/output.ptx
-echo "assembling .ptx to .fatbin"
-nvcc -fatbin -arch=$PHYSICAL_ARCH -o /tmp/output.fatbin /tmp/output.ptx
 
 # copy back
 pushd nvvm_compiler
@@ -59,5 +57,4 @@ cp $RISCV_LL_FILE build/
 cp /tmp/output.ll build/
 cp /tmp/output.ptx build/
 cp /tmp/output.cubin build/
-cp /tmp/output.fatbin build/
 popd
