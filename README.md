@@ -21,12 +21,12 @@ cd /mnt
 container system stop
 ```
 
-## RISC-V Build Pipeline
+## Build Pipeline
 
-* compile no_std Rust `logic` + `kernels` libraries (specifically 1.86.0 because it was built against LLVM 19) targeting riscv64gc-unknown-none-elf due to its simplicity in instruction set
-* make it emit LLVM IR instead of an actual binary
-* Adapt the RISC-V LLVM IR to "NVPTX64 compatiable LLVM IR"
-* assemble the LLVM IR to LLVM bitcode
-* feed the NVPTX64 LLVM bitcode to new CUDA toolkit 12.9 libNVVM which adds support for LLVM19 for Blackwell (previous architectures only support LLVM v7 which is very old) to get Nvidia's PTX (Parallel Thread Execution)
-* feed the PTX to `ptxas` to get CUBIN SaSS (Streaming ASSembler)
-* run the CUBIN on device with `gpu_runner`
+1. compile `no_std` Rust `logic` + `kernels` libraries (specifically 1.86.0 because it was built against LLVM 19) targeting `riscv64gc-unknown-none-elf` due to its simplicity in instruction set
+2. make it emit LLVM IR instead of an actual binary
+3. Adapt the RISC-V LLVM IR to NVPTX64 LLVM IR
+4. assemble the NVPTX64 LLVM IR to NVPTX64 LLVM bitcode
+5. feed the NVPTX64 LLVM bitcode to new CUDA toolkit 12.9 `libNVVM` which adds support for LLVM19 for Blackwell (previous architectures only support LLVM v7 which is very old) to get Nvidia's PTX (Parallel Thread Execution)
+6. feed the PTX to `ptxas` to get CUBIN SaSS (Streaming ASSembler)
+7. run the CUBIN on device with `gpu_runner`
