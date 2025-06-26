@@ -35,8 +35,10 @@ opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
 
 # Convert LLVM IR to SPIR-V using llvm-spirv
 llvm-spirv \
+    --spirv-target-env=SPV-IR \
+    --spirv-max-version=1.6 \
+    --spirv-ext-inst=none \
+    --spirv-mem2reg \
+    --spirv-lower-const-expr \
     -o /tmp/spirv.spv \
     /tmp/output.bc
-
-# Convert SPIR-V to MSL using spirv-cross
-spirv-cross --msl --output /tmp/kernel.metal /tmp/spirv.spv

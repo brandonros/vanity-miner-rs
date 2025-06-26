@@ -2,7 +2,7 @@ FROM docker.io/debian:bookworm-slim
 
 # install dependencies
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install curl git cmake pkg-config build-essential && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install curl git cmake pkg-config build-essential libssl-dev zlib1g-dev libzstd-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -15,15 +15,12 @@ RUN curl -L -O https://apt.llvm.org/llvm.sh && \
 chmod +x llvm.sh && \
 ./llvm.sh 19
 
-# add spirv-cross
-WORKDIR /root/
-RUN git clone https://github.com/KhronosGroup/SPIRV-Cross.git && \
-    cd SPIRV-Cross && \
-    mkdir build && \
-    cd build && \
-    cmake .. && \
-    make
-ENV PATH="/root/SPIRV-Cross/build:${PATH}"
+# install polly
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install libpolly-19-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 
 # add SPIRV-LLVM-Translator
 WORKDIR /root/
@@ -43,9 +40,3 @@ RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain 1.86.0
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV CARGO_TARGET_DIR="/root/.cargo/target"
-
-# install polly
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install libpolly-19-dev libssl-dev zlib1g-dev libzstd-dev && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
