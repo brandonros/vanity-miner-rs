@@ -1,0 +1,5 @@
+
+```shell
+container build -f Dockerfile.spirv -t spirv-rust-builder
+container run --rm -it --memory 8G -v $(pwd):/mnt spirv-rust-builder
+```

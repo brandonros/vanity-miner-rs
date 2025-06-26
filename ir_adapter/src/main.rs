@@ -27,12 +27,13 @@ fn add_nvvm_ir_version<'ctx, 'module>(context: &'ctx Context, module: &'module M
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
-    if args.len() != 3 {
-        eprintln!("Usage: {} <riscv_filename> <ptx_filename>", args[0]);
+    if args.len() != 4 {
+        eprintln!("Usage: {} <mode> <riscv_filename> <ptx_filename>", args[0]);
         std::process::exit(1);
     }
-    let risc_filename = args[1].clone();
-    let ptx_filename = args[2].clone();
+    let mode = args[1].clone();
+    let risc_filename = args[2].clone();
+    let out_filename = args[3].clone();
     
     // create context
     let context = Context::create();
@@ -43,23 +44,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let risc_module = context.create_module_from_ir(risc_memory_buffer)?;
 
     // jumpstart ptx module from risc module
-    let ptx_module = risc_module.clone();
+    let out_module = risc_module.clone();
 
-    // Set target triple
-    let target_triple = "nvptx64-nvidia-cuda";
-    ptx_module.set_triple(&TargetTriple::create(target_triple));
+    if mode == "nvptx64" {
+        // Set target triple
+        let target_triple = "nvptx64-nvidia-cuda";
+        out_module.set_triple(&TargetTriple::create(target_triple));
 
-    // Set data layout
-    let data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-i128:128:128-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-v128:128:128-n16:32:64-a:8:8";
-    ptx_module.set_data_layout(&DataLayout::create(data_layout));
+        // Set data layout
+        let data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-i128:128:128-f32:32:32-f64:64:64-v16:16:16-v32:32:32-v64:64:64-v128:128:128-n16:32:64-a:8:8";
+        out_module.set_data_layout(&DataLayout::create(data_layout));
 
-    // Add NVVM IR version metadata
-    add_nvvm_ir_version(&context, &ptx_module);
+        // Add NVVM IR version metadata
+        add_nvvm_ir_version(&context, &out_module);
+    } else if mode == "spirv64" {
+        // Set target triple
+        let target_triple = "spirv64-unknown-unknown";
+        out_module.set_triple(&TargetTriple::create(target_triple));
+
+        // Set data layout
+        let data_layout = "e-p:64:64:64-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f32:32:32-f64:64:64-v16:16:16-v24:32:32-v32:32:32-v48:64:64-v64:64:64-v96:128:128-v128:128:128-v192:256:256-v256:256:256-v512:512:512-v1024:1024:1024";
+        out_module.set_data_layout(&DataLayout::create(data_layout));
+    } else {
+        eprintln!("Invalid mode: {}", mode);
+        std::process::exit(1);
+    }
 
     // Write to .ll file
-    let llvm_ir = ptx_module.print_to_string().to_string();
-    fs::write(&ptx_filename, llvm_ir).expect("Unable to write file");
-    println!("LLVM IR written to {}", ptx_filename);
+    let llvm_ir = out_module.print_to_string().to_string();
+    fs::write(&out_filename, llvm_ir).expect("Unable to write file");
+    println!("LLVM IR written to {}", out_filename);
     
     Ok(())
 }

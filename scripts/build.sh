@@ -33,7 +33,7 @@ sed -i 's/ uwtable//g' $RISCV_LL_FILE
 # transpile riscv .ll to nvptx64 .ll
 PTX_LL_FILE=/tmp/output.ll
 pushd ir_adapter
-cargo run --release -- $RISCV_LL_FILE $PTX_LL_FILE
+cargo run --release -- nvptx64 $RISCV_LL_FILE $PTX_LL_FILE
 popd
 
 # mark kernels as ptx_kernel for .entry attribute

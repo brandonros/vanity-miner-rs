@@ -10,17 +10,6 @@ cargo run --release -- bitcoin-vanity bc1qqqqq ""
 cargo run --release -- shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 ```
 
-## Apple Container
-
-```shell
-container system start
-container build -t cuda-12-9-rust-builder
-container run --rm -it --memory 8G -v $(pwd):/mnt cuda-12-9-rust-builder
-cd /mnt
-./scripts/build.sh
-container system stop
-```
-
 ## Build Pipeline
 
 1. compile `no_std` Rust `logic` + `kernels` libraries (specifically 1.86.0 because it was built against LLVM 19) targeting `riscv64gc-unknown-none-elf` due to its simplicity in instruction set

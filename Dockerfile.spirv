@@ -1,0 +1,51 @@
+FROM docker.io/debian:bookworm-slim
+
+# install dependencies
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install curl git cmake pkg-config build-essential && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# install llvm 19
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install lsb-release wget software-properties-common gnupg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+RUN curl -L -O https://apt.llvm.org/llvm.sh && \
+chmod +x llvm.sh && \
+./llvm.sh 19
+
+# add spirv-cross
+WORKDIR /root/
+RUN git clone https://github.com/KhronosGroup/SPIRV-Cross.git && \
+    cd SPIRV-Cross && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make
+ENV PATH="/root/SPIRV-Cross/build:${PATH}"
+
+# add SPIRV-LLVM-Translator
+WORKDIR /root/
+RUN git clone https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
+    cd SPIRV-LLVM-Translator && \
+    git checkout dad1f0eaab8047a4f73c50ed5f3d1694b78aae97 && \
+    mkdir build && \
+    cd build && \
+    cmake -DBASE_LLVM_VERSION=19.1.7 .. && \
+    make
+ENV PATH="/root/SPIRV-LLVM-Translator/build/tools/llvm-spirv:${PATH}"
+
+# install rust and add riscv target
+RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain 1.86.0 --profile complete && \
+    . /root/.cargo/env && \
+    rustup target add riscv64gc-unknown-none-elf
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+ENV CARGO_TARGET_DIR="/root/.cargo/target"
+
+# install polly
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install libpolly-19-dev libssl-dev zlib1g-dev libzstd-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*

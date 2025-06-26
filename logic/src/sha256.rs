@@ -20,7 +20,7 @@ const H0: [u32; 8] = [
 
 #[inline(always)]
 const fn rotr32(x: u32, n: u32) -> u32 {
-    (x >> n) | (x << (32 - n))
+    x.rotate_right(n)
 }
 
 #[inline(always)]
