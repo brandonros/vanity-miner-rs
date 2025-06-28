@@ -1,4 +1,4 @@
-name: compile
+name: cuda-compile
 
 on:
   workflow_dispatch:
