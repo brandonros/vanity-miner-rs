@@ -21,7 +21,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # install rust
-RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain 1.86.0 --profile complete
+RUN curl -sSf -L https://sh.rustup.rs | bash -s -- --no-modify-path -y --default-toolchain 1.86.0 --profile complete
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV CARGO_TARGET_DIR="/root/.cargo/target"
 RUN rustup target add riscv64gc-unknown-none-elf

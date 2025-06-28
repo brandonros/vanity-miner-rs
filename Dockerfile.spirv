@@ -52,7 +52,7 @@ RUN git clone https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git && \
 ENV PATH="/root/SPIRV-LLVM-Translator/build/tools/llvm-spirv:${PATH}"
 
 # install rust and add riscv target
-RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain 1.86.0 --profile complete && \
+RUN curl -sSf -L https://sh.rustup.rs | bash -s -- --no-modify-path -y --default-toolchain 1.86.0 --profile complete && \
     . /root/.cargo/env && \
     rustup target add riscv64gc-unknown-none-elf
 
