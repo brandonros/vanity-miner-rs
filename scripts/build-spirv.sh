@@ -17,6 +17,11 @@ if [ -z "$RISCV_LL_FILE" ]; then
     exit 1
 fi
 
+# Strip debug info
+opt-19 -strip-debug $RISCV_LL_FILE -o $RISCV_LL_FILE
+opt-19 -passes="mem2reg,sroa,early-cse,dce" $RISCV_LL_FILE -o $RISCV_LL_FILE
+opt-19 $RISCV_LL_FILE -o $RISCV_LL_FILE
+
 # replace uwtable attributes due to riscv core being built with unwind and not being recompiled despite panic = "abort" flag?
 sed -i 's/ uwtable //g' $RISCV_LL_FILE
 sed -i 's/ uwtable//g' $RISCV_LL_FILE
@@ -30,17 +35,10 @@ popd
 # Convert the ptx .ll files to .bc files
 llvm-as-19 $SPIRV_LL_FILE -o /tmp/output.bc
 
-# strip debug info out of the .bc file
-opt-19 -strip-debug /tmp/output.bc -o /tmp/output.bc
-
 # Convert LLVM IR to SPIR-V using llvm-spirv
 llvm-spirv \
-    --spirv-target-env=SPV-IR \
-    --spirv-max-version=1.6 \
-    --spirv-ext-inst=none \
-    --spirv-mem2reg \
-    --spirv-lower-const-expr \
-    -o /tmp/spirv.spv \
-    /tmp/output.bc
-
-# Convert SPIR-V to WGSL with Naga
+  --spirv-max-version=1.6 \
+  --spirv-mem2reg \
+  --spirv-lower-const-expr \
+  -o /tmp/spirv.spv \
+  /tmp/output.bc

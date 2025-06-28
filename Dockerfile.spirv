@@ -39,6 +39,7 @@ RUN git clone https://github.com/KhronosGroup/SPIRV-Tools.git && \
     cd build && \
     cmake .. && \
     make
+ENV PATH="/root/SPIRV-Tools/build/tools:${PATH}"
 
 # add SPIRV-LLVM-Translator
 WORKDIR /root/
@@ -59,6 +60,3 @@ RUN curl -sSf -L https://sh.rustup.rs | bash -s -- --no-modify-path -y --default
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV CARGO_TARGET_DIR="/root/.cargo/target"
 
-# add naga
-RUN . /root/.cargo/env && \
-    cargo install naga-cli

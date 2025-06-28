@@ -59,7 +59,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         add_nvvm_ir_version(&context, &out_module);
     } else if mode == "spirv64" {
         // Set target triple
-        let target_triple = "spirv64-unknown-unknown";
+        // TODO: spir64 or spirv64?
+        let target_triple = "spir64-unknown-unknown";
         out_module.set_triple(&TargetTriple::create(target_triple));
 
         // Set data layout

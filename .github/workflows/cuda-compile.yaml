@@ -32,7 +32,7 @@ jobs:
             --memory=4g \
             --memory-swap=16g \
             ghcr.io/brandonros/cuda-12-9-rust-builder:latest \
-            bash scripts/build.sh
+            bash scripts/build-cuda.sh
           
           # Create output directory
           mkdir -p artifacts
