@@ -1,4 +1,4 @@
-name: builder
+name: cuda-builder
 
 on:
   workflow_dispatch:
@@ -26,12 +26,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        run: |
-          IMAGE_NAME="ghcr.io/${{ github.actor }}/cuda-12-9-rust-builder:latest"
-          
-          # Build and tag the Docker image
-          docker build -f Dockerfile -t $IMAGE_NAME .
-          
-          # Push the image to ghcr.io
-          docker push $IMAGE_NAME
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./
+          file: ./Dockerfile.cuda
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ github.actor }}/cuda-rust-builder:latest
+            ghcr.io/${{ github.actor }}/cuda-rust-builder:${{ github.sha }}

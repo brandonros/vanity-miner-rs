@@ -58,3 +58,7 @@ RUN curl -sSf -L https://sh.rustup.rs | bash -s -- -y --default-toolchain 1.86.0
 
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV CARGO_TARGET_DIR="/root/.cargo/target"
+
+# add naga
+RUN . /root/.cargo/env && \
+    cargo install naga-cli

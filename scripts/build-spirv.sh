@@ -42,3 +42,5 @@ llvm-spirv \
     --spirv-lower-const-expr \
     -o /tmp/spirv.spv \
     /tmp/output.bc
+
+# Convert SPIR-V to WGSL with Naga
