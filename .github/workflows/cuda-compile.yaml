@@ -7,11 +7,37 @@ jobs:
   compile:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag and calculate next version
+        id: version
+        run: |
+          # Get the latest tag, fallback to v0.0.0 if no tags exist
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Extract version numbers (remove 'v' prefix if present)
+          VERSION=${LATEST_TAG#v}
+          
+          # Split version into parts
+          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+          MAJOR=${VERSION_PARTS[0]:-0}
+          MINOR=${VERSION_PARTS[1]:-0}
+          PATCH=${VERSION_PARTS[2]:-0}
+          
+          # Increment minor version (you can change this to PATCH if you prefer patch bumps)
+          NEW_MINOR=$((MINOR + 1))
+          NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
+          
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -39,12 +65,69 @@ jobs:
           
           # Copy the built artifacts from the build script output
           cp nvvm_compiler/build/output.cubin ./artifacts/
+          cp nvvm_compiler/build/output.ptx ./artifacts/
           cp nvvm_compiler/build/gpu_runner ./artifacts/
           
           echo "Copied build artifacts to artifacts directory"
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.new_version }} -m "Release ${{ steps.version.outputs.new_version }}"
+          git push origin ${{ steps.version.outputs.new_version }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.new_version }}
+          release_name: Release ${{ steps.version.outputs.new_version }}
+          body: |
+            ## CUDA Vanity Miner ${{ steps.version.outputs.new_version }}
+
+            ### Build Information
+            - **Workflow**: ${{ github.workflow }}
+            - **Run ID**: ${{ github.run_id }}
+            - **Commit**: ${{ github.sha }}
+            - **Built on**: ${{ github.event.repository.updated_at }}
+          draft: false
+          prerelease: false
+
+      - name: Upload output.cubin to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/output.cubin
+          asset_name: output.cubin
+          asset_content_type: application/octet-stream
       
-      - name: Upload artifacts
+      - name: Upload output.ptx to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/output.ptx
+          asset_name: output.ptx
+          asset_content_type: application/octet-stream
+
+      - name: Upload GPU runner to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./artifacts/gpu_runner
+          asset_name: gpu_runner
+          asset_content_type: application/octet-stream
+
+      - name: Upload artifacts (workflow artifacts)
         uses: actions/upload-artifact@v4
         with:
-          name: vanity_miner
+          name: vanity_miner_${{ steps.version.outputs.version_number }}
           path: artifacts/
