@@ -20,7 +20,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# install rust
+# install rust (1.86.0 was last version that supported LLVM 19)
 RUN curl -sSf -L https://sh.rustup.rs | bash -s -- --no-modify-path -y --default-toolchain 1.86.0 --profile complete
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV CARGO_TARGET_DIR="/root/.cargo/target"
