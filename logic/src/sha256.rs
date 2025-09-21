@@ -308,11 +308,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_sha256() {
-        // Test with 32 zero bytes
+    fn test_sha256_32() {
+        // Test with 32 bytes
         let input: [u8; 32] = "brandonros/000000000000000000000".as_bytes().try_into().unwrap();
         let result = sha256_32_from_bytes(&input);
         let expected: [u8; 32] = hex::decode("f7a41dae1196282f0a544a8c7f1bbf61bda79307dc424c0d9febd27b08e1bf78").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_sha256_variable() {
+        // Test with 33 bytes
+        let input: [u8; 33] = "brandonros/0000000000000000000000".as_bytes().try_into().unwrap();
+        let result = sha256_from_bytes(&input);
+        let expected: [u8; 32] = hex::decode("062389936c519ed73f3371ef2e66d438e1cf0a6603f8b67c748a5d211e48b29d").unwrap().try_into().unwrap();
         assert_eq!(result, expected);
     }
 }
