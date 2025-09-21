@@ -15,6 +15,7 @@ mod keccak256;
 mod solana_vanity;
 mod bitcoin_vanity;
 mod ethereum_vanity;
+mod cube_root;
 
 pub use xoroshiro::*;
 pub use base58::*;
@@ -29,3 +30,4 @@ pub use keccak256::*;
 pub use solana_vanity::*;
 pub use bitcoin_vanity::*;
 pub use ethereum_vanity::*;
+pub use cube_root::*;
