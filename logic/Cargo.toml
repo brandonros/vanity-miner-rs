@@ -9,5 +9,6 @@ k256 = { version = "0.13.4", default-features = false, features = ["alloc", "ari
 tiny-keccak = { version = "2.0", default-features = false, features = ["keccak"] }
 rand_core = { version = "0.9.3" }
 rand_xoshiro = { version = "0.7.0", default-features = false }
+num-bigint = { version = "0.4.6", default-features = false }
 seq-macro = "0.3"
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }

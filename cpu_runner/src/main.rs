@@ -84,7 +84,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         let target_hash = args[3].clone();
         common::validate_hex_string(&target_hash)?;
         Mode::Shallenge { username, target_hash }
-    } else if args.len() == 4 && args[1] == "cube_root" {
+    } else if args.len() == 5 && args[1] == "cube_root" {
         let message = args[2].clone();
         let modulus = args[3].clone();
         let exponent = args[4].clone();

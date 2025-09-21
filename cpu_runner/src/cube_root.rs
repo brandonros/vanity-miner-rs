@@ -15,7 +15,7 @@ fn cpu_worker_thread_cube_root(
     println!("[CPU-{}] Starting CPU cuberoot worker thread", thread_id);
     
     loop {
-        let rng_seed: u64 = rng.gen();
+        let rng_seed: u64 = rng.r#gen();
         
         // Create the request with the cube root parameters
         let request = logic::CubeRootRequest {
@@ -54,15 +54,12 @@ fn cpu_worker_thread_cube_root(
 
 pub fn cpu_main_cube_root(
     num_threads: usize,
-    message: String,
+    message_bytes: Vec<u8>,
     modulus_bytes: Vec<u8>,
     exponent_bytes: Vec<u8>,        
     global_stats: Arc<GlobalStats>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Starting CPU cube root mode with {} threads", num_threads);
-    println!("Looking for perfect cube hash for message: '{}'", message);
-    
-    let message_bytes = message.into_bytes();
     
     let mut handles = Vec::new();
     

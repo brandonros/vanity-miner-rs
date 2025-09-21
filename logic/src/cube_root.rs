@@ -27,7 +27,7 @@ pub fn cube_root_hash(message: &[u8], message_len: usize, nonce: &[u8], nonce_le
     let mut pos = 0;
     
     // Copy message
-    let copy_len = std::cmp::min(message_len, input.len() - pos);
+    let copy_len = core::cmp::min(message_len, input.len() - pos);
     input[pos..pos + copy_len].copy_from_slice(&message[..copy_len]);
     pos += copy_len;
     
@@ -38,7 +38,7 @@ pub fn cube_root_hash(message: &[u8], message_len: usize, nonce: &[u8], nonce_le
     }
     
     // Copy nonce
-    let nonce_copy_len = std::cmp::min(nonce_len, input.len() - pos);
+    let nonce_copy_len = core::cmp::min(nonce_len, input.len() - pos);
     input[pos..pos + nonce_copy_len].copy_from_slice(&nonce[..nonce_copy_len]);
     pos += nonce_copy_len;
     
@@ -46,13 +46,13 @@ pub fn cube_root_hash(message: &[u8], message_len: usize, nonce: &[u8], nonce_le
     sha256::sha256_from_bytes(&input[..pos])
 }
 
-pub fn is_perfect_cube(hash: &[u8; 32], modulus: &[u8]) -> Option<Vec<u8>> {
+pub fn is_perfect_cube(hash: &[u8; 32], modulus: &[u8]) -> bool {
     let hash_bigint = BigUint::from_bytes_be(hash);
     let modulus_bigint = BigUint::from_bytes_be(modulus);
     
     // Check if hash is less than modulus (required for RSA)
     if hash_bigint >= modulus_bigint {
-        return None;
+        return false;
     }
     
     // Check if it's a perfect cube
@@ -61,9 +61,9 @@ pub fn is_perfect_cube(hash: &[u8; 32], modulus: &[u8]) -> Option<Vec<u8>> {
     
     if cube_check == hash_bigint {
         // It's a perfect cube! Return the signature (cube root)
-        Some(cube_root.to_bytes_be())
+        true
     } else {
-        None
+        false
     }
 }
 
@@ -80,9 +80,10 @@ pub fn generate_and_check_cuberoot(request: &CubeRootRequest) -> CubeRootResult 
     let mut signature_len = 0;
     let mut found_perfect_cube = false;
     
-    if let Some(sig_bytes) = is_perfect_cube(&hash, request.modulus) {
+    if is_perfect_cube(&hash, request.modulus) {
+        let sig_bytes = []; // TODO
         found_perfect_cube = true;
-        signature_len = std::cmp::min(sig_bytes.len(), signature.len());
+        signature_len = core::cmp::min(sig_bytes.len(), signature.len());
         signature[..signature_len].copy_from_slice(&sig_bytes[..signature_len]);
     }
     
