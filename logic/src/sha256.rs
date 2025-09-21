@@ -53,6 +53,62 @@ const fn small_sigma1(x: u32) -> u32 {
     rotr32(x, 17) ^ rotr32(x, 19) ^ (x >> 10)
 }
 
+fn process_block(block: &[u32; 16], state: &mut [u32; 8]) {
+    // Message schedule array - we need 64 words for SHA-256
+    let mut w = [0u32; 64];
+    
+    // Copy input block
+    w[0..16].copy_from_slice(block);
+    
+    // Extend the first 16 words into the remaining 48 words
+    seq!(N in 16..64 {
+        w[N] = small_sigma1(w[N - 2])
+            .wrapping_add(w[N - 7])
+            .wrapping_add(small_sigma0(w[N - 15]))
+            .wrapping_add(w[N - 16]);
+    });
+    
+    // Initialize working variables
+    let mut a = state[0];
+    let mut b = state[1];
+    let mut c = state[2];
+    let mut d = state[3];
+    let mut e = state[4];
+    let mut f = state[5];
+    let mut g = state[6];
+    let mut h = state[7];
+    
+    // Main loop - 64 rounds
+    seq!(ROUND in 0..64 {
+        let t1 = h
+            .wrapping_add(big_sigma1(e))
+            .wrapping_add(ch(e, f, g))
+            .wrapping_add(K[ROUND])
+            .wrapping_add(w[ROUND]);
+        
+        let t2 = big_sigma0(a).wrapping_add(maj(a, b, c));
+        
+        h = g;
+        g = f;
+        f = e;
+        e = d.wrapping_add(t1);
+        d = c;
+        c = b;
+        b = a;
+        a = t1.wrapping_add(t2);
+    });
+    
+    // Add this chunk's hash to the result so far
+    state[0] = state[0].wrapping_add(a);
+    state[1] = state[1].wrapping_add(b);
+    state[2] = state[2].wrapping_add(c);
+    state[3] = state[3].wrapping_add(d);
+    state[4] = state[4].wrapping_add(e);
+    state[5] = state[5].wrapping_add(f);
+    state[6] = state[6].wrapping_add(g);
+    state[7] = state[7].wrapping_add(h);
+}
+
 fn sha256_32(input: [u32; 8]) -> [u32; 8] {
     // Message schedule array - we need 64 words for SHA-256
     let mut w = [0u32; 64];
@@ -121,91 +177,92 @@ fn sha256_32(input: [u32; 8]) -> [u32; 8] {
 }
 
 fn sha256_variable_length(input: &[u8]) -> [u32; 8] {
-    // Message schedule array - we need 64 words for SHA-256
-    let mut w = [0u32; 64];
-    
     let input_len = input.len();
-    let input_bits = input_len * 8;
+    let input_bits = (input_len as u64) * 8;
     
-    // Convert bytes to u32 words (big-endian)
-    let full_words = input_len / 4;
-    for i in 0..full_words {
-        w[i] = u32::from_be_bytes([
-            input[i * 4],
-            input[i * 4 + 1], 
-            input[i * 4 + 2],
-            input[i * 4 + 3]
+    // Initialize hash state
+    let mut state = H0;
+    
+    // Process complete 64-byte blocks
+    let complete_blocks = input_len / 64;
+    for block_idx in 0..complete_blocks {
+        let mut block = [0u32; 16];
+        let start = block_idx * 64;
+        
+        // Convert 64 bytes to 16 u32 words (big-endian)
+        for i in 0..16 {
+            let byte_idx = start + i * 4;
+            block[i] = u32::from_be_bytes([
+                input[byte_idx],
+                input[byte_idx + 1],
+                input[byte_idx + 2],
+                input[byte_idx + 3],
+            ]);
+        }
+        
+        process_block(&block, &mut state);
+    }
+    
+    // Handle the final partial block with padding
+    let remaining_bytes = input_len % 64;
+    let remaining_start = complete_blocks * 64;
+    
+    let mut final_block = [0u32; 16];
+    
+    // Convert remaining bytes to words
+    let complete_words_in_final = remaining_bytes / 4;
+    for i in 0..complete_words_in_final {
+        let byte_idx = remaining_start + i * 4;
+        final_block[i] = u32::from_be_bytes([
+            input[byte_idx],
+            input[byte_idx + 1],
+            input[byte_idx + 2],
+            input[byte_idx + 3],
         ]);
     }
     
-    // Handle remaining bytes (if input length is not multiple of 4)
-    let remaining_bytes = input_len % 4;
-    if remaining_bytes > 0 {
-        let mut last_word = [0u8; 4];
-        for i in 0..remaining_bytes {
-            last_word[i] = input[full_words * 4 + i];
+    // Handle the last partial word (if any) and add padding
+    let remaining_bytes_in_word = remaining_bytes % 4;
+    if remaining_bytes_in_word > 0 {
+        let mut last_word_bytes = [0u8; 4];
+        for i in 0..remaining_bytes_in_word {
+            last_word_bytes[i] = input[remaining_start + complete_words_in_final * 4 + i];
         }
         // Add the padding bit (0x80) right after the last byte
-        last_word[remaining_bytes] = 0x80;
-        w[full_words] = u32::from_be_bytes(last_word);
+        last_word_bytes[remaining_bytes_in_word] = 0x80;
+        final_block[complete_words_in_final] = u32::from_be_bytes(last_word_bytes);
     } else {
-        // If input is exactly multiple of 4, add padding in next word
-        w[full_words] = 0x80000000;
+        // If remaining bytes is exactly divisible by 4, add padding in next word
+        if complete_words_in_final < 16 {
+            final_block[complete_words_in_final] = 0x80000000;
+        } else {
+            // Need another block for padding
+            process_block(&final_block, &mut state);
+            final_block = [0u32; 16];
+            final_block[0] = 0x80000000;
+        }
     }
     
-    // Add length at the end (last 64 bits = words 14 and 15)
-    w[14] = 0; // Upper 32 bits of length (always 0 for inputs < 2^32 bits)
-    w[15] = input_bits as u32; // Lower 32 bits of length
+    // Check if we have room for the length (need 2 words = 8 bytes)
+    let padding_word_idx = if remaining_bytes_in_word > 0 {
+        complete_words_in_final + 1
+    } else {
+        complete_words_in_final + 1
+    };
     
-    // Extend the first 16 words into the remaining 48 words
-    seq!(N in 16..64 {
-        w[N] = small_sigma1(w[N - 2])
-            .wrapping_add(w[N - 7])
-            .wrapping_add(small_sigma0(w[N - 15]))
-            .wrapping_add(w[N - 16]);
-    });
+    if padding_word_idx > 14 {
+        // Not enough room for length, need another block
+        process_block(&final_block, &mut state);
+        final_block = [0u32; 16];
+    }
     
-    // Initialize working variables
-    let mut a = H0[0];
-    let mut b = H0[1];
-    let mut c = H0[2];
-    let mut d = H0[3];
-    let mut e = H0[4];
-    let mut f = H0[5];
-    let mut g = H0[6];
-    let mut h = H0[7];
+    // Add length in bits as the last 64 bits (big-endian)
+    final_block[14] = (input_bits >> 32) as u32; // Upper 32 bits
+    final_block[15] = input_bits as u32;         // Lower 32 bits
     
-    // Main loop - 64 rounds
-    seq!(ROUND in 0..64 {
-        let t1 = h
-            .wrapping_add(big_sigma1(e))
-            .wrapping_add(ch(e, f, g))
-            .wrapping_add(K[ROUND])
-            .wrapping_add(w[ROUND]);
-        
-        let t2 = big_sigma0(a).wrapping_add(maj(a, b, c));
-        
-        h = g;
-        g = f;
-        f = e;
-        e = d.wrapping_add(t1);
-        d = c;
-        c = b;
-        b = a;
-        a = t1.wrapping_add(t2);
-    });
+    process_block(&final_block, &mut state);
     
-    // Add this chunk's hash to the result so far
-    [
-        H0[0].wrapping_add(a),
-        H0[1].wrapping_add(b),
-        H0[2].wrapping_add(c),
-        H0[3].wrapping_add(d),
-        H0[4].wrapping_add(e),
-        H0[5].wrapping_add(f),
-        H0[6].wrapping_add(g),
-        H0[7].wrapping_add(h),
-    ]
+    state
 }
 
 fn hash_to_bytes(hash: [u32; 8]) -> [u8; 32] {
