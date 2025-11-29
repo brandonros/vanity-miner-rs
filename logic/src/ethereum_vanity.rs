@@ -1,5 +1,6 @@
 use crate::secp256k1;
 use crate::keccak256;
+use crate::vanity;
 use crate::xoroshiro;
 
 pub struct EthereumVanityKeyRequest<'a> {
@@ -15,37 +16,6 @@ pub struct EthereumVanityKeyResult {
     pub public_key: [u8; 64],           // uncompressed secp256k1 public key (without 0x04 prefix)
     pub address: [u8; 20],              // last 20 bytes of keccak256(public_key)
     pub matches: bool,
-}
-
-/// Pure function for matching logic - same as Solana
-fn check_vanity_match(
-    address: &[u8; 20],
-    prefix: &[u8],
-    suffix: &[u8],
-) -> bool {
-    let address_len = 20;
-    
-    // Check prefix
-    if prefix.len() > address_len {
-        return false;
-    }
-    for i in 0..prefix.len() {
-        if address[i] != prefix[i] {
-            return false;
-        }
-    }
-    
-    // Check suffix
-    if suffix.len() > address_len {
-        return false;
-    }
-    for i in 0..suffix.len() {
-        if address[address_len - suffix.len() + i] != suffix[i] {
-            return false;
-        }
-    }
-    
-    true
 }
 
 /// Pure function - no side effects, easily testable
@@ -69,7 +39,7 @@ pub fn generate_and_check_ethereum_vanity_key(request: &EthereumVanityKeyRequest
     address.copy_from_slice(&public_key_hash[12..]);
     
     // Check if matches vanity criteria (no hex encoding needed!)
-    let matches = check_vanity_match(&address, request.prefix, request.suffix);
+    let matches = vanity::check_vanity_match(&address, request.prefix, request.suffix);
     
     EthereumVanityKeyResult {
         private_key,

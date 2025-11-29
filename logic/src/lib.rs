@@ -12,6 +12,7 @@ mod sha512;
 mod ripemd160;
 mod shallenge;
 mod keccak256;
+mod vanity;
 mod solana_vanity;
 mod bitcoin_vanity;
 mod ethereum_vanity;

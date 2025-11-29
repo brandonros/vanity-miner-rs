@@ -3,6 +3,7 @@ use crate::bech32;
 use crate::secp256k1;
 use crate::sha256;
 use crate::ripemd160;
+use crate::vanity;
 use crate::xoroshiro;
 
 pub struct BitcoinVanityKeyRequest<'a> {
@@ -22,36 +23,6 @@ pub struct BitcoinVanityKeyResult {
     pub encoded_public_key: [u8; 64],      // Bech32 encoded address
     pub encoded_len: usize,
     pub matches: bool,
-}
-
-/// Pure function for matching logic - same as Solana
-fn check_vanity_match(
-    encoded_key: &[u8; 64],
-    encoded_len: usize,
-    prefix: &[u8],
-    suffix: &[u8],
-) -> bool {
-    // Check prefix
-    if prefix.len() > encoded_len {
-        return false;
-    }
-    for i in 0..prefix.len() {
-        if encoded_key[i] != prefix[i] {
-            return false;
-        }
-    }
-    
-    // Check suffix
-    if suffix.len() > encoded_len {
-        return false;
-    }
-    for i in 0..suffix.len() {
-        if encoded_key[encoded_len - suffix.len() + i] != suffix[i] {
-            return false;
-        }
-    }
-    
-    true
 }
 
 /// Pure function - no side effects, easily testable
@@ -87,7 +58,7 @@ pub fn generate_and_check_bitcoin_vanity_key(request: &BitcoinVanityKeyRequest) 
     let encoded_len = bech32::encode_p2wpkh_address(&public_key_hash, true, &mut encoded_public_key);
     
     // Check if matches vanity criteria
-    let matches = check_vanity_match(&encoded_public_key, encoded_len, request.prefix, request.suffix);
+    let matches = vanity::check_vanity_match(&encoded_public_key[..encoded_len], request.prefix, request.suffix);
     
     BitcoinVanityKeyResult {
         private_key,

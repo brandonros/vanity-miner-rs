@@ -1,6 +1,7 @@
 use crate::base58;
 use crate::ed25519;
 use crate::sha512;
+use crate::vanity;
 use crate::xoroshiro;
 
 pub struct SolanaVanityKeyRequest<'a> {
@@ -18,36 +19,6 @@ pub struct SolanaVanityKeyResult {
     pub encoded_public_key: [u8; 64],
     pub encoded_len: usize,
     pub matches: bool,
-}
-
-/// Pure function for matching logic
-fn check_vanity_match(
-    encoded_key: &[u8; 64],
-    encoded_len: usize,
-    prefix: &[u8],
-    suffix: &[u8],
-) -> bool {
-    // Check prefix
-    if prefix.len() > encoded_len {
-        return false;
-    }
-    for i in 0..prefix.len() {
-        if encoded_key[i] != prefix[i] {
-            return false;
-        }
-    }
-    
-    // Check suffix
-    if suffix.len() > encoded_len {
-        return false;
-    }
-    for i in 0..suffix.len() {
-        if encoded_key[encoded_len - suffix.len() + i] != suffix[i] {
-            return false;
-        }
-    }
-    
-    true
 }
 
 /// Pure function - no side effects, easily testable
@@ -69,7 +40,7 @@ pub fn generate_and_check_solana_vanity_key(request: &SolanaVanityKeyRequest) ->
     let encoded_len = base58::base58_encode_32(&public_key, &mut encoded_public_key);
     
     // Check if matches vanity criteria
-    let matches = check_vanity_match(&encoded_public_key, encoded_len, request.prefix, request.suffix);
+    let matches = vanity::check_vanity_match(&encoded_public_key[..encoded_len], request.prefix, request.suffix);
     
     SolanaVanityKeyResult {
         private_key,
