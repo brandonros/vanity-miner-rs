@@ -56,25 +56,9 @@ pub mod cpu {
         vanity_suffix: String,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        println!("Starting CPU vanity mode with {} threads", num_threads);
-
-        let mut handles = Vec::new();
-
-        for i in 0..num_threads {
-            let vanity_prefix_clone = vanity_prefix.clone();
-            let vanity_suffix_clone = vanity_suffix.clone();
-            let stats_clone = Arc::clone(&global_stats);
-
-            handles.push(std::thread::spawn(move || {
-                worker(i, vanity_prefix_clone, vanity_suffix_clone, stats_clone)
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap()?;
-        }
-
-        Ok(())
+        crate::modes::spawn_cpu_workers(num_threads, "vanity", move |thread_id| {
+            worker(thread_id, vanity_prefix.clone(), vanity_suffix.clone(), Arc::clone(&global_stats))
+        })
     }
 }
 
