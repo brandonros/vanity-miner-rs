@@ -4,14 +4,16 @@ use std::sync::Arc;
 
 pub mod cpu {
     use super::*;
+    use crate::common::spawn_cpu_workers;
     use rand::Rng as _;
 
-    fn worker(
-        thread_id: usize,
+    struct WorkerData {
         prefix_bytes: Vec<u8>,
         suffix_bytes: Vec<u8>,
         global_stats: Arc<GlobalStats>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    }
+
+    fn worker(thread_id: usize, data: Arc<WorkerData>) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
         println!("[CPU-{thread_id}] Starting CPU bitcoin vanity worker thread");
@@ -20,15 +22,15 @@ pub mod cpu {
             let rng_seed: u64 = rng.r#gen();
 
             let request = logic::BitcoinVanityKeyRequest {
-                prefix: &prefix_bytes,
-                suffix: &suffix_bytes,
+                prefix: &data.prefix_bytes,
+                suffix: &data.suffix_bytes,
                 thread_idx: thread_id,
                 rng_seed,
             };
 
             let result = logic::generate_and_check_bitcoin_vanity_key(&request);
 
-            global_stats.add_launch(1);
+            data.global_stats.add_launch(1);
 
             if result.matches {
                 let encoded_public_key_str =
@@ -62,8 +64,8 @@ pub mod cpu {
                 );
                 println!("[CPU-{thread_id}] Vanity match: wallet = {encoded_private_key_str}");
 
-                global_stats.add_matches(1);
-                global_stats.print_stats(thread_id, 1);
+                data.global_stats.add_matches(1);
+                data.global_stats.print_stats(thread_id, 1);
             }
         }
     }
@@ -74,31 +76,18 @@ pub mod cpu {
         suffix: String,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let prefix_bytes = prefix.as_bytes().to_vec();
-        let suffix_bytes = suffix.as_bytes().to_vec();
-
         println!(
             "Starting CPU bitcoin vanity mode with {} threads",
             num_threads
         );
 
-        let mut handles = Vec::new();
+        let data = Arc::new(WorkerData {
+            prefix_bytes: prefix.as_bytes().to_vec(),
+            suffix_bytes: suffix.as_bytes().to_vec(),
+            global_stats,
+        });
 
-        for i in 0..num_threads {
-            let prefix_clone = prefix_bytes.clone();
-            let suffix_clone = suffix_bytes.clone();
-            let stats_clone = Arc::clone(&global_stats);
-
-            handles.push(std::thread::spawn(move || {
-                worker(i, prefix_clone, suffix_clone, stats_clone)
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap()?;
-        }
-
-        Ok(())
+        spawn_cpu_workers(num_threads, data, worker)
     }
 }
 
@@ -128,6 +117,10 @@ pub mod gpu {
 
         let mut rng = rand::thread_rng();
 
+        // Allocate static input buffers once (they don't change between iterations)
+        let prefix_dev = prefix_bytes.as_dbuf()?;
+        let suffix_dev = suffix_bytes.as_dbuf()?;
+
         loop {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
@@ -138,9 +131,6 @@ pub mod gpu {
             let mut found_encoded_public_key = [0u8; 64];
             let mut found_encoded_len_slice = [0u32; 1];
             let mut found_thread_idx_slice = [0u32; 1];
-
-            let prefix_dev = prefix_bytes.as_dbuf()?;
-            let suffix_dev = suffix_bytes.as_dbuf()?;
             let found_matches_dev = found_matches_slice.as_dbuf()?;
             let found_private_key_dev = found_private_key.as_dbuf()?;
             let found_public_key_dev = found_public_key.as_dbuf()?;

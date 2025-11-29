@@ -5,14 +5,16 @@ use std::sync::{Arc, RwLock};
 
 pub mod cpu {
     use super::*;
+    use crate::common::spawn_cpu_workers;
     use rand::Rng as _;
 
-    fn worker(
-        thread_id: usize,
+    struct WorkerData {
         username: String,
         shared_best_hash: Arc<RwLock<SharedBestHash>>,
         global_stats: Arc<GlobalStats>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    }
+
+    fn worker(thread_id: usize, data: Arc<WorkerData>) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
         println!("[CPU-{}] Starting CPU shallenge worker thread", thread_id);
@@ -22,14 +24,14 @@ pub mod cpu {
 
             // Get the current best hash (with minimal lock time)
             let current_target = {
-                let best_hash_guard = shared_best_hash.read().unwrap();
+                let best_hash_guard = data.shared_best_hash.read().unwrap();
                 best_hash_guard.get_current()
             };
 
             // Create the request with the current best target
             let request = logic::ShallengeRequest {
-                username: username.as_bytes(),
-                username_len: username.len(),
+                username: data.username.as_bytes(),
+                username_len: data.username.len(),
                 target_hash: &current_target,
                 thread_idx: thread_id,
                 rng_seed,
@@ -37,7 +39,7 @@ pub mod cpu {
 
             let result = logic::generate_and_check_shallenge(&request);
 
-            global_stats.add_launch(1);
+            data.global_stats.add_launch(1);
 
             if result.is_better {
                 let nonce_string =
@@ -45,7 +47,7 @@ pub mod cpu {
 
                 // Try to update the global best hash
                 let was_global_best = {
-                    let mut best_hash_guard = shared_best_hash.write().unwrap();
+                    let mut best_hash_guard = data.shared_best_hash.write().unwrap();
                     best_hash_guard.update_if_better(result.hash)
                 };
 
@@ -53,10 +55,10 @@ pub mod cpu {
                     println!("[CPU-{}] NEW GLOBAL BEST found: thread_idx = {}", thread_id, thread_id);
                     println!("[CPU-{}] NEW GLOBAL BEST hash: {}", thread_id, hex::encode(result.hash));
                     println!("[CPU-{}] NEW GLOBAL BEST nonce: {}", thread_id, nonce_string);
-                    println!("[CPU-{}] Challenge string: {}/{}", thread_id, username, nonce_string);
+                    println!("[CPU-{}] Challenge string: {}/{}", thread_id, data.username, nonce_string);
 
-                    global_stats.add_matches(1);
-                    global_stats.print_stats(thread_id, 1);
+                    data.global_stats.add_matches(1);
+                    data.global_stats.print_stats(thread_id, 1);
                 }
             }
         }
@@ -77,23 +79,13 @@ pub mod cpu {
         // Create shared state for the best hash found so far
         let shared_best_hash = Arc::new(RwLock::new(SharedBestHash::new(initial_target)));
 
-        let mut handles = Vec::new();
+        let data = Arc::new(WorkerData {
+            username,
+            shared_best_hash,
+            global_stats,
+        });
 
-        for i in 0..num_threads {
-            let username_clone = username.clone();
-            let shared_best_hash_clone = Arc::clone(&shared_best_hash);
-            let stats_clone = Arc::clone(&global_stats);
-
-            handles.push(std::thread::spawn(move || {
-                worker(i, username_clone, shared_best_hash_clone, stats_clone)
-            }));
-        }
-
-        for handle in handles {
-            handle.join().unwrap()?;
-        }
-
-        Ok(())
+        spawn_cpu_workers(num_threads, data, worker)
     }
 }
 
@@ -123,6 +115,9 @@ pub mod gpu {
 
         let mut rng = rand::thread_rng();
 
+        // Allocate static input buffer once (username doesn't change between iterations)
+        let username_dev = username_bytes.as_dbuf()?;
+
         loop {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
@@ -138,7 +133,7 @@ pub mod gpu {
             let mut found_nonce_len = [0usize; 1];
             let mut found_thread_idx_slice = [0u32; 1];
 
-            let username_dev = username_bytes.as_dbuf()?;
+            // target_hash_dev stays in loop - it changes when a better hash is found
             let target_hash_dev = current_target.as_dbuf()?;
             let found_matches_slice_dev = found_matches_slice.as_dbuf()?;
             let found_hash_dev = found_hash.as_dbuf()?;
