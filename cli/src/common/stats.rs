@@ -69,6 +69,18 @@ impl GlobalStats {
         let formatted_total_operations = total_operations as f64 / 1_000_000.0;
 
         println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!("[{device_id}] GLOBAL STATS ({vanity_prefix_length} prefix length, {vanity_suffix_length} suffix length): Found {matches_found} matches in {elapsed_seconds:.2}s ({match_eta:.6}s/match, {matches_per_second:.6} matches/sec, {operations_per_second:.2}M ops/sec, {device_operations_per_second:.4}M ops/sec/device, {operations_per_match:.4}M ops/match, {formatted_total_operations:.2}M ops)");
+        println!(
+            "[{}] GLOBAL STATS: {} prefix, {} suffix | {} matches in {:.2}s",
+            device_id, vanity_prefix_length, vanity_suffix_length, matches_found, elapsed_seconds
+        );
+        println!(
+            "[{}]   {:.2}M ops/sec ({:.4}M/device) | {:.6} matches/sec ({:.6}s/match)",
+            device_id, operations_per_second, device_operations_per_second,
+            matches_per_second, match_eta
+        );
+        println!(
+            "[{}]   {:.2}M total ops | {:.4}M ops/match",
+            device_id, formatted_total_operations, operations_per_match
+        );
     }
 }

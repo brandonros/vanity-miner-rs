@@ -23,8 +23,9 @@ pub mod cpu {
             let rng_seed: u64 = rng.r#gen();
 
             // Get the current best hash (with minimal lock time)
+            // Use unwrap_or_else to recover data even if lock is poisoned
             let current_target = {
-                let best_hash_guard = data.shared_best_hash.read().unwrap();
+                let best_hash_guard = data.shared_best_hash.read().unwrap_or_else(|e| e.into_inner());
                 best_hash_guard.get_current()
             };
 
@@ -47,7 +48,7 @@ pub mod cpu {
 
                 // Try to update the global best hash
                 let was_global_best = {
-                    let mut best_hash_guard = data.shared_best_hash.write().unwrap();
+                    let mut best_hash_guard = data.shared_best_hash.write().unwrap_or_else(|e| e.into_inner());
                     best_hash_guard.update_if_better(result.hash)
                 };
 
@@ -122,8 +123,9 @@ pub mod gpu {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
             // Get the current best hash (with minimal lock time)
+            // Use unwrap_or_else to recover data even if lock is poisoned
             let current_target = {
-                let best_hash_guard = shared_best_hash.read().unwrap();
+                let best_hash_guard = shared_best_hash.read().unwrap_or_else(|e| e.into_inner());
                 best_hash_guard.get_current()
             };
 
@@ -175,7 +177,7 @@ pub mod gpu {
 
                 // Try to update the global best hash
                 let was_global_best = {
-                    let mut best_hash_guard = shared_best_hash.write().unwrap();
+                    let mut best_hash_guard = shared_best_hash.write().unwrap_or_else(|e| e.into_inner());
                     best_hash_guard.update_if_better(found_hash)
                 };
 
