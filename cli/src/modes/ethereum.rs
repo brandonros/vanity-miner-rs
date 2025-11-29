@@ -1,52 +1,57 @@
 use crate::common::GlobalStats;
+use crate::modes::VanityMode;
 use std::error::Error;
 use std::sync::Arc;
 
+/// Ethereum vanity address mode
+pub struct EthereumVanity;
+
+impl VanityMode for EthereumVanity {
+    type Result = logic::EthereumVanityKeyResult;
+
+    const NAME: &'static str = "ethereum vanity";
+
+    fn process_prefix(prefix: &str) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+        Ok(hex::decode(prefix)?)
+    }
+
+    fn process_suffix(suffix: &str) -> Result<Vec<u8>, Box<dyn Error + Send + Sync>> {
+        Ok(hex::decode(suffix)?)
+    }
+
+    fn generate_and_check(
+        prefix: &[u8],
+        suffix: &[u8],
+        thread_idx: usize,
+        rng_seed: u64,
+    ) -> Self::Result {
+        let request = logic::EthereumVanityKeyRequest {
+            prefix,
+            suffix,
+            thread_idx,
+            rng_seed,
+        };
+        logic::generate_and_check_ethereum_vanity_key(&request)
+    }
+
+    fn is_match(result: &Self::Result) -> bool {
+        result.matches
+    }
+
+    fn print_match(thread_id: usize, rng_seed: u64, result: &Self::Result) {
+        let encoded_address_str = hex::encode(result.address);
+
+        println!("[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}");
+        println!("[CPU-{thread_id}] Vanity match: thread_idx = {thread_id}");
+        println!("[CPU-{thread_id}] Vanity match: address = 0x{encoded_address_str}");
+        println!("[CPU-{thread_id}] Vanity match: public_key = {}", hex::encode(result.public_key));
+        println!("[CPU-{thread_id}] Vanity match: private_key = 0x{}", hex::encode(result.private_key));
+        println!("[CPU-{thread_id}] Vanity match: wallet = 0x{}", hex::encode(result.private_key));
+    }
+}
+
 pub mod cpu {
     use super::*;
-    use rand::Rng as _;
-
-    fn worker(
-        thread_id: usize,
-        vanity_prefix: String,
-        vanity_suffix: String,
-        global_stats: Arc<GlobalStats>,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut rng = rand::thread_rng();
-        let vanity_prefix_bytes = hex::decode(vanity_prefix)?;
-        let vanity_suffix_bytes = hex::decode(vanity_suffix)?;
-
-        println!("[CPU-{}] Starting CPU vanity worker thread", thread_id);
-
-        loop {
-            let rng_seed: u64 = rng.r#gen();
-
-            let request = logic::EthereumVanityKeyRequest {
-                prefix: &vanity_prefix_bytes,
-                suffix: &vanity_suffix_bytes,
-                thread_idx: thread_id,
-                rng_seed,
-            };
-
-            let result = logic::generate_and_check_ethereum_vanity_key(&request);
-
-            global_stats.add_launch(1);
-
-            if result.matches {
-                let encoded_address_str = hex::encode(result.address);
-
-                println!("[CPU-{}] Vanity match: rng_seed = {}", thread_id, rng_seed);
-                println!("[CPU-{}] Vanity match: thread_idx = {}", thread_id, thread_id);
-                println!("[CPU-{}] Vanity match: address = 0x{}", thread_id, encoded_address_str);
-                println!("[CPU-{}] Vanity match: public_key = {}", thread_id, hex::encode(result.public_key));
-                println!("[CPU-{}] Vanity match: private_key = 0x{}", thread_id, hex::encode(result.private_key));
-                println!("[CPU-{}] Vanity match: wallet = 0x{}", thread_id, hex::encode(result.private_key));
-
-                global_stats.add_matches(1);
-                global_stats.print_stats(thread_id, 1);
-            }
-        }
-    }
 
     pub fn run(
         num_threads: usize,
@@ -54,9 +59,7 @@ pub mod cpu {
         vanity_suffix: String,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        crate::modes::spawn_cpu_workers(num_threads, "vanity", move |thread_id| {
-            worker(thread_id, vanity_prefix.clone(), vanity_suffix.clone(), Arc::clone(&global_stats))
-        })
+        crate::modes::run_cpu_vanity::<EthereumVanity>(num_threads, vanity_prefix, vanity_suffix, global_stats)
     }
 }
 
