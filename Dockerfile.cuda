@@ -1,4 +1,5 @@
-FROM docker.io/nvidia/cuda:12.9.1-cudnn-devel-ubuntu24.04
+ARG CUDA_VERSION=13.0.2
+FROM docker.io/nvidia/cuda:${CUDA_VERSION}-cudnn-devel-ubuntu24.04
 
 # set the path for the nvvm library
 ENV LD_LIBRARY_PATH="/usr/local/cuda/nvvm/lib64:${LD_LIBRARY_PATH}"

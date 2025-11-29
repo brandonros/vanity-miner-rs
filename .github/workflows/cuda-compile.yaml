@@ -49,7 +49,7 @@ jobs:
       - name: Pull builder image and build project
         run: |
           # Pull the pre-built builder image
-          docker pull ghcr.io/brandonros/cuda-12-9-rust-builder:latest
+          docker pull ghcr.io/brandonros/cuda-13-0-rust-builder:latest
           
           # Run the custom build script inside the container
           docker run --rm \
@@ -57,7 +57,7 @@ jobs:
             -w /workspace \
             --memory=4g \
             --memory-swap=16g \
-            ghcr.io/brandonros/cuda-12-9-rust-builder:latest \
+            ghcr.io/brandonros/cuda-13-0-rust-builder:latest \
             bash scripts/build-cuda.sh
           
           # Create output directory
