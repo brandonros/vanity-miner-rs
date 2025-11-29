@@ -1,10 +1,11 @@
 mod args;
+mod common;
 mod modes;
 mod runner;
 
 use args::Cli;
 use clap::Parser;
-use common::GlobalStats;
+use crate::common::GlobalStats;
 use runner::{CpuRunner, Runner};
 use std::error::Error;
 use std::sync::Arc;

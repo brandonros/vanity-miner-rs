@@ -1,8 +1,8 @@
 use crate::args::Command;
+use crate::common::{GlobalStats, SharedBestHash};
 use crate::modes;
 use crate::runner::Runner;
 use backtrace::Backtrace;
-use common::{GlobalStats, SharedBestHash};
 use cust::device::Device;
 use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;

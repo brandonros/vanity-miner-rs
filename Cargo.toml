@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
   "cli",
-  "common",
   "kernels",
   "logic",
   "ir_adapter",

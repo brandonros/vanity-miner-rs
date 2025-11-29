@@ -7,7 +7,7 @@ pub use cpu::CpuRunner;
 pub use gpu::GpuRunner;
 
 use crate::args::Command;
-use common::GlobalStats;
+use crate::common::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 

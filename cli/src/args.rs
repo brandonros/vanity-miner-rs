@@ -46,30 +46,30 @@ impl Command {
         match self {
             Command::SolanaVanity { prefix, suffix } => {
                 if !prefix.is_empty() {
-                    common::validate_base58_string(prefix)?;
+                    crate::common::validate_base58_string(prefix)?;
                 }
                 if !suffix.is_empty() {
-                    common::validate_base58_string(suffix)?;
+                    crate::common::validate_base58_string(suffix)?;
                 }
             }
             Command::BitcoinVanity { prefix, suffix } => {
                 if !prefix.is_empty() {
-                    common::validate_bech32_string(prefix)?;
+                    crate::common::validate_bech32_string(prefix)?;
                 }
                 if !suffix.is_empty() {
-                    common::validate_bech32_string(suffix)?;
+                    crate::common::validate_bech32_string(suffix)?;
                 }
             }
             Command::EthereumVanity { prefix, suffix } => {
                 if !prefix.is_empty() {
-                    common::validate_hex_string(prefix)?;
+                    crate::common::validate_hex_string(prefix)?;
                 }
                 if !suffix.is_empty() {
-                    common::validate_hex_string(suffix)?;
+                    crate::common::validate_hex_string(suffix)?;
                 }
             }
             Command::Shallenge { target_hash, .. } => {
-                common::validate_hex_string(target_hash)?;
+                crate::common::validate_hex_string(target_hash)?;
             }
         }
         Ok(())

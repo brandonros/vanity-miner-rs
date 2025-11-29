@@ -1,7 +1,7 @@
 use crate::args::Command;
+use crate::common::GlobalStats;
 use crate::modes;
 use crate::runner::Runner;
-use common::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 

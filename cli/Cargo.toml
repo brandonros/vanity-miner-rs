@@ -8,7 +8,6 @@ default = []
 gpu = ["dep:cust", "dep:backtrace"]
 
 [dependencies]
-common = { path = "../common" }
 logic = { path = "../logic" }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"

@@ -1,5 +1,5 @@
-use common::GlobalStats;
-use common::SharedBestHash;
+use crate::common::GlobalStats;
+use crate::common::SharedBestHash;
 use std::error::Error;
 use std::sync::{Arc, RwLock};
 
@@ -100,12 +100,10 @@ pub mod cpu {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use cust::device::Device;
+    use crate::common::GpuContext;
     use cust::launch;
     use cust::memory::CopyDestination;
     use cust::module::Module;
-    use cust::prelude::Context;
-    use cust::stream::{Stream, StreamFlags};
     use cust::util::SliceExt;
     use rand::Rng;
 
@@ -119,31 +117,9 @@ pub mod gpu {
         let username_bytes = username.as_bytes();
         let username_len: usize = username_bytes.len();
 
-        let device = Device::get_device(ordinal as u32)?;
-        let ctx = Context::new(device)?;
-        cust::context::CurrentContext::set_current(&ctx)?;
-
-        let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
-        let find_better_shallenge_nonce =
-            module.get_function("kernel_find_better_shallenge_nonce")?;
-
-        let number_of_streaming_multiprocessors =
-            device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
-        let blocks_per_sm = std::env::var("BLOCKS_PER_SM")
-            .unwrap_or("128".to_string())
-            .parse::<usize>()
-            .unwrap();
-        let threads_per_block = std::env::var("THREADS_PER_BLOCK")
-            .unwrap_or("256".to_string())
-            .parse::<usize>()
-            .unwrap();
-        let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
-        let operations_per_launch = blocks_per_grid * threads_per_block;
-
-        println!(
-            "[{ordinal}] Starting shallenge search loop ({} blocks per grid, {} threads per block, {} operations per launch)",
-            blocks_per_grid, threads_per_block, operations_per_launch
-        );
+        let gpu = GpuContext::new(ordinal)?;
+        let kernel = module.get_function("kernel_find_better_shallenge_nonce")?;
+        gpu.print_launch_info(ordinal, "shallenge");
 
         let mut rng = rand::thread_rng();
 
@@ -172,7 +148,7 @@ pub mod gpu {
 
             unsafe {
                 launch!(
-                    find_better_shallenge_nonce<<<blocks_per_grid as u32, threads_per_block as u32, 0, stream>>>(
+                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, gpu.stream>>>(
                         username_dev.as_device_ptr(),
                         username_len,
                         target_hash_dev.as_device_ptr(),
@@ -186,8 +162,8 @@ pub mod gpu {
                 )?;
             }
 
-            stream.synchronize()?;
-            global_stats.add_launch(operations_per_launch);
+            gpu.stream.synchronize()?;
+            global_stats.add_launch(gpu.operations_per_launch);
 
             found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
 
