@@ -3,6 +3,10 @@ use rand::Rng as _;
 use std::error::Error;
 use std::sync::Arc;
 
+#[cfg(feature = "gpu")]
+#[macro_use]
+mod gpu_macros;
+
 pub mod bitcoin;
 pub mod ethereum;
 pub mod shallenge;

@@ -73,8 +73,6 @@ mod gpu_impl {
     use crate::modes::{GpuBuffers, GpuVanityMode};
     use cust::function::Function;
     use cust::launch;
-    use cust::memory::CopyDestination;
-    use cust::util::SliceExt;
 
     /// GPU buffer layout for Ethereum vanity mining
     #[derive(Default)]
@@ -95,48 +93,32 @@ mod gpu_impl {
             suffix_bytes: &[u8],
             rng_seed: u64,
         ) -> Result<(), Box<dyn Error + Send + Sync>> {
-            let prefix_len = prefix_bytes.len();
-            let suffix_len = suffix_bytes.len();
-
-            let prefix_dev = prefix_bytes.as_dbuf()?;
-            let suffix_dev = suffix_bytes.as_dbuf()?;
-            let found_matches_dev = self.found_matches_slice.as_dbuf()?;
-            let found_private_key_dev = self.found_private_key.as_dbuf()?;
-            let found_public_key_dev = self.found_public_key.as_dbuf()?;
-            let found_address_dev = self.found_address.as_dbuf()?;
-            let found_thread_idx_dev = self.found_thread_idx_slice.as_dbuf()?;
-
-            unsafe {
-                launch!(
-                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, gpu.stream>>>(
-                        prefix_dev.as_device_ptr(),
-                        prefix_len,
-                        suffix_dev.as_device_ptr(),
-                        suffix_len,
-                        rng_seed,
-                        found_matches_dev.as_device_ptr(),
-                        found_private_key_dev.as_device_ptr(),
-                        found_public_key_dev.as_device_ptr(),
-                        found_address_dev.as_device_ptr(),
-                        found_thread_idx_dev.as_device_ptr(),
-                    )
-                )?;
+            impl_run_iteration! {
+                self, kernel, gpu, prefix_bytes, suffix_bytes, rng_seed,
+                output_buffers: [
+                    found_private_key,
+                    found_public_key,
+                    found_address,
+                ],
+                launch: {
+                    unsafe {
+                        launch!(
+                            kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, gpu.stream>>>(
+                                prefix_dev.as_device_ptr(),
+                                prefix_len,
+                                suffix_dev.as_device_ptr(),
+                                suffix_len,
+                                rng_seed,
+                                found_matches_dev.as_device_ptr(),
+                                found_private_key_dev.as_device_ptr(),
+                                found_public_key_dev.as_device_ptr(),
+                                found_address_dev.as_device_ptr(),
+                                found_thread_idx_dev.as_device_ptr(),
+                            )
+                        )?;
+                    }
+                }
             }
-
-            gpu.stream.synchronize()?;
-
-            // Always copy back matches count
-            found_matches_dev.copy_to(&mut self.found_matches_slice)?;
-
-            // Only copy remaining data if we found a match
-            if self.found_matches_slice[0] != 0 {
-                found_private_key_dev.copy_to(&mut self.found_private_key)?;
-                found_public_key_dev.copy_to(&mut self.found_public_key)?;
-                found_address_dev.copy_to(&mut self.found_address)?;
-                found_thread_idx_dev.copy_to(&mut self.found_thread_idx_slice)?;
-            }
-
-            Ok(())
         }
 
         fn found_matches(&self) -> u32 {

@@ -3,6 +3,8 @@
 extern crate alloc;
 
 mod atomic;
+#[macro_use]
+mod match_handler;
 mod memory;
 mod panic;
 mod utilities;
