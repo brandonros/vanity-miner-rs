@@ -1,0 +1,24 @@
+[package]
+name = "vanity-miner"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+gpu = ["dep:cust", "dep:backtrace"]
+
+[dependencies]
+common = { path = "../common" }
+logic = { path = "../logic" }
+clap = { version = "4", features = ["derive"] }
+hex = "0.4.3"
+rand = "0.8"
+
+[dependencies.cust]
+git = "https://github.com/brandonros/Rust-CUDA.git"
+rev = "10cbfd2bb8fbe54b42b891b270da821512c56409"
+optional = true
+
+[dependencies.backtrace]
+version = "0.3"
+optional = true

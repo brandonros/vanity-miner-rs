@@ -1,9 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+  "cli",
   "common",
-  "cpu_runner",
-  "gpu_runner",
   "kernels",
   "logic",
   "ir_adapter",

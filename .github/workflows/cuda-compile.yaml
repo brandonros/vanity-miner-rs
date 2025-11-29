@@ -66,8 +66,8 @@ jobs:
           # Copy the built artifacts from the build script output
           cp nvvm_compiler/build/output.cubin ./artifacts/
           cp nvvm_compiler/build/output.ptx ./artifacts/
-          cp nvvm_compiler/build/gpu_runner ./artifacts/
-          
+          cp nvvm_compiler/build/vanity-miner ./artifacts/
+
           echo "Copied build artifacts to artifacts directory"
 
       - name: Create and push tag
@@ -116,14 +116,14 @@ jobs:
           asset_name: output.ptx
           asset_content_type: application/octet-stream
 
-      - name: Upload GPU runner to release
+      - name: Upload vanity-miner to release
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/gpu_runner
-          asset_name: gpu_runner
+          asset_path: ./artifacts/vanity-miner
+          asset_name: vanity-miner
           asset_content_type: application/octet-stream
 
       - name: Upload artifacts (workflow artifacts)

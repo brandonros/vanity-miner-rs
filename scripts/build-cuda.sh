@@ -9,10 +9,8 @@ PHYSICAL_ARCH=sm_120
 # clean
 cargo clean
 
-# build runner
-pushd gpu_runner
-cargo build --release
-popd
+# build runner with GPU feature
+cargo build -p vanity-miner --features gpu --release
 
 # build kernels to get the riscv .ll file
 pushd kernels
@@ -58,7 +56,7 @@ ptxas -arch=$PHYSICAL_ARCH -o /tmp/output.cubin /tmp/output.ptx
 
 # copy back
 pushd nvvm_compiler
-cp $CARGO_TARGET_DIR/release/gpu_runner build/
+cp $CARGO_TARGET_DIR/release/vanity-miner build/
 cp $RISCV_LL_FILE build/
 cp $PTX_LL_FILE build/
 cp /tmp/output.ptx build/
