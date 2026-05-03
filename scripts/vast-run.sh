@@ -7,7 +7,7 @@ HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.22.0"
+VERSION="v1.23.0"
 
 banner() {
     echo ""
@@ -19,7 +19,7 @@ banner() {
 banner "ENV CHECK :: killall"
 if ! command -v killall &> /dev/null
 then
-    apt update1
+    apt update
     apt install -y psmisc
 else
     echo "killall already installed"
@@ -49,7 +49,7 @@ echo "BLOCKS_PER_SM=$BLOCKS_PER_SM"
 echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
 echo "STACK_SIZE=$STACK_SIZE"
 
-banner "RUN :: vanity-miner shallenge"
+banner "RUN :: vanity-miner"
 ./vanity-miner solana-vanity aaaa ""
 #./vanity-miner bitcoin-vanity bc1qqqqqq ""
 #./vanity-miner ethereum-vanity 55555555 ""
