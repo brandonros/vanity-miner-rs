@@ -69,6 +69,7 @@
             pkgs.pkg-config
             pkgs.cmake
             pkgs.ninja
+            pkgs.patchelf
             cudaRoot
             llvm19.clang
             llvm19.libclang

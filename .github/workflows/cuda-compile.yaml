@@ -4,7 +4,59 @@ on:
   workflow_dispatch:
 
 jobs:
-  compile:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-latest
+            arch: x86_64
+          - runs-on: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build with nix devshell
+        run: |
+          nix develop --command cargo build -p vanity-miner --features gpu --release
+
+          mkdir -p artifacts
+          cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
+
+          # PTX is target-independent (nvptx64), so it's identical across host arches.
+          cp target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output.ptx
+
+          echo "Copied build artifacts for ${{ matrix.arch }}"
+
+      - name: Patch ELF interpreter for portability
+        run: |
+          # Nix bakes a /nix/store/... interpreter path into the binary, which
+          # doesn't exist on stock Ubuntu/Debian hosts. Repoint at the standard
+          # system path so the binary runs on non-Nix targets.
+          if [ "${{ matrix.arch }}" = "x86_64" ]; then
+            INTERP=/lib64/ld-linux-x86-64.so.2
+          else
+            INTERP=/lib/ld-linux-aarch64.so.1
+          fi
+          nix develop --command patchelf --set-interpreter "$INTERP" --remove-rpath \
+            ./artifacts/vanity-miner-${{ matrix.arch }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vanity-miner-${{ matrix.arch }}
+          path: artifacts/
+
+  release:
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,42 +72,28 @@ jobs:
           # Get the latest tag, fallback to v0.0.0 if no tags exist
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "Latest tag: $LATEST_TAG"
-          
+
           # Extract version numbers (remove 'v' prefix if present)
           VERSION=${LATEST_TAG#v}
-          
+
           # Split version into parts
           IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
           MAJOR=${VERSION_PARTS[0]:-0}
           MINOR=${VERSION_PARTS[1]:-0}
           PATCH=${VERSION_PARTS[2]:-0}
-          
+
           # Increment minor version (you can change this to PATCH if you prefer patch bumps)
           NEW_MINOR=$((MINOR + 1))
           NEW_VERSION="v${MAJOR}.${NEW_MINOR}.0"
-          
+
           echo "New version: $NEW_VERSION"
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "version_number=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-
-      - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
-
-      - name: Build with nix devshell
-        run: |
-          nix develop --command cargo build -p vanity-miner --features gpu --release
-
-          mkdir -p artifacts
-          cp target/release/vanity-miner ./artifacts/
-
-          # cuda_builder writes PTX to OUT_DIR; the kernels-<hash> dir name
-          # changes per build so we glob for it.
-          find target/release/build -name 'kernels.ptx' -exec cp {} ./artifacts/output.ptx \;
-
-          echo "Copied build artifacts to artifacts directory"
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
 
       - name: Create and push tag
         run: |
@@ -83,28 +121,32 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload output.ptx to release
+      - name: Upload x86_64 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/output.ptx
+          asset_path: dist/vanity-miner-x86_64/vanity-miner-x86_64
+          asset_name: vanity-miner-x86_64
+          asset_content_type: application/octet-stream
+
+      - name: Upload aarch64 binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
+          asset_name: vanity-miner-aarch64
+          asset_content_type: application/octet-stream
+
+      - name: Upload output.ptx
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-x86_64/output.ptx
           asset_name: output.ptx
           asset_content_type: application/octet-stream
-
-      - name: Upload vanity-miner to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/vanity-miner
-          asset_name: vanity-miner
-          asset_content_type: application/octet-stream
-
-      - name: Upload artifacts (workflow artifacts)
-        uses: actions/upload-artifact@v4
-        with:
-          name: vanity_miner_${{ steps.version.outputs.version_number }}
-          path: artifacts/
