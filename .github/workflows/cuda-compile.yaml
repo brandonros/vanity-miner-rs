@@ -48,6 +48,7 @@ jobs:
 
       - name: Pull builder image and build project
         run: |
+          # TODO: switch to building from flake.nix
           # Pull the pre-built builder image
           docker pull ghcr.io/brandonros/cuda-13-0-rust-builder:latest
           
