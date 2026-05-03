@@ -2,12 +2,12 @@
 
 set -e
 
-PORT=12583
+PORT=13375
 HOST=ssh9.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.17.0"
+VERSION="v1.18.0"
 
 # check for killall
 if ! command -v killall &> /dev/null

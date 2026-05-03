@@ -16,7 +16,7 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "9f0262bef4db8930e3e9c26d0524c14303a82b24"
+rev = "2f4fd1d"
 optional = true
 
 [dependencies.backtrace]
@@ -25,7 +25,7 @@ optional = true
 
 [build-dependencies.cuda_builder]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "9f0262bef4db8930e3e9c26d0524c14303a82b24"
+rev = "2f4fd1d"
 default-features = false
-features = ["rustc_codegen_nvvm", "llvm19"]
+features = ["rustc_codegen_nvvm", "llvm19"]]
 optional = true

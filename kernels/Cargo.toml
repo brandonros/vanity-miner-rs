@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 logic = { path = "../logic" }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "9f0262bef4db8930e3e9c26d0524c14303a82b24" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "2f4fd1d" }
 
 [workspace]
 
