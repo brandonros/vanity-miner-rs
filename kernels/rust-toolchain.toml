@@ -1,4 +1,0 @@
-[toolchain]
-channel = "1.86.0" # last version to use llvm v19
-components = ["rust-src", "rust-analyzer", "clippy", "rustfmt"]
-targets = ["riscv64gc-unknown-none-elf"]

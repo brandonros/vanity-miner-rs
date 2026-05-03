@@ -29,14 +29,9 @@
           # before running CUDA programs.
           cudaRoot = pkgs.cudaPackages_13_2.cudatoolkit;
 
-          # Pin matches rust-toolchain.toml. We use override (not
-          # fromRustupToolchainFile) because we need to add the riscv64 target
-          # for the kernels crate plus rust-analyzer/rust-src extensions for IDE
-          # support — fromRustupToolchainFile doesn't compose with overrides.
-          toolchain = pkgs.rust-bin.stable."1.86.0".default.override {
-            extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
-            targets = [ "riscv64gc-unknown-none-elf" ];
-          };
+          # Single source of truth for channel + components lives in
+          # rust-toolchain.toml. Update there, not here.
+          toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
           # ---- LLVM 19 ----
           llvm19 = pkgs.llvmPackages_19;
