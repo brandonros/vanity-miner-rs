@@ -2,8 +2,8 @@
 
 set -e
 
-PORT=13375
-HOST=ssh9.vast.ai
+PORT=15975
+HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
@@ -25,7 +25,12 @@ ARCH=$(uname -m)  # x86_64 or aarch64
 curl -fL -o vanity-miner https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/vanity-miner-$ARCH
 chmod +x vanity-miner
 
+# log
+echo "running nvidia-smi --query-gpu=name,compute_cap --format=csv"
+nvidia-smi --query-gpu=name,compute_cap --format=csv
+
 # run
+export CUDA_LOG_FILE="stdout"
 export BLOCKS_PER_SM="1024"
 export THREADS_PER_BLOCK="256"
 export STACK_SIZE="8192"

@@ -10,7 +10,7 @@ fn build_gpu() {
     use std::env;
     use std::path::PathBuf;
 
-    use cuda_builder::CudaBuilder;
+    use cuda_builder::{NvvmArch, CudaBuilder};
 
     // On Windows, nanorand's entropy uses SystemFunction036 (RtlGenRandom) from advapi32.
     // Explicitly link it so the MSVC linker resolves the symbol (avoids LNK2019 when
@@ -26,6 +26,7 @@ fn build_gpu() {
 
     let ptx_path = out_path.join("kernels.ptx");
     CudaBuilder::new(&kernels_dir)
+        .arch(NvvmArch::Compute120)
         .copy_to(&ptx_path)
         .final_module_path(out_path.join("final-module.ll"))
         .emit_llvm_ir(true)

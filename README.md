@@ -1,6 +1,12 @@
 # vanity-miner-rs
 GPU-accelerated vanity address generator for multiple blockchains
 
+## How to build
+
+```shell
+nix develop --command cargo build -p vanity-miner --features gpu --release
+```
+
 ## How to use
 
 ### CPU mode (no CUDA required)
