@@ -1,7 +1,7 @@
 use crate::utilities;
+use cuda_std::prelude::*;
 
-// TODO: kernel
-#[unsafe(no_mangle)]
+#[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_find_bitcoin_vanity_private_key(
     // input

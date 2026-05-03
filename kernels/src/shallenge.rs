@@ -1,4 +1,5 @@
 use crate::{atomic, utilities};
+use cuda_std::prelude::*;
 
 /// Handle the infrastructure concerns when a better hash is found
 unsafe fn handle_shallenge_match_found(
@@ -30,8 +31,7 @@ unsafe fn handle_shallenge_match_found(
     // TODO: do we need device_fence here?
 }
 
-// TODO: kernel
-#[unsafe(no_mangle)]
+#[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
     // input

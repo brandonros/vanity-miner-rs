@@ -17,10 +17,14 @@ cargo build -p vanity-miner --release
 
 ### GPU mode (requires CUDA)
 ```shell
-# Build GPU-enabled binary
+# Build GPU-enabled binary (PTX is built and embedded automatically)
 cargo build -p vanity-miner --features gpu --release
 
-# Run (requires CUBIN_PATH or PTX_PATH environment variable)
+# Run — the binary is self-contained, no env vars needed
+./target/release/vanity-miner solana-vanity aaa ""
+
+# Optional: override the embedded PTX with a hand-built one
+PTX_PATH=./output.ptx ./target/release/vanity-miner solana-vanity aaa ""
 CUBIN_PATH=./output.cubin ./target/release/vanity-miner solana-vanity aaa ""
 ```
 

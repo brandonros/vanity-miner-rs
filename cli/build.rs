@@ -23,25 +23,14 @@ fn build_gpu() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     println!("cargo::rerun-if-changed={}", kernels_dir.display());
-    println!("cargo::rerun-if-env-changed=RUST_CUDA_DUMP_FINAL_MODULE");
-    println!("cargo::rerun-if-env-changed=RUST_CUDA_EMIT_LLVM_IR");
-
-    let dump_final_module = env::var_os("RUST_CUDA_DUMP_FINAL_MODULE").is_some();
-    let emit_llvm_ir = env::var_os("RUST_CUDA_EMIT_LLVM_IR").is_some();
 
     let ptx_path = out_path.join("kernels.ptx");
-    let mut builder = CudaBuilder::new(&kernels_dir);
-    builder = builder.copy_to(&ptx_path);
-
-    if dump_final_module {
-        builder = builder.final_module_path(out_path.join("final-module.ll"));
-    }
-
-    if emit_llvm_ir {
-        builder = builder.emit_llvm_ir(true);
-    }
-
-    builder.build().unwrap();
+    CudaBuilder::new(&kernels_dir)
+        .copy_to(&ptx_path)
+        .final_module_path(out_path.join("final-module.ll"))
+        .emit_llvm_ir(true)
+        .build()
+        .unwrap();
 
     println!("cargo:rustc-env=KERNELS_PTX_PATH={}", ptx_path.display());
 }
