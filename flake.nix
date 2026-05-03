@@ -17,13 +17,12 @@
       lib = pkgs.lib;
 
       # ---- CUDA toolkit (Nix-managed) ----
-      # The NVIDIA **driver** (libcuda.so.1, libnvidia-*) still comes from the
-      # host — apt on Debian, hardware.nvidia on NixOS. Nix only provides the
-      # **toolkit** (nvcc, libnvvm, cudart, headers).
-      #
-      # CUDA 13.2 → NVVM 22.0 → PTX 9.2 → needs driver 580.x+ (CUDA 13).
+      # CUDA 13.2 → NVVM 22.0 → PTX 9.2 → needs driver 580.x+ (CUDA 13) at runtime.
       # `cudatoolkit` is the kitchen-sink symlinkJoin maintained by nixpkgs —
-      # every header path and lib layout is already wired correctly.
+      # every header path and lib layout is already wired correctly. The host
+      # NVIDIA driver (libcuda.so.1) is needed at runtime; it is *not* shimmed
+      # in here — supply it via the system or extend LD_LIBRARY_PATH yourself
+      # before running CUDA programs.
       cudaRoot = pkgs.cudaPackages_13_2.cudatoolkit;
 
       # Pin matches rust-toolchain.toml. We use override (not
@@ -84,12 +83,11 @@
 
         shellHook = ''
           export PATH="${llvm19CompatTools}/bin:${llvm19Bin}/bin:${llvm19Dev}/bin:${cudaRoot}/bin:${cudaRoot}/nvvm/bin:$PATH"
-          export LD_LIBRARY_PATH="$driver_shim_dir:${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
           echo "rust-cuda llvm19 shell"
           echo "  CUDA_HOME=$CUDA_HOME"
           echo "  LLVM_CONFIG_19=$LLVM_CONFIG_19"
-          echo "  NVIDIA_DRIVER_LIB=$driver_shim_dir/libcuda.so.1"
         '';
       };
     in
