@@ -1,6 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
+
+if [ -z "$CARGO_TARGET_DIR" ]; then
+    echo "CARGO_TARGET_DIR must be set"
+    exit 1
+fi
 
 # set architecture (rtx5090 blackwell)
 VIRTUAL_ARCH=compute_120

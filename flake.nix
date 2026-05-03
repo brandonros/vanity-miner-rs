@@ -60,6 +60,10 @@
         LLVM_CONFIG_19 = "${llvm19Dev}/bin/llvm-config";
         LIBCLANG_PATH = "${lib.getLib llvm19.libclang}/lib";
 
+        # nativeBuildInputs: tools invoked *during* the build — compilers,
+        # codegen, build systems. End up on $PATH. cudaRoot lives here because
+        # build-cuda.sh shells out to ptxas/nvcc; its libraries are picked up
+        # via LD_LIBRARY_PATH/LIBRARY_PATH below.
         nativeBuildInputs = [
           toolchain
           pkgs.gcc
@@ -73,17 +77,24 @@
           llvm19Dev
           llvm19CompatTools
         ];
+        # buildInputs: libraries our binaries link against at compile time.
+        # These get wired into the C/C++ include and link search paths.
         buildInputs = [
           pkgs.openssl
           pkgs.libxml2
           pkgs.zlib
           pkgs.ncurses
+          pkgs.libffi
           pkgs.stdenv.cc.cc.lib
         ];
 
         shellHook = ''
+          export CARGO_TARGET_DIR="$PWD/target"
           export PATH="${llvm19CompatTools}/bin:${llvm19Bin}/bin:${llvm19Dev}/bin:${cudaRoot}/bin:${cudaRoot}/nvvm/bin:$PATH"
           export LD_LIBRARY_PATH="${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          # LIBRARY_PATH is the *link-time* analog of LD_LIBRARY_PATH — needed
+          # so cc/ld can resolve `-lnvvm` (from #[link(name = "nvvm")]) etc.
+          export LIBRARY_PATH="${cudaRoot}/nvvm/lib64:${cudaRoot}/nvvm/lib:${cudaRoot}/lib64:${cudaRoot}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
           echo "rust-cuda llvm19 shell"
           echo "  CUDA_HOME=$CUDA_HOME"
