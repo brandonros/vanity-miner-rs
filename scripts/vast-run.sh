@@ -7,34 +7,49 @@ HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.19.0"
+VERSION="v1.20.0"
 
-# check for killall
+banner() {
+    echo ""
+    echo "=================================================================="
+    echo "==  $1"
+    echo "=================================================================="
+}
+
+banner "ENV CHECK :: killall"
 if ! command -v killall &> /dev/null
 then
-    apt update
+    apt update1
     apt install -y psmisc
+else
+    echo "killall already installed"
 fi
 
-# cleanup
+banner "CLEANUP :: previous binary + running processes"
 rm -f vanity-miner
 killall vanity-miner || true
 
-# download the right arch (PTX is embedded — single binary)
+banner "DOWNLOAD :: vanity-miner $VERSION"
 ARCH=$(uname -m)  # x86_64 or aarch64
+echo "arch=$ARCH version=$VERSION"
 curl -fL -o vanity-miner https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/vanity-miner-$ARCH
 chmod +x vanity-miner
+ls -lh vanity-miner
 
-# log
-echo "running nvidia-smi --query-gpu=name,compute_cap --format=csv"
+banner "GPU INFO :: nvidia-smi"
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 
-# run
+banner "RUNTIME ENV"
 export CUDA_LOG_FILE="stdout"
 export BLOCKS_PER_SM="1024"
 export THREADS_PER_BLOCK="256"
 export STACK_SIZE="8192"
+echo "CUDA_LOG_FILE=$CUDA_LOG_FILE"
+echo "BLOCKS_PER_SM=$BLOCKS_PER_SM"
+echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
+echo "STACK_SIZE=$STACK_SIZE"
 
+banner "RUN :: vanity-miner shallenge"
 #./vanity-miner solana-vanity aaaa ""
 #./vanity-miner bitcoin-vanity bc1qqqqqq ""
 #./vanity-miner ethereum-vanity 55555555 ""
