@@ -28,20 +28,19 @@ impl GpuRunner {
         cust::context::CurrentContext::set_current(&ctx)?;
 
         println!("[{ordinal}] Loading module...");
-        let module = {
-            let cubin_path = std::env::var("CUBIN_PATH");
-            let ptx_path = std::env::var("PTX_PATH");
-            if let Ok(cubin_path) = cubin_path {
-                let cubin = std::fs::read(cubin_path)
-                    .map_err(|e| format!("Failed to read CUBIN file: {}", e))?;
-                Module::from_cubin(cubin, &[])?
-            } else if let Ok(ptx_path) = ptx_path {
-                let ptx = std::fs::read_to_string(ptx_path)
-                    .map_err(|e| format!("Failed to read PTX file: {}", e))?;
-                Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(256)])?
-            } else {
-                return Err("CUBIN_PATH or PTX_PATH environment variable is required".into());
-            }
+        let module = if let Ok(cubin_path) = std::env::var("CUBIN_PATH") {
+            let cubin = std::fs::read(cubin_path)
+                .map_err(|e| format!("Failed to read CUBIN file: {}", e))?;
+            Module::from_cubin(cubin, &[])?
+        } else if let Ok(ptx_path) = std::env::var("PTX_PATH") {
+            let ptx = std::fs::read_to_string(ptx_path)
+                .map_err(|e| format!("Failed to read PTX file: {}", e))?;
+            Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(256)])?
+        } else {
+            const EMBEDDED_PTX: &[u8] = include_bytes!(env!("KERNELS_PTX_PATH"));
+            let ptx = std::str::from_utf8(EMBEDDED_PTX)
+                .map_err(|e| format!("Embedded PTX is not valid UTF-8: {}", e))?;
+            Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(256)])?
         };
         println!("[{ordinal}] Module loaded");
         Ok(module)

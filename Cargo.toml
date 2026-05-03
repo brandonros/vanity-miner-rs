@@ -2,14 +2,13 @@
 resolver = "3"
 members = [
   "cli",
-  "logic",
-  "ir_adapter",
-  "nvvm_compiler",
+  "logic"
 ]
 exclude = ["kernels"]
 
 [patch.crates-io]
-zeroize = { git = "https://github.com/brandonros/utils", rev = "4c9734e1ae4a6cb61db4693f9d164866f084ca97" }
+# put compiler_fence behind a feature flag that is disabled by default
+zeroize = { git = "https://github.com/brandonros/utils", branch = "nvptx64-support" }
 
 [profile.dev]
 panic = "abort"

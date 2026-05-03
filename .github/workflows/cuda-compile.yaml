@@ -46,13 +46,14 @@ jobs:
 
       - name: Build with nix devshell
         run: |
-          nix develop --command bash scripts/build-cuda.sh
+          nix develop --command cargo build -p vanity-miner --features gpu --release
 
-          # Copy the built artifacts from the build script output
           mkdir -p artifacts
-          cp nvvm_compiler/build/output.cubin ./artifacts/
-          cp nvvm_compiler/build/output.ptx ./artifacts/
-          cp nvvm_compiler/build/vanity-miner ./artifacts/
+          cp target/release/vanity-miner ./artifacts/
+
+          # cuda_builder writes PTX to OUT_DIR; the kernels-<hash> dir name
+          # changes per build so we glob for it.
+          find target/release/build -name 'kernels.ptx' -exec cp {} ./artifacts/output.ptx \;
 
           echo "Copied build artifacts to artifacts directory"
 
@@ -82,16 +83,6 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload output.cubin to release
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./artifacts/output.cubin
-          asset_name: output.cubin
-          asset_content_type: application/octet-stream
-      
       - name: Upload output.ptx to release
         uses: actions/upload-release-asset@v1
         env:
