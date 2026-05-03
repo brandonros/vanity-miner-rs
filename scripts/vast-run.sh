@@ -7,7 +7,7 @@ HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.21.0"
+VERSION="v1.22.0"
 
 banner() {
     echo ""

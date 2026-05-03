@@ -26,7 +26,7 @@ impl GpuRunner {
         Ok(Self { num_devices })
     }
 
-    fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send + Sync>> {
+    fn load_module(ordinal: usize) -> Result<(Context, Module), Box<dyn Error + Send + Sync>> {
         let device = Device::get_device(ordinal as u32)?;
         let ctx = Context::new(device)?;
         cust::context::CurrentContext::set_current(&ctx)?;
@@ -44,7 +44,7 @@ impl GpuRunner {
         };
         let module = Self::load_ptx_with_log(ordinal, ptx)?;
         println!("[{ordinal}] Module loaded");
-        Ok(module)
+        Ok((ctx, module))
     }
 
     fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error + Send + Sync>> {
@@ -153,7 +153,10 @@ impl Runner for GpuRunner {
             let stats_clone = Arc::clone(&stats);
 
             handles.push(std::thread::spawn(move || -> Result<(), Box<dyn Error + Send + Sync>> {
-                let module = Self::load_module(i)?;
+                // Hold the context alive for the lifetime of the module — dropping the
+                // Context destroys every CUmodule inside it, which would make the
+                // Module's handle invalid before we ever launch a kernel.
+                let (_ctx, module) = Self::load_module(i)?;
 
                 match command_clone {
                     Command::SolanaVanity { prefix, suffix } => {
