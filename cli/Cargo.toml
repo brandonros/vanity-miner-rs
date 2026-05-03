@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = []
-gpu = ["dep:cust", "dep:backtrace"]
+gpu = ["dep:cust", "dep:backtrace", "dep:cuda_builder"]
 
 [dependencies]
 logic = { path = "../logic" }
@@ -16,9 +16,16 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "c417c1df32511281a7f1c322de849cca41d66a29"
+rev = "38212ab745b6d257992e37bc0bc2b7b659bebed4"
 optional = true
 
 [dependencies.backtrace]
 version = "0.3"
+optional = true
+
+[build-dependencies.cuda_builder]
+git = "https://github.com/brandonros/Rust-CUDA.git"
+rev = "38212ab745b6d257992e37bc0bc2b7b659bebed4"
+default-features = false
+features = ["rustc_codegen_nvvm", "llvm19"]
 optional = true

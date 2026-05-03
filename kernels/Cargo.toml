@@ -4,13 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 logic = { path = "../logic" }
-
-[build-dependencies]
-cuda_builder = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "38212ab745b6d257992e37bc0bc2b7b659bebed4", default-features = false, features = ["rustc_codegen_nvvm", "llvm19"] }
 
 [workspace]
 
