@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,32 +38,18 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "version_number=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Pull builder image and build project
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build with nix devshell
         run: |
-          # TODO: switch to building from flake.nix
-          # Pull the pre-built builder image
-          docker pull ghcr.io/brandonros/cuda-13-0-rust-builder:latest
-          
-          # Run the custom build script inside the container
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -w /workspace \
-            --memory=4g \
-            --memory-swap=16g \
-            ghcr.io/brandonros/cuda-13-0-rust-builder:latest \
-            bash scripts/build-cuda.sh
-          
-          # Create output directory
-          mkdir -p artifacts
-          
+          nix develop --command bash scripts/build-cuda.sh
+
           # Copy the built artifacts from the build script output
+          mkdir -p artifacts
           cp nvvm_compiler/build/output.cubin ./artifacts/
           cp nvvm_compiler/build/output.ptx ./artifacts/
           cp nvvm_compiler/build/vanity-miner ./artifacts/
