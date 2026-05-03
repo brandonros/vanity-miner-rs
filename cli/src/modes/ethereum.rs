@@ -2,6 +2,7 @@ use crate::common::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 
+#[cfg(not(feature = "gpu"))]
 pub mod cpu {
     use super::*;
     use crate::common::spawn_cpu_workers;
@@ -110,8 +111,8 @@ pub mod gpu {
         let mut rng = rand::thread_rng();
 
         // Allocate static input buffers once (they don't change between iterations)
-        let prefix_dev = prefix_bytes.as_dbuf()?;
-        let suffix_dev = suffix_bytes.as_dbuf()?;
+        let prefix_dev = prefix_bytes.as_slice().as_dbuf()?;
+        let suffix_dev = suffix_bytes.as_slice().as_dbuf()?;
 
         loop {
             let rng_seed: u64 = rng.r#gen::<u64>();
@@ -127,9 +128,10 @@ pub mod gpu {
             let found_address_dev = found_address.as_dbuf()?;
             let found_thread_idx_dev = found_thread_idx_slice.as_dbuf()?;
 
+            let stream = &gpu.stream;
             unsafe {
                 launch!(
-                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, gpu.stream>>>(
+                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, stream>>>(
                         prefix_dev.as_device_ptr(),
                         prefix_bytes.len(),
                         suffix_dev.as_device_ptr(),

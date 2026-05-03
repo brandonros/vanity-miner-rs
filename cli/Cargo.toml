@@ -16,7 +16,7 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "10cbfd2bb8fbe54b42b891b270da821512c56409"
+rev = "c417c1df32511281a7f1c322de849cca41d66a29"
 optional = true
 
 [dependencies.backtrace]

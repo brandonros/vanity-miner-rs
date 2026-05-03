@@ -10,8 +10,8 @@ cargo build -p vanity-miner --release
 
 # Run
 ./target/release/vanity-miner solana-vanity aaa ""
-./target/release/vanity-miner ethereum-vanity 555555 ""
-./target/release/vanity-miner bitcoin-vanity bc1qqqqq ""
+./target/release/vanity-miner ethereum-vanity 5555 ""
+./target/release/vanity-miner bitcoin-vanity bc1qqqq ""
 ./target/release/vanity-miner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 ```
 

@@ -6,9 +6,12 @@ mod runner;
 use args::Cli;
 use clap::Parser;
 use crate::common::GlobalStats;
-use runner::{CpuRunner, Runner};
+use runner::Runner;
 use std::error::Error;
 use std::sync::Arc;
+
+#[cfg(not(feature = "gpu"))]
+use runner::CpuRunner;
 
 #[cfg(feature = "gpu")]
 use runner::GpuRunner;

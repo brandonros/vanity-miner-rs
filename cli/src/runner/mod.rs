@@ -1,7 +1,9 @@
+#[cfg(not(feature = "gpu"))]
 mod cpu;
 #[cfg(feature = "gpu")]
 mod gpu;
 
+#[cfg(not(feature = "gpu"))]
 pub use cpu::CpuRunner;
 #[cfg(feature = "gpu")]
 pub use gpu::GpuRunner;

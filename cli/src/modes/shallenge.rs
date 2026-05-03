@@ -3,6 +3,7 @@ use crate::common::SharedBestHash;
 use std::error::Error;
 use std::sync::{Arc, RwLock};
 
+#[cfg(not(feature = "gpu"))]
 pub mod cpu {
     use super::*;
     use crate::common::spawn_cpu_workers;
@@ -143,9 +144,10 @@ pub mod gpu {
             let found_nonce_len_dev = found_nonce_len.as_dbuf()?;
             let found_thread_idx_slice_dev = found_thread_idx_slice.as_dbuf()?;
 
+            let stream = &gpu.stream;
             unsafe {
                 launch!(
-                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, gpu.stream>>>(
+                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, stream>>>(
                         username_dev.as_device_ptr(),
                         username_len,
                         target_hash_dev.as_device_ptr(),
