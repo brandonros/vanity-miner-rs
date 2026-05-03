@@ -1494,6 +1494,7 @@ dependencies = [
  "clap",
  "cuda_builder",
  "cust",
+ "cust_raw",
  "hex",
  "logic",
  "paste",

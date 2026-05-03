@@ -7,7 +7,7 @@ HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.18.0"
+VERSION="v1.19.0"
 
 # check for killall
 if ! command -v killall &> /dev/null
