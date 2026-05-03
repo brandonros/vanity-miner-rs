@@ -32,29 +32,21 @@ impl GpuRunner {
         cust::context::CurrentContext::set_current(&ctx)?;
 
         println!("[{ordinal}] Loading module...");
-        let module = if let Ok(cubin_path) = std::env::var("CUBIN_PATH") {
-            let cubin = std::fs::read(cubin_path)
-                .map_err(|e| format!("Failed to read CUBIN file: {}", e))?;
-            Module::from_cubin(cubin, &[])?
-        } else if let Ok(ptx_path) = std::env::var("PTX_PATH") {
-            let ptx = std::fs::read_to_string(ptx_path)
+        let ptx_owned;
+        let ptx: &str = if let Ok(ptx_path) = std::env::var("PTX_PATH") {
+            ptx_owned = std::fs::read_to_string(ptx_path)
                 .map_err(|e| format!("Failed to read PTX file: {}", e))?;
-            Self::load_ptx_with_log(ordinal, &ptx)?
+            &ptx_owned
         } else {
             const EMBEDDED_PTX: &[u8] = include_bytes!(env!("KERNELS_PTX_PATH"));
-            let ptx = std::str::from_utf8(EMBEDDED_PTX)
-                .map_err(|e| format!("Embedded PTX is not valid UTF-8: {}", e))?;
-            Self::load_ptx_with_log(ordinal, ptx)?
+            std::str::from_utf8(EMBEDDED_PTX)
+                .map_err(|e| format!("Embedded PTX is not valid UTF-8: {}", e))?
         };
+        let module = Self::load_ptx_with_log(ordinal, ptx)?;
         println!("[{ordinal}] Module loaded");
         Ok(module)
     }
 
-    /// JIT-compile PTX via the raw driver API with CU_JIT_{INFO,ERROR}_LOG_BUFFER
-    /// so we can surface the driver's actual diagnostic when JIT compilation fails.
-    /// cust's ModuleJitOption doesn't expose the log buffers, so on UnknownError
-    /// the only way to see "register X exceeded" / "unsupported sm_XX" / etc. is
-    /// to round-trip through cuModuleLoadDataEx ourselves.
     fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error + Send + Sync>> {
         let cstr = CString::new(ptx).map_err(|e| format!("PTX contains nul bytes: {}", e))?;
 
@@ -62,8 +54,10 @@ impl GpuRunner {
         let mut info_log = vec![0u8; LOG_CAP];
         let mut error_log = vec![0u8; LOG_CAP];
 
-        // Driver packs scalar values directly into the *mut c_void slot when they fit.
-        // Order must line up with `options` below.
+        // Driver packs values directly into the *mut c_void slot when the payload fits.
+        // LOG_VERBOSE = request detailed log
+        // INFO/ERROR_LOG_BUFFER = pointer to buffer
+        // *_LOG_BUFFER_SIZE_BYTES = capacity (in), bytes written (out)
         let mut options = [
             driver_sys::CUjit_option::CU_JIT_MAX_REGISTERS,
             driver_sys::CUjit_option::CU_JIT_LOG_VERBOSE,
@@ -73,7 +67,7 @@ impl GpuRunner {
             driver_sys::CUjit_option::CU_JIT_ERROR_LOG_BUFFER_SIZE_BYTES,
         ];
         let mut option_values: [*mut c_void; 6] = [
-            256usize as *mut c_void,
+            255usize as *mut c_void,
             1usize as *mut c_void,
             info_log.as_mut_ptr() as *mut c_void,
             LOG_CAP as *mut c_void,
@@ -103,31 +97,26 @@ impl GpuRunner {
         if !error_str.trim().is_empty() {
             eprintln!("[{ordinal}] JIT error log ({error_len} bytes):\n{error_str}");
         }
+        eprintln!("[{ordinal}] cuModuleLoadDataEx raw result code: {:?}", res);
 
         if res != driver_sys::cudaError_enum::CUDA_SUCCESS {
-            let driver_msg = unsafe {
+            unsafe {
                 let mut err_cstr: *const c_char = ptr::null();
                 if driver_sys::cuGetErrorString(res, &mut err_cstr)
                     == driver_sys::cudaError_enum::CUDA_SUCCESS
                     && !err_cstr.is_null()
                 {
-                    CStr::from_ptr(err_cstr).to_string_lossy().into_owned()
-                } else {
-                    format!("{:?}", res)
+                    let msg = CStr::from_ptr(err_cstr).to_string_lossy();
+                    eprintln!("[{ordinal}] cuGetErrorString: {msg}");
                 }
-            };
-            return Err(format!(
-                "cuModuleLoadDataEx failed on device {ordinal}: {driver_msg} ({:?}); error log: {}",
-                res,
-                error_str.trim()
-            )
-            .into());
+            }
+            return Err(format!("cuModuleLoadDataEx failed: {:?}", res).into());
         }
 
-        // Driver accepted the PTX. Drop the raw handle and re-load through cust so
-        // the rest of the runner gets a typed Module with cust's drop semantics.
+        // The driver accepted the PTX; drop our raw handle and re-load via cust so the
+        // caller gets a typed Module with cust's lifetime/drop machinery.
         let _ = unsafe { driver_sys::cuModuleUnload(module_ptr) };
-        Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(256)]).map_err(|e| e.into())
+        Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(255)]).map_err(|e| e.into())
     }
 }
 

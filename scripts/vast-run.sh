@@ -7,7 +7,7 @@ HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.20.0"
+VERSION="v1.21.0"
 
 banner() {
     echo ""
@@ -50,8 +50,8 @@ echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
 echo "STACK_SIZE=$STACK_SIZE"
 
 banner "RUN :: vanity-miner shallenge"
-#./vanity-miner solana-vanity aaaa ""
+./vanity-miner solana-vanity aaaa ""
 #./vanity-miner bitcoin-vanity bc1qqqqqq ""
 #./vanity-miner ethereum-vanity 55555555 ""
-./vanity-miner shallenge brandonros 0000000000bd0310ff0f88ac484f7fcd256ef78ae0deecd5693ed0ead124d17b
+#./vanity-miner shallenge brandonros 0000000000bd0310ff0f88ac484f7fcd256ef78ae0deecd5693ed0ead124d17b
 EOF
