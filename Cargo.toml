@@ -2,9 +2,9 @@
 resolver = "3"
 members = [
   "cli",
+  "kernels",
   "logic"
 ]
-exclude = ["kernels"]
 
 [patch.crates-io]
 # put compiler_fence behind a feature flag that is disabled by default

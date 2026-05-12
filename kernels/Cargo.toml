@@ -3,20 +3,15 @@ name = "kernels"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+[features]
+default = ["kernel_bitcoin", "kernel_ethereum", "kernel_solana", "kernel_shallenge"]
+kernel_bitcoin = []
+kernel_ethereum = []
+kernel_solana = []
+kernel_shallenge = []
 
 [dependencies]
 logic = { path = "../logic" }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "2f4fd1d" }
-
-[workspace]
-
-[patch.crates-io]
-zeroize = { git = "https://github.com/brandonros/utils", rev = "4c9734e1ae4a6cb61db4693f9d164866f084ca97" }
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
+cuda-device = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }
+cuda-host = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }
+cuda-core = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }

@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = []
-gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
+gpu = ["dep:kernels", "dep:cuda-core", "dep:cuda-host"]
 
 [dependencies]
 logic = { path = "../logic" }
@@ -14,23 +14,16 @@ hex = "0.4.3"
 rand = "0.8"
 paste = "1.0"
 
-[dependencies.cust]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+[dependencies.kernels]
+path = "../kernels"
 optional = true
 
-[dependencies.cust_raw]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+[dependencies.cuda-core]
+git = "https://github.com/brandonros/cuda-oxide.git"
+rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
 optional = true
 
-[dependencies.backtrace]
-version = "0.3"
-optional = true
-
-[build-dependencies.cuda_builder]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
-default-features = false
-features = ["rustc_codegen_nvvm"]
+[dependencies.cuda-host]
+git = "https://github.com/brandonros/cuda-oxide.git"
+rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
 optional = true
