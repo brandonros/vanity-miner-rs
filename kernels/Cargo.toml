@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["kernel_bitcoin", "kernel_ethereum", "kernel_solana", "kernel_shallenge"]
+default = ["kernel_shallenge"]
 kernel_bitcoin = []
 kernel_ethereum = []
 kernel_solana = []

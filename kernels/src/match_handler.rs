@@ -1,59 +1,54 @@
-/// Macro to handle the common pattern when a vanity match is found in a kernel.
+/// Common copy pattern when a vanity match is found in a kernel.
 ///
-/// Handles:
-/// 1. Reconstructing found_matches slice from raw pointer
-/// 2. Atomic check for first-find (only first match copies data)
-/// 3. Copying result fields to device buffers
-/// 4. Incrementing match counter
+/// Output buffers arrive as `&mut [T]` slices (the `#[cuda_module]` macro
+/// unpacks the (ptr, len) pair on the host side). Single-element writes,
+/// range indexing, and `copy_from_slice` all compile through cuda-oxide.
 ///
 /// Copy syntax:
-/// - `src => ptr, len;`                      - full slice copy
-/// - `partial: src, dyn_len => ptr, max;`    - partial slice copy
-/// - `scalar: value => ptr;`                 - scalar assignment (single element)
+/// - `src => dst;`                          - full slice copy
+/// - `partial: src, dyn_len => dst;`        - copy first `dyn_len` bytes
+/// - `scalar: value => dst;`                - assign to dst[0]
 #[macro_export]
 macro_rules! handle_match {
     (
         thread_idx: $thread_idx:expr,
-        found_matches_ptr: $found_matches_ptr:expr,
+        found_matches: $found_matches_slice:expr,
         copies: [ $( $copy:tt )* ],
-        found_thread_idx_ptr: $found_thread_idx_ptr:expr $(,)?
+        found_thread_idx: $found_thread_idx_slice:expr $(,)?
     ) => {{
-        let found_matches_slice = unsafe { core::slice::from_raw_parts_mut($found_matches_ptr, 1) };
-        let found_matches = &mut found_matches_slice[0];
+        let found_matches_slice: &mut [u32] = $found_matches_slice;
+        let found_thread_idx_slice: &mut [u32] = $found_thread_idx_slice;
 
-        // If first find, copy results to device buffers
-        if unsafe { $crate::atomic::atomic_add_u32(found_matches, 0) } == 0 {
+        // First-write-wins: only the first thread to observe a zero counter
+        // commits the result fields. Other matches still increment the
+        // counter so the host sees a non-zero value. `atomic_add_u32` is
+        // unqualified so it resolves at the call site — every invocation
+        // happens inside the cuda_module mod where it is defined.
+        if unsafe { atomic_add_u32(&mut found_matches_slice[0], 0) } == 0 {
             handle_match!(@copies $($copy)*);
-
-            let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut($found_thread_idx_ptr, 1) };
             found_thread_idx_slice[0] = $thread_idx as u32;
         }
 
-        // Increment number of found matches
-        unsafe { $crate::atomic::atomic_add_u32(found_matches, 1) };
+        unsafe { atomic_add_u32(&mut found_matches_slice[0], 1) };
     }};
 
-    // Full slice copy: src => ptr, len;
-    (@copies $src:expr => $dst_ptr:expr, $len:expr ; $($rest:tt)*) => {
-        let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, $len) };
-        dst.copy_from_slice(&$src);
+    // Full slice copy: src => dst;
+    (@copies $src:expr => $dst:expr ; $($rest:tt)*) => {
+        ($dst).copy_from_slice(&$src);
         handle_match!(@copies $($rest)*);
     };
 
-    // Partial slice copy: partial: src, dyn_len => ptr, max_len;
-    (@copies partial: $src:expr, $dyn_len:expr => $dst_ptr:expr, $max_len:expr ; $($rest:tt)*) => {
-        let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, $max_len) };
-        dst[..$dyn_len].copy_from_slice(&$src[..$dyn_len]);
+    // Partial slice copy: partial: src, dyn_len => dst;
+    (@copies partial: $src:expr, $dyn_len:expr => $dst:expr ; $($rest:tt)*) => {
+        ($dst)[..$dyn_len].copy_from_slice(&$src[..$dyn_len]);
         handle_match!(@copies $($rest)*);
     };
 
-    // Scalar assignment: scalar: value => ptr;
-    (@copies scalar: $value:expr => $dst_ptr:expr ; $($rest:tt)*) => {
-        let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, 1) };
-        dst[0] = $value;
+    // Scalar assignment: scalar: value => dst;
+    (@copies scalar: $value:expr => $dst:expr ; $($rest:tt)*) => {
+        ($dst)[0] = $value;
         handle_match!(@copies $($rest)*);
     };
 
-    // Base case - no more copies
     (@copies) => {};
 }
