@@ -23,13 +23,15 @@ macro_rules! handle_match {
         // commits the result fields. Other matches still increment the
         // counter so the host sees a non-zero value. `atomic_add_u32` is
         // unqualified so it resolves at the call site — every invocation
-        // happens inside the cuda_module mod where it is defined.
-        if unsafe { atomic_add_u32(&mut found_matches_slice[0], 0) } == 0 {
+        // happens inside the cuda_module mod where it is defined. It is a
+        // safe `pub fn` because cuda-oxide's `#[device]` macro doesn't
+        // propagate `unsafe fn` to the generated wrapper.
+        if atomic_add_u32(&mut found_matches_slice[0], 0) == 0 {
             handle_match!(@copies $($copy)*);
             found_thread_idx_slice[0] = $thread_idx as u32;
         }
 
-        unsafe { atomic_add_u32(&mut found_matches_slice[0], 1) };
+        atomic_add_u32(&mut found_matches_slice[0], 1);
     }};
 
     // Full slice copy: src => dst;

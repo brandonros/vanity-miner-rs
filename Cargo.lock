@@ -247,7 +247,7 @@ dependencies = [
 [[package]]
 name = "cuda-bindings"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "bindgen",
 ]
@@ -255,7 +255,7 @@ dependencies = [
 [[package]]
 name = "cuda-core"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "anyhow",
  "cuda-bindings",
@@ -266,7 +266,7 @@ dependencies = [
 [[package]]
 name = "cuda-device"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "cuda-macros",
 ]
@@ -274,7 +274,7 @@ dependencies = [
 [[package]]
 name = "cuda-host"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "cuda-core",
  "cuda-macros",
@@ -287,7 +287,7 @@ dependencies = [
 [[package]]
 name = "cuda-macros"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "libnvvm-sys"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "libloading",
  "thiserror",
@@ -568,7 +568,7 @@ dependencies = [
  "curve25519-dalek",
  "hex",
  "k256",
- "rand_core 0.9.3",
+ "rand_core 0.9.5",
  "rand_xoshiro",
  "seq-macro",
  "tiny-keccak",
@@ -599,7 +599,7 @@ dependencies = [
 [[package]]
 name = "nvjitlink-sys"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "libloading",
  "thiserror",
@@ -636,7 +636,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "oxide-artifacts"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 dependencies = [
  "object",
 ]
@@ -732,9 +732,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-version = "0.9.3"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99d9a13982dcf210057a8a78572b2217b667c3beacbf3a0d8b454f6f82837d38"
+checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 
 [[package]]
 name = "rand_xoshiro"
@@ -742,7 +742,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f703f4665700daf5512dcca5f43afa6af89f09db47fb56be587f80636bda2d41"
 dependencies = [
- "rand_core 0.9.3",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -777,7 +777,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "reserved-oxide-symbols"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?rev=990e028fc0756d3082bd1bfe41876c2cf4ce3efa#990e028fc0756d3082bd1bfe41876c2cf4ce3efa"
+source = "git+https://github.com/brandonros/cuda-oxide.git?rev=c345b43f384b81280042c5c2bf232c30787e7140#c345b43f384b81280042c5c2bf232c30787e7140"
 
 [[package]]
 name = "rustc-hash"

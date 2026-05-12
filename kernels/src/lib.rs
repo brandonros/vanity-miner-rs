@@ -1,7 +1,7 @@
 #[macro_use]
 mod match_handler;
 
-use cuda_device::{cuda_module, kernel};
+use cuda_device::{cuda_module, device, kernel};
 
 #[cuda_module]
 pub mod kernels {
@@ -9,19 +9,31 @@ pub mod kernels {
     use cuda_device::atomic::{AtomicOrdering, DeviceAtomicU32};
     use cuda_device::thread;
 
-    /// 1-D global thread index. `#[inline]` so the codegen backend sees the
-    /// body inlined at every call site instead of looking up a symbol —
-    /// matches the pattern used by the upstream cross_crate_kernel example.
-    #[inline]
+    /// 1-D global thread index. `#[device]` (not `#[inline]`) because this
+    /// helper *calls* a cuda-oxide intrinsic (`thread::index_1d`). The
+    /// `#[cuda_module]` macro rewrites intrinsic call sites only inside
+    /// `#[kernel]` and `#[device]` items; under `#[inline]` rustc folds the
+    /// intrinsic's `unreachable!()` stub body into every caller before the
+    /// rewrite pass runs, and the optimizer then DCEs the kernel down to a
+    /// single `panic_fmt` — emitting PTX whose only operation is `exit;`.
+    #[device]
     pub fn get_thread_idx() -> usize {
         thread::index_1d().get()
     }
 
     /// Device-scope relaxed atomic add over a u32 location borrowed from a
-    /// slice element. `#[inline]` because the cuda-oxide codegen collector
-    /// only emits PTX for inlined helpers inside `#[cuda_module]`.
-    #[inline]
-    pub unsafe fn atomic_add_u32(address: &mut u32, val: u32) -> u32 {
+    /// slice element. `#[device]` for the same reason as `get_thread_idx`:
+    /// the body calls intrinsics (`DeviceAtomicU32::from_ptr`, `.fetch_add`)
+    /// that the macro must rewrite at *this* call site, not at the kernel.
+    ///
+    /// Not marked `unsafe fn` even though the body does an unsafe op:
+    /// cuda-oxide's `#[device]` macro generates a safe wrapper that doesn't
+    /// propagate the `unsafe` modifier, so an `unsafe fn` declaration here
+    /// would produce a wrapper that fails to compile (E0133). Given the
+    /// `&mut u32` argument type, the API is in fact callable safely —
+    /// exclusive aliasing is guaranteed by the borrow.
+    #[device]
+    pub fn atomic_add_u32(address: &mut u32, val: u32) -> u32 {
         unsafe {
             DeviceAtomicU32::from_ptr(address as *mut u32)
                 .fetch_add(val, AtomicOrdering::Relaxed)
@@ -151,10 +163,13 @@ pub mod kernels {
 
     /// Race-tolerant write of a better hash. Multiple threads may overwrite
     /// each other within a single launch; the host keeps the global best
-    /// across launches. `#[inline]` for the same reason as `get_thread_idx`.
+    /// across launches. `#[device]` so the call to `atomic_add_u32` (itself
+    /// a `#[device]` wrapper around a cuda-oxide atomic intrinsic) is
+    /// preserved instead of being folded into the kernel before the macro's
+    /// rewrite pass runs.
     #[cfg(feature = "kernel_shallenge")]
-    #[inline]
-    unsafe fn handle_shallenge_match_found(
+    #[device]
+    fn handle_shallenge_match_found(
         result: logic::ShallengeResult,
         thread_idx: usize,
         found_matches: &mut [u32],
@@ -167,7 +182,7 @@ pub mod kernels {
         found_nonce.copy_from_slice(&result.nonce);
         found_nonce_len[0] = result.nonce_len;
         found_thread_idx[0] = thread_idx as u32;
-        unsafe { atomic_add_u32(&mut found_matches[0], 1) };
+        atomic_add_u32(&mut found_matches[0], 1);
     }
 
     /// Shallenge search kernel. Slice lengths:
@@ -201,17 +216,15 @@ pub mod kernels {
         let result = logic::generate_and_check_shallenge(&request);
 
         if result.is_better {
-            unsafe {
-                handle_shallenge_match_found(
-                    result,
-                    thread_idx,
-                    found_matches,
-                    found_hash,
-                    found_nonce,
-                    found_nonce_len,
-                    found_thread_idx,
-                );
-            }
+            handle_shallenge_match_found(
+                result,
+                thread_idx,
+                found_matches,
+                found_hash,
+                found_nonce,
+                found_nonce_len,
+                found_thread_idx,
+            );
         }
     }
 }

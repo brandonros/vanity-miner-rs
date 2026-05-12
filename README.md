@@ -4,6 +4,8 @@ GPU-accelerated vanity address generator for multiple blockchains
 ## How to build
 
 ```shell
+cargo install --path ~/cuda-oxide/crates/cargo-oxide --force
+cargo oxide build --features gpu --arch sm_89
 nix develop --command cargo build -p vanity-miner --features gpu --release
 ```
 

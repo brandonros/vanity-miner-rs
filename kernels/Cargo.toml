@@ -12,6 +12,6 @@ kernel_shallenge = []
 
 [dependencies]
 logic = { path = "../logic" }
-cuda-device = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }
-cuda-host = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }
-cuda-core = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "990e028fc0756d3082bd1bfe41876c2cf4ce3efa" }
+cuda-device = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "c345b43f384b81280042c5c2bf232c30787e7140" }
+cuda-host = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "c345b43f384b81280042c5c2bf232c30787e7140" }
+cuda-core = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "c345b43f384b81280042c5c2bf232c30787e7140" }
