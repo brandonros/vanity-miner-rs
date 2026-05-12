@@ -1,39 +1,44 @@
+use core::mem::ManuallyDrop;
 use k256::SecretKey;
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 
 pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> [u8; 33] {
-    // Create secret key from bytes (validates it's in valid range)
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
-    
+    // Create secret key from bytes (validates it's in valid range).
+    // Wrapped in `ManuallyDrop` because `SecretKey` zeroizes on drop, and
+    // cuda-oxide does not yet emit device-side `drop_in_place`.
+    let secret_key = ManuallyDrop::new(SecretKey::from_bytes(private_key_bytes.into()).unwrap()); // TODO: handle error
+
     // Derive public key
     let public_key = secret_key.public_key();
-    
+
     // Get compressed point (33 bytes: 0x02/0x03 prefix + 32 bytes x-coordinate)
     let encoded_point = public_key.to_encoded_point(true); // true = compressed
     let compressed_bytes = encoded_point.as_bytes();
-    
+
     // Convert to fixed-size array
     let mut result = [0u8; 33];
     result.copy_from_slice(compressed_bytes);
-    
+
     result
 }
 
 pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> [u8; 65] {
-    // Create secret key from bytes
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
-    
+    // Create secret key from bytes.
+    // Wrapped in `ManuallyDrop` because `SecretKey` zeroizes on drop, and
+    // cuda-oxide does not yet emit device-side `drop_in_place`.
+    let secret_key = ManuallyDrop::new(SecretKey::from_bytes(private_key_bytes.into()).unwrap()); // TODO: handle error
+
     // Derive public key
     let public_key = secret_key.public_key();
-    
+
     // Get uncompressed point (65 bytes: 0x04 prefix + 32 bytes x + 32 bytes y)
     let encoded_point = public_key.to_encoded_point(false); // false = uncompressed
     let uncompressed_bytes = encoded_point.as_bytes();
-    
+
     // Convert to fixed-size array
     let mut result = [0u8; 65];
     result.copy_from_slice(uncompressed_bytes);
-    
+
     result
 }
 

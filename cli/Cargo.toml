@@ -28,10 +28,10 @@ optional = true
 
 [dependencies.cuda-core]
 git = "https://github.com/brandonros/cuda-oxide.git"
-rev = "c345b43f384b81280042c5c2bf232c30787e7140"
+rev = "157cf42133f3e189b66a723f1dfbe21192397c40"
 optional = true
 
 [dependencies.cuda-host]
 git = "https://github.com/brandonros/cuda-oxide.git"
-rev = "c345b43f384b81280042c5c2bf232c30787e7140"
+rev = "157cf42133f3e189b66a723f1dfbe21192397c40"
 optional = true
