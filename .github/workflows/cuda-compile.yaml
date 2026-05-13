@@ -33,6 +33,10 @@ jobs:
 
           mkdir -p artifacts
           cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
+          # kernels.ptx is host-arch-independent (nvptx64), but copy it from
+          # both arch jobs so the release step can pick either one — they're
+          # identical. download-artifact will merge under one name.
+          cp target/ptx/kernels.ptx ./artifacts/kernels.ptx
           echo "Copied build artifacts for ${{ matrix.arch }}"
 
       - name: Patch ELF interpreter for portability
@@ -139,3 +143,13 @@ jobs:
           asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
           asset_name: vanity-miner-aarch64
           asset_content_type: application/octet-stream
+
+      - name: Upload kernels.ptx
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-x86_64/kernels.ptx
+          asset_name: kernels.ptx
+          asset_content_type: text/plain

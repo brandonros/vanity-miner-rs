@@ -30,7 +30,20 @@ impl GpuRunner {
     ) -> Result<(Arc<CudaContext>, LoadedModule), Box<dyn Error + Send + Sync>> {
         let ctx = CudaContext::new(ordinal)?;
         println!("[{ordinal}] Loading module...");
-        let module = kernels::kernels::load(&ctx)?;
+        // Workaround: cuda-oxide's codegen backend emits a host object with
+        // an `.oxart` section containing the PTX bundle, but it isn't ending
+        // up in our final binary (verified via `readelf -S` — no `.oxart`).
+        // Likely the embed `.o` lands in the kernels rlib but the linker
+        // drops it because nothing references a symbol inside it. Until
+        // that's fixed, allow loading PTX from a file path so we can ship
+        // the .ptx alongside the binary.
+        let module = if let Ok(path) = std::env::var("PTX_PATH") {
+            println!("[{ordinal}] Loading PTX from {path}");
+            let cu_module = ctx.load_module_from_file(std::path::Path::new(&path))?;
+            kernels::kernels::from_module(cu_module)?
+        } else {
+            kernels::kernels::load(&ctx)?
+        };
         println!("[{ordinal}] Module loaded");
         Ok((ctx, module))
     }

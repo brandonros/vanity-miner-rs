@@ -73,9 +73,24 @@ banner "build :: vanity-miner (release, gpu) with NVPTX backend"
 # (loaded into rustc via -Z codegen-backend) can resolve librustc_driver-*.so.
 # This mirrors cargo-oxide's apply_ld_library_path helper.
 unset CUDA_OXIDE_BACKEND
+# CUDA_OXIDE_PTX_DIR pins where the codegen backend writes kernels.ptx.
+# Without it, the backend defaults to rustc's cwd, which is fine for local
+# builds but harder to script around in CI. The .ptx is host-arch-independent
+# (nvptx64), so one file covers x86_64 and aarch64 releases.
+mkdir -p target/ptx
+CUDA_OXIDE_PTX_DIR="$PWD/target/ptx" \
 LD_LIBRARY_PATH="$RUSTC_LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 RUSTFLAGS="-Z codegen-backend=$BACKEND_SO -C opt-level=3 -C debug-assertions=off -Z mir-enable-passes=-JumpThreading -Csymbol-mangling-version=v0 -Z always-encode-mir=yes" \
     cargo build -p vanity-miner --features gpu --release
+
+banner "verify :: kernels.ptx produced"
+# Hard fail if the codegen backend didn't actually run — better than silently
+# shipping a binary with no usable kernels. We currently load PTX at runtime
+# via PTX_PATH because the .oxart embedded-section path isn't landing in the
+# final ELF (see cli/src/runner/gpu.rs for context).
+test -f target/ptx/kernels.ptx \
+    || { echo "FATAL: target/ptx/kernels.ptx missing — codegen backend did not run"; exit 1; }
+ls -lh target/ptx/kernels.ptx
 
 banner "result"
 ls -lh target/release/vanity-miner
