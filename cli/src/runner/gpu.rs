@@ -15,6 +15,7 @@ pub struct GpuRunner {
 
 impl GpuRunner {
     pub fn new() -> Result<Self, Box<dyn Error + Send + Sync>> {
+        unsafe { cuda_core::init(0)? };
         let num_devices = unsafe {
             let mut count = MaybeUninit::<c_int>::uninit();
             cuDeviceGetCount(count.as_mut_ptr()).result()?;
