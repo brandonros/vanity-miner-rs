@@ -101,9 +101,11 @@
           shellHook = ''
             export CARGO_TARGET_DIR="$PWD/target"
             export PATH="${llvm21CompatTools}/bin:${llvm21Bin}/bin:${llvm21Dev}/bin:${cudaRoot}/bin:$PATH"
+
             # libcuda.so.1 is provided by the host NVIDIA driver, not nix.
             # LD_LIBRARY_PATH covers libcudart + libcublas etc. for runtime.
             export LD_LIBRARY_PATH="${cudaRoot}/lib64:${cudaRoot}/lib:${lib.getLib llvm21.libclang}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            
             # cuda-bindings' build.rs only adds lib64/{,stubs} to the rustc link
             # search path; on aarch64 CUDA toolkits the stubs live under
             # lib/stubs, so add both layouts to LIBRARY_PATH so -lcuda resolves.

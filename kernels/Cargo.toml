@@ -13,6 +13,6 @@ kernel_self_test = []
 
 [dependencies]
 logic = { path = "../logic" }
-cuda-device = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "157cf42133f3e189b66a723f1dfbe21192397c40" }
-cuda-host = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "157cf42133f3e189b66a723f1dfbe21192397c40" }
-cuda-core = { git = "https://github.com/brandonros/cuda-oxide.git", rev = "157cf42133f3e189b66a723f1dfbe21192397c40" }
+cuda-device = { workspace = true }
+cuda-host = { workspace = true }
+cuda-core = { workspace = true }
