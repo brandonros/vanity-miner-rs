@@ -75,14 +75,65 @@ pub mod gpu {
 
         let mut results_dev =
             DeviceBuffer::<u32>::zeroed(stream, logic::SELF_TEST_NUM_CHECKS)?;
+        let mut results = [0u32; logic::SELF_TEST_NUM_CHECKS];
 
-        unsafe {
-            module.kernel_self_test(stream, launch_config, &mut results_dev)?;
+        // Launch each slot's kernel sequentially with a copy+sync between
+        // launches. If a kernel hits an illegal address, the *next* host
+        // call (kernel launch or copy) is what surfaces the sticky error —
+        // so per-slot sync lets us pinpoint which slot's kernel faulted.
+        // Slots before the fault still produce reliable values; slots at
+        // and after are reported as FAIL since their writes never landed.
+        macro_rules! run_slot {
+            ($slot:expr, $method:ident) => {{
+                let slot: usize = $slot;
+                let label = logic::SELF_TEST_LABELS[slot];
+                let launch_res = unsafe {
+                    module.$method(stream, launch_config, &mut results_dev)
+                };
+                if let Err(e) = launch_res {
+                    return Err(format!(
+                        "[{ordinal}] slot {slot:2} [{label}] launch failed: {e}"
+                    )
+                    .into());
+                }
+                if let Err(e) = results_dev.copy_to_host(stream, &mut results) {
+                    return Err(format!(
+                        "[{ordinal}] slot {slot:2} [{label}] DtoH copy failed (kernel likely faulted): {e}"
+                    )
+                    .into());
+                }
+                if let Err(e) = stream.synchronize() {
+                    return Err(format!(
+                        "[{ordinal}] slot {slot:2} [{label}] sync failed (kernel likely faulted): {e}"
+                    )
+                    .into());
+                }
+                let status = if results[slot] == 1 { "PASS" } else { "FAIL" };
+                println!("[{ordinal}] slot {slot:2} {status}  {label}");
+            }};
         }
 
-        let mut results = [0u32; logic::SELF_TEST_NUM_CHECKS];
-        results_dev.copy_to_host(stream, &mut results)?;
-        stream.synchronize()?;
+        run_slot!(0,  kernel_self_test_solana_priv);
+        run_slot!(1,  kernel_self_test_solana_pub);
+        run_slot!(2,  kernel_self_test_solana_encoded);
+        run_slot!(3,  kernel_self_test_ethereum_priv);
+        run_slot!(4,  kernel_self_test_ethereum_pub);
+        run_slot!(5,  kernel_self_test_ethereum_address);
+        run_slot!(6,  kernel_self_test_bitcoin_priv);
+        run_slot!(7,  kernel_self_test_bitcoin_pub);
+        run_slot!(8,  kernel_self_test_bitcoin_pkh);
+        run_slot!(9,  kernel_self_test_bitcoin_encoded);
+        run_slot!(10, kernel_self_test_bitcoin_matches);
+        run_slot!(11, kernel_self_test_wif_compressed_mainnet);
+        run_slot!(12, kernel_self_test_wif_uncompressed_mainnet);
+        run_slot!(13, kernel_self_test_wif_compressed_testnet);
+        run_slot!(14, kernel_self_test_wif_uncompressed_testnet);
+        run_slot!(15, kernel_self_test_shallenge_hash);
+        run_slot!(16, kernel_self_test_shallenge_nonce_len);
+        run_slot!(17, kernel_self_test_shallenge_is_better);
+        run_slot!(18, kernel_self_test_compare_hashes_lt);
+        run_slot!(19, kernel_self_test_compare_hashes_gt);
+        run_slot!(20, kernel_self_test_compare_hashes_eq);
 
         report(&results)
     }

@@ -229,10 +229,9 @@ pub mod kernels {
     }
 
     /// Self-test plumbing probe: writes `results[0] = 1` and nothing else.
-    /// Launched before `kernel_self_test` to isolate "PTX load + launch +
-    /// DtoH copy" health from the much larger logic body. If this fails but
-    /// the regular self-test would have failed too, the bug is in the
-    /// plumbing, not in `logic::run_self_test`.
+    /// Launched before the per-slot kernels to isolate "PTX load + launch +
+    /// DtoH copy" health from any logic body. If this fails, the bug isn't
+    /// in `logic::*` — it's in the kernel-load / launch path.
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
@@ -240,16 +239,161 @@ pub mod kernels {
         results[0] = 1;
     }
 
-    /// Self-test kernel: runs known-answer tests for every logic primitive
-    /// against externally-validated expected values, writing pass(1)/fail(0)
-    /// per check into the results buffer. Launch as 1×1 grid×block. If any
-    /// slot reads 0 on the host, PTX codegen has diverged from CPU behavior.
-    /// The body lives in `logic::run_self_test` so CPU and GPU run the
-    /// same code; see `logic::SELF_TEST_LABELS` for slot semantics.
+    // Per-slot self-test kernels. Each writes its single `1`/`0` result into
+    // `results[slot]`. Launched as 1×1 grid×block — these are deterministic
+    // single-point KAT checks. Splitting per slot keeps each kernel's stack
+    // footprint to one subsystem so an illegal-address fault localizes
+    // (and slots that ran before the fault still produce reliable values
+    // before the context goes sticky-errored).
+    //
+    // Slot ordering matches `logic::SELF_TEST_LABELS`. See `logic::self_test`
+    // for the underlying `check_*` bodies (CPU mode calls them too via
+    // `logic::run_self_test`).
+
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
-    pub unsafe fn kernel_self_test(results: &mut [u32]) {
-        logic::run_self_test(results);
+    pub unsafe fn kernel_self_test_solana_priv(results: &mut [u32]) {
+        results[0] = logic::check_solana_priv();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_solana_pub(results: &mut [u32]) {
+        results[1] = logic::check_solana_pub();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_solana_encoded(results: &mut [u32]) {
+        results[2] = logic::check_solana_encoded();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_ethereum_priv(results: &mut [u32]) {
+        results[3] = logic::check_ethereum_priv();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_ethereum_pub(results: &mut [u32]) {
+        results[4] = logic::check_ethereum_pub();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_ethereum_address(results: &mut [u32]) {
+        results[5] = logic::check_ethereum_address();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bitcoin_priv(results: &mut [u32]) {
+        results[6] = logic::check_bitcoin_priv();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bitcoin_pub(results: &mut [u32]) {
+        results[7] = logic::check_bitcoin_pub();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bitcoin_pkh(results: &mut [u32]) {
+        results[8] = logic::check_bitcoin_pkh();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bitcoin_encoded(results: &mut [u32]) {
+        results[9] = logic::check_bitcoin_encoded();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bitcoin_matches(results: &mut [u32]) {
+        results[10] = logic::check_bitcoin_matches();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_wif_compressed_mainnet(results: &mut [u32]) {
+        results[11] = logic::check_wif_compressed_mainnet();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_wif_uncompressed_mainnet(results: &mut [u32]) {
+        results[12] = logic::check_wif_uncompressed_mainnet();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_wif_compressed_testnet(results: &mut [u32]) {
+        results[13] = logic::check_wif_compressed_testnet();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_wif_uncompressed_testnet(results: &mut [u32]) {
+        results[14] = logic::check_wif_uncompressed_testnet();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_shallenge_hash(results: &mut [u32]) {
+        results[15] = logic::check_shallenge_hash();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_shallenge_nonce_len(results: &mut [u32]) {
+        results[16] = logic::check_shallenge_nonce_len();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_shallenge_is_better(results: &mut [u32]) {
+        results[17] = logic::check_shallenge_is_better();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_compare_hashes_lt(results: &mut [u32]) {
+        results[18] = logic::check_compare_hashes_lt();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_compare_hashes_gt(results: &mut [u32]) {
+        results[19] = logic::check_compare_hashes_gt();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_compare_hashes_eq(results: &mut [u32]) {
+        results[20] = logic::check_compare_hashes_eq();
     }
 }
