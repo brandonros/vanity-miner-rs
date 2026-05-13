@@ -24,29 +24,12 @@ jobs:
       - name: Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Build cuda-oxide codegen backend
+      - name: Build (via scripts/build-gpu.sh)
         run: |
-          # Build librustc_codegen_cuda.so (the rustc plugin doing NVPTX lowering).
-          # The crate is intentionally NOT a workspace member of cuda-oxide, so build
-          # it standalone by cd-ing in. The flake's shellHook sets CARGO_TARGET_DIR
-          # so the .so lands under $GITHUB_WORKSPACE/target/debug/.
-          git clone --branch reproduce-errors --depth 1 \
-            https://github.com/brandonros/cuda-oxide.git "$HOME/cuda-oxide"
-          nix develop --command bash -c \
-            'cd "$HOME/cuda-oxide/crates/rustc-codegen-cuda" && cargo build'
-
-      - name: Build vanity-miner with NVPTX backend
-        run: |
-          # Load the codegen backend via RUSTFLAGS — same pattern documented in
-          # cuda-oxide's example Cargo.toml ("Or manually: RUSTFLAGS=-Z codegen-backend=...").
-          # CUDA_OXIDE_BACKEND is set by the flake's shellHook; unset it so the cuda-* runtime
-          # deps don't try to load a stale .so path from $HOME/cuda-oxide/target/.
-          BACKEND_SO="$GITHUB_WORKSPACE/target/debug/librustc_codegen_cuda.so"
-          nix develop --command bash -c "
-            unset CUDA_OXIDE_BACKEND;
-            RUSTFLAGS='-Z codegen-backend=$BACKEND_SO' \
-              cargo build -p vanity-miner --features gpu --release
-          "
+          # Single script for CI + local debugging. Mirrors cargo-oxide's full
+          # RUSTFLAGS set including -Z always-encode-mir=yes (without which
+          # cross-crate pub fn calls into logic/ get dropped at the collector).
+          nix develop --command bash scripts/build-gpu.sh
 
           mkdir -p artifacts
           cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
