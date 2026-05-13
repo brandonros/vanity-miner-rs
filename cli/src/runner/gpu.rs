@@ -39,7 +39,7 @@ impl GpuRunner {
         // the .ptx alongside the binary.
         let module = if let Ok(path) = std::env::var("PTX_PATH") {
             println!("[{ordinal}] Loading PTX from {path}");
-            let cu_module = ctx.load_module_from_file(std::path::Path::new(&path))?;
+            let cu_module = ctx.load_module_from_file(&path)?;
             kernels::kernels::from_module(cu_module)?
         } else {
             kernels::kernels::load(&ctx)?
