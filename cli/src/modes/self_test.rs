@@ -196,6 +196,9 @@ pub mod gpu {
         // the divisor / accumulator shapes the existing slots miss.
         run_slot!(64, kernel_self_test_arith_divrem_by_58_pow_5);
         run_slot!(65, kernel_self_test_arith_i128_chain_add);
+        run_slot!(66, kernel_self_test_base58_limb_divrem);
+        run_slot!(67, kernel_self_test_dynamic_index_write);
+        run_slot!(68, kernel_self_test_arith_widening_mul_chain_3term);
         // Slots 60-62: triangulating bisects for the iter_mut + alphabet-
         // lookup pattern (the suspect shared crash path between slot 41
         // and slot 43). Ordered simplest→most complex so an early crash

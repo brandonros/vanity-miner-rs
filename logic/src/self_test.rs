@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 66;
+pub const SELF_TEST_NUM_CHECKS: usize = 69;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -163,6 +163,28 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     //        k256's FieldElement5x52::mul_inner.
     "arith divrem by 58^5",
     "arith i128 chain add",
+    // Slots 66-68: ported from cuda-oxide standalone repros that
+    // existing slots don't cover.
+    //   66 — `mul.hi.u64` with multiplicand reconstructed via
+    //        `shl + add` from a stack-resident u32 limb (base58's
+    //        exact inner-loop shape). Slot 64 feeds the divrem from
+    //        a black_box'd u64 — different operand path. If 64
+    //        passes and 66 fails, the bug is specifically `mul.hi.u64`
+    //        with arithmetic-derived operands.
+    //   67 — dynamic-grow stack-array writes:
+    //        `while c > 0 { limbs[limb_count] = ...; limb_count += 1; }`.
+    //        Distinct from slots 60-62 (read-side) — those use a
+    //        static index variable / IterMut. This is the write side
+    //        with the index variable mutating across iterations.
+    //   68 — dalek/k256 partial-product accumulation:
+    //        `a0*b2 + a1*b1 + a2*b0` via widening mul + u128 add.
+    //        Slot 49 covers one widening pair; slot 65 covers a
+    //        u128 add chain. This composes them — the actual shape
+    //        Scalar52::mul_internal and FieldElement5x52::mul_inner
+    //        emit.
+    "base58 limb divrem (shl+add multiplicand)",
+    "dynamic-grow stack array write",
+    "widening mul chain 3-term",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1189,6 +1211,129 @@ pub fn check_arith_i128_chain_add() -> u32 {
     1
 }
 
+pub fn check_base58_limb_divrem() -> u32 {
+    // The exact base58_encode_32 inner-loop shape: a u32 limb loaded
+    // from a stack array, shifted into the high half, added to a u64
+    // carry, then div/mod by NEXT_LIMB_DIVISOR. Slot 64 covers div by
+    // 58^5 from a clean u64 source; this slot covers the case where
+    // the multiplicand goes into `mul.hi.u64` after being reconstructed
+    // via `shl + add`. The discriminator is the operand path, not the
+    // divisor.
+    //
+    // Runtime index defeats mem2reg so `limbs[]` actually lives in
+    // local memory and the read materialises as ld.local.b32. Even if
+    // the optimizer tracks the value across the local store, the
+    // multiplicand `%dividend` still comes from `add.s64(carry, shl.b64(limb,
+    // 32))` — that's the suspect shape.
+    const D: u64 = 58_u64.pow(5);
+    let mut limbs = [0u32; 8];
+    let write_idx = core::hint::black_box(3usize) & 7;
+    let limb_val: u32 = core::hint::black_box(0x089A_23FF_u32);
+    limbs[write_idx] = limb_val;
+
+    let carry: u64 = core::hint::black_box(0xDEAD_BEEF_u64);
+    let dividend = carry.wrapping_add((limbs[write_idx] as u64) << 32);
+
+    // Const-eval baseline computed on the host rustc.
+    const EXPECTED_DIVIDEND: u64 = 0xDEAD_BEEF_u64.wrapping_add((0x089A_23FF_u64) << 32);
+    const EXPECTED_Q: u64 = EXPECTED_DIVIDEND / D;
+    const EXPECTED_R: u64 = EXPECTED_DIVIDEND % D;
+
+    (dividend == EXPECTED_DIVIDEND
+        && dividend / D == EXPECTED_Q
+        && dividend % D == EXPECTED_R) as u32
+}
+
+pub fn check_dynamic_index_write() -> u32 {
+    // base58_encode_32's dynamic-growth pattern in isolation:
+    //   while remaining_carry > 0 && limb_count < N {
+    //       limbs[limb_count] = (remaining_carry % D) as u32;
+    //       remaining_carry /= D;
+    //       limb_count += 1;
+    //   }
+    // Slot 43 ([0u8; 32] input) PASSes because this loop never runs
+    // with non-zero values; slot 3 (real input) FAILs and exercises
+    // it heavily. Slot 60-62 cover runtime-index *reads*; this one is
+    // about *writes* where the index variable mutates across loop
+    // iterations.
+    //
+    // Verifies all 10 slots of the resulting array against the
+    // host-CPU baseline computed under `const`.
+    const D: u64 = 58_u64.pow(5);
+    let mut limbs = [0u32; 10];
+    let mut limb_count: usize = 0;
+    let mut remaining_carry = core::hint::black_box(0xDEAD_BEEF_CAFE_BABE_u64);
+
+    while remaining_carry > 0 && limb_count < 10 {
+        limbs[limb_count] = (remaining_carry % D) as u32;
+        remaining_carry /= D;
+        limb_count += 1;
+    }
+
+    // Host-side const-eval of the same loop.
+    const fn run_growth() -> ([u32; 10], usize) {
+        let mut out = [0u32; 10];
+        let mut count = 0usize;
+        let mut c = 0xDEAD_BEEF_CAFE_BABE_u64;
+        while c > 0 && count < 10 {
+            out[count] = (c % D) as u32;
+            c /= D;
+            count += 1;
+        }
+        (out, count)
+    }
+    const EXPECTED: ([u32; 10], usize) = run_growth();
+
+    if limb_count != EXPECTED.1 {
+        return 0;
+    }
+    let mut i = 0;
+    while i < 10 {
+        if limbs[i] != EXPECTED.0[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
+pub fn check_arith_widening_mul_chain_3term() -> u32 {
+    // dalek's `Scalar52::mul_internal` and k256's
+    // `FieldElement5x52::mul_inner` accumulate partial products as
+    //   z = m(a0, b2) + m(a1, b1) + m(a2, b0)
+    // where m(x, y) = `(x as u128) * (y as u128)`. Slot 40 (one u128
+    // wrapping_mul) and slot 49 (one widening pair) both PASS; slot
+    // 65 covers a chain of u128 adds. This composes them: three
+    // widening mults summed via `u128 + u128 + u128`. If a register-
+    // pressure or scheduling bug only surfaces under composition,
+    // this slot catches it where the isolated ones don't.
+    //
+    // 52-bit operands (the actual limb size dalek uses) → products
+    // span ~104 bits, sums span ~106, forcing real carries across
+    // the 64-bit boundary in every step.
+    const A0: u64 = 0x000F_FFFF_FFFF_FFFF;
+    const A1: u64 = 0x000F_FFFF_FFFF_FFFE;
+    const A2: u64 = 0x000F_FFFF_FFFF_FFFD;
+    const B0: u64 = 0x000F_FFFF_FFFF_FFFC;
+    const B1: u64 = 0x000F_FFFF_FFFF_FFFB;
+    const B2: u64 = 0x000F_FFFF_FFFF_FFFA;
+    const EXPECTED: u128 = (A0 as u128).wrapping_mul(B2 as u128)
+        .wrapping_add((A1 as u128).wrapping_mul(B1 as u128))
+        .wrapping_add((A2 as u128).wrapping_mul(B0 as u128));
+
+    let a0 = core::hint::black_box(A0) as u128;
+    let a1 = core::hint::black_box(A1) as u128;
+    let a2 = core::hint::black_box(A2) as u128;
+    let b0 = core::hint::black_box(B0) as u128;
+    let b1 = core::hint::black_box(B1) as u128;
+    let b2 = core::hint::black_box(B2) as u128;
+
+    let z = a0.wrapping_mul(b2)
+        .wrapping_add(a1.wrapping_mul(b1))
+        .wrapping_add(a2.wrapping_mul(b0));
+    (z == EXPECTED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1256,6 +1401,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[63] = check_iter_static_slice_lookup();
     results[64] = check_arith_divrem_by_58_pow_5();
     results[65] = check_arith_i128_chain_add();
+    results[66] = check_base58_limb_divrem();
+    results[67] = check_dynamic_index_write();
+    results[68] = check_arith_widening_mul_chain_3term();
 }
 
 #[cfg(test)]

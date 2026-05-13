@@ -751,4 +751,28 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_arith_i128_chain_add(results: &mut [u32]) {
         results[65] = logic::check_arith_i128_chain_add();
     }
+
+    // Slots 66-68: ports of three cuda-oxide standalone-repro hypotheses
+    // that aren't covered by any existing in-suite slot.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_limb_divrem(results: &mut [u32]) {
+        results[66] = logic::check_base58_limb_divrem();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dynamic_index_write(results: &mut [u32]) {
+        results[67] = logic::check_dynamic_index_write();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_widening_mul_chain_3term(results: &mut [u32]) {
+        results[68] = logic::check_arith_widening_mul_chain_3term();
+    }
 }
