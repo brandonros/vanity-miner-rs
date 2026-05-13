@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 64;
+pub const SELF_TEST_NUM_CHECKS: usize = 66;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -150,6 +150,19 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     // CRASHes and 63 PASSes, the array-ref-vs-slice discriminator is
     // confirmed and the alpha-NVPTX bug is narrowed to one Rust idiom.
     "iter static slice lookup",
+    // Slots 64-65: targeted regressions ported from the cuda-oxide
+    // standalone repros (divrem_large_const, i128_add_carry_chain). Each
+    // mirrors the standalone kernel's logic but runs in this suite so
+    // every future compiler bump re-validates them automatically.
+    //   64 — `x / 58^5` and `x % 58^5` for the same divisor base58
+    //        actually uses (NEXT_LIMB_DIVISOR = 656_356_768). Slot 59
+    //        only goes up to /58^4; slot 64 covers the gap.
+    //   65 — sequential `u128 + u128` wrapping chain that forces a
+    //        low→high carry on every addition. Mirrors the
+    //        accumulation pattern in dalek's Scalar52::mul_internal and
+    //        k256's FieldElement5x52::mul_inner.
+    "arith divrem by 58^5",
+    "arith i128 chain add",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1065,6 +1078,96 @@ pub fn check_iter_static_slice_lookup() -> u32 {
     (TABLE[idx] == b'A') as u32
 }
 
+pub fn check_arith_divrem_by_58_pow_5() -> u32 {
+    // Slot 59 covers `x / 58` through `x / 58^4`. base58_encode_32's limb
+    // update loop divides by `58^5 = 656_356_768` (NEXT_LIMB_DIVISOR),
+    // which produces a *different* magic-multiply constant than slot 59
+    // exercises (PTX inspection of v1.42 confirms: 7_544_311_872_078_572_213
+    // for /58^5, distinct from slot 59's constants). This slot covers
+    // exactly that gap.
+    //
+    // Cases include the first 4 bytes of slot 3's input, the divisor
+    // itself, divisor-1 boundary, a known quotient with non-zero
+    // remainder, and u64 extremes. Each `(input, quotient, remainder)`
+    // tuple is const-evaluated by the host rustc.
+    const D: u64 = 58_u64.pow(5);
+    const CASES: [(u64, u64, u64); 6] = [
+        (0x089A23FF, 0x089A23FF_u64 / D, 0x089A23FF_u64 % D),
+        (D, 1, 0),
+        (D - 1, 0, D - 1),
+        (D.wrapping_mul(7).wrapping_add(123), 7, 123),
+        (u64::MAX, u64::MAX / D, u64::MAX % D),
+        (0xFFFFFFFF_00000000, 0xFFFFFFFF_00000000_u64 / D, 0xFFFFFFFF_00000000_u64 % D),
+    ];
+
+    let mut i = 0;
+    while i < CASES.len() {
+        let (input, eq, er) = CASES[i];
+        let x = core::hint::black_box(input);
+        if x / D != eq || x % D != er {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
+pub fn check_arith_i128_chain_add() -> u32 {
+    // Slot 40 (u128 wrapping_mul) and slot 49 (widening mul pair) both
+    // PASS, but those only exercise a single u128 op. dalek's
+    // Scalar52::mul_internal and k256's FieldElement5x52::mul_inner
+    // accumulate ~25 widening products via sequential `u128 + u128`
+    // chains. Each addition must propagate the low-half carry into the
+    // high half. If that's broken, every accumulation step silently
+    // drops a bit — which would explain the residual failure of slots
+    // 2/4/5/11–20 even after the overflowing_add fix.
+    //
+    // Three regimes per the cuda-oxide divrem_large_const_repro: pure
+    // low→high carry, carry-rolls-fully-over (both halves saturated),
+    // and combined low+high adds.
+
+    // Case 0: (MAX, 0) + (1, 0) = (0, 1). Pure low→high carry.
+    {
+        let a = core::hint::black_box(u64::MAX as u128);
+        let b = core::hint::black_box(1u128);
+        const E: u128 = (u64::MAX as u128).wrapping_add(1);
+        if a.wrapping_add(b) != E {
+            return 0;
+        }
+    }
+
+    // Case 1: (MAX, MAX) + (1, 0) = (0, 0). Carry rolls all the way over.
+    {
+        let a = core::hint::black_box(u128::MAX);
+        let b = core::hint::black_box(1u128);
+        const E: u128 = u128::MAX.wrapping_add(1);
+        if a.wrapping_add(b) != E {
+            return 0;
+        }
+    }
+
+    // Case 2: 4-operand chain forcing carry on every step.
+    // (MAX_LO) + (MAX_LO) + (MAX_LO) + ((1 << 64) | 1)
+    //   → low halves wrap three times (3 carries to high) + 1 from d's
+    //     high half → high = 4, low = ((MAX*3) wrapping) + 1.
+    {
+        let a = core::hint::black_box(u64::MAX as u128);
+        let b = core::hint::black_box(u64::MAX as u128);
+        let c = core::hint::black_box(u64::MAX as u128);
+        let d = core::hint::black_box((1u128 << 64) | 1u128);
+        let s = a.wrapping_add(b).wrapping_add(c).wrapping_add(d);
+        const E: u128 = (u64::MAX as u128)
+            .wrapping_add(u64::MAX as u128)
+            .wrapping_add(u64::MAX as u128)
+            .wrapping_add((1u128 << 64) | 1u128);
+        if s != E {
+            return 0;
+        }
+    }
+
+    1
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1130,6 +1233,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[61] = check_iter_mut_slice_partial();
     results[62] = check_iter_mut_alphabet_lookup();
     results[63] = check_iter_static_slice_lookup();
+    results[64] = check_arith_divrem_by_58_pow_5();
+    results[65] = check_arith_i128_chain_add();
 }
 
 #[cfg(test)]

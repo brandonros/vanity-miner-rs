@@ -732,4 +732,23 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_iter_static_slice_lookup(results: &mut [u32]) {
         results[63] = logic::check_iter_static_slice_lookup();
     }
+
+    // Slots 64-65: in-suite versions of the cuda-oxide standalone repros
+    // (divrem_large_const, i128_add_carry_chain). Adding them here means
+    // every future compiler bump re-validates these specific shapes
+    // automatically.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_divrem_by_58_pow_5(results: &mut [u32]) {
+        results[64] = logic::check_arith_divrem_by_58_pow_5();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_i128_chain_add(results: &mut [u32]) {
+        results[65] = logic::check_arith_i128_chain_add();
+    }
 }

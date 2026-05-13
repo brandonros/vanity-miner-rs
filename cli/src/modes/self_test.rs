@@ -191,6 +191,11 @@ pub mod gpu {
         // Slot 59: isolated divmod-by-58 — must run BEFORE the deferred
         // base58 kernels so its result is captured even when they fault.
         run_slot!(59, kernel_self_test_base58_div_by_58);
+        // Slots 64-65: in-suite versions of the cuda-oxide standalone
+        // repros (divrem_large_const, i128_add_carry_chain). They cover
+        // the divisor / accumulator shapes the existing slots miss.
+        run_slot!(64, kernel_self_test_arith_divrem_by_58_pow_5);
+        run_slot!(65, kernel_self_test_arith_i128_chain_add);
         // Slots 60-62: triangulating bisects for the iter_mut + alphabet-
         // lookup pattern (the suspect shared crash path between slot 41
         // and slot 43). Ordered simplest→most complex so an early crash
