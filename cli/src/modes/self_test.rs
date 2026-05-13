@@ -162,11 +162,11 @@ pub mod gpu {
         run_slot!(38, kernel_self_test_arith_u64_mul_lo);
         run_slot!(39, kernel_self_test_arith_u64_mul_hi);
         run_slot!(40, kernel_self_test_arith_u128_mul);
-        // Slots 43-45: composed-primitive sub-bisects (all-zeros base58,
-        // xoroshiro nonce, bech32 p2wpkh). Slots 41-42 also belong to this
-        // group but are deferred to the very end of the run — see the
-        // comment near their run_slot! calls below.
-        run_slot!(43, kernel_self_test_base58_all_zeros);
+        // Slots 44-45: composed-primitive sub-bisects (xoroshiro nonce,
+        // bech32 p2wpkh). Slot 43 (base58 all-zeros) ALSO turns out to be
+        // crash-prone — surprising, since with all-zero input the divide
+        // loop is dead, but the codegen still faults wildly. Deferred with
+        // 41/42 to the tail; see the comment near their run_slot! calls.
         run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
         run_slot!(45, kernel_self_test_bech32_p2wpkh);
         // Slots 46-56: tier-2 arithmetic bisect targeting PTX idioms
@@ -188,12 +188,27 @@ pub mod gpu {
         // black_box artifact, not a per-op codegen bug.
         run_slot!(57, kernel_self_test_arith_blackbox_identity_u64);
         run_slot!(58, kernel_self_test_arith_blackbox_identity_u32);
-        // Slots 41-42 run LAST: the variable-length base58 kernels are
-        // known to fault on this device (broken divide-by-58 in the
-        // dynamic-limb loop computes corrupted indices, triggering an
-        // illegal __global__ read). Once a kernel faults the CUDA context
-        // is sticky-errored — every subsequent launch/copy/sync fails —
-        // so we defer these so they don't kill the slots above.
+        // Slot 59: isolated divmod-by-58 — must run BEFORE the deferred
+        // base58 kernels so its result is captured even when they fault.
+        run_slot!(59, kernel_self_test_base58_div_by_58);
+        // Slots 60-62: triangulating bisects for the iter_mut + alphabet-
+        // lookup pattern (the suspect shared crash path between slot 41
+        // and slot 43). Ordered simplest→most complex so an early crash
+        // still captures earlier slots' results.
+        run_slot!(60, kernel_self_test_iter_static_table_lookup);
+        run_slot!(61, kernel_self_test_iter_mut_slice_partial);
+        run_slot!(62, kernel_self_test_iter_mut_alphabet_lookup);
+        // Slots 41, 42, 43 run LAST: all three base58 entry points are
+        // crash-prone on this device. 41/42 (variable-length) fault inside
+        // the divide-by-58 dynamic limb loop, where corrupted indices land
+        // wild addresses; 43 (32-byte all-zero) ALSO faults despite the
+        // divide loop being dynamically dead — same `0xfff8…` wild-pointer
+        // shape, so likely the codegen emits the divide PTX unconditionally
+        // and the broken arithmetic propagates somewhere downstream. Once
+        // any kernel faults the CUDA context is sticky-errored — every
+        // subsequent launch/copy/sync fails — so we run all three at the
+        // tail to keep the prior slots' results.
+        run_slot!(43, kernel_self_test_base58_all_zeros);
         run_slot!(41, kernel_self_test_base58_var_len);
         run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
 

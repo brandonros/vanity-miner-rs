@@ -685,4 +685,40 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_arith_blackbox_identity_u32(results: &mut [u32]) {
         results[58] = logic::check_arith_blackbox_identity_u32();
     }
+
+    // Slot 59: isolated divmod-by-58 — confirms slot 41's crash is
+    // downstream of the same `mul.hi.u64` codegen bug, not independent.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_div_by_58(results: &mut [u32]) {
+        results[59] = logic::check_base58_div_by_58();
+    }
+
+    // Slots 60-62: triangulating bisects for the slot 41/43 crash class.
+    // 60 isolates the bare static-table lookup, 61 isolates iter_mut over
+    // `&mut [u8; N][..n]`, 62 combines both into the exact shape
+    // base58_encode_32's final alphabet-encoding loop takes.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_iter_static_table_lookup(results: &mut [u32]) {
+        results[60] = logic::check_iter_static_table_lookup();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_iter_mut_slice_partial(results: &mut [u32]) {
+        results[61] = logic::check_iter_mut_slice_partial();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_iter_mut_alphabet_lookup(results: &mut [u32]) {
+        results[62] = logic::check_iter_mut_alphabet_lookup();
+    }
 }

@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 59;
+pub const SELF_TEST_NUM_CHECKS: usize = 63;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -122,6 +122,26 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     // identity check, no arithmetic at all.
     "arith blackbox identity u64",
     "arith blackbox identity u32",
+    // Slot 59: confirms slot 41's crash is downstream of broken div/mod-
+    // by-58 codegen (same mul.hi.u64 class as slot 40), not an independent
+    // bug. Runs the exact divmod-by-58 pattern from base58_encode_32 in
+    // isolation — no alphabet lookup, no output[] writes, no dynamic
+    // loops — and compares against a host-const-eval baseline.
+    "base58 div by 58",
+    // Slots 60-62: triangulating bisects for the slot 41/43 fault class.
+    // Slot 43 ([0u8; 32] → all-zero input) crashes despite the divide loop
+    // being dynamically dead, so the shared crash path between 41 and 43
+    // can't be the divide-by-58 codegen. Suspects narrow to the *final*
+    // base58 stage: `for val in &mut output[..result_len]` IterMut over a
+    // sub-slice of a stack-resident fixed-size array, and the dynamic
+    // `TABLE[byte as usize]` lookup against a static byte alphabet. These
+    // slots isolate each sub-pattern independently:
+    //   60 — bare static-table dynamic lookup (no iter, no slice)
+    //   61 — iter_mut over `&mut [u8; N][..n]` (no table lookup)
+    //   62 — combined (mirrors the slot 43 final-loop shape exactly)
+    "iter static table lookup",
+    "iter mut slice partial",
+    "iter mut alphabet lookup",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -952,6 +972,77 @@ pub fn check_arith_blackbox_identity_u32() -> u32 {
     (core::hint::black_box(v) == v) as u32
 }
 
+pub fn check_base58_div_by_58() -> u32 {
+    // Exact divmod-by-58 pattern from base58_encode_32's digit-extraction
+    // loop (logic/src/base58.rs:73-82), in isolation. The constant-divisor
+    // `/ 58^k` and `% 58` lowerings emit `mul.hi.u64` magic-multiply ops
+    // in PTX — the smoking-gun op from earlier inspection. No alphabet
+    // lookup, no output[] writes, no leading-zero pad, no dynamic loops —
+    // just the arithmetic that produces digit values in [0, 58).
+    //
+    // If this FAILs on GPU while the surrounding non-arithmetic code (sha2,
+    // ripemd, etc.) PASSes, slot 41's `Invalid __global__ read` cascade
+    // is downstream of broken div/mod codegen (corrupted digit values →
+    // garbage byte writes → corrupted state → wild address used as an
+    // alphabet index), not an independent OOB bug.
+    const LIMB: u64 = 0x0123_4567_89AB_CDEF;
+    const EXPECTED: [u8; 5] = [
+        ((LIMB / 1) % 58) as u8,
+        ((LIMB / 58) % 58) as u8,
+        ((LIMB / (58 * 58)) % 58) as u8,
+        ((LIMB / (58 * 58 * 58)) % 58) as u8,
+        ((LIMB / (58 * 58 * 58 * 58)) % 58) as u8,
+    ];
+
+    let limb = core::hint::black_box(LIMB);
+    let got: [u8; 5] = [
+        ((limb / 1) % 58) as u8,
+        ((limb / 58) % 58) as u8,
+        ((limb / (58 * 58)) % 58) as u8,
+        ((limb / (58 * 58 * 58)) % 58) as u8,
+        ((limb / (58 * 58 * 58 * 58)) % 58) as u8,
+    ];
+
+    (got == EXPECTED) as u32
+}
+
+pub fn check_iter_static_table_lookup() -> u32 {
+    // Simplest possible probe for `TABLE[byte as usize]`: a single dynamic
+    // index into a small static byte slice. No iterator, no &mut, no slice
+    // projection — pure indexed read from a `&'static [u8; N]` plus an
+    // equality check.
+    const TABLE: &[u8; 4] = b"ABCD";
+    let idx = core::hint::black_box(0usize);
+    (TABLE[idx] == b'A') as u32
+}
+
+pub fn check_iter_mut_slice_partial() -> u32 {
+    // `for val in &mut buf[..n]` over a partial slice of a stack-resident
+    // fixed-size array, writing a constant. Isolates the IterMut codegen
+    // from any table lookup. If this FAILs, the iter_mut over a sliced
+    // `&mut [T; N]` is the broken op.
+    let mut buf = [0u8; 8];
+    let n = core::hint::black_box(4usize);
+    for val in &mut buf[..n] {
+        *val = 0xAA;
+    }
+    (buf[0] == 0xAA && buf[3] == 0xAA && buf[4] == 0 && buf[7] == 0) as u32
+}
+
+pub fn check_iter_mut_alphabet_lookup() -> u32 {
+    // Combined: `for val in &mut buf[..n] { *val = TABLE[*val as usize]; }`
+    // — the exact final-stage pattern in base58_encode_32 that runs even
+    // when the divide loop is dead (slot 43's failure case). Mirror of
+    // base58.rs:99-101.
+    const TABLE: &[u8; 4] = b"ABCD";
+    let mut buf = [0u8; 8];
+    let n = core::hint::black_box(4usize);
+    for val in &mut buf[..n] {
+        *val = TABLE[*val as usize];
+    }
+    (buf[0] == b'A' && buf[3] == b'A' && buf[4] == 0 && buf[7] == 0) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1012,6 +1103,10 @@ pub fn run_self_test(results: &mut [u32]) {
     results[56] = check_arith_var_shl_u64();
     results[57] = check_arith_blackbox_identity_u64();
     results[58] = check_arith_blackbox_identity_u32();
+    results[59] = check_base58_div_by_58();
+    results[60] = check_iter_static_table_lookup();
+    results[61] = check_iter_mut_slice_partial();
+    results[62] = check_iter_mut_alphabet_lookup();
 }
 
 #[cfg(test)]
