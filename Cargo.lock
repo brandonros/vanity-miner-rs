@@ -247,7 +247,7 @@ dependencies = [
 [[package]]
 name = "cuda-bindings"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "bindgen",
 ]
@@ -255,7 +255,7 @@ dependencies = [
 [[package]]
 name = "cuda-core"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "anyhow",
  "cuda-bindings",
@@ -266,7 +266,7 @@ dependencies = [
 [[package]]
 name = "cuda-device"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "cuda-macros",
 ]
@@ -274,7 +274,7 @@ dependencies = [
 [[package]]
 name = "cuda-host"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "cuda-core",
  "cuda-macros",
@@ -287,7 +287,7 @@ dependencies = [
 [[package]]
 name = "cuda-macros"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "libnvvm-sys"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "libloading",
  "thiserror",
@@ -599,7 +599,7 @@ dependencies = [
 [[package]]
 name = "nvjitlink-sys"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "libloading",
  "thiserror",
@@ -636,7 +636,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "oxide-artifacts"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 dependencies = [
  "object",
 ]
@@ -777,7 +777,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "reserved-oxide-symbols"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#172567e7275dd511ade6268dbbe88a6dfdb43ff1"
+source = "git+https://github.com/brandonros/cuda-oxide.git?branch=reproduce-errors#2cc155decb9a420c8b52264a774aff23178a2344"
 
 [[package]]
 name = "rustc-hash"
