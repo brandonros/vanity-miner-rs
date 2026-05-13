@@ -553,4 +553,41 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_arith_u128_mul(results: &mut [u32]) {
         results[40] = logic::check_arith_u128_mul();
     }
+
+    // Slots 41-45: composed-primitive sub-bisects.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_var_len(results: &mut [u32]) {
+        results[41] = logic::check_base58_var_len();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_var_len_leading_zero(results: &mut [u32]) {
+        results[42] = logic::check_base58_var_len_leading_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_all_zeros(results: &mut [u32]) {
+        results[43] = logic::check_base58_all_zeros();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_xoroshiro_base64_nonce(results: &mut [u32]) {
+        results[44] = logic::check_xoroshiro_base64_nonce();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_bech32_p2wpkh(results: &mut [u32]) {
+        results[45] = logic::check_bech32_p2wpkh();
+    }
 }

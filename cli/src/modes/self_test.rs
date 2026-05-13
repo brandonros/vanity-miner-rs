@@ -162,6 +162,13 @@ pub mod gpu {
         run_slot!(38, kernel_self_test_arith_u64_mul_lo);
         run_slot!(39, kernel_self_test_arith_u64_mul_hi);
         run_slot!(40, kernel_self_test_arith_u128_mul);
+        // Slots 41-45: composed-primitive sub-bisects (base58 variants,
+        // xoroshiro nonce, bech32 p2wpkh).
+        run_slot!(41, kernel_self_test_base58_var_len);
+        run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
+        run_slot!(43, kernel_self_test_base58_all_zeros);
+        run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
+        run_slot!(45, kernel_self_test_bech32_p2wpkh);
 
         report(&results)
     }

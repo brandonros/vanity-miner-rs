@@ -11,16 +11,16 @@
 use crate::{
     BitcoinVanityKeyRequest, BitcoinVanityKeyResult, EthereumVanityKeyRequest,
     EthereumVanityKeyResult, ShallengeRequest, ShallengeResult, SolanaVanityKeyRequest,
-    SolanaVanityKeyResult, base58_encode_32, compare_hashes, ed25519_derive_public_key,
-    generate_and_check_bitcoin_vanity_key, generate_and_check_ethereum_vanity_key,
-    generate_and_check_shallenge, generate_and_check_solana_vanity_key,
-    generate_random_private_key, keccak256_64bytes, private_key_to_wif,
-    ripemd160_32bytes_from_bytes, secp256k1_derive_public_key,
-    secp256k1_derive_public_key_uncompressed, sha256_32_from_bytes, sha256_from_bytes,
-    sha512_32bytes_from_bytes,
+    SolanaVanityKeyResult, base58_encode, base58_encode_32, compare_hashes,
+    ed25519_derive_public_key, encode_p2wpkh_address, generate_and_check_bitcoin_vanity_key,
+    generate_and_check_ethereum_vanity_key, generate_and_check_shallenge,
+    generate_and_check_solana_vanity_key, generate_base64_nonce, generate_random_private_key,
+    keccak256_64bytes, private_key_to_wif, ripemd160_32bytes_from_bytes,
+    secp256k1_derive_public_key, secp256k1_derive_public_key_uncompressed,
+    sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 41;
+pub const SELF_TEST_NUM_CHECKS: usize = 46;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -78,6 +78,23 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "arith u64 mul lo",
     "arith u64 mul hi",
     "arith u128 mul",
+    // Slots 41-45: composed-primitive sub-bisects that the broader checks
+    // can't cleanly isolate.
+    //   41 — base58 variable-length, no leading zeros (different entry
+    //        point than base58_encode_32 at slot 3; same divide-by-58 loop)
+    //   42 — base58 variable-length, leading-zero pad (Bitcoin P2PKH genesis)
+    //   43 — base58 all-zero 32-byte input (pure leading-zero path, no
+    //        numeric work — separates the divide loop from the pad logic)
+    //   44 — xoroshiro base64 nonce (different code path from
+    //        generate_random_private_key — next_u32 + alphabet lookup)
+    //   45 — bech32 p2wpkh address encoding (only otherwise reached through
+    //        the bitcoin composed kernel; isolating it tells us whether the
+    //        bitcoin failure stops upstream at secp256k1 or also breaks here)
+    "base58 var-len",
+    "base58 var-len leading-zero",
+    "base58 32 all-zeros",
+    "xoroshiro base64 nonce",
+    "bech32 p2wpkh",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -598,6 +615,124 @@ pub fn check_arith_u128_mul() -> u32 {
     (a.wrapping_mul(b) == EXPECTED) as u32
 }
 
+// === Composed-primitive sub-bisects (slots 41-45) ===
+
+// 25-byte test vector that lives entirely in the divide-by-58 loop with no
+// leading-zero pad. Exercises `base58_encode` (variable length) as opposed
+// to `base58_encode_32` (fixed) already covered by slot 3.
+const BASE58_VAR_INPUT: [u8; 25] = [
+    0x0A, 0xF7, 0x64, 0xC1, 0xB6, 0x13, 0x3A, 0x3A,
+    0x0A, 0xBD, 0x7E, 0xF9, 0xC8, 0x53, 0x79, 0x1B,
+    0x68, 0x7C, 0xE1, 0xE2, 0x35, 0xF9, 0xDC, 0x84,
+    0x66,
+];
+const BASE58_VAR_EXPECTED: &[u8] = b"5Qw8TAab98QrQmymczzxwkZzacMDL4MeEH";
+
+// Bitcoin Genesis P2PKH (mainnet) — one leading 0x00 forces the
+// `num_leading_zeros` pad branch to emit a single '1' before the encoded
+// numeric tail.
+const BASE58_LEADZERO_INPUT: [u8; 25] = [
+    0x00, 0x62, 0xE9, 0x07, 0xB1, 0x5C, 0xBF, 0x27,
+    0xD5, 0x42, 0x53, 0x99, 0xEB, 0xF6, 0xF0, 0xFB,
+    0x50, 0xEB, 0xB8, 0x8F, 0x18, 0xC2, 0x9B, 0x7D,
+    0x93,
+];
+const BASE58_LEADZERO_EXPECTED: &[u8] = b"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+
+// 32 all-zero bytes → all-leading-zero pad with no divide loop iterations.
+// If this PASSes but slot 3 FAILs, the divide-by-58 codegen is to blame;
+// if it FAILs the leading-zero pad logic itself is broken.
+const BASE58_ALLZERO_EXPECTED: &[u8] = b"11111111111111111111111111111111";
+
+pub fn check_base58_var_len() -> u32 {
+    let mut out = [0u8; 64];
+    let n = base58_encode(&BASE58_VAR_INPUT, &mut out);
+    if n != BASE58_VAR_EXPECTED.len() {
+        return 0;
+    }
+    let mut i = 0;
+    while i < n {
+        if out[i] != BASE58_VAR_EXPECTED[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
+pub fn check_base58_var_len_leading_zero() -> u32 {
+    let mut out = [0u8; 64];
+    let n = base58_encode(&BASE58_LEADZERO_INPUT, &mut out);
+    if n != BASE58_LEADZERO_EXPECTED.len() {
+        return 0;
+    }
+    let mut i = 0;
+    while i < n {
+        if out[i] != BASE58_LEADZERO_EXPECTED[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
+pub fn check_base58_all_zeros() -> u32 {
+    let input = [0u8; 32];
+    let mut out = [0u8; 64];
+    let n = base58_encode_32(&input, &mut out);
+    if n != BASE58_ALLZERO_EXPECTED.len() {
+        return 0;
+    }
+    let mut i = 0;
+    while i < n {
+        if out[i] != BASE58_ALLZERO_EXPECTED[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
+// Captured by running `generate_base64_nonce(0, 12345, &mut [0u8; 21])` on
+// the host (see /tmp/probe). Same (thread_idx, rng_seed) the shallenge
+// pipeline uses, so this slot directly answers "is the nonce wrong, and is
+// that why shallenge_hash fails?".
+const XOROSHIRO_NONCE_EXPECTED: [u8; 21] = [
+    0x61, 0x63, 0x65, 0x43, 0x48, 0x73, 0x71, 0x46,
+    0x36, 0x67, 0x31, 0x33, 0x5a, 0x65, 0x32, 0x6e,
+    0x47, 0x53, 0x4a, 0x67, 0x6d,
+];
+
+pub fn check_xoroshiro_base64_nonce() -> u32 {
+    let mut nonce = [0u8; 21];
+    generate_base64_nonce(0, 12345, &mut nonce);
+    (nonce == XOROSHIRO_NONCE_EXPECTED) as u32
+}
+
+// p2wpkh KAT lifted from bech32::test::should_encode_p2wpkh_correctly.
+const BECH32_P2WPKH_HASH: [u8; 20] = [
+    0x46, 0x04, 0x7c, 0x8a, 0x3d, 0x8e, 0xdb, 0x13,
+    0x4c, 0x3f, 0x1a, 0x3e, 0x7d, 0x65, 0xb0, 0xfd,
+    0x74, 0x21, 0xf1, 0x27,
+];
+const BECH32_P2WPKH_EXPECTED: &[u8] = b"bc1qgcz8ez3a3md3xnplrgl86edsl46zruf8mwx56m";
+
+pub fn check_bech32_p2wpkh() -> u32 {
+    let mut out = [0u8; 64];
+    let n = encode_p2wpkh_address(&BECH32_P2WPKH_HASH, true, &mut out);
+    if n != BECH32_P2WPKH_EXPECTED.len() {
+        return 0;
+    }
+    let mut i = 0;
+    while i < n {
+        if out[i] != BECH32_P2WPKH_EXPECTED[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -640,6 +775,11 @@ pub fn run_self_test(results: &mut [u32]) {
     results[38] = check_arith_u64_mul_lo();
     results[39] = check_arith_u64_mul_hi();
     results[40] = check_arith_u128_mul();
+    results[41] = check_base58_var_len();
+    results[42] = check_base58_var_len_leading_zero();
+    results[43] = check_base58_all_zeros();
+    results[44] = check_xoroshiro_base64_nonce();
+    results[45] = check_bech32_p2wpkh();
 }
 
 #[cfg(test)]
