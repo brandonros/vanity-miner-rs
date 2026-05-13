@@ -113,23 +113,35 @@ pub mod gpu {
             }};
         }
 
-        // Slots 0-3: solana per-primitive bisect (run first so a primitive
-        // fault localizes before the composed solana kernels inline it).
+        // Slots run in strict numeric order. Earlier compiler versions
+        // faulted on several alphabet-lookup kernels (41/42/43/45/63) and
+        // forced a crash-tail layout; the v1.43 fixes made those slots
+        // FAIL-clean or PASS, so the ordering no longer matters for
+        // result preservation.
+        //
+        // Group boundaries (see SELF_TEST_LABELS in logic for details):
+        //   0-3   solana per-primitive bisect
+        //   4-9   non-solana primitive bisect (k256 / hashes)
+        //   10-30 composed-subsystem KATs
+        //   31-40 tier-1 arithmetic
+        //   41-45 base58 / bech32 var-len + alphabet lookup
+        //   46-56 tier-2 arithmetic (dalek/k256 PTX idioms)
+        //   57-58 black_box identity probes
+        //   59-63 base58 div-by-58 + iter_mut/lookup bisects
+        //   64-68 cuda-oxide standalone-repro ports
+        //   69    base58 Phase A inner-mutate
+        //   70-72 curve25519-dalek per-stage bisect
+        //   73-75 k256 per-stage bisect
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
         run_slot!(3,  kernel_self_test_primitive_base58);
-        // Slots 4-9: non-solana primitive bisect — same idea as 0-3 but for
-        // the primitives consumed by the bitcoin / ethereum / shallenge /
-        // WIF pipelines. Run before the composed kernels so a fault
-        // localizes to the broken primitive instead of the inlined caller.
         run_slot!(4,  kernel_self_test_primitive_secp256k1_compressed);
         run_slot!(5,  kernel_self_test_primitive_secp256k1_uncompressed);
         run_slot!(6,  kernel_self_test_primitive_keccak256);
         run_slot!(7,  kernel_self_test_primitive_ripemd160);
         run_slot!(8,  kernel_self_test_primitive_sha256_32);
         run_slot!(9,  kernel_self_test_primitive_sha256_variable);
-        // Slots 10-30: composed-subsystem KAT checks.
         run_slot!(10, kernel_self_test_solana_priv);
         run_slot!(11, kernel_self_test_solana_pub);
         run_slot!(12, kernel_self_test_solana_encoded);
@@ -151,7 +163,6 @@ pub mod gpu {
         run_slot!(28, kernel_self_test_compare_hashes_lt);
         run_slot!(29, kernel_self_test_compare_hashes_gt);
         run_slot!(30, kernel_self_test_compare_hashes_eq);
-        // Slots 31-40: raw-arithmetic micro-bisect (one PTX op per slot).
         run_slot!(31, kernel_self_test_arith_u32_div_var);
         run_slot!(32, kernel_self_test_arith_u32_div_const);
         run_slot!(33, kernel_self_test_arith_u64_div_var);
@@ -162,15 +173,11 @@ pub mod gpu {
         run_slot!(38, kernel_self_test_arith_u64_mul_lo);
         run_slot!(39, kernel_self_test_arith_u64_mul_hi);
         run_slot!(40, kernel_self_test_arith_u128_mul);
-        // Slot 44: xoroshiro base64 nonce (uses `&'static [u8]` slice
-        // for the alphabet — FAILs with wrong bytes but doesn't crash).
-        // Slot 45 (bech32) and slot 43 (base58 all-zeros) turn out to be
-        // crash-prone too — both use `&'static [u8; N]` array references
-        // for their alphabets, same shape as slot 41. Deferred to the
-        // tail; see the comment near their run_slot! calls.
+        run_slot!(41, kernel_self_test_base58_var_len);
+        run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
+        run_slot!(43, kernel_self_test_base58_all_zeros);
         run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
-        // Slots 46-56: tier-2 arithmetic bisect targeting PTX idioms
-        // dalek/k256 hit that the tier-1 net (31-40) doesn't cover.
+        run_slot!(45, kernel_self_test_bech32_p2wpkh);
         run_slot!(46, kernel_self_test_arith_overflowing_add);
         run_slot!(47, kernel_self_test_arith_overflowing_sub);
         run_slot!(48, kernel_self_test_arith_carry_chain_3limb);
@@ -182,57 +189,25 @@ pub mod gpu {
         run_slot!(54, kernel_self_test_arith_mask_blend_false);
         run_slot!(55, kernel_self_test_arith_var_shr_u64);
         run_slot!(56, kernel_self_test_arith_var_shl_u64);
-        // Slots 57-58: black_box identity probes. Cheap one-line tests
-        // that determine whether `core::hint::black_box` preserves its
-        // input — if not, every tier-1/tier-2 arith slot's FAIL is a
-        // black_box artifact, not a per-op codegen bug.
         run_slot!(57, kernel_self_test_arith_blackbox_identity_u64);
         run_slot!(58, kernel_self_test_arith_blackbox_identity_u32);
-        // Slot 59: isolated divmod-by-58 — must run BEFORE the deferred
-        // base58 kernels so its result is captured even when they fault.
         run_slot!(59, kernel_self_test_base58_div_by_58);
-        // Slots 64-65: in-suite versions of the cuda-oxide standalone
-        // repros (divrem_large_const, i128_add_carry_chain). They cover
-        // the divisor / accumulator shapes the existing slots miss.
+        run_slot!(60, kernel_self_test_iter_static_table_lookup);
+        run_slot!(61, kernel_self_test_iter_mut_slice_partial);
+        run_slot!(62, kernel_self_test_iter_mut_alphabet_lookup);
+        run_slot!(63, kernel_self_test_iter_static_slice_lookup);
         run_slot!(64, kernel_self_test_arith_divrem_by_58_pow_5);
         run_slot!(65, kernel_self_test_arith_i128_chain_add);
         run_slot!(66, kernel_self_test_base58_limb_divrem);
         run_slot!(67, kernel_self_test_dynamic_index_write);
         run_slot!(68, kernel_self_test_arith_widening_mul_chain_3term);
-        // Slots 60-62: triangulating bisects for the iter_mut + alphabet-
-        // lookup pattern (the suspect shared crash path between slot 41
-        // and slot 43). Ordered simplest→most complex so an early crash
-        // still captures earlier slots' results.
-        // Originally slot 63 (slice lookup) ran first as a control for
-        // 60 (array-ref lookup), under the hypothesis that `&[u8]` would
-        // pass while `&[u8; N]` would crash. After the v1.40 compiler
-        // fixes for `black_box`, slot 63 itself started crashing — the
-        // honest black_box now lets the indexed load actually execute,
-        // and it faults the same way as slots 41/43/45 did. So 63 moves
-        // to the deferred crash group; the surviving probes (60, 61, 62)
-        // run here to determine whether the bug is universal across
-        // table-typed lookups.
-        run_slot!(61, kernel_self_test_iter_mut_slice_partial);
-        run_slot!(60, kernel_self_test_iter_static_table_lookup);
-        run_slot!(62, kernel_self_test_iter_mut_alphabet_lookup);
-        // Crash-tail slots: 41, 42, 43 (base58 — `&[u8; 58]` alphabet),
-        // 45 (bech32 — `&[u8; 32]` alphabet). All four faulted with the
-        // same `0xfff…` wild-pointer shape; common factor across slot 43
-        // (where the divide loop is dynamically dead) and the others is
-        // indexing a `&'static [u8; N]` array reference, suggesting the
-        // alpha NVPTX backend mishandles the address-space tagging for
-        // fixed-size static arrays. Slot 44 (which uses `&'static [u8]`
-        // slice for its alphabet) FAILs with wrong bytes but doesn't crash
-        // — strong evidence the discriminator is array-ref vs slice.
-        //
-        // Once any kernel faults the CUDA context is sticky-errored, so
-        // run all crashers at the very end to preserve earlier slots'
-        // results.
-        run_slot!(43, kernel_self_test_base58_all_zeros);
-        run_slot!(45, kernel_self_test_bech32_p2wpkh);
-        run_slot!(41, kernel_self_test_base58_var_len);
-        run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
-        run_slot!(63, kernel_self_test_iter_static_slice_lookup);
+        run_slot!(69, kernel_self_test_base58_inner_mutate_phase);
+        run_slot!(70, kernel_self_test_dalek_clamp_integer);
+        run_slot!(71, kernel_self_test_dalek_scalar_round_trip_one);
+        run_slot!(72, kernel_self_test_dalek_mul_base_scalar_one);
+        run_slot!(73, kernel_self_test_k256_secret_from_bytes_one);
+        run_slot!(74, kernel_self_test_k256_derive_scalar_one);
+        run_slot!(75, kernel_self_test_k256_derive_scalar_two);
 
         report(&results)
     }

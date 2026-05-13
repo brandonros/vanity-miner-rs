@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 69;
+pub const SELF_TEST_NUM_CHECKS: usize = 76;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -185,6 +185,41 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "base58 limb divrem (shl+add multiplicand)",
     "dynamic-grow stack array write",
     "widening mul chain 3-term",
+    // Slot 69: Phase A of base58_encode_32's outer-loop body — the
+    // in-place mutate over `for i in 0..limb_count` that reads each
+    // existing limb, shifts+adds the carry, divrems by 58^5, and
+    // writes back. Slot 67 covers Phase B (append-grow) but not this.
+    // Slot 41 (non-zero base58 input) exercises Phase A starting at
+    // outer iter 1; slot 43 (all-zero input) never enters Phase A
+    // because limb_count stays 0 forever. That asymmetry points
+    // squarely at Phase A.
+    "base58 inner-mutate phase A",
+    // Slots 70-72: ed25519 (curve25519-dalek) per-stage bisect.
+    // Slot 2 (full ed25519_derive) fails; these isolate WHICH stage:
+    //   70 — clamp_integer (pure bit-mask on byte 0 + byte 31, no arith).
+    //        If FAIL, the most trivial dalek call is broken → look at
+    //        public-API entry overhead, not the arithmetic.
+    //   71 — Scalar::from_bytes_mod_order round-trip for the canonical
+    //        scalar 1. Tests Scalar52 deserialization with no field math.
+    //   72 — EdwardsPoint::mul_base(scalar=1).compress() must equal the
+    //        well-known basepoint encoding. Tests the FULL fixed-base
+    //        scalar-mult path with the smallest non-trivial scalar.
+    "dalek clamp_integer",
+    "dalek scalar from-bytes round-trip",
+    "dalek mul_base scalar=1 == basepoint",
+    // Slots 73-75: secp256k1 (k256) per-stage bisect for slot 4.
+    //   73 — SecretKey::from_bytes for scalar=1: just the validation +
+    //        wrap step. If FAIL alone, scalar reduction / Choice mask
+    //        blend (subtle) is the suspect.
+    //   74 — full derive for scalar=1: compressed pub must equal the
+    //        well-known generator encoding. Smallest non-trivial input
+    //        through the entire k256 pipeline.
+    //   75 — full derive for scalar=2: must equal 2G compressed (also
+    //        well-known). Exercises exactly one point doubling beyond
+    //        slot 74; a 74-PASS / 75-FAIL split pinpoints doubling.
+    "k256 SecretKey::from_bytes(1)",
+    "k256 derive scalar=1 == generator",
+    "k256 derive scalar=2 == 2G",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1348,6 +1383,161 @@ pub fn check_arith_widening_mul_chain_3term() -> u32 {
     (z == EXPECTED) as u32
 }
 
+// Slot 69: base58 Phase A inner-mutate phase in isolation.
+//
+// `base58_encode_32` runs an 8-iter outer loop. Each iter does two phases:
+//   Phase A — `for i in 0..limb_count { rc += (limbs[i] << 32); limbs[i] = (rc % D) as u32; rc /= D; }`
+//   Phase B — `if rc > 0 && limb_count < 10 { limbs[limb_count] = ...; limb_count += 1; }` (×2)
+// Slot 67 covered Phase B. Slot 43 (all-zero input) PASSes because Phase A
+// never runs (limb_count stays 0). Slot 41 (non-zero input) FAILs and the
+// only path it touches that slot 43 doesn't is Phase A. This slot runs
+// Phase A standalone with limb_count=1 and a non-zero limb so the loop
+// executes exactly one iteration of read-shift-add-divrem-writeback.
+pub fn check_base58_inner_mutate_phase() -> u32 {
+    const D: u64 = 58_u64.pow(5);
+    const LIMB0_IN: u32 = 0x1234_5678;
+    const CHUNK_IN: u32 = 0x89AB_CDEF;
+    // Const-eval baseline (same loop body, fully evaluated at compile time).
+    const fn expected_limb0() -> u32 {
+        let rc: u64 = (CHUNK_IN as u64) + ((LIMB0_IN as u64) << 32);
+        (rc % D) as u32
+    }
+    const fn expected_rc() -> u64 {
+        let rc: u64 = (CHUNK_IN as u64) + ((LIMB0_IN as u64) << 32);
+        rc / D
+    }
+    const E_LIMB0: u32 = expected_limb0();
+    const E_RC: u64 = expected_rc();
+
+    let mut limbs = [0u32; 10];
+    limbs[0] = core::hint::black_box(LIMB0_IN);
+    let limb_count: usize = core::hint::black_box(1);
+
+    let chunk: u32 = core::hint::black_box(CHUNK_IN);
+    let mut remaining_carry: u64 = chunk as u64;
+    for i in 0..limb_count {
+        remaining_carry += (limbs[i] as u64) << 32;
+        limbs[i] = (remaining_carry % D) as u32;
+        remaining_carry /= D;
+    }
+
+    (limbs[0] == E_LIMB0 && remaining_carry == E_RC) as u32
+}
+
+// Slot 70: curve25519-dalek `clamp_integer` in isolation. The smallest
+// possible dalek call — pure bit-mask on bytes 0 and 31, no field math,
+// no scalar repr conversion. If THIS fails, the bug is in the dalek
+// API-entry plumbing itself, not in any arithmetic.
+//
+// Clamp definition (RFC 7748 / dalek):
+//   byte[0]  &= 0xF8        (clear bits 0,1,2)
+//   byte[31] &= 0x7F        (clear bit 7)
+//   byte[31] |= 0x40        (set bit 6)
+pub fn check_dalek_clamp_integer() -> u32 {
+    let input: [u8; 32] = [0xFF; 32];
+    let clamped = curve25519_dalek::scalar::clamp_integer(input);
+    const EXPECTED: [u8; 32] = {
+        let mut e = [0xFFu8; 32];
+        e[0] = 0xF8;
+        e[31] = 0x7F; // (0xFF & 0x7F) | 0x40 = 0x7F
+        e
+    };
+    (clamped == EXPECTED) as u32
+}
+
+// Slot 71: `Scalar::from_bytes_mod_order` round-trip for the canonical
+// scalar 1 (little-endian [1, 0, …, 0]). 1 is already < l, so reduction
+// is a no-op and `to_bytes()` must return the input unchanged. Tests
+// Scalar52 deserialization + canonical encoding without exercising any
+// field multiplication or scalar mul.
+pub fn check_dalek_scalar_round_trip_one() -> u32 {
+    let mut input = [0u8; 32];
+    input[0] = 1;
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
+    let bytes = scalar.to_bytes();
+    (bytes == input) as u32
+}
+
+// Slot 72: `EdwardsPoint::mul_base(scalar=1).compress()` must equal the
+// well-known ed25519 basepoint encoding (RFC 8032). Exercises the full
+// fixed-base scalar-mult path with the smallest non-trivial scalar.
+//
+// If slots 70/71 PASS and 72 FAILs, the bug is in mul_base / EdwardsPoint
+// ops or in `compress()` (field inversion), not in the scalar plumbing.
+const ED25519_BASEPOINT_COMPRESSED: [u8; 32] = [
+    0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
+    0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
+    0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
+    0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66,
+];
+
+pub fn check_dalek_mul_base_scalar_one() -> u32 {
+    let mut scalar_bytes = [0u8; 32];
+    scalar_bytes[0] = 1;
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(scalar_bytes);
+    let point = curve25519_dalek::EdwardsPoint::mul_base(&scalar);
+    let compressed = point.compress().to_bytes();
+    (compressed == ED25519_BASEPOINT_COMPRESSED) as u32
+}
+
+// Slot 73: `SecretKey::from_bytes` for the smallest valid scalar (=1).
+// Tests just the validation/wrap step (range check + GenericArray copy).
+// k256 scalars are big-endian, so 1 = [0; 31] ++ [0x01].
+//
+// Wrapped in ManuallyDrop because SecretKey zeroizes on Drop and
+// cuda-oxide does not yet emit device-side drop_in_place (same pattern
+// as logic/src/secp256k1.rs).
+pub fn check_k256_secret_from_bytes_one() -> u32 {
+    use core::mem::ManuallyDrop;
+    use k256::SecretKey;
+    let mut priv_bytes = [0u8; 32];
+    priv_bytes[31] = 1;
+    let result = SecretKey::from_bytes((&priv_bytes).into());
+    match result {
+        Ok(sk) => {
+            let _sk = ManuallyDrop::new(sk);
+            1
+        }
+        Err(_) => 0,
+    }
+}
+
+// Slot 74: full k256 derive for scalar=1. Compressed public key must
+// equal the well-known secp256k1 generator G.
+const SECP256K1_GENERATOR_COMPRESSED: [u8; 33] = [
+    0x02, 0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB,
+    0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B,
+    0x07, 0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28,
+    0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17,
+    0x98,
+];
+
+pub fn check_k256_derive_scalar_one() -> u32 {
+    let mut priv_bytes = [0u8; 32];
+    priv_bytes[31] = 1;
+    let pub_key = secp256k1_derive_public_key(&priv_bytes);
+    (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
+// Slot 75: full k256 derive for scalar=2. Compressed public key must
+// equal 2G (one more doubling beyond slot 74). A 74-PASS / 75-FAIL split
+// pinpoints the doubling formula; a 74-FAIL / 75-FAIL means scalar mult
+// is broken even for the trivial-scalar case.
+const SECP256K1_TWO_G_COMPRESSED: [u8; 33] = [
+    0x02, 0xC6, 0x04, 0x7F, 0x94, 0x41, 0xED, 0x7D,
+    0x6D, 0x30, 0x45, 0x40, 0x6E, 0x95, 0xC0, 0x7C,
+    0xD8, 0x5C, 0x77, 0x8E, 0x4B, 0x8C, 0xEF, 0x3C,
+    0xA7, 0xAB, 0xAC, 0x09, 0xB9, 0x5C, 0x70, 0x9E,
+    0xE5,
+];
+
+pub fn check_k256_derive_scalar_two() -> u32 {
+    let mut priv_bytes = [0u8; 32];
+    priv_bytes[31] = 2;
+    let pub_key = secp256k1_derive_public_key(&priv_bytes);
+    (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1418,6 +1608,13 @@ pub fn run_self_test(results: &mut [u32]) {
     results[66] = check_base58_limb_divrem();
     results[67] = check_dynamic_index_write();
     results[68] = check_arith_widening_mul_chain_3term();
+    results[69] = check_base58_inner_mutate_phase();
+    results[70] = check_dalek_clamp_integer();
+    results[71] = check_dalek_scalar_round_trip_one();
+    results[72] = check_dalek_mul_base_scalar_one();
+    results[73] = check_k256_secret_from_bytes_one();
+    results[74] = check_k256_derive_scalar_one();
+    results[75] = check_k256_derive_scalar_two();
 }
 
 #[cfg(test)]

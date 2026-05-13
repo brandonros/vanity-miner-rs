@@ -775,4 +775,58 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_arith_widening_mul_chain_3term(results: &mut [u32]) {
         results[68] = logic::check_arith_widening_mul_chain_3term();
     }
+
+    // Slot 69: base58 Phase A inner-mutate (the only outer-loop phase
+    // slot 67 doesn't cover and the only phase slot 43's all-zero input
+    // doesn't exercise — exactly the asymmetry between slot 41/43).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_inner_mutate_phase(results: &mut [u32]) {
+        results[69] = logic::check_base58_inner_mutate_phase();
+    }
+
+    // Slots 70-72: curve25519-dalek per-stage bisect for slot 2.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_clamp_integer(results: &mut [u32]) {
+        results[70] = logic::check_dalek_clamp_integer();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar_round_trip_one(results: &mut [u32]) {
+        results[71] = logic::check_dalek_scalar_round_trip_one();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_mul_base_scalar_one(results: &mut [u32]) {
+        results[72] = logic::check_dalek_mul_base_scalar_one();
+    }
+
+    // Slots 73-75: k256 per-stage bisect for slot 4.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_secret_from_bytes_one(results: &mut [u32]) {
+        results[73] = logic::check_k256_secret_from_bytes_one();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_derive_scalar_one(results: &mut [u32]) {
+        results[74] = logic::check_k256_derive_scalar_one();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_derive_scalar_two(results: &mut [u32]) {
+        results[75] = logic::check_k256_derive_scalar_two();
+    }
 }
