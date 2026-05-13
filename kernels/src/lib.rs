@@ -845,4 +845,26 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_static_struct_wrapped_u64_lookup(results: &mut [u32]) {
         results[77] = logic::check_static_struct_wrapped_u64_lookup();
     }
+
+    // Slots 78-80: k256 bug-triangulation probes (Bug B in KNOWN_FAILURES).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_encode_generator(results: &mut [u32]) {
+        results[78] = logic::check_k256_encode_generator();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_double_generator(results: &mut [u32]) {
+        results[79] = logic::check_k256_double_generator();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_scalar_one_round_trip(results: &mut [u32]) {
+        results[80] = logic::check_k256_scalar_one_round_trip();
+    }
 }

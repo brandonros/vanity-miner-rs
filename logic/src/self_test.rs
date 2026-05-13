@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 78;
+pub const SELF_TEST_NUM_CHECKS: usize = 81;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -232,6 +232,27 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     //        match dalek/k256's actual newtype shape.
     "static [u64; 5] indexed read",
     "static struct-wrapped [u64; 5] indexed read",
+    // Slots 78-80: k256 bug-triangulation probes (Bug B in KNOWN_FAILURES).
+    // Slots 4/5/74/75 fail but k256's code path differs from dalek (uses
+    // `Lazy<>` instead of `&'static const`), so these isolate WHICH
+    // k256 subsystem is broken.
+    //   78 — Encode generator directly (no scalar mult, no Lazy<>).
+    //        FAIL → bug in projective→affine + encoding.
+    //   79 — Double generator + encode (one doubling, no scalar mult).
+    //        78 PASS / 79 FAIL → doubling formula or 5-wide field-mul
+    //        carry chain.
+    //   80 — k256 `Scalar::ONE` round-trip via to_repr/from_repr.
+    //        FAIL → k256 Scalar hits the same shape as Bug A on dalek
+    //        Scalar52, widening Bug A's scope.
+    //
+    // (Originally we also had a slot for `once_cell::sync::Lazy<u64>`
+    // first-access — k256 uses `Lazy<[LookupTable; 33]>` for the
+    // precomputed generator table — but it required a dev-dep dance
+    // for host tests that wasn't worth the noise. If 78/79/80 all PASS
+    // and 4/5/74/75 still FAIL, Lazy is implicated by elimination.)
+    "k256 encode generator (no mul)",
+    "k256 double generator + encode",
+    "k256 Scalar::ONE round-trip",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1588,6 +1609,65 @@ pub fn check_static_struct_wrapped_u64_lookup() -> u32 {
     (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
 }
 
+// Slot 78: encode the secp256k1 generator point directly — no scalar mult,
+// no Lazy<> table touch. Tests the projective→affine + to_encoded_point
+// chain in isolation. ProjectivePoint::GENERATOR has z=1, so the affine
+// conversion's field inversion is trivial; this primarily exercises the
+// FieldElement→bytes serialization + parity-bit pack.
+pub fn check_k256_encode_generator() -> u32 {
+    use k256::ProjectivePoint;
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    let g = ProjectivePoint::GENERATOR;
+    let affine = g.to_affine();
+    let encoded = affine.to_encoded_point(true);
+    let bytes = encoded.as_bytes();
+    if bytes.len() != 33 {
+        return 0;
+    }
+    let mut out = [0u8; 33];
+    out.copy_from_slice(bytes);
+    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
+// Slot 79: `ProjectivePoint::double()` on the generator + encode. One
+// doubling = one field-mul-heavy operation that produces a projective
+// point with z != 1, so the subsequent `to_affine()` requires a real
+// field inversion. 78 PASS + 79 FAIL = doubling formula or non-trivial
+// field inversion broken (5-wide variant of Bug C suspect).
+pub fn check_k256_double_generator() -> u32 {
+    use k256::ProjectivePoint;
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    let g2 = ProjectivePoint::GENERATOR.double();
+    let affine = g2.to_affine();
+    let encoded = affine.to_encoded_point(true);
+    let bytes = encoded.as_bytes();
+    if bytes.len() != 33 {
+        return 0;
+    }
+    let mut out = [0u8; 33];
+    out.copy_from_slice(bytes);
+    (out == SECP256K1_TWO_G_COMPRESSED) as u32
+}
+
+// Slot 80: k256 `Scalar::ONE` round-trip via the PrimeField trait. Mirror
+// of slot 71 for k256's Scalar type. k256's Scalar wraps a `U256` from
+// crypto-bigint (different layout than dalek's `Scalar52([u64; 5])`),
+// so this distinguishes Bug A (dalek-specific newtype shape) from a
+// broader Bug A' (any static-resident scalar repr).
+pub fn check_k256_scalar_one_round_trip() -> u32 {
+    use k256::Scalar;
+    use k256::elliptic_curve::PrimeField;
+    let s = Scalar::ONE;
+    let repr = s.to_repr();
+    let s2_opt = Scalar::from_repr(repr);
+    let recovered: bool = s2_opt.is_some().into();
+    if !recovered {
+        return 0;
+    }
+    let s2 = s2_opt.unwrap();
+    (s2 == s) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1667,6 +1747,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[75] = check_k256_derive_scalar_two();
     results[76] = check_static_u64_array_lookup();
     results[77] = check_static_struct_wrapped_u64_lookup();
+    results[78] = check_k256_encode_generator();
+    results[79] = check_k256_double_generator();
+    results[80] = check_k256_scalar_one_round_trip();
 }
 
 #[cfg(test)]

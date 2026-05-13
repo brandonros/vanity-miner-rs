@@ -133,6 +133,7 @@ pub mod gpu {
         //   70-72 curve25519-dalek per-stage bisect
         //   73-75 k256 per-stage bisect
         //   76-77 unifying-hypothesis probe: `&'static` array of u64s
+        //   78-80 k256 Bug-B triangulation (encode, double, Scalar)
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -211,6 +212,9 @@ pub mod gpu {
         run_slot!(75, kernel_self_test_k256_derive_scalar_two);
         run_slot!(76, kernel_self_test_static_u64_array_lookup);
         run_slot!(77, kernel_self_test_static_struct_wrapped_u64_lookup);
+        run_slot!(78, kernel_self_test_k256_encode_generator);
+        run_slot!(79, kernel_self_test_k256_double_generator);
+        run_slot!(80, kernel_self_test_k256_scalar_one_round_trip);
 
         report(&results)
     }

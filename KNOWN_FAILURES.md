@@ -10,6 +10,7 @@ execute, so this doc alone is enough context to hand to the compiler agent.
 | Date       | Suite size | FAIL | cuda-oxide rev | Notes                                 |
 |------------|------------|------|----------------|---------------------------------------|
 | 2026-05-13 | 76         | 25   | v1.43.0        | 2 confirmed bugs + 1 suspected, rest cascade. |
+| pending    | 81         | ?    | next           | +5 triangulation probes (76-80). |
 
 ---
 
@@ -286,21 +287,58 @@ fn mul_inner(&self, rhs: &Self) -> Self {
 }
 ```
 
+### Triangulation probes (slots 78-80, in suite awaiting run)
+
+| Slot | Probe | Tests | FAIL implies |
+|---|---|---|---|
+| 78 | `ProjectivePoint::GENERATOR.to_affine().to_encoded_point(true)` | projective→affine + encoding chain only, no scalar mult | encoding/serialization broken |
+| 79 | `ProjectivePoint::GENERATOR.double()` then encode | one doubling + non-trivial field inversion | doubling formula or 5-wide field-mul carry chain (variant of Bug C) |
+| 80 | `Scalar::ONE.to_repr() ⇄ from_repr()` | k256 Scalar (not FieldElement; wraps `U256` from crypto-bigint) | Bug A's scope wider than dalek; k256 Scalar repr hits the same shape |
+
+### Outcome decision table
+
+| 78 | 79 | 80 | Diagnosis |
+|---|---|---|---|
+| F | — | — | Encoding chain (field inversion or `to_bytes`) is broken |
+| P | F | — | Doubling formula / field-mul carry chain (5-wide variant of Bug C) |
+| P | P | F | k256 `Scalar` hits the same shape as Bug A |
+| P | P | P | None of the above — `Lazy` (`once_cell::sync::Lazy<[LookupTable; 33]>` in `k256/arithmetic/mul.rs:367`), or scalar-mult algorithm, or table indexing. Add a direct `Lazy<u64>` probe slot if needed; it requires adding `once_cell` as a logic dep + a host-only `critical-section/std` dev-dep, so we skipped it in this round and rely on elimination. |
+
+### Code — probes (logic/src/self_test.rs)
+
+```rust
+// Slot 78
+pub fn check_k256_encode_generator() -> u32 {
+    let g = k256::ProjectivePoint::GENERATOR;
+    let affine = g.to_affine();
+    let encoded = affine.to_encoded_point(true);
+    /* compare 33 bytes to SECP256K1_GENERATOR_COMPRESSED */
+}
+
+// Slot 79
+pub fn check_k256_double_generator() -> u32 {
+    let g2 = k256::ProjectivePoint::GENERATOR.double();
+    let affine = g2.to_affine();
+    let encoded = affine.to_encoded_point(true);
+    /* compare 33 bytes to SECP256K1_TWO_G_COMPRESSED */
+}
+
+// Slot 80
+pub fn check_k256_scalar_one_round_trip() -> u32 {
+    let s = k256::Scalar::ONE;
+    let repr = s.to_repr();
+    let s2 = k256::Scalar::from_repr(repr).unwrap();
+    (s2 == s) as u32
+}
+```
+
 ### Next steps — cuda-oxide compiler side
 
-1. **First, see what Bug A fix does.** A k256 lazy-init bug could be masked
-   by Bug A polluting the field-arithmetic constants k256 uses. Fix Bug A
-   first; if slots 4/5/13-24/74/75 then clear, Bug B was actually Bug A.
-2. **If still failing post-Bug-A fix, add a bisect slot for `Lazy<>` access:**
-   - Slot 78 candidate: instantiate a `once_cell::Lazy<u64>` in static
-     storage, force first-access from a kernel, compare to expected.
-     If FAILs → `once_cell` doesn't work on GPU; either patch k256 to
-     remove the Lazy or block on cuda-oxide adding the runtime hooks
-     `once_cell` needs.
-3. **If `Lazy<>` works, add a bisect slot for k256 field mul directly:**
-   - Slot 79 candidate: call `k256::elliptic_curve::Field::mul` on two
-     known FieldElement values with a known product. If FAILs → field
-     mul carry chain bug. Likely a wider variant of Bug C.
+1. **Run the suite once with all 4 probes in.** Decision table above maps
+   results directly to root cause.
+2. **First, see what Bug A fix does.** A k256 lazy-init bug could be masked
+   by Bug A polluting constants k256 uses. Fix Bug A first; if slots
+   4/5/13-24/74/75 then clear, Bug B was actually Bug A.
 
 ---
 
