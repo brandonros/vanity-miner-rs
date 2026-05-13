@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 76;
+pub const SELF_TEST_NUM_CHECKS: usize = 78;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -220,6 +220,18 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "k256 SecretKey::from_bytes(1)",
     "k256 derive scalar=1 == generator",
     "k256 derive scalar=2 == 2G",
+    // Slots 76-77: unifying-hypothesis probe.
+    //   Slot 71 FAILs on `Scalar::from_bytes_mod_order(1).to_bytes()`.
+    //   The only static read in that path is `Scalar52::reduce()`
+    //   indexing `L: Scalar52([u64; 5])` — a `&'static` of u64s. Earlier
+    //   runs proved `&'static [u8; N]` works (slots 60/63 PASS). So the
+    //   discriminator might be element width, not array-vs-slice.
+    //   76 — bare `&'static [u64; 5]` runtime-indexed read, no struct
+    //        wrapper, no field math.
+    //   77 — `&'static StructWrap([u64; 5])` indexed via `.0[i]` to
+    //        match dalek/k256's actual newtype shape.
+    "static [u64; 5] indexed read",
+    "static struct-wrapped [u64; 5] indexed read",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1538,6 +1550,44 @@ pub fn check_k256_derive_scalar_two() -> u32 {
     (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
 }
 
+// Slot 76: bare `&'static [u64; 5]` runtime-indexed read. The simplest
+// possible test of the "element-width > 1 byte breaks &'static reads"
+// hypothesis. No struct wrapper, no arithmetic on the result.
+static STATIC_U64_TABLE: [u64; 5] = [
+    0x0123_4567_89AB_CDEF,
+    0xFEDC_BA98_7654_3210,
+    0x1111_2222_3333_4444,
+    0xAAAA_BBBB_CCCC_DDDD,
+    0xDEAD_BEEF_CAFE_BABE,
+];
+
+pub fn check_static_u64_array_lookup() -> u32 {
+    let idx = core::hint::black_box(3usize);
+    let val = STATIC_U64_TABLE[idx];
+    (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
+}
+
+// Slot 77: same but wrapped in a single-field tuple struct — matches
+// dalek's `Scalar52(pub(crate) [u64; 5])` newtype shape. If 76 PASSes
+// and 77 FAILs, the bug is specifically in field projection through a
+// newtype, not in the underlying array.
+#[repr(transparent)]
+pub struct U64Wrap5(pub [u64; 5]);
+
+static STATIC_U64_WRAPPED: U64Wrap5 = U64Wrap5([
+    0x0123_4567_89AB_CDEF,
+    0xFEDC_BA98_7654_3210,
+    0x1111_2222_3333_4444,
+    0xAAAA_BBBB_CCCC_DDDD,
+    0xDEAD_BEEF_CAFE_BABE,
+]);
+
+pub fn check_static_struct_wrapped_u64_lookup() -> u32 {
+    let idx = core::hint::black_box(3usize);
+    let val = STATIC_U64_WRAPPED.0[idx];
+    (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1615,6 +1665,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[73] = check_k256_secret_from_bytes_one();
     results[74] = check_k256_derive_scalar_one();
     results[75] = check_k256_derive_scalar_two();
+    results[76] = check_static_u64_array_lookup();
+    results[77] = check_static_struct_wrapped_u64_lookup();
 }
 
 #[cfg(test)]

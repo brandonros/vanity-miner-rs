@@ -829,4 +829,20 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_k256_derive_scalar_two(results: &mut [u32]) {
         results[75] = logic::check_k256_derive_scalar_two();
     }
+
+    // Slots 76-77: unifying-hypothesis probes for the &'static multi-byte
+    // element bug suspected behind slots 2/4/41/42/71/72/74/75.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_static_u64_array_lookup(results: &mut [u32]) {
+        results[76] = logic::check_static_u64_array_lookup();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_static_struct_wrapped_u64_lookup(results: &mut [u32]) {
+        results[77] = logic::check_static_struct_wrapped_u64_lookup();
+    }
 }
