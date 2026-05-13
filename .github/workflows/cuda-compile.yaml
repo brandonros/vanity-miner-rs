@@ -24,19 +24,22 @@ jobs:
       - name: Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
 
-      - name: Build cuda-oxide codegen backend
+      - name: Install cargo-oxide
         run: |
-          # The flake's shellHook expects $HOME/cuda-oxide/target/debug/librustc_codegen_cuda.so
-          # to exist — it's the rustc codegen plugin doing NVPTX lowering. Track the same
-          # branch the Cargo deps point at (see [workspace.dependencies] in root Cargo.toml).
+          # cargo-oxide is the custom cargo subcommand that loads librustc_codegen_cuda.so
+          # as a rustc plugin. The flake's shellHook expects the clone at $HOME/cuda-oxide.
+          # See README "How to build" for the canonical local-dev flow.
           git clone --branch reproduce-errors --depth 1 \
             https://github.com/brandonros/cuda-oxide.git "$HOME/cuda-oxide"
-          nix develop "$GITHUB_WORKSPACE" --command bash -c \
-            'cd "$HOME/cuda-oxide" && cargo build -p rustc_codegen_cuda'
+          nix develop --command \
+            cargo install --path "$HOME/cuda-oxide/crates/cargo-oxide" --force
 
-      - name: Build with nix devshell
+      - name: Build with cargo oxide
         run: |
-          nix develop --command cargo build -p vanity-miner --features gpu --release
+          # `cargo oxide build` builds the codegen backend if needed, then compiles
+          # vanity-miner with NVPTX lowering for the target compute capability.
+          nix develop --command \
+            cargo oxide build --release --features gpu --arch sm_89
 
           mkdir -p artifacts
           cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
