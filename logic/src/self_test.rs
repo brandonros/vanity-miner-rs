@@ -1088,23 +1088,44 @@ pub fn check_arith_divrem_by_58_pow_5() -> u32 {
     //
     // Cases include the first 4 bytes of slot 3's input, the divisor
     // itself, divisor-1 boundary, a known quotient with non-zero
-    // remainder, and u64 extremes. Each `(input, quotient, remainder)`
-    // tuple is const-evaluated by the host rustc.
+    // remainder, and u64 extremes.
+    //
+    // Layout note: parallel primitive arrays (INPUTS / EXPECTED_Q /
+    // EXPECTED_R) instead of an `[(u64, u64, u64); N]` array of tuples.
+    // cuda-oxide as of 5feaf2e doesn't handle tuple-element array
+    // constants (`translate_array_constant` only takes the integer-element
+    // branch); parallel arrays of primitives go through the supported
+    // path. Semantics are identical to the tuple form.
     const D: u64 = 58_u64.pow(5);
-    const CASES: [(u64, u64, u64); 6] = [
-        (0x089A23FF, 0x089A23FF_u64 / D, 0x089A23FF_u64 % D),
-        (D, 1, 0),
-        (D - 1, 0, D - 1),
-        (D.wrapping_mul(7).wrapping_add(123), 7, 123),
-        (u64::MAX, u64::MAX / D, u64::MAX % D),
-        (0xFFFFFFFF_00000000, 0xFFFFFFFF_00000000_u64 / D, 0xFFFFFFFF_00000000_u64 % D),
+    const INPUTS: [u64; 6] = [
+        0x089A23FF,
+        D,
+        D - 1,
+        D.wrapping_mul(7).wrapping_add(123),
+        u64::MAX,
+        0xFFFFFFFF_00000000,
+    ];
+    const EXPECTED_Q: [u64; 6] = [
+        0x089A23FF_u64 / D,
+        1,
+        0,
+        7,
+        u64::MAX / D,
+        0xFFFFFFFF_00000000_u64 / D,
+    ];
+    const EXPECTED_R: [u64; 6] = [
+        0x089A23FF_u64 % D,
+        0,
+        D - 1,
+        123,
+        u64::MAX % D,
+        0xFFFFFFFF_00000000_u64 % D,
     ];
 
     let mut i = 0;
-    while i < CASES.len() {
-        let (input, eq, er) = CASES[i];
-        let x = core::hint::black_box(input);
-        if x / D != eq || x % D != er {
+    while i < INPUTS.len() {
+        let x = core::hint::black_box(INPUTS[i]);
+        if x / D != EXPECTED_Q[i] || x % D != EXPECTED_R[i] {
             return 0;
         }
         i += 1;
