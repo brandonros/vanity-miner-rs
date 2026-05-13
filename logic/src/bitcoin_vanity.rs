@@ -131,15 +131,43 @@ mod test {
         let result = generate_and_check_bitcoin_vanity_key(&request);
 
         // Assert
-        //assert_eq!(result.matches, true);
+        assert_eq!(result.matches, true);
         assert_eq!(
-            result.private_key, 
+            result.private_key,
             <[u8; 32]>::try_from(
                 hex::decode("23a33f35737ab1abc16cc1d17555c8dc751833ac76cf4bc9e32faf3d7352e930")
                     .unwrap()
                     .as_slice()
             ).unwrap()
         );
-        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"bc1qgcz8ez3a3md3xnplrgl86edsl46zruf8mwx56m");   
+        assert_eq!(
+            result.public_key,
+            <[u8; 33]>::try_from(
+                hex::decode("03bd954ff18736033d7eb34a760a16e7096a0f3a00e74f541d17e55619e6510b16")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
+        assert_eq!(
+            result.public_key_hash,
+            <[u8; 20]>::try_from(
+                hex::decode("46047c8a3d8edb134c3f1a3e7d65b0fd7421f127")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
+        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"bc1qgcz8ez3a3md3xnplrgl86edsl46zruf8mwx56m");
+    }
+
+    #[test]
+    fn should_encode_wif_compressed_mainnet_correctly() {
+        let private_key: [u8; 32] = <[u8; 32]>::try_from(
+            hex::decode("3632f66fed3b77f3309c86d708fcce8a071a61a1a94add0cb45f957c3467d1dc")
+                .unwrap()
+                .as_slice()
+        ).unwrap();
+        let mut output = [0u8; 64];
+        let len = private_key_to_wif(&private_key, true, false, &mut output);
+        assert_eq!(&output[..len], b"Ky34pxSf7FLh6GFgKpvJwfDFdCw6GG4vytEh3Kt3ZzZoxw3e3WaG");
     }
 }
