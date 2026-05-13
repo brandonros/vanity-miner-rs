@@ -867,4 +867,57 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_k256_scalar_one_round_trip(results: &mut [u32]) {
         results[80] = logic::check_k256_scalar_one_round_trip();
     }
+
+    // Slots 81-83: post-v1.46 re-bisect probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u128_imm_shr_52(results: &mut [u32]) {
+        results[81] = logic::check_arith_u128_imm_shr_52();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_static_depth4_newtype_nesting(results: &mut [u32]) {
+        results[82] = logic::check_static_depth4_newtype_nesting();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_reverse_range_write(results: &mut [u32]) {
+        results[83] = logic::check_reverse_range_write();
+    }
+
+    // Slots 84-87: dalek Scalar52 ladder bisect of slot 71's chain
+    // (using a verbatim port in logic::bisect_scalar52 since dalek's
+    // backend module is pub(crate)).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_from_bytes(results: &mut [u32]) {
+        results[84] = logic::check_dalek_scalar52_from_bytes();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_montgomery_reduce_r(results: &mut [u32]) {
+        results[85] = logic::check_dalek_scalar52_montgomery_reduce_r();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r(results: &mut [u32]) {
+        results[86] = logic::check_dalek_scalar52_mul_internal_then_reduce_one_r();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_as_bytes_one(results: &mut [u32]) {
+        results[87] = logic::check_dalek_scalar52_as_bytes_one();
+    }
 }

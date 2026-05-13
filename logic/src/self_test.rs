@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 81;
+pub const SELF_TEST_NUM_CHECKS: usize = 88;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -253,6 +253,44 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "k256 encode generator (no mul)",
     "k256 double generator + encode",
     "k256 Scalar::ONE round-trip",
+    // Slots 81-83: post-v1.46 re-bisect (Bug A hypothesis falsified by
+    // slots 76/77 PASSing; Bug C fixed). New hypotheses for remaining
+    // failures:
+    //   81 — `u128 >> 52` immediate right shift, the exact shape inside
+    //        dalek's montgomery_reduce::part1 and Barrett reduction
+    //        generally. LLVM IR expands this into multi-step 64-bit
+    //        shifts; if the expansion is wrong, every multi-limb modular
+    //        reduction silently produces garbage.
+    //   82 — `&'static` data with 4-deep newtype nesting matching k256's
+    //        `Scalar(U256(Uint { limbs: [Limb(u64); 4] }))` layout. Slot
+    //        77 covered depth-2 (`Wrap([u64; 5])`); this tests whether
+    //        deeper GEP through nested newtypes is broken.
+    //   83 — `(0..N).rev()` reverse range iterator writing to a stack
+    //        array. The one remaining shape in base58_encode_32's
+    //        digit-extraction loop that isn't isolated by slots 60-69.
+    "arith u128 immediate shr 52",
+    "static depth-4 newtype nesting",
+    "reverse range iterator write",
+    // Slots 84-87: ladder bisect of slot 71's call chain.
+    // `Scalar::from_bytes_mod_order(x).to_bytes()` for x=1 expands to:
+    //   A: Scalar52::from_bytes(&bytes)         — bit-pack bytes→limbs
+    //   B: Scalar52::mul_internal(x, R)         — 5×5 widening mul matrix
+    //   C: Scalar52::montgomery_reduce(xR)      — u128 carry chain + L reads
+    //   D: result.as_bytes()                     — bit-pack limbs→bytes
+    // mul_internal and montgomery_reduce are pub(crate), so we test them
+    // via the public `as_montgomery` (B+C together with RR) and
+    // `from_montgomery` (just C, synthetic input).
+    //   84 — Rung A (from_bytes)
+    //   85 — Rung C (from_montgomery on hardcoded R → should yield 1)
+    //   86 — Rung B+C (as_montgomery on 1 → should yield R)
+    //   87 — Rung D (as_bytes on 1)
+    // 84+85+87 PASS, 86 FAIL → mul_internal is broken.
+    // 84+86+87 PASS, 85 FAIL → montgomery_reduce broken in isolation.
+    // 84+87 PASS, 85+86 FAIL → both broken (or shared subroutine).
+    "dalek Scalar52::from_bytes(1)",
+    "dalek Scalar52::from_montgomery(R) == 1",
+    "dalek Scalar52::ONE.as_montgomery() == R",
+    "dalek Scalar52([1,..]).as_bytes() == [1,0,..]",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1668,6 +1706,297 @@ pub fn check_k256_scalar_one_round_trip() -> u32 {
     (s2 == s) as u32
 }
 
+// Slot 81: `u128 >> 52` immediate right shift, matching the exact shape
+// inside dalek's `montgomery_reduce::part1`:
+//   ((sum + m(p, constants::L[0])) >> 52, p)
+// LLVM lowers u128 immediate shifts to multi-step 64-bit shift sequences.
+// Slot 65 (i128 add chain) is fixed but doesn't cover this shape. Slot
+// 55/56 cover u64 var shifts, not u128 immediate shifts.
+pub fn check_arith_u128_imm_shr_52() -> u32 {
+    const SUM: u128 = 0xFEDC_BA98_7654_3210_0123_4567_89AB_CDEF;
+    const EXPECTED: u128 = SUM >> 52;
+    let sum = core::hint::black_box(SUM);
+    let shifted = sum >> 52;
+    (shifted == EXPECTED) as u32
+}
+
+// Slot 82: depth-4 newtype nesting on `&'static` data. k256's `Scalar::ONE`
+// is a `pub const Scalar = Self(U256::ONE)` where:
+//   Scalar(U256)
+//     U256 = Uint<4> { limbs: [Limb; 4] }
+//       Limb(u64)
+// So accessing the inner u64 requires `scalar.0.limbs[i].0` — 4 levels of
+// field projection. Slot 77 tested depth-2 (`Wrap([u64; 5])` + index).
+// If THIS fails, the bug is GEP through nested newtypes, not array reads.
+#[repr(transparent)]
+pub struct ProbeLimb(pub u64);
+
+#[repr(C)]
+pub struct ProbeUint4 {
+    pub limbs: [ProbeLimb; 4],
+}
+
+#[repr(transparent)]
+pub struct ProbeScalar(pub ProbeUint4);
+
+static NESTED_ONE_PROBE: ProbeScalar = ProbeScalar(ProbeUint4 {
+    limbs: [
+        ProbeLimb(0x1111_2222_3333_4444),
+        ProbeLimb(0x5555_6666_7777_8888),
+        ProbeLimb(0x9999_AAAA_BBBB_CCCC),
+        ProbeLimb(0xDDDD_EEEE_FFFF_0000),
+    ],
+});
+
+pub fn check_static_depth4_newtype_nesting() -> u32 {
+    let idx = core::hint::black_box(2usize);
+    let v = NESTED_ONE_PROBE.0.limbs[idx].0;
+    (v == 0x9999_AAAA_BBBB_CCCC) as u32
+}
+
+// Slot 83: reverse range iterator `(0..N).rev()` writing into a stack
+// array. The only loop shape inside base58_encode_32's digit-extraction
+// phase that isn't covered by an existing isolated slot:
+//   for idx in (0..limb_count).rev() {
+//       let output_offset = idx * DIGITS_PER_LIMB;
+//       output[output_offset + i] = ...;
+//   }
+pub fn check_reverse_range_write() -> u32 {
+    let limb_count: usize = core::hint::black_box(3);
+    let mut out = [0u32; 10];
+    for idx in (0..limb_count).rev() {
+        out[idx] = (idx as u32) * 100;
+    }
+    const fn expected() -> [u32; 10] {
+        let mut e = [0u32; 10];
+        let mut idx = 3usize;
+        while idx > 0 {
+            idx -= 1;
+            e[idx] = (idx as u32) * 100;
+        }
+        e
+    }
+    const EXPECTED: [u32; 10] = expected();
+    (out == EXPECTED) as u32
+}
+
+// === Slots 84-87: ladder bisect of slot 71's call chain ===
+//
+// Slot 71's `Scalar::from_bytes_mod_order(x).to_bytes()` for x=1 expands
+// inside dalek to:
+//   1. Scalar52::from_bytes(&bytes)            — byte→limb unpack
+//   2. Scalar52::mul_internal(x, R)            — 5×5 widening mul matrix
+//   3. Scalar52::montgomery_reduce(xR)         — u128 chain + L reads
+//   4. result.as_bytes()                       — limb→byte pack
+//
+// dalek's `backend` module is `pub(crate)`, so we can't reach Scalar52,
+// mul_internal, montgomery_reduce, or constants::L/R from outside. To
+// ladder-bisect we copy the minimum needed from dalek into this module
+// verbatim — same Rust source, just compiled inside the logic crate so
+// each step is callable in isolation.
+//
+// All names prefixed `bisect_` to make it obvious these are not the real
+// dalek types, even though the code is byte-for-byte identical to
+// `curve25519-dalek/src/backend/serial/u64/scalar.rs`.
+mod bisect_scalar52 {
+    //! Verbatim copy of the parts of `curve25519_dalek::backend::serial::u64::scalar`
+    //! we need for slot 71's ladder bisect. If the GPU produces wrong
+    //! results from THIS code (which is identical to what dalek runs
+    //! internally), the bug is in the compiler's lowering of these
+    //! specific Rust idioms, not in dalek's API surface.
+    //!
+    //! Source: curve25519-dalek 4.1.3.
+
+    /// u64 * u64 = u128 multiply helper (dalek's `m`).
+    #[inline(always)]
+    fn m(x: u64, y: u64) -> u128 {
+        (x as u128) * (y as u128)
+    }
+
+    #[derive(Copy, Clone)]
+    pub struct Scalar52(pub [u64; 5]);
+
+    /// `L` = group order of curve25519's scalar field.
+    pub const L: Scalar52 = Scalar52([
+        0x0002631a5cf5d3ed,
+        0x000dea2f79cd6581,
+        0x000000000014def9,
+        0x0000000000000000,
+        0x0000100000000000,
+    ]);
+
+    /// `L` * LFACTOR ≡ -1 (mod 2^52)
+    pub const LFACTOR: u64 = 0x51da312547e1b;
+
+    /// `R` = 2^260 mod L
+    pub const R: Scalar52 = Scalar52([
+        0x000f48bd6721e6ed,
+        0x0003bab5ac67e45a,
+        0x000fffffeb35e51b,
+        0x000fffffffffffff,
+        0x00000fffffffffff,
+    ]);
+
+    impl Scalar52 {
+        pub const ZERO: Scalar52 = Scalar52([0, 0, 0, 0, 0]);
+
+        /// Unpack 32 bytes (little-endian) into 5 52-bit limbs.
+        pub fn from_bytes(bytes: &[u8; 32]) -> Scalar52 {
+            let mut words = [0u64; 4];
+            for i in 0..4 {
+                for j in 0..8 {
+                    words[i] |= (bytes[(i * 8) + j] as u64) << (j * 8);
+                }
+            }
+            let mask = (1u64 << 52) - 1;
+            let top_mask = (1u64 << 48) - 1;
+            let mut s = Scalar52::ZERO;
+            s.0[0] =   words[0]                            & mask;
+            s.0[1] = ((words[0] >> 52) | (words[1] << 12)) & mask;
+            s.0[2] = ((words[1] >> 40) | (words[2] << 24)) & mask;
+            s.0[3] = ((words[2] >> 28) | (words[3] << 36)) & mask;
+            s.0[4] =  (words[3] >> 16)                     & top_mask;
+            s
+        }
+
+        /// Pack 5 52-bit limbs into 32 bytes (little-endian).
+        #[allow(clippy::identity_op)]
+        pub fn as_bytes(&self) -> [u8; 32] {
+            let mut s = [0u8; 32];
+            s[ 0] =  (self.0[ 0] >>  0)                      as u8;
+            s[ 1] =  (self.0[ 0] >>  8)                      as u8;
+            s[ 2] =  (self.0[ 0] >> 16)                      as u8;
+            s[ 3] =  (self.0[ 0] >> 24)                      as u8;
+            s[ 4] =  (self.0[ 0] >> 32)                      as u8;
+            s[ 5] =  (self.0[ 0] >> 40)                      as u8;
+            s[ 6] = ((self.0[ 0] >> 48) | (self.0[ 1] << 4)) as u8;
+            s[ 7] =  (self.0[ 1] >>  4)                      as u8;
+            s[ 8] =  (self.0[ 1] >> 12)                      as u8;
+            s[ 9] =  (self.0[ 1] >> 20)                      as u8;
+            s[10] =  (self.0[ 1] >> 28)                      as u8;
+            s[11] =  (self.0[ 1] >> 36)                      as u8;
+            s[12] =  (self.0[ 1] >> 44)                      as u8;
+            s[13] =  (self.0[ 2] >>  0)                      as u8;
+            s[14] =  (self.0[ 2] >>  8)                      as u8;
+            s[15] =  (self.0[ 2] >> 16)                      as u8;
+            s[16] =  (self.0[ 2] >> 24)                      as u8;
+            s[17] =  (self.0[ 2] >> 32)                      as u8;
+            s[18] =  (self.0[ 2] >> 40)                      as u8;
+            s[19] = ((self.0[ 2] >> 48) | (self.0[ 3] << 4)) as u8;
+            s[20] =  (self.0[ 3] >>  4)                      as u8;
+            s[21] =  (self.0[ 3] >> 12)                      as u8;
+            s[22] =  (self.0[ 3] >> 20)                      as u8;
+            s[23] =  (self.0[ 3] >> 28)                      as u8;
+            s[24] =  (self.0[ 3] >> 36)                      as u8;
+            s[25] =  (self.0[ 3] >> 44)                      as u8;
+            s[26] =  (self.0[ 4] >>  0)                      as u8;
+            s[27] =  (self.0[ 4] >>  8)                      as u8;
+            s[28] =  (self.0[ 4] >> 16)                      as u8;
+            s[29] =  (self.0[ 4] >> 24)                      as u8;
+            s[30] =  (self.0[ 4] >> 32)                      as u8;
+            s[31] =  (self.0[ 4] >> 40)                      as u8;
+            s
+        }
+
+        /// 5×5 widening multiply → [u128; 9]. The exact shape dalek uses.
+        pub fn mul_internal(a: &Scalar52, b: &Scalar52) -> [u128; 9] {
+            let mut z = [0u128; 9];
+            z[0] = m(a.0[0], b.0[0]);
+            z[1] = m(a.0[0], b.0[1]) + m(a.0[1], b.0[0]);
+            z[2] = m(a.0[0], b.0[2]) + m(a.0[1], b.0[1]) + m(a.0[2], b.0[0]);
+            z[3] = m(a.0[0], b.0[3]) + m(a.0[1], b.0[2]) + m(a.0[2], b.0[1]) + m(a.0[3], b.0[0]);
+            z[4] = m(a.0[0], b.0[4]) + m(a.0[1], b.0[3]) + m(a.0[2], b.0[2]) + m(a.0[3], b.0[1]) + m(a.0[4], b.0[0]);
+            z[5] =                     m(a.0[1], b.0[4]) + m(a.0[2], b.0[3]) + m(a.0[3], b.0[2]) + m(a.0[4], b.0[1]);
+            z[6] =                                         m(a.0[2], b.0[4]) + m(a.0[3], b.0[3]) + m(a.0[4], b.0[2]);
+            z[7] =                                                             m(a.0[3], b.0[4]) + m(a.0[4], b.0[3]);
+            z[8] =                                                                                 m(a.0[4], b.0[4]);
+            z
+        }
+
+        /// Compute `limbs / R` (mod L) — exactly dalek's montgomery_reduce.
+        pub fn montgomery_reduce(limbs: &[u128; 9]) -> Scalar52 {
+            #[inline(always)]
+            fn part1(sum: u128) -> (u128, u64) {
+                let p = (sum as u64).wrapping_mul(LFACTOR) & ((1u64 << 52) - 1);
+                ((sum + m(p, L.0[0])) >> 52, p)
+            }
+            #[inline(always)]
+            fn part2(sum: u128) -> (u128, u64) {
+                let w = (sum as u64) & ((1u64 << 52) - 1);
+                (sum >> 52, w)
+            }
+            let l = &L;
+            let (carry, n0) = part1(        limbs[0]);
+            let (carry, n1) = part1(carry + limbs[1] + m(n0, l.0[1]));
+            let (carry, n2) = part1(carry + limbs[2] + m(n0, l.0[2]) + m(n1, l.0[1]));
+            let (carry, n3) = part1(carry + limbs[3]                 + m(n1, l.0[2]) + m(n2, l.0[1]));
+            let (carry, n4) = part1(carry + limbs[4] + m(n0, l.0[4])                 + m(n2, l.0[2]) + m(n3, l.0[1]));
+            let (carry, r0) = part2(carry + limbs[5]                 + m(n1, l.0[4])                 + m(n3, l.0[2]) + m(n4, l.0[1]));
+            let (carry, r1) = part2(carry + limbs[6]                                 + m(n2, l.0[4])                 + m(n4, l.0[2]));
+            let (carry, r2) = part2(carry + limbs[7]                                                 + m(n3, l.0[4]));
+            let (carry, r3) = part2(carry + limbs[8]                                                                 + m(n4, l.0[4]));
+            let         r4 = carry as u64;
+            // result may be >= L; dalek then subtracts L if so. For our
+            // smoke tests (input = small canonical 1), the unreduced
+            // result already equals 1 / R or R, so we skip the final
+            // sub.
+            Scalar52([r0, r1, r2, r3, r4])
+        }
+    }
+}
+
+const DALEK_ONE_LIMBS: [u64; 5] = [1, 0, 0, 0, 0];
+
+// Slot 84 — Rung A: pure byte→limbs unpack. No arithmetic, no statics
+// other than the const masks.
+pub fn check_dalek_scalar52_from_bytes() -> u32 {
+    let mut bytes = [0u8; 32];
+    bytes[0] = 1;
+    let bytes = core::hint::black_box(bytes);
+    let s = bisect_scalar52::Scalar52::from_bytes(&bytes);
+    (s.0 == DALEK_ONE_LIMBS) as u32
+}
+
+// Slot 85 — Rung C alone: montgomery_reduce on a synthetic widened input.
+// Build `[u128; 9]` from R's limbs (zero-padding 5..9) — semantically
+// this is "R in [u128; 9] form" — then run montgomery_reduce. Result
+// should be R / R = 1.
+pub fn check_dalek_scalar52_montgomery_reduce_r() -> u32 {
+    let r = bisect_scalar52::R;
+    let mut widened = [0u128; 9];
+    for (i, x) in r.0.iter().enumerate() {
+        widened[i] = *x as u128;
+    }
+    let widened = core::hint::black_box(widened);
+    let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
+    (result.0 == DALEK_ONE_LIMBS) as u32
+}
+
+// Slot 86 — Rungs B+C: full mul_internal + montgomery_reduce. Slot 71's
+// exact internal call. For input ONE and constant R, mul_internal yields
+// R as [u128; 9] (limbs 0..5 = R, limbs 5..9 = 0), then montgomery_reduce
+// yields R / R = 1. If 85 PASSes and 86 FAILs, mul_internal is the bug.
+pub fn check_dalek_scalar52_mul_internal_then_reduce_one_r() -> u32 {
+    use bisect_scalar52::Scalar52;
+    const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
+    let one = core::hint::black_box(ONE);
+    let r = core::hint::black_box(bisect_scalar52::R);
+    let x_r = Scalar52::mul_internal(&one, &r);
+    let result = Scalar52::montgomery_reduce(&x_r);
+    (result.0 == DALEK_ONE_LIMBS) as u32
+}
+
+// Slot 87 — Rung D: limbs→bytes pack. Inverse of slot 84.
+pub fn check_dalek_scalar52_as_bytes_one() -> u32 {
+    use bisect_scalar52::Scalar52;
+    const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
+    let one = core::hint::black_box(ONE);
+    let bytes = one.as_bytes();
+    let mut expected = [0u8; 32];
+    expected[0] = 1;
+    (bytes == expected) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1750,6 +2079,13 @@ pub fn run_self_test(results: &mut [u32]) {
     results[78] = check_k256_encode_generator();
     results[79] = check_k256_double_generator();
     results[80] = check_k256_scalar_one_round_trip();
+    results[81] = check_arith_u128_imm_shr_52();
+    results[82] = check_static_depth4_newtype_nesting();
+    results[83] = check_reverse_range_write();
+    results[84] = check_dalek_scalar52_from_bytes();
+    results[85] = check_dalek_scalar52_montgomery_reduce_r();
+    results[86] = check_dalek_scalar52_mul_internal_then_reduce_one_r();
+    results[87] = check_dalek_scalar52_as_bytes_one();
 }
 
 #[cfg(test)]

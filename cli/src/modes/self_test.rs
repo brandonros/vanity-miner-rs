@@ -134,6 +134,8 @@ pub mod gpu {
         //   73-75 k256 per-stage bisect
         //   76-77 unifying-hypothesis probe: `&'static` array of u64s
         //   78-80 k256 Bug-B triangulation (encode, double, Scalar)
+        //   81-83 post-v1.46 re-bisect (u128 shr, deep newtype, rev iter)
+        //   84-87 dalek Scalar52 ladder bisect of slot 71 chain
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -215,6 +217,13 @@ pub mod gpu {
         run_slot!(78, kernel_self_test_k256_encode_generator);
         run_slot!(79, kernel_self_test_k256_double_generator);
         run_slot!(80, kernel_self_test_k256_scalar_one_round_trip);
+        run_slot!(81, kernel_self_test_arith_u128_imm_shr_52);
+        run_slot!(82, kernel_self_test_static_depth4_newtype_nesting);
+        run_slot!(83, kernel_self_test_reverse_range_write);
+        run_slot!(84, kernel_self_test_dalek_scalar52_from_bytes);
+        run_slot!(85, kernel_self_test_dalek_scalar52_montgomery_reduce_r);
+        run_slot!(86, kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r);
+        run_slot!(87, kernel_self_test_dalek_scalar52_as_bytes_one);
 
         report(&results)
     }
