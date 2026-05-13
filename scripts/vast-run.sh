@@ -2,10 +2,10 @@
 
 set -e
 
-PORT=21385
-HOST=ssh9.vast.ai
+PORT=19411
+HOST=ssh6.vast.ai
 USER=root
-VERSION="${VANITY_MINER_VERSION:-v1.31.0}"
+VERSION="${VANITY_MINER_VERSION:-$(gh release view --repo brandonros/vanity-miner-rs --json tagName -q .tagName)}"
 
 ssh -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" <<EOF
 banner() {

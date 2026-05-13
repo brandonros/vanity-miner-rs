@@ -282,152 +282,201 @@ pub mod kernels {
         results[3] = logic::check_primitive_base58();
     }
 
-    // Slots 4-24: composed-subsystem KAT checks.
+    // Slots 4-9: non-solana primitive bisect — secp256k1 (compressed +
+    // uncompressed), keccak256, ripemd160, sha256 (fixed-32 + variable).
+    // These are the primitives the bitcoin / ethereum / shallenge / WIF
+    // pipelines compose; isolating each one means a fault here pinpoints
+    // the broken primitive before the composed kernels (slots 10+) would
+    // have inlined it.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_secp256k1_compressed(results: &mut [u32]) {
+        results[4] = logic::check_primitive_secp256k1_compressed();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_secp256k1_uncompressed(results: &mut [u32]) {
+        results[5] = logic::check_primitive_secp256k1_uncompressed();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_keccak256(results: &mut [u32]) {
+        results[6] = logic::check_primitive_keccak256();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_ripemd160(results: &mut [u32]) {
+        results[7] = logic::check_primitive_ripemd160();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_sha256_32(results: &mut [u32]) {
+        results[8] = logic::check_primitive_sha256_32();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_sha256_variable(results: &mut [u32]) {
+        results[9] = logic::check_primitive_sha256_variable();
+    }
+
+    // Slots 10-30: composed-subsystem KAT checks.
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_priv(results: &mut [u32]) {
-        results[4] = logic::check_solana_priv();
+        results[10] = logic::check_solana_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_pub(results: &mut [u32]) {
-        results[5] = logic::check_solana_pub();
+        results[11] = logic::check_solana_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_encoded(results: &mut [u32]) {
-        results[6] = logic::check_solana_encoded();
+        results[12] = logic::check_solana_encoded();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_priv(results: &mut [u32]) {
-        results[7] = logic::check_ethereum_priv();
+        results[13] = logic::check_ethereum_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_pub(results: &mut [u32]) {
-        results[8] = logic::check_ethereum_pub();
+        results[14] = logic::check_ethereum_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_address(results: &mut [u32]) {
-        results[9] = logic::check_ethereum_address();
+        results[15] = logic::check_ethereum_address();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_priv(results: &mut [u32]) {
-        results[10] = logic::check_bitcoin_priv();
+        results[16] = logic::check_bitcoin_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_pub(results: &mut [u32]) {
-        results[11] = logic::check_bitcoin_pub();
+        results[17] = logic::check_bitcoin_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_pkh(results: &mut [u32]) {
-        results[12] = logic::check_bitcoin_pkh();
+        results[18] = logic::check_bitcoin_pkh();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_encoded(results: &mut [u32]) {
-        results[13] = logic::check_bitcoin_encoded();
+        results[19] = logic::check_bitcoin_encoded();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_matches(results: &mut [u32]) {
-        results[14] = logic::check_bitcoin_matches();
+        results[20] = logic::check_bitcoin_matches();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_compressed_mainnet(results: &mut [u32]) {
-        results[15] = logic::check_wif_compressed_mainnet();
+        results[21] = logic::check_wif_compressed_mainnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_uncompressed_mainnet(results: &mut [u32]) {
-        results[16] = logic::check_wif_uncompressed_mainnet();
+        results[22] = logic::check_wif_uncompressed_mainnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_compressed_testnet(results: &mut [u32]) {
-        results[17] = logic::check_wif_compressed_testnet();
+        results[23] = logic::check_wif_compressed_testnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_uncompressed_testnet(results: &mut [u32]) {
-        results[18] = logic::check_wif_uncompressed_testnet();
+        results[24] = logic::check_wif_uncompressed_testnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_hash(results: &mut [u32]) {
-        results[19] = logic::check_shallenge_hash();
+        results[25] = logic::check_shallenge_hash();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_nonce_len(results: &mut [u32]) {
-        results[20] = logic::check_shallenge_nonce_len();
+        results[26] = logic::check_shallenge_nonce_len();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_is_better(results: &mut [u32]) {
-        results[21] = logic::check_shallenge_is_better();
+        results[27] = logic::check_shallenge_is_better();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_lt(results: &mut [u32]) {
-        results[22] = logic::check_compare_hashes_lt();
+        results[28] = logic::check_compare_hashes_lt();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_gt(results: &mut [u32]) {
-        results[23] = logic::check_compare_hashes_gt();
+        results[29] = logic::check_compare_hashes_gt();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_eq(results: &mut [u32]) {
-        results[24] = logic::check_compare_hashes_eq();
+        results[30] = logic::check_compare_hashes_eq();
     }
 }

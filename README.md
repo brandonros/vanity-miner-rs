@@ -1,6 +1,12 @@
 # vanity-miner-rs
 GPU-accelerated vanity address generator for multiple blockchains
 
+## How to trigger CI
+
+```shell
+gh workflow run cuda-compile.yaml --ref cuda-oxide
+```
+
 ## How to build
 
 ```shell
