@@ -170,4 +170,43 @@ mod test {
         let len = private_key_to_wif(&private_key, true, false, &mut output);
         assert_eq!(&output[..len], b"Ky34pxSf7FLh6GFgKpvJwfDFdCw6GG4vytEh3Kt3ZzZoxw3e3WaG");
     }
+
+    // The three remaining (compressed, testnet) flag combinations.
+    // Expected values derived via independent base58check implementation
+    // (see scripts/sanity_check.py-equivalent flow).
+    #[test]
+    fn should_encode_wif_uncompressed_mainnet_correctly() {
+        let private_key: [u8; 32] = <[u8; 32]>::try_from(
+            hex::decode("3632f66fed3b77f3309c86d708fcce8a071a61a1a94add0cb45f957c3467d1dc")
+                .unwrap()
+                .as_slice()
+        ).unwrap();
+        let mut output = [0u8; 64];
+        let len = private_key_to_wif(&private_key, false, false, &mut output);
+        assert_eq!(&output[..len], b"5JEA2MGL4EDcpQr6HVywMzbVgvTJWHZA4NaTk7znSbnx3ooTWrv");
+    }
+
+    #[test]
+    fn should_encode_wif_compressed_testnet_correctly() {
+        let private_key: [u8; 32] = <[u8; 32]>::try_from(
+            hex::decode("3632f66fed3b77f3309c86d708fcce8a071a61a1a94add0cb45f957c3467d1dc")
+                .unwrap()
+                .as_slice()
+        ).unwrap();
+        let mut output = [0u8; 64];
+        let len = private_key_to_wif(&private_key, true, true, &mut output);
+        assert_eq!(&output[..len], b"cPQ4HsSWYK2xFhiwiEjSJyiKFSEVviAd3vPA9kLZ57DpDg5McHdr");
+    }
+
+    #[test]
+    fn should_encode_wif_uncompressed_testnet_correctly() {
+        let private_key: [u8; 32] = <[u8; 32]>::try_from(
+            hex::decode("3632f66fed3b77f3309c86d708fcce8a071a61a1a94add0cb45f957c3467d1dc")
+                .unwrap()
+                .as_slice()
+        ).unwrap();
+        let mut output = [0u8; 64];
+        let len = private_key_to_wif(&private_key, false, true, &mut output);
+        assert_eq!(&output[..len], b"91znc65seTHknUMNuqsrEb9TLap1fT6MQKSQpkMHnLXzpohhjJo");
+    }
 }
