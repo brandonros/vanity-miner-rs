@@ -5,7 +5,7 @@ set -e
 PORT=21385
 HOST=ssh9.vast.ai
 USER=root
-VERSION="${VANITY_MINER_VERSION:-v1.29.0}"
+VERSION="${VANITY_MINER_VERSION:-v1.30.0}"
 
 ssh -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" <<EOF
 banner() {
