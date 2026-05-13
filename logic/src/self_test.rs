@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 63;
+pub const SELF_TEST_NUM_CHECKS: usize = 64;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -142,6 +142,14 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "iter static table lookup",
     "iter mut slice partial",
     "iter mut alphabet lookup",
+    // Slot 63: direct counterpart to slot 60. Slot 60 uses `&'static
+    // [u8; N]` (array reference) for the table; this one uses `&'static
+    // [u8]` (slice) — the *only* difference. Across the run history:
+    // every crashing alphabet-lookup site uses array-ref; the one site
+    // that uses a slice (xoroshiro/slot 44) FAILs without crashing. If 60
+    // CRASHes and 63 PASSes, the array-ref-vs-slice discriminator is
+    // confirmed and the alpha-NVPTX bug is narrowed to one Rust idiom.
+    "iter static slice lookup",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1043,6 +1051,20 @@ pub fn check_iter_mut_alphabet_lookup() -> u32 {
     (buf[0] == b'A' && buf[3] == b'A' && buf[4] == 0 && buf[7] == 0) as u32
 }
 
+pub fn check_iter_static_slice_lookup() -> u32 {
+    // Counterpart to slot 60. Identical shape — single dynamic index into
+    // a small static byte table — but typed as `&'static [u8]` (slice)
+    // instead of `&'static [u8; 4]` (array reference). Slot 44 already
+    // hinted that slice-typed alphabets don't crash where array-ref-typed
+    // ones do (compare xoroshiro `&[u8]` → FAIL no crash, vs base58/
+    // bech32 `&[u8; N]` → CRASH). This slot makes the discriminator a
+    // controlled one-variable test: if 60 CRASHes and 63 PASSes, the
+    // backend mishandles array-ref static indexing specifically.
+    const TABLE: &[u8] = b"ABCD";
+    let idx = core::hint::black_box(0usize);
+    (TABLE[idx] == b'A') as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -1107,6 +1129,7 @@ pub fn run_self_test(results: &mut [u32]) {
     results[60] = check_iter_static_table_lookup();
     results[61] = check_iter_mut_slice_partial();
     results[62] = check_iter_mut_alphabet_lookup();
+    results[63] = check_iter_static_slice_lookup();
 }
 
 #[cfg(test)]

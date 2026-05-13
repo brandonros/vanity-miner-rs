@@ -162,13 +162,13 @@ pub mod gpu {
         run_slot!(38, kernel_self_test_arith_u64_mul_lo);
         run_slot!(39, kernel_self_test_arith_u64_mul_hi);
         run_slot!(40, kernel_self_test_arith_u128_mul);
-        // Slots 44-45: composed-primitive sub-bisects (xoroshiro nonce,
-        // bech32 p2wpkh). Slot 43 (base58 all-zeros) ALSO turns out to be
-        // crash-prone — surprising, since with all-zero input the divide
-        // loop is dead, but the codegen still faults wildly. Deferred with
-        // 41/42 to the tail; see the comment near their run_slot! calls.
+        // Slot 44: xoroshiro base64 nonce (uses `&'static [u8]` slice
+        // for the alphabet — FAILs with wrong bytes but doesn't crash).
+        // Slot 45 (bech32) and slot 43 (base58 all-zeros) turn out to be
+        // crash-prone too — both use `&'static [u8; N]` array references
+        // for their alphabets, same shape as slot 41. Deferred to the
+        // tail; see the comment near their run_slot! calls.
         run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
-        run_slot!(45, kernel_self_test_bech32_p2wpkh);
         // Slots 46-56: tier-2 arithmetic bisect targeting PTX idioms
         // dalek/k256 hit that the tier-1 net (31-40) doesn't cover.
         run_slot!(46, kernel_self_test_arith_overflowing_add);
@@ -195,20 +195,29 @@ pub mod gpu {
         // lookup pattern (the suspect shared crash path between slot 41
         // and slot 43). Ordered simplest→most complex so an early crash
         // still captures earlier slots' results.
-        run_slot!(60, kernel_self_test_iter_static_table_lookup);
+        // Slot 63 (slice counterpart) runs BEFORE slot 60 (array-ref
+        // version) so we capture the slice baseline even if 60 faults
+        // the way bech32/base58 did. If 63 PASSes and 60 CRASHes, the
+        // array-ref-vs-slice discriminator is confirmed.
+        run_slot!(63, kernel_self_test_iter_static_slice_lookup);
         run_slot!(61, kernel_self_test_iter_mut_slice_partial);
+        run_slot!(60, kernel_self_test_iter_static_table_lookup);
         run_slot!(62, kernel_self_test_iter_mut_alphabet_lookup);
-        // Slots 41, 42, 43 run LAST: all three base58 entry points are
-        // crash-prone on this device. 41/42 (variable-length) fault inside
-        // the divide-by-58 dynamic limb loop, where corrupted indices land
-        // wild addresses; 43 (32-byte all-zero) ALSO faults despite the
-        // divide loop being dynamically dead — same `0xfff8…` wild-pointer
-        // shape, so likely the codegen emits the divide PTX unconditionally
-        // and the broken arithmetic propagates somewhere downstream. Once
-        // any kernel faults the CUDA context is sticky-errored — every
-        // subsequent launch/copy/sync fails — so we run all three at the
-        // tail to keep the prior slots' results.
+        // Crash-tail slots: 41, 42, 43 (base58 — `&[u8; 58]` alphabet),
+        // 45 (bech32 — `&[u8; 32]` alphabet). All four faulted with the
+        // same `0xfff…` wild-pointer shape; common factor across slot 43
+        // (where the divide loop is dynamically dead) and the others is
+        // indexing a `&'static [u8; N]` array reference, suggesting the
+        // alpha NVPTX backend mishandles the address-space tagging for
+        // fixed-size static arrays. Slot 44 (which uses `&'static [u8]`
+        // slice for its alphabet) FAILs with wrong bytes but doesn't crash
+        // — strong evidence the discriminator is array-ref vs slice.
+        //
+        // Once any kernel faults the CUDA context is sticky-errored, so
+        // run all crashers at the very end to preserve earlier slots'
+        // results.
         run_slot!(43, kernel_self_test_base58_all_zeros);
+        run_slot!(45, kernel_self_test_bech32_p2wpkh);
         run_slot!(41, kernel_self_test_base58_var_len);
         run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
 

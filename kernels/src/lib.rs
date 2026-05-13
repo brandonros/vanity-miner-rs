@@ -721,4 +721,15 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_iter_mut_alphabet_lookup(results: &mut [u32]) {
         results[62] = logic::check_iter_mut_alphabet_lookup();
     }
+
+    // Slot 63: `&[u8]` slice counterpart to slot 60's `&[u8; N]` array
+    // reference probe. Same shape, one-variable comparison for the
+    // array-ref-vs-slice discriminator hypothesis.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_iter_static_slice_lookup(results: &mut [u32]) {
+        results[63] = logic::check_iter_static_slice_lookup();
+    }
 }
