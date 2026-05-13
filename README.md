@@ -14,8 +14,9 @@ cargo oxide build --features gpu --arch sm_89
 ```shell
 # Build CPU-only binary
 cargo build -p vanity-miner --release
-
+1
 # Run
+./target/release/vanity-miner self-test
 ./target/release/vanity-miner solana-vanity aaa ""
 ./target/release/vanity-miner ethereum-vanity 5555 ""
 ./target/release/vanity-miner bitcoin-vanity bc1qqqq ""

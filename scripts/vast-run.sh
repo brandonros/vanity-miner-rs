@@ -2,13 +2,23 @@
 
 set -e
 
-PORT=31329
-HOST=ssh1.vast.ai
+PORT=15633
+HOST=ssh9.vast.ai
 USER=root
 
-ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.24.0"
+LOCAL_BIN="$(dirname "$0")/../target/release/vanity-miner"
 
+if [ ! -x "$LOCAL_BIN" ]; then
+    echo "missing local binary at $LOCAL_BIN — run: cargo build --release --features gpu"
+    exit 1
+fi
+
+echo "=================================================================="
+echo "==  SCP :: pushing $(ls -lh "$LOCAL_BIN" | awk '{print $5}') binary to $HOST"
+echo "=================================================================="
+scp -o StrictHostKeyChecking=no -P "$PORT" "$LOCAL_BIN" "$USER@$HOST:vanity-miner"
+
+ssh -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" <<'EOF'
 banner() {
     echo ""
     echo "=================================================================="
@@ -17,22 +27,14 @@ banner() {
 }
 
 banner "ENV CHECK :: killall"
-if ! command -v killall &> /dev/null
-then
-    apt update
-    apt install -y psmisc
+if ! command -v killall &> /dev/null; then
+    apt update && apt install -y psmisc
 else
     echo "killall already installed"
 fi
 
-banner "CLEANUP :: previous binary + running processes"
-rm -f vanity-miner
+banner "CLEANUP :: stop any running miner"
 killall vanity-miner || true
-
-banner "DOWNLOAD :: vanity-miner $VERSION"
-ARCH=$(uname -m)  # x86_64 or aarch64
-echo "arch=$ARCH version=$VERSION"
-curl -fL -o vanity-miner https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/vanity-miner-$ARCH
 chmod +x vanity-miner
 ls -lh vanity-miner
 
@@ -41,17 +43,8 @@ nvidia-smi --query-gpu=name,compute_cap --format=csv
 
 banner "RUNTIME ENV"
 export CUDA_LOG_FILE="stdout"
-export BLOCKS_PER_SM="1024"
-export THREADS_PER_BLOCK="256"
-export STACK_SIZE="8192"
 echo "CUDA_LOG_FILE=$CUDA_LOG_FILE"
-echo "BLOCKS_PER_SM=$BLOCKS_PER_SM"
-echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
-echo "STACK_SIZE=$STACK_SIZE"
 
-banner "RUN :: vanity-miner"
-./vanity-miner solana-vanity aaaa ""
-#./vanity-miner bitcoin-vanity bc1qqqqqq ""
-#./vanity-miner ethereum-vanity 55555555 ""
-#./vanity-miner shallenge brandonros 0000000000bd0310ff0f88ac484f7fcd256ef78ae0deecd5693ed0ead124d17b
+banner "RUN :: vanity-miner self-test"
+./vanity-miner self-test
 EOF
