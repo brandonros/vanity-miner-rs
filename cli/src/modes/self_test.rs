@@ -169,6 +169,19 @@ pub mod gpu {
         run_slot!(43, kernel_self_test_base58_all_zeros);
         run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
         run_slot!(45, kernel_self_test_bech32_p2wpkh);
+        // Slots 46-56: tier-2 arithmetic bisect targeting PTX idioms
+        // dalek/k256 hit that the tier-1 net (31-40) doesn't cover.
+        run_slot!(46, kernel_self_test_arith_overflowing_add);
+        run_slot!(47, kernel_self_test_arith_overflowing_sub);
+        run_slot!(48, kernel_self_test_arith_carry_chain_3limb);
+        run_slot!(49, kernel_self_test_arith_widening_mul_pair);
+        run_slot!(50, kernel_self_test_arith_mad_lo_u64);
+        run_slot!(51, kernel_self_test_arith_mad_hi_u64);
+        run_slot!(52, kernel_self_test_arith_mul_wide_u32);
+        run_slot!(53, kernel_self_test_arith_mask_blend_true);
+        run_slot!(54, kernel_self_test_arith_mask_blend_false);
+        run_slot!(55, kernel_self_test_arith_var_shr_u64);
+        run_slot!(56, kernel_self_test_arith_var_shl_u64);
 
         report(&results)
     }

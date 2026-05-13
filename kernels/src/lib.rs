@@ -590,4 +590,83 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_bech32_p2wpkh(results: &mut [u32]) {
         results[45] = logic::check_bech32_p2wpkh();
     }
+
+    // Slots 46-56: tier-2 arithmetic bisect.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_overflowing_add(results: &mut [u32]) {
+        results[46] = logic::check_arith_overflowing_add();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_overflowing_sub(results: &mut [u32]) {
+        results[47] = logic::check_arith_overflowing_sub();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_carry_chain_3limb(results: &mut [u32]) {
+        results[48] = logic::check_arith_carry_chain_3limb();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_widening_mul_pair(results: &mut [u32]) {
+        results[49] = logic::check_arith_widening_mul_pair();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_mad_lo_u64(results: &mut [u32]) {
+        results[50] = logic::check_arith_mad_lo_u64();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_mad_hi_u64(results: &mut [u32]) {
+        results[51] = logic::check_arith_mad_hi_u64();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_mul_wide_u32(results: &mut [u32]) {
+        results[52] = logic::check_arith_mul_wide_u32();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_mask_blend_true(results: &mut [u32]) {
+        results[53] = logic::check_arith_mask_blend_true();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_mask_blend_false(results: &mut [u32]) {
+        results[54] = logic::check_arith_mask_blend_false();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_var_shr_u64(results: &mut [u32]) {
+        results[55] = logic::check_arith_var_shr_u64();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_var_shl_u64(results: &mut [u32]) {
+        results[56] = logic::check_arith_var_shl_u64();
+    }
 }

@@ -4,8 +4,8 @@ GPU-accelerated vanity address generator for multiple blockchains
 ## How to trigger CI
 
 ```shell
-gh workflow run cuda-compile.yaml --ref cuda-oxide
-gh run watch 25804592275 --exit-status
+gh workflow run cuda-compile.yaml --ref cuda-oxide && sleep 5 && \
+  gh run watch $(gh run list --workflow=cuda-compile.yaml --branch=cuda-oxide -L1 --json databaseId -q '.[0].databaseId') --exit-status
 ```
 
 ## How to build

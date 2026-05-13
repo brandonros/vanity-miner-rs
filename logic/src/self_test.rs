@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 46;
+pub const SELF_TEST_NUM_CHECKS: usize = 57;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -95,6 +95,25 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "base58 32 all-zeros",
     "xoroshiro base64 nonce",
     "bech32 p2wpkh",
+    // Slots 46-56: second-tier arithmetic bisect targeting PTX idioms
+    // dalek/k256 hit that the slot 31-40 net misses. Highest-signal entries:
+    //   46-48 — carry-chain plumbing (add.cc.u64/addc.cc.u64). If broken,
+    //           every multi-limb add silently corrupts bits → explains all
+    //           three failing primitives in one stroke.
+    //   53-54 — subtle::Choice-style mask blend. If broken, k256's
+    //           SecretKey::from_bytes(...).unwrap() returns the wrong arm
+    //           silently → matches "consistent but wrong" secp256k1.
+    "arith overflowing_add",
+    "arith overflowing_sub",
+    "arith carry-chain 3limb",
+    "arith widening mul pair",
+    "arith mad lo u64",
+    "arith mad hi u64",
+    "arith mul wide u32",
+    "arith mask blend true",
+    "arith mask blend false",
+    "arith var shr u64",
+    "arith var shl u64",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -733,6 +752,180 @@ pub fn check_bech32_p2wpkh() -> u32 {
     1
 }
 
+// === Tier-2 arithmetic bisect (slots 46-56) ===
+// Targets the PTX idioms heavily used by dalek/k256 that the tier-1 net
+// (slots 31-40) doesn't directly exercise: carry-chain plumbing, both-lane
+// extraction from a single widening mul, fused mul-add, 32×32→64, the
+// subtle::Choice mask-blend pattern, and variable shifts.
+
+pub fn check_arith_overflowing_add() -> u32 {
+    // Three regimes in one slot so any miscompile of `add.cc.u64` /
+    // `addc.cc.u64` (the PTX primitives that carry the boolean out) FAILs
+    // the slot regardless of which value range trips it.
+    let a = core::hint::black_box(1u64);
+    let b = core::hint::black_box(2u64);
+    let (s, c) = a.overflowing_add(b);
+    if s != 3 || c { return 0; }
+
+    // Carry at the wraparound boundary: u64::MAX + 1 → (0, true)
+    let a = core::hint::black_box(u64::MAX);
+    let b = core::hint::black_box(1u64);
+    let (s, c) = a.overflowing_add(b);
+    if s != 0 || !c { return 0; }
+
+    // Saturating-style overflow: u64::MAX + u64::MAX → (u64::MAX-1, true)
+    let a = core::hint::black_box(u64::MAX);
+    let b = core::hint::black_box(u64::MAX);
+    let (s, c) = a.overflowing_add(b);
+    if s != u64::MAX - 1 || !c { return 0; }
+
+    1
+}
+
+pub fn check_arith_overflowing_sub() -> u32 {
+    // No borrow: 5 - 3
+    let a = core::hint::black_box(5u64);
+    let b = core::hint::black_box(3u64);
+    let (s, c) = a.overflowing_sub(b);
+    if s != 2 || c { return 0; }
+
+    // Borrow at zero boundary: 0 - 1 → (u64::MAX, true)
+    let a = core::hint::black_box(0u64);
+    let b = core::hint::black_box(1u64);
+    let (s, c) = a.overflowing_sub(b);
+    if s != u64::MAX || !c { return 0; }
+
+    // Borrow from mid-range: 1 - u64::MAX → (2, true)
+    let a = core::hint::black_box(1u64);
+    let b = core::hint::black_box(u64::MAX);
+    let (s, c) = a.overflowing_sub(b);
+    if s != 2 || !c { return 0; }
+
+    1
+}
+
+pub fn check_arith_carry_chain_3limb() -> u32 {
+    // Three-limb add chosen so the carry propagates through every limb.
+    // [u64::MAX, u64::MAX, 0] + [1, 0, 0] = [0, 0, 1]
+    // This is the literal shape dalek's Scalar52::add / k256's
+    // FieldElement::add expand to, so a miscompile of the carry-propagation
+    // PTX sequence (overflowing_add + boolean OR + add of `prev_carry as
+    // u64`) corrupts every field-element add silently.
+    let a0 = core::hint::black_box(u64::MAX);
+    let a1 = core::hint::black_box(u64::MAX);
+    let a2 = core::hint::black_box(0u64);
+    let b0 = core::hint::black_box(1u64);
+    let b1 = core::hint::black_box(0u64);
+    let b2 = core::hint::black_box(0u64);
+
+    let (s0, c0) = a0.overflowing_add(b0);
+    let (s1a, c1a) = a1.overflowing_add(b1);
+    let (s1, c1b) = s1a.overflowing_add(c0 as u64);
+    let c1 = c1a | c1b;
+    let (s2a, c2a) = a2.overflowing_add(b2);
+    let (s2, c2b) = s2a.overflowing_add(c1 as u64);
+    let _c2 = c2a | c2b;
+
+    (s0 == 0 && s1 == 0 && s2 == 1) as u32
+}
+
+pub fn check_arith_widening_mul_pair() -> u32 {
+    // Tier-1 slots 38 (lo) and 39 (hi) verify each lane in isolation. This
+    // one verifies both lanes come from the *same* widening product, the
+    // way schoolbook multiplies in dalek/k256 consume them. A bug that
+    // swaps lane association passes 38 and 39 individually but FAILs here.
+    const PROD: u128 = (ARITH_U64_A as u128) * (ARITH_U64_B as u128);
+    const EXPECTED_LO: u64 = PROD as u64;
+    const EXPECTED_HI: u64 = (PROD >> 64) as u64;
+
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let p = (a as u128) * (b as u128);
+    let lo = p as u64;
+    let hi = (p >> 64) as u64;
+    (lo == EXPECTED_LO && hi == EXPECTED_HI) as u32
+}
+
+pub fn check_arith_mad_lo_u64() -> u32 {
+    // `a.wrapping_mul(b).wrapping_add(c)` typically folds to a single
+    // `mad.lo.u64` PTX op. This is dalek's `m!` macro shape — slot 38 only
+    // tests the mul, so a MAD-folding-only codegen bug slips through.
+    const EXPECTED: u64 = ARITH_U64_A.wrapping_mul(ARITH_U64_B).wrapping_add(ARITH_U64_A);
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let c = core::hint::black_box(ARITH_U64_A);
+    (a.wrapping_mul(b).wrapping_add(c) == EXPECTED) as u32
+}
+
+pub fn check_arith_mad_hi_u64() -> u32 {
+    // High-half MAD: same shape as mad_lo but pulling the upper 64 bits
+    // of the widening product before the add. May fold to `mad.hi.u64`.
+    const PROD: u128 = (ARITH_U64_A as u128) * (ARITH_U64_B as u128);
+    const EXPECTED: u64 = ((PROD >> 64) as u64).wrapping_add(ARITH_U64_A);
+
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let c = core::hint::black_box(ARITH_U64_A);
+    let hi = (((a as u128) * (b as u128)) >> 64) as u64;
+    (hi.wrapping_add(c) == EXPECTED) as u32
+}
+
+pub fn check_arith_mul_wide_u32() -> u32 {
+    // Both operands start as u32 then widen to u64 for the mul — rustc may
+    // emit `mul.wide.u32` (one PTX op, distinct from `mul.lo.u64`). k256's
+    // 32-bit big-int paths take exactly this shape.
+    const EXPECTED: u64 = (ARITH_U32_A as u64) * (ARITH_U32_B as u64);
+    let a = core::hint::black_box(ARITH_U32_A);
+    let b = core::hint::black_box(ARITH_U32_B);
+    ((a as u64) * (b as u64) == EXPECTED) as u32
+}
+
+pub fn check_arith_mask_blend_true() -> u32 {
+    // The subtle::Choice / CtOption idiom: bool → u64 → wrapping_neg gives
+    // an all-1s or all-0s mask; (a & mask) | (b & !mask) selects a or b.
+    // k256's `SecretKey::from_bytes(...).unwrap()` runs through CtOption
+    // whose unwrap is a const-time select on the validity flag — if the
+    // `cond as u64` → `wrapping_neg()` lowering is wrong, unwrap silently
+    // returns the wrong arm (matches the "consistent-but-wrong" secp256k1
+    // symptom).
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let cond = core::hint::black_box(true);
+    let mask = (cond as u64).wrapping_neg();
+    let r = (a & mask) | (b & !mask);
+    (r == ARITH_U64_A) as u32
+}
+
+pub fn check_arith_mask_blend_false() -> u32 {
+    // Same as above but with cond=false — selects b. Splitting true/false
+    // into two slots means a bug that breaks only one arm pinpoints
+    // immediately.
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let cond = core::hint::black_box(false);
+    let mask = (cond as u64).wrapping_neg();
+    let r = (a & mask) | (b & !mask);
+    (r == ARITH_U64_B) as u32
+}
+
+pub fn check_arith_var_shr_u64() -> u32 {
+    // Runtime shift amount — emits `shr.b64 %rd, %rd, %r` (variable form),
+    // distinct from constant-amount shifts which can be folded. Montgomery
+    // reductions in k256 do variable shifts during scalar splitting.
+    const EXPECTED: u64 = ARITH_U64_A >> 13;
+    let a = core::hint::black_box(ARITH_U64_A);
+    let n = core::hint::black_box(13u32);
+    (a >> n == EXPECTED) as u32
+}
+
+pub fn check_arith_var_shl_u64() -> u32 {
+    // Same as var_shr but the other direction (`shl.b64`).
+    const EXPECTED: u64 = ARITH_U64_A << 13;
+    let a = core::hint::black_box(ARITH_U64_A);
+    let n = core::hint::black_box(13u32);
+    (a << n == EXPECTED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -780,6 +973,17 @@ pub fn run_self_test(results: &mut [u32]) {
     results[43] = check_base58_all_zeros();
     results[44] = check_xoroshiro_base64_nonce();
     results[45] = check_bech32_p2wpkh();
+    results[46] = check_arith_overflowing_add();
+    results[47] = check_arith_overflowing_sub();
+    results[48] = check_arith_carry_chain_3limb();
+    results[49] = check_arith_widening_mul_pair();
+    results[50] = check_arith_mad_lo_u64();
+    results[51] = check_arith_mad_hi_u64();
+    results[52] = check_arith_mul_wide_u32();
+    results[53] = check_arith_mask_blend_true();
+    results[54] = check_arith_mask_blend_false();
+    results[55] = check_arith_var_shr_u64();
+    results[56] = check_arith_var_shl_u64();
 }
 
 #[cfg(test)]
