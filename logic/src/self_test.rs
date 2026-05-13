@@ -1270,8 +1270,12 @@ pub fn check_dynamic_index_write() -> u32 {
         limb_count += 1;
     }
 
-    // Host-side const-eval of the same loop.
-    const fn run_growth() -> ([u32; 10], usize) {
+    // Host-side const-eval of the same loop. Split into two parallel
+    // const fns (one returning the array, one returning the count)
+    // because cuda-oxide v1.43 can't lower tuple constants whose fields
+    // are arrays — same limitation that forced the parallel-primitive
+    // arrays layout in slot 64.
+    const fn run_growth_limbs() -> [u32; 10] {
         let mut out = [0u32; 10];
         let mut count = 0usize;
         let mut c = 0xDEAD_BEEF_CAFE_BABE_u64;
@@ -1280,16 +1284,26 @@ pub fn check_dynamic_index_write() -> u32 {
             c /= D;
             count += 1;
         }
-        (out, count)
+        out
     }
-    const EXPECTED: ([u32; 10], usize) = run_growth();
+    const fn run_growth_count() -> usize {
+        let mut count = 0usize;
+        let mut c = 0xDEAD_BEEF_CAFE_BABE_u64;
+        while c > 0 && count < 10 {
+            c /= D;
+            count += 1;
+        }
+        count
+    }
+    const EXPECTED_LIMBS: [u32; 10] = run_growth_limbs();
+    const EXPECTED_COUNT: usize = run_growth_count();
 
-    if limb_count != EXPECTED.1 {
+    if limb_count != EXPECTED_COUNT {
         return 0;
     }
     let mut i = 0;
     while i < 10 {
-        if limbs[i] != EXPECTED.0[i] {
+        if limbs[i] != EXPECTED_LIMBS[i] {
             return 0;
         }
         i += 1;
