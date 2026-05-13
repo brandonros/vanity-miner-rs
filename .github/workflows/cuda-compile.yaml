@@ -11,8 +11,8 @@ jobs:
         include:
           - runs-on: ubuntu-24.04
             arch: x86_64
-          - runs-on: ubuntu-24.04-arm
-            arch: aarch64
+          # - runs-on: ubuntu-24.04-arm
+          #   arch: aarch64
     runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout repository
@@ -134,15 +134,15 @@ jobs:
           asset_name: vanity-miner-x86_64
           asset_content_type: application/octet-stream
 
-      - name: Upload aarch64 binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
-          asset_name: vanity-miner-aarch64
-          asset_content_type: application/octet-stream
+      # - name: Upload aarch64 binary
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
+      #     asset_name: vanity-miner-aarch64
+      #     asset_content_type: application/octet-stream
 
       - name: Upload kernels.ptx
         uses: actions/upload-release-asset@v1

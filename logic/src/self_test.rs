@@ -11,15 +11,25 @@
 use crate::{
     BitcoinVanityKeyRequest, BitcoinVanityKeyResult, EthereumVanityKeyRequest,
     EthereumVanityKeyResult, ShallengeRequest, ShallengeResult, SolanaVanityKeyRequest,
-    SolanaVanityKeyResult, compare_hashes, generate_and_check_bitcoin_vanity_key,
-    generate_and_check_ethereum_vanity_key, generate_and_check_shallenge,
-    generate_and_check_solana_vanity_key, private_key_to_wif,
+    SolanaVanityKeyResult, base58_encode_32, compare_hashes, ed25519_derive_public_key,
+    generate_and_check_bitcoin_vanity_key, generate_and_check_ethereum_vanity_key,
+    generate_and_check_shallenge, generate_and_check_solana_vanity_key,
+    generate_random_private_key, private_key_to_wif, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 21;
+pub const SELF_TEST_NUM_CHECKS: usize = 25;
 
 /// Slot labels in order; useful for printing results.
+///
+/// Slots 0–3 isolate the four primitives that the solana pipeline composes
+/// (xoroshiro → sha512 → ed25519 → base58). Running them first means a
+/// fault inside any one of those primitives surfaces in its own slot before
+/// the full `solana priv` slot (4) would have inlined it.
 pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
+    "xoroshiro priv",
+    "sha512 of priv",
+    "ed25519 derive",
+    "base58 encode pub",
     "solana priv",
     "solana pub",
     "solana encoded",
@@ -42,6 +52,60 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "compare_hashes gt",
     "compare_hashes eq",
 ];
+
+// === Solana per-primitive bisect (slots 0-3) ===
+// The `solana priv` slot ran the *whole* pipeline before checking the priv
+// bytes; if that kernel faulted we couldn't tell which primitive triggered
+// it. These four `check_primitive_*` functions exercise each stage in
+// isolation against externally-validated intermediates, so GPU mode can
+// localize a fault to xoroshiro / sha512 / ed25519 / base58.
+
+const SOLANA_PRIMITIVE_PRIV: [u8; 32] = [
+    0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48,
+    0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2, 0xc4,
+    0x43, 0xd5, 0x96, 0x56, 0x5f, 0xa0, 0x52, 0x14,
+    0xb0, 0xff, 0x7c, 0x5a, 0xb5, 0xe7, 0x95, 0x6b,
+];
+
+const SOLANA_PRIMITIVE_HASHED_PRIV: [u8; 64] = [
+    0xaa, 0xe4, 0x1d, 0x15, 0x43, 0x8a, 0x30, 0xa5,
+    0x0e, 0x27, 0x4b, 0x13, 0x6d, 0x5c, 0x2a, 0x7c,
+    0x36, 0x6e, 0x68, 0xbf, 0xf9, 0xa0, 0xbb, 0x05,
+    0x87, 0x2c, 0x35, 0x75, 0x2e, 0x9a, 0x45, 0xa4,
+    0x8c, 0x25, 0x5f, 0x21, 0xb8, 0x43, 0xfc, 0xa7,
+    0x21, 0x81, 0x3f, 0xc2, 0x40, 0x3e, 0x20, 0x13,
+    0xe0, 0xe8, 0x1d, 0xd6, 0xd7, 0xc9, 0xd8, 0x69,
+    0xac, 0xf6, 0x03, 0x1e, 0x33, 0xb6, 0x95, 0x6a,
+];
+
+const SOLANA_PRIMITIVE_PUB: [u8; 32] = [
+    0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d,
+    0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0, 0x28,
+    0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc,
+    0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30, 0x16, 0xbb,
+];
+
+pub fn check_primitive_xoroshiro() -> u32 {
+    let priv_key = generate_random_private_key(3, 583437459223573146);
+    (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
+}
+
+pub fn check_primitive_sha512() -> u32 {
+    let hashed = sha512_32bytes_from_bytes(&SOLANA_PRIMITIVE_PRIV);
+    (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
+}
+
+pub fn check_primitive_ed25519() -> u32 {
+    let pub_key = ed25519_derive_public_key(&SOLANA_PRIMITIVE_HASHED_PRIV);
+    (pub_key == SOLANA_PRIMITIVE_PUB) as u32
+}
+
+pub fn check_primitive_base58() -> u32 {
+    let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
+    let mut out = [0u8; 64];
+    let n = base58_encode_32(&SOLANA_PRIMITIVE_PUB, &mut out);
+    (n == expected.len() && bytes_eq_prefix(&out, expected)) as u32
+}
 
 /// Compare the first `expected.len()` bytes of `actual` to `expected`.
 fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
@@ -285,27 +349,31 @@ pub fn check_compare_hashes_eq() -> u32 {
 }
 
 pub fn run_self_test(results: &mut [u32]) {
-    results[0] = check_solana_priv();
-    results[1] = check_solana_pub();
-    results[2] = check_solana_encoded();
-    results[3] = check_ethereum_priv();
-    results[4] = check_ethereum_pub();
-    results[5] = check_ethereum_address();
-    results[6] = check_bitcoin_priv();
-    results[7] = check_bitcoin_pub();
-    results[8] = check_bitcoin_pkh();
-    results[9] = check_bitcoin_encoded();
-    results[10] = check_bitcoin_matches();
-    results[11] = check_wif_compressed_mainnet();
-    results[12] = check_wif_uncompressed_mainnet();
-    results[13] = check_wif_compressed_testnet();
-    results[14] = check_wif_uncompressed_testnet();
-    results[15] = check_shallenge_hash();
-    results[16] = check_shallenge_nonce_len();
-    results[17] = check_shallenge_is_better();
-    results[18] = check_compare_hashes_lt();
-    results[19] = check_compare_hashes_gt();
-    results[20] = check_compare_hashes_eq();
+    results[0] = check_primitive_xoroshiro();
+    results[1] = check_primitive_sha512();
+    results[2] = check_primitive_ed25519();
+    results[3] = check_primitive_base58();
+    results[4] = check_solana_priv();
+    results[5] = check_solana_pub();
+    results[6] = check_solana_encoded();
+    results[7] = check_ethereum_priv();
+    results[8] = check_ethereum_pub();
+    results[9] = check_ethereum_address();
+    results[10] = check_bitcoin_priv();
+    results[11] = check_bitcoin_pub();
+    results[12] = check_bitcoin_pkh();
+    results[13] = check_bitcoin_encoded();
+    results[14] = check_bitcoin_matches();
+    results[15] = check_wif_compressed_mainnet();
+    results[16] = check_wif_uncompressed_mainnet();
+    results[17] = check_wif_compressed_testnet();
+    results[18] = check_wif_uncompressed_testnet();
+    results[19] = check_shallenge_hash();
+    results[20] = check_shallenge_nonce_len();
+    results[21] = check_shallenge_is_better();
+    results[22] = check_compare_hashes_lt();
+    results[23] = check_compare_hashes_gt();
+    results[24] = check_compare_hashes_eq();
 }
 
 #[cfg(test)]

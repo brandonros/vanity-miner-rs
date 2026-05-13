@@ -250,150 +250,184 @@ pub mod kernels {
     // for the underlying `check_*` bodies (CPU mode calls them too via
     // `logic::run_self_test`).
 
+    // Slots 0-3: solana per-primitive bisect. If a fault localizes here,
+    // we know which of xoroshiro / sha512 / ed25519 / base58 is the
+    // culprit before the composed `solana priv` kernel inlines all four.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_xoroshiro(results: &mut [u32]) {
+        results[0] = logic::check_primitive_xoroshiro();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_sha512(results: &mut [u32]) {
+        results[1] = logic::check_primitive_sha512();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_ed25519(results: &mut [u32]) {
+        results[2] = logic::check_primitive_ed25519();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_primitive_base58(results: &mut [u32]) {
+        results[3] = logic::check_primitive_base58();
+    }
+
+    // Slots 4-24: composed-subsystem KAT checks.
+
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_priv(results: &mut [u32]) {
-        results[0] = logic::check_solana_priv();
+        results[4] = logic::check_solana_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_pub(results: &mut [u32]) {
-        results[1] = logic::check_solana_pub();
+        results[5] = logic::check_solana_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_solana_encoded(results: &mut [u32]) {
-        results[2] = logic::check_solana_encoded();
+        results[6] = logic::check_solana_encoded();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_priv(results: &mut [u32]) {
-        results[3] = logic::check_ethereum_priv();
+        results[7] = logic::check_ethereum_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_pub(results: &mut [u32]) {
-        results[4] = logic::check_ethereum_pub();
+        results[8] = logic::check_ethereum_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_ethereum_address(results: &mut [u32]) {
-        results[5] = logic::check_ethereum_address();
+        results[9] = logic::check_ethereum_address();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_priv(results: &mut [u32]) {
-        results[6] = logic::check_bitcoin_priv();
+        results[10] = logic::check_bitcoin_priv();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_pub(results: &mut [u32]) {
-        results[7] = logic::check_bitcoin_pub();
+        results[11] = logic::check_bitcoin_pub();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_pkh(results: &mut [u32]) {
-        results[8] = logic::check_bitcoin_pkh();
+        results[12] = logic::check_bitcoin_pkh();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_encoded(results: &mut [u32]) {
-        results[9] = logic::check_bitcoin_encoded();
+        results[13] = logic::check_bitcoin_encoded();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_bitcoin_matches(results: &mut [u32]) {
-        results[10] = logic::check_bitcoin_matches();
+        results[14] = logic::check_bitcoin_matches();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_compressed_mainnet(results: &mut [u32]) {
-        results[11] = logic::check_wif_compressed_mainnet();
+        results[15] = logic::check_wif_compressed_mainnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_uncompressed_mainnet(results: &mut [u32]) {
-        results[12] = logic::check_wif_uncompressed_mainnet();
+        results[16] = logic::check_wif_uncompressed_mainnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_compressed_testnet(results: &mut [u32]) {
-        results[13] = logic::check_wif_compressed_testnet();
+        results[17] = logic::check_wif_compressed_testnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_wif_uncompressed_testnet(results: &mut [u32]) {
-        results[14] = logic::check_wif_uncompressed_testnet();
+        results[18] = logic::check_wif_uncompressed_testnet();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_hash(results: &mut [u32]) {
-        results[15] = logic::check_shallenge_hash();
+        results[19] = logic::check_shallenge_hash();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_nonce_len(results: &mut [u32]) {
-        results[16] = logic::check_shallenge_nonce_len();
+        results[20] = logic::check_shallenge_nonce_len();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_shallenge_is_better(results: &mut [u32]) {
-        results[17] = logic::check_shallenge_is_better();
+        results[21] = logic::check_shallenge_is_better();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_lt(results: &mut [u32]) {
-        results[18] = logic::check_compare_hashes_lt();
+        results[22] = logic::check_compare_hashes_lt();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_gt(results: &mut [u32]) {
-        results[19] = logic::check_compare_hashes_gt();
+        results[23] = logic::check_compare_hashes_gt();
     }
 
     #[cfg(feature = "kernel_self_test")]
     #[kernel]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn kernel_self_test_compare_hashes_eq(results: &mut [u32]) {
-        results[20] = logic::check_compare_hashes_eq();
+        results[24] = logic::check_compare_hashes_eq();
     }
 }

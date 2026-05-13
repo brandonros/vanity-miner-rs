@@ -113,27 +113,34 @@ pub mod gpu {
             }};
         }
 
-        run_slot!(0,  kernel_self_test_solana_priv);
-        run_slot!(1,  kernel_self_test_solana_pub);
-        run_slot!(2,  kernel_self_test_solana_encoded);
-        run_slot!(3,  kernel_self_test_ethereum_priv);
-        run_slot!(4,  kernel_self_test_ethereum_pub);
-        run_slot!(5,  kernel_self_test_ethereum_address);
-        run_slot!(6,  kernel_self_test_bitcoin_priv);
-        run_slot!(7,  kernel_self_test_bitcoin_pub);
-        run_slot!(8,  kernel_self_test_bitcoin_pkh);
-        run_slot!(9,  kernel_self_test_bitcoin_encoded);
-        run_slot!(10, kernel_self_test_bitcoin_matches);
-        run_slot!(11, kernel_self_test_wif_compressed_mainnet);
-        run_slot!(12, kernel_self_test_wif_uncompressed_mainnet);
-        run_slot!(13, kernel_self_test_wif_compressed_testnet);
-        run_slot!(14, kernel_self_test_wif_uncompressed_testnet);
-        run_slot!(15, kernel_self_test_shallenge_hash);
-        run_slot!(16, kernel_self_test_shallenge_nonce_len);
-        run_slot!(17, kernel_self_test_shallenge_is_better);
-        run_slot!(18, kernel_self_test_compare_hashes_lt);
-        run_slot!(19, kernel_self_test_compare_hashes_gt);
-        run_slot!(20, kernel_self_test_compare_hashes_eq);
+        // Slots 0-3: solana per-primitive bisect (run first so a primitive
+        // fault localizes before the composed solana kernels inline it).
+        run_slot!(0,  kernel_self_test_primitive_xoroshiro);
+        run_slot!(1,  kernel_self_test_primitive_sha512);
+        run_slot!(2,  kernel_self_test_primitive_ed25519);
+        run_slot!(3,  kernel_self_test_primitive_base58);
+        // Slots 4-24: composed-subsystem KAT checks.
+        run_slot!(4,  kernel_self_test_solana_priv);
+        run_slot!(5,  kernel_self_test_solana_pub);
+        run_slot!(6,  kernel_self_test_solana_encoded);
+        run_slot!(7,  kernel_self_test_ethereum_priv);
+        run_slot!(8,  kernel_self_test_ethereum_pub);
+        run_slot!(9,  kernel_self_test_ethereum_address);
+        run_slot!(10, kernel_self_test_bitcoin_priv);
+        run_slot!(11, kernel_self_test_bitcoin_pub);
+        run_slot!(12, kernel_self_test_bitcoin_pkh);
+        run_slot!(13, kernel_self_test_bitcoin_encoded);
+        run_slot!(14, kernel_self_test_bitcoin_matches);
+        run_slot!(15, kernel_self_test_wif_compressed_mainnet);
+        run_slot!(16, kernel_self_test_wif_uncompressed_mainnet);
+        run_slot!(17, kernel_self_test_wif_compressed_testnet);
+        run_slot!(18, kernel_self_test_wif_uncompressed_testnet);
+        run_slot!(19, kernel_self_test_shallenge_hash);
+        run_slot!(20, kernel_self_test_shallenge_nonce_len);
+        run_slot!(21, kernel_self_test_shallenge_is_better);
+        run_slot!(22, kernel_self_test_compare_hashes_lt);
+        run_slot!(23, kernel_self_test_compare_hashes_gt);
+        run_slot!(24, kernel_self_test_compare_hashes_eq);
 
         report(&results)
     }
