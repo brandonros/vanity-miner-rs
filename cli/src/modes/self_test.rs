@@ -195,11 +195,15 @@ pub mod gpu {
         // lookup pattern (the suspect shared crash path between slot 41
         // and slot 43). Ordered simplest→most complex so an early crash
         // still captures earlier slots' results.
-        // Slot 63 (slice counterpart) runs BEFORE slot 60 (array-ref
-        // version) so we capture the slice baseline even if 60 faults
-        // the way bech32/base58 did. If 63 PASSes and 60 CRASHes, the
-        // array-ref-vs-slice discriminator is confirmed.
-        run_slot!(63, kernel_self_test_iter_static_slice_lookup);
+        // Originally slot 63 (slice lookup) ran first as a control for
+        // 60 (array-ref lookup), under the hypothesis that `&[u8]` would
+        // pass while `&[u8; N]` would crash. After the v1.40 compiler
+        // fixes for `black_box`, slot 63 itself started crashing — the
+        // honest black_box now lets the indexed load actually execute,
+        // and it faults the same way as slots 41/43/45 did. So 63 moves
+        // to the deferred crash group; the surviving probes (60, 61, 62)
+        // run here to determine whether the bug is universal across
+        // table-typed lookups.
         run_slot!(61, kernel_self_test_iter_mut_slice_partial);
         run_slot!(60, kernel_self_test_iter_static_table_lookup);
         run_slot!(62, kernel_self_test_iter_mut_alphabet_lookup);
@@ -220,6 +224,7 @@ pub mod gpu {
         run_slot!(45, kernel_self_test_bech32_p2wpkh);
         run_slot!(41, kernel_self_test_base58_var_len);
         run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
+        run_slot!(63, kernel_self_test_iter_static_slice_lookup);
 
         report(&results)
     }
