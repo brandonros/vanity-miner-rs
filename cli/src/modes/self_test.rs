@@ -47,14 +47,34 @@ pub mod gpu {
         println!("[{}] Running self-test on GPU", ordinal);
 
         let stream = &gpu.stream;
-        let mut results_dev =
-            DeviceBuffer::<u32>::zeroed(stream, logic::SELF_TEST_NUM_CHECKS)?;
 
         let launch_config = LaunchConfig {
             grid_dim: (1, 1, 1),
             block_dim: (1, 1, 1),
             shared_mem_bytes: 0,
         };
+
+        // Plumbing probe: confirm PTX load + launch + DtoH copy work before
+        // running the heavy logic body. If this fails, the bug isn't in
+        // `logic::run_self_test` — it's in the kernel-load / launch path.
+        let mut stub_dev = DeviceBuffer::<u32>::zeroed(stream, 1)?;
+        unsafe {
+            module.kernel_self_test_stub(stream, launch_config, &mut stub_dev)?;
+        }
+        let mut stub = [0u32; 1];
+        stub_dev.copy_to_host(stream, &mut stub)?;
+        stream.synchronize()?;
+        if stub[0] != 1 {
+            return Err(format!(
+                "[{ordinal}] stub kernel wrote {} (expected 1) — PTX/launch plumbing is broken",
+                stub[0]
+            )
+            .into());
+        }
+        println!("[{ordinal}] stub kernel OK (results[0] = 1)");
+
+        let mut results_dev =
+            DeviceBuffer::<u32>::zeroed(stream, logic::SELF_TEST_NUM_CHECKS)?;
 
         unsafe {
             module.kernel_self_test(stream, launch_config, &mut results_dev)?;

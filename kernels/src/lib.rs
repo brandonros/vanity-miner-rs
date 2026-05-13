@@ -228,6 +228,18 @@ pub mod kernels {
         }
     }
 
+    /// Self-test plumbing probe: writes `results[0] = 1` and nothing else.
+    /// Launched before `kernel_self_test` to isolate "PTX load + launch +
+    /// DtoH copy" health from the much larger logic body. If this fails but
+    /// the regular self-test would have failed too, the bug is in the
+    /// plumbing, not in `logic::run_self_test`.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_stub(results: &mut [u32]) {
+        results[0] = 1;
+    }
+
     /// Self-test kernel: runs known-answer tests for every logic primitive
     /// against externally-validated expected values, writing pass(1)/fail(0)
     /// per check into the results buffer. Launch as 1×1 grid×block. If any
