@@ -6,8 +6,10 @@ PORT=19411
 HOST=ssh6.vast.ai
 USER=root
 VERSION="${VANITY_MINER_VERSION:-$(gh release view --repo brandonros/vanity-miner-rs --json tagName -q .tagName)}"
+echo "==> deploying vanity-miner $VERSION to $USER@$HOST:$PORT"
 
 ssh -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" <<EOF
+echo "==> vanity-miner version: $VERSION"
 banner() {
     echo ""
     echo "=================================================================="
