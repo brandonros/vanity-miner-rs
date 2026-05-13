@@ -9,6 +9,7 @@ kernel_bitcoin = []
 kernel_ethereum = []
 kernel_solana = []
 kernel_shallenge = []
+kernel_self_test = []
 
 [dependencies]
 logic = { path = "../logic" }

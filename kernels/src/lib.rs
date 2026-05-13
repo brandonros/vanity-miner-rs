@@ -227,4 +227,17 @@ pub mod kernels {
             );
         }
     }
+
+    /// Self-test kernel: runs known-answer tests for every logic primitive
+    /// against externally-validated expected values, writing pass(1)/fail(0)
+    /// per check into the results buffer. Launch as 1×1 grid×block. If any
+    /// slot reads 0 on the host, PTX codegen has diverged from CPU behavior.
+    /// The body lives in `logic::run_self_test` so CPU and GPU run the
+    /// same code; see `logic::SELF_TEST_LABELS` for slot semantics.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test(results: &mut [u32]) {
+        logic::run_self_test(results);
+    }
 }

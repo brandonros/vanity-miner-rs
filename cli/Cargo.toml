@@ -13,6 +13,7 @@ gpu = [
     "kernels/kernel_ethereum",
     "kernels/kernel_solana",
     "kernels/kernel_shallenge",
+    "kernels/kernel_self_test",
 ]
 
 [dependencies]

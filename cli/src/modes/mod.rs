@@ -17,5 +17,6 @@
 
 pub mod bitcoin;
 pub mod ethereum;
+pub mod self_test;
 pub mod shallenge;
 pub mod solana;

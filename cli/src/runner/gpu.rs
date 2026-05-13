@@ -91,6 +91,10 @@ impl Runner for GpuRunner {
                                 stats_clone,
                             )
                         }
+                        Command::SelfTest => {
+                            let _ = stats_clone;
+                            modes::self_test::gpu::run(i, &ctx, &module)
+                        }
                     }
                     .inspect_err(|e| eprintln!("Error in device {}: {}", i, e))
                 },
