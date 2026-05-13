@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 57;
+pub const SELF_TEST_NUM_CHECKS: usize = 59;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -114,6 +114,14 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "arith mask blend false",
     "arith var shr u64",
     "arith var shl u64",
+    // Slots 57-58: smoking-gun probe for `core::hint::black_box`. If
+    // black_box itself doesn't preserve its input on the device, every
+    // tier-1 / tier-2 arith slot above is testing 0-vs-EXPECTED instead of
+    // the intended operands → uniform FAIL that has nothing to do with the
+    // op being probed. These two slots are the cheapest possible test:
+    // identity check, no arithmetic at all.
+    "arith blackbox identity u64",
+    "arith blackbox identity u32",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -926,6 +934,24 @@ pub fn check_arith_var_shl_u64() -> u32 {
     (a << n == EXPECTED) as u32
 }
 
+pub fn check_arith_blackbox_identity_u64() -> u32 {
+    // The cheapest possible probe: does black_box preserve a u64?
+    // No arithmetic of any kind — if this FAILs on GPU + PASSes on CPU,
+    // black_box's PTX lowering doesn't preserve the value, and every
+    // tier-1/tier-2 arith slot's FAIL is a black_box artifact, not an op
+    // bug. Tests with `0xDEADBEEFCAFEBABE` so a zero return is obviously
+    // wrong.
+    let v: u64 = 0xDEADBEEFCAFEBABE;
+    (core::hint::black_box(v) == v) as u32
+}
+
+pub fn check_arith_blackbox_identity_u32() -> u32 {
+    // u32 variant — same probe at half the width in case the bug is
+    // type-specific.
+    let v: u32 = 0xDEADBEEF;
+    (core::hint::black_box(v) == v) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -984,6 +1010,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[54] = check_arith_mask_blend_false();
     results[55] = check_arith_var_shr_u64();
     results[56] = check_arith_var_shl_u64();
+    results[57] = check_arith_blackbox_identity_u64();
+    results[58] = check_arith_blackbox_identity_u32();
 }
 
 #[cfg(test)]

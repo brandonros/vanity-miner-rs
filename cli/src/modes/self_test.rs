@@ -162,10 +162,10 @@ pub mod gpu {
         run_slot!(38, kernel_self_test_arith_u64_mul_lo);
         run_slot!(39, kernel_self_test_arith_u64_mul_hi);
         run_slot!(40, kernel_self_test_arith_u128_mul);
-        // Slots 41-45: composed-primitive sub-bisects (base58 variants,
-        // xoroshiro nonce, bech32 p2wpkh).
-        run_slot!(41, kernel_self_test_base58_var_len);
-        run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
+        // Slots 43-45: composed-primitive sub-bisects (all-zeros base58,
+        // xoroshiro nonce, bech32 p2wpkh). Slots 41-42 also belong to this
+        // group but are deferred to the very end of the run — see the
+        // comment near their run_slot! calls below.
         run_slot!(43, kernel_self_test_base58_all_zeros);
         run_slot!(44, kernel_self_test_xoroshiro_base64_nonce);
         run_slot!(45, kernel_self_test_bech32_p2wpkh);
@@ -182,6 +182,20 @@ pub mod gpu {
         run_slot!(54, kernel_self_test_arith_mask_blend_false);
         run_slot!(55, kernel_self_test_arith_var_shr_u64);
         run_slot!(56, kernel_self_test_arith_var_shl_u64);
+        // Slots 57-58: black_box identity probes. Cheap one-line tests
+        // that determine whether `core::hint::black_box` preserves its
+        // input — if not, every tier-1/tier-2 arith slot's FAIL is a
+        // black_box artifact, not a per-op codegen bug.
+        run_slot!(57, kernel_self_test_arith_blackbox_identity_u64);
+        run_slot!(58, kernel_self_test_arith_blackbox_identity_u32);
+        // Slots 41-42 run LAST: the variable-length base58 kernels are
+        // known to fault on this device (broken divide-by-58 in the
+        // dynamic-limb loop computes corrupted indices, triggering an
+        // illegal __global__ read). Once a kernel faults the CUDA context
+        // is sticky-errored — every subsequent launch/copy/sync fails —
+        // so we defer these so they don't kill the slots above.
+        run_slot!(41, kernel_self_test_base58_var_len);
+        run_slot!(42, kernel_self_test_base58_var_len_leading_zero);
 
         report(&results)
     }

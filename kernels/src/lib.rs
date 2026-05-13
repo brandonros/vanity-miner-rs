@@ -669,4 +669,20 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_arith_var_shl_u64(results: &mut [u32]) {
         results[56] = logic::check_arith_var_shl_u64();
     }
+
+    // Slots 57-58: black_box identity smoking-gun probes.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_blackbox_identity_u64(results: &mut [u32]) {
+        results[57] = logic::check_arith_blackbox_identity_u64();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_blackbox_identity_u32(results: &mut [u32]) {
+        results[58] = logic::check_arith_blackbox_identity_u32();
+    }
 }
