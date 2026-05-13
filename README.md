@@ -5,6 +5,7 @@ GPU-accelerated vanity address generator for multiple blockchains
 
 ```shell
 gh workflow run cuda-compile.yaml --ref cuda-oxide
+gh run watch 25804592275 --exit-status
 ```
 
 ## How to build

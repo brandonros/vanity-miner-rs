@@ -151,6 +151,17 @@ pub mod gpu {
         run_slot!(28, kernel_self_test_compare_hashes_lt);
         run_slot!(29, kernel_self_test_compare_hashes_gt);
         run_slot!(30, kernel_self_test_compare_hashes_eq);
+        // Slots 31-40: raw-arithmetic micro-bisect (one PTX op per slot).
+        run_slot!(31, kernel_self_test_arith_u32_div_var);
+        run_slot!(32, kernel_self_test_arith_u32_div_const);
+        run_slot!(33, kernel_self_test_arith_u64_div_var);
+        run_slot!(34, kernel_self_test_arith_u64_div_const);
+        run_slot!(35, kernel_self_test_arith_u32_rem_var);
+        run_slot!(36, kernel_self_test_arith_u64_rem_var);
+        run_slot!(37, kernel_self_test_arith_u32_mul_lo);
+        run_slot!(38, kernel_self_test_arith_u64_mul_lo);
+        run_slot!(39, kernel_self_test_arith_u64_mul_hi);
+        run_slot!(40, kernel_self_test_arith_u128_mul);
 
         report(&results)
     }

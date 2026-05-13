@@ -20,7 +20,7 @@ use crate::{
     sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 31;
+pub const SELF_TEST_NUM_CHECKS: usize = 41;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -63,6 +63,21 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "compare_hashes lt",
     "compare_hashes gt",
     "compare_hashes eq",
+    // Slots 31-40: micro-bisect of raw integer ops. The failing primitives
+    // above (ed25519/secp256k1 field math, base58 divide-by-58) all use
+    // `mul.hi.u64` in the emitted PTX; the passing ones don't. These slots
+    // isolate each suspect op against a const-evaluated host-side baseline
+    // so a per-op compiler bug surfaces directly.
+    "arith u32 div var",
+    "arith u32 div const",
+    "arith u64 div var",
+    "arith u64 div const",
+    "arith u32 rem var",
+    "arith u64 rem var",
+    "arith u32 mul lo",
+    "arith u64 mul lo",
+    "arith u64 mul hi",
+    "arith u128 mul",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -469,6 +484,120 @@ pub fn check_compare_hashes_eq() -> u32 {
     (compare_hashes(&zero, &zero) == 0) as u32
 }
 
+// === Arithmetic primitive bisect (slots 31-40) ===
+// The composed primitives above all reduce to the same root cause: any
+// integer op that lowers to `mul.hi.u64` (multi-word multiply, divide-by-
+// constant via magic-multiply) returns wrong bytes on the current device.
+// These slots pin down exactly which PTX op is broken so the alpha-compiler
+// regression can be reported against a one-line repro.
+//
+// Pattern: each `check_arith_*` baselines the expected value via a `const`
+// evaluated by the *host* rustc (correct, well-tested code), then runs the
+// same expression at runtime with both operands hidden behind `black_box`
+// so the GPU codegen can't constant-fold. Mismatch on GPU + match on CPU =
+// codegen bug isolated to that op.
+
+const ARITH_U32_A: u32 = 0xDEADBEEF;
+const ARITH_U32_B: u32 = 0x12345678;
+const ARITH_U64_A: u64 = 0xDEADBEEFCAFEBABE;
+const ARITH_U64_B: u64 = 0x123456789ABCDEF0;
+const ARITH_U128_A: u128 = ((ARITH_U64_A as u128) << 64) | (ARITH_U64_B as u128);
+const ARITH_U128_B: u128 = ((ARITH_U64_B as u128) << 64) | (ARITH_U64_A as u128);
+
+pub fn check_arith_u32_div_var() -> u32 {
+    // Two black-boxed operands — forces `div.u32` PTX op (no magic-multiply
+    // folding, since the divisor isn't a known constant).
+    const EXPECTED: u32 = ARITH_U32_A / 58;
+    let a = core::hint::black_box(ARITH_U32_A);
+    let b = core::hint::black_box(58u32);
+    (a / b == EXPECTED) as u32
+}
+
+pub fn check_arith_u32_div_const() -> u32 {
+    // Variable dividend, constant divisor — rustc lowers `x / 58` to
+    // `mul.hi.u32` (or `mul.wide.u32` + shift) magic-multiply. Same path
+    // base58_encode_32 uses.
+    const EXPECTED: u32 = ARITH_U32_A / 58;
+    let a = core::hint::black_box(ARITH_U32_A);
+    (a / 58 == EXPECTED) as u32
+}
+
+pub fn check_arith_u64_div_var() -> u32 {
+    // Forces `div.u64` PTX op.
+    const EXPECTED: u64 = ARITH_U64_A / 58;
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(58u64);
+    (a / b == EXPECTED) as u32
+}
+
+pub fn check_arith_u64_div_const() -> u32 {
+    // Variable dividend, constant divisor — rustc lowers `x / 58` to
+    // `mul.hi.u64` (the smoking-gun op). This is THE path base58_encode_32
+    // takes for its divide-by-58 reduction loop.
+    const EXPECTED: u64 = ARITH_U64_A / 58;
+    let a = core::hint::black_box(ARITH_U64_A);
+    (a / 58 == EXPECTED) as u32
+}
+
+pub fn check_arith_u32_rem_var() -> u32 {
+    // Forces `rem.u32`.
+    const EXPECTED: u32 = ARITH_U32_A % 58;
+    let a = core::hint::black_box(ARITH_U32_A);
+    let b = core::hint::black_box(58u32);
+    (a % b == EXPECTED) as u32
+}
+
+pub fn check_arith_u64_rem_var() -> u32 {
+    // Forces `rem.u64`.
+    const EXPECTED: u64 = ARITH_U64_A % 58;
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(58u64);
+    (a % b == EXPECTED) as u32
+}
+
+pub fn check_arith_u32_mul_lo() -> u32 {
+    // Forces `mul.lo.s32` / `mul.lo.u32` (low 32 bits of u32 × u32).
+    const EXPECTED: u32 = ARITH_U32_A.wrapping_mul(ARITH_U32_B);
+    let a = core::hint::black_box(ARITH_U32_A);
+    let b = core::hint::black_box(ARITH_U32_B);
+    (a.wrapping_mul(b) == EXPECTED) as u32
+}
+
+pub fn check_arith_u64_mul_lo() -> u32 {
+    // Forces `mul.lo.s64` / `mul.lo.u64` (low 64 bits of u64 × u64). This
+    // op is *heavily* used by the failing primitives but is also used by
+    // some passing ones via the slice-indexing path, so it's worth a direct
+    // isolated check.
+    const EXPECTED: u64 = ARITH_U64_A.wrapping_mul(ARITH_U64_B);
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    (a.wrapping_mul(b) == EXPECTED) as u32
+}
+
+pub fn check_arith_u64_mul_hi() -> u32 {
+    // The smoking gun: `(a as u128) * (b as u128) >> 64` lowers to a single
+    // `mul.hi.u64` PTX op. Every failing primitive (ed25519 field math,
+    // secp256k1 field math, base58 divide-by-constant) is dominated by
+    // this exact op. If this slot FAILs on GPU and the matching CPU test
+    // passes, the alpha compiler's `mul.hi.u64` codegen is broken.
+    const PROD: u128 = (ARITH_U64_A as u128) * (ARITH_U64_B as u128);
+    const EXPECTED: u64 = (PROD >> 64) as u64;
+    let a = core::hint::black_box(ARITH_U64_A);
+    let b = core::hint::black_box(ARITH_U64_B);
+    let hi = (((a as u128) * (b as u128)) >> 64) as u64;
+    (hi == EXPECTED) as u32
+}
+
+pub fn check_arith_u128_mul() -> u32 {
+    // Full u128 wrapping multiply. Lowers to a sequence of `mul.lo.s64` +
+    // `mul.hi.u64` + `mad.lo.s64`. Exercises the carry chain rustc emits
+    // for >64-bit arithmetic.
+    const EXPECTED: u128 = ARITH_U128_A.wrapping_mul(ARITH_U128_B);
+    let a = core::hint::black_box(ARITH_U128_A);
+    let b = core::hint::black_box(ARITH_U128_B);
+    (a.wrapping_mul(b) == EXPECTED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -501,6 +630,16 @@ pub fn run_self_test(results: &mut [u32]) {
     results[28] = check_compare_hashes_lt();
     results[29] = check_compare_hashes_gt();
     results[30] = check_compare_hashes_eq();
+    results[31] = check_arith_u32_div_var();
+    results[32] = check_arith_u32_div_const();
+    results[33] = check_arith_u64_div_var();
+    results[34] = check_arith_u64_div_const();
+    results[35] = check_arith_u32_rem_var();
+    results[36] = check_arith_u64_rem_var();
+    results[37] = check_arith_u32_mul_lo();
+    results[38] = check_arith_u64_mul_lo();
+    results[39] = check_arith_u64_mul_hi();
+    results[40] = check_arith_u128_mul();
 }
 
 #[cfg(test)]

@@ -479,4 +479,78 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_compare_hashes_eq(results: &mut [u32]) {
         results[30] = logic::check_compare_hashes_eq();
     }
+
+    // Slots 31-40: raw-arithmetic bisect — one PTX op per kernel. Each
+    // baselines against a host-rustc `const`-evaluated expected value, so a
+    // PASS on CPU + FAIL on GPU isolates the codegen bug to that exact op.
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u32_div_var(results: &mut [u32]) {
+        results[31] = logic::check_arith_u32_div_var();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u32_div_const(results: &mut [u32]) {
+        results[32] = logic::check_arith_u32_div_const();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u64_div_var(results: &mut [u32]) {
+        results[33] = logic::check_arith_u64_div_var();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u64_div_const(results: &mut [u32]) {
+        results[34] = logic::check_arith_u64_div_const();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u32_rem_var(results: &mut [u32]) {
+        results[35] = logic::check_arith_u32_rem_var();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u64_rem_var(results: &mut [u32]) {
+        results[36] = logic::check_arith_u64_rem_var();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u32_mul_lo(results: &mut [u32]) {
+        results[37] = logic::check_arith_u32_mul_lo();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u64_mul_lo(results: &mut [u32]) {
+        results[38] = logic::check_arith_u64_mul_lo();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u64_mul_hi(results: &mut [u32]) {
+        results[39] = logic::check_arith_u64_mul_hi();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_arith_u128_mul(results: &mut [u32]) {
+        results[40] = logic::check_arith_u128_mul();
+    }
 }
