@@ -139,6 +139,7 @@ pub mod gpu {
         //   88-90 dalek Scalar52::sub probes (the call missing from
         //         our ladder copy that's present in real dalek)
         //   91-93 Index trait dispatch + minimal cross-crate const probes
+        //   94-96 subtle::Choice + ConditionallySelectable + EncodedPoint construction
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -233,6 +234,9 @@ pub mod gpu {
         run_slot!(91, kernel_self_test_index_trait_dispatch);
         run_slot!(92, kernel_self_test_dalek_scalar_one_to_bytes_direct);
         run_slot!(93, kernel_self_test_k256_affine_generator_encode);
+        run_slot!(94, kernel_self_test_subtle_choice_u8_into_bool);
+        run_slot!(95, kernel_self_test_subtle_conditional_select_u64);
+        run_slot!(96, kernel_self_test_k256_encoded_point_from_affine_coords);
 
         report(&results)
     }

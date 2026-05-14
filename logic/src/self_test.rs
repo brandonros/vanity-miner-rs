@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 94;
+pub const SELF_TEST_NUM_CHECKS: usize = 97;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -318,6 +318,23 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "Index/IndexMut trait dispatch",
     "dalek Scalar::ONE.to_bytes() direct",
     "k256 AffinePoint::GENERATOR.to_encoded_point()",
+    // Slots 94-96: Bug F bisect. Slot 91 confirmed the Index-trait bug
+    // explaining the dalek-side failures. Slot 93 FAILed showing a
+    // *separate* k256 bug in AffinePoint→encoded chain. k256 / elliptic-
+    // curve / crypto-bigint have NO Index trait impls (grepped), so 93's
+    // bug must be elsewhere in the chain:
+    //   subtle::Choice ↔ bool, ConditionallySelectable, or
+    //   EncodedPoint::from_affine_coordinates.
+    //   94 — `Choice::from(0).into() == false; Choice::from(1).into() == true`.
+    //        Tests `From<u8>` and `Into<bool>` on the subtle::Choice newtype.
+    //   95 — `u64::conditional_select(&a, &b, Choice(0)) == a; …(Choice(1)) == b`.
+    //        Tests `ConditionallySelectable` impl for primitive u64.
+    //   96 — `EncodedPoint::from_affine_coordinates(&GX, &GY, true) == G`.
+    //        Tests EncodedPoint construction from known good bytes,
+    //        bypassing `is_identity()`/`conditional_select` entirely.
+    "subtle Choice from(u8) into bool",
+    "subtle u64::conditional_select(0|1)",
+    "k256 EncodedPoint::from_affine_coordinates(GX, GY)",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2189,6 +2206,73 @@ pub fn check_k256_affine_generator_encode() -> u32 {
     (out == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+// Slot 94: subtle::Choice u8 → bool. The most trivial subtle operation.
+// Choice is a tuple struct wrapping u8 with field private. From<u8> sets
+// it; Into<bool> reads it via debug_assert + comparison.
+pub fn check_subtle_choice_u8_into_bool() -> u32 {
+    use k256::elliptic_curve::subtle::Choice;
+    let c0 = Choice::from(core::hint::black_box(0u8));
+    let c1 = Choice::from(core::hint::black_box(1u8));
+    let b0: bool = c0.into();
+    let b1: bool = c1.into();
+    (!b0 && b1) as u32
+}
+
+// Slot 95: subtle::ConditionallySelectable on u64. The mechanism k256's
+// `AffinePoint::to_encoded_point` uses to pick between the identity
+// arm and the from_affine_coordinates arm.
+//   conditional_select(&a, &b, Choice(0)) should return a
+//   conditional_select(&a, &b, Choice(1)) should return b
+// Slot 53/54 tested a HAND-ROLLED mask blend with the same conceptual
+// math; this slot tests the actual subtle::ConditionallySelectable trait
+// impl which the real code path uses.
+pub fn check_subtle_conditional_select_u64() -> u32 {
+    use k256::elliptic_curve::subtle::{Choice, ConditionallySelectable};
+    let a = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+    let b = core::hint::black_box(0x1234_5678_9ABC_DEF0_u64);
+    let c0 = Choice::from(core::hint::black_box(0u8));
+    let c1 = Choice::from(core::hint::black_box(1u8));
+    let r0 = u64::conditional_select(&a, &b, c0);
+    let r1 = u64::conditional_select(&a, &b, c1);
+    (r0 == a && r1 == b) as u32
+}
+
+// Slot 96: `EncodedPoint::from_affine_coordinates(&GX_bytes, &GY_bytes,
+// compress=true)` with hardcoded generator-x/y. Bypasses AffinePoint's
+// own `to_encoded_point` (which goes through `is_identity`+
+// `conditional_select`) and tests just the EncodedPoint construction.
+//
+// If 96 PASSes and 93 FAILs, the bug is in `is_identity`/`conditional_
+// select` (slot 95 should then also FAIL). If 96 FAILs, EncodedPoint
+// construction itself is broken.
+const SECP256K1_GX_BYTES: [u8; 32] = [
+    0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC,
+    0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
+    0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9,
+    0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
+];
+const SECP256K1_GY_BYTES: [u8; 32] = [
+    0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65,
+    0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
+    0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19,
+    0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8,
+];
+
+pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
+    use k256::EncodedPoint;
+    use k256::elliptic_curve::FieldBytes;
+    let x: &FieldBytes<k256::Secp256k1> = (&SECP256K1_GX_BYTES).into();
+    let y: &FieldBytes<k256::Secp256k1> = (&SECP256K1_GY_BYTES).into();
+    let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
+    let bytes = encoded.as_bytes();
+    if bytes.len() != 33 {
+        return 0;
+    }
+    let mut out = [0u8; 33];
+    out.copy_from_slice(bytes);
+    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -2284,6 +2368,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[91] = check_index_trait_dispatch();
     results[92] = check_dalek_scalar_one_to_bytes_direct();
     results[93] = check_k256_affine_generator_encode();
+    results[94] = check_subtle_choice_u8_into_bool();
+    results[95] = check_subtle_conditional_select_u64();
+    results[96] = check_k256_encoded_point_from_affine_coords();
 }
 
 #[cfg(test)]

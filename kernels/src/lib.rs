@@ -966,4 +966,27 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_k256_affine_generator_encode(results: &mut [u32]) {
         results[93] = logic::check_k256_affine_generator_encode();
     }
+
+    // Slots 94-96: Bug F bisect (subtle::Choice + ConditionallySelectable +
+    // EncodedPoint construction).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_subtle_choice_u8_into_bool(results: &mut [u32]) {
+        results[94] = logic::check_subtle_choice_u8_into_bool();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_subtle_conditional_select_u64(results: &mut [u32]) {
+        results[95] = logic::check_subtle_conditional_select_u64();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_encoded_point_from_affine_coords(results: &mut [u32]) {
+        results[96] = logic::check_k256_encoded_point_from_affine_coords();
+    }
 }

@@ -15,7 +15,9 @@ execute, so this doc alone is enough context to hand to the compiler agent.
 | 2026-05-13 | 88         | 27   | v1.46.0        | All 81-87 PASSed. New finding: ladder copy missing `Scalar52::sub` from montgomery_reduce. |
 | pending    | 91         | ?    | v1.46 (rerun)  | +3 sub probes (88-90) added; 85/86 kept on `_no_sub` variant for direct comparison. |
 | 2026-05-13 | 91         | 27   | v1.46.0        | All 81-90 PASSed. Smoking gun: my port uses `a.0[i]`, dalek uses `a[i]` via custom Index trait. |
-| pending    | 94         | ?    | next           | +3 probes (91-93): Index trait dispatch + cross-crate minimal const/encoding. |
+| pending    | 94         | ?    | v1.46 (rerun)  | +3 probes (91-93): Index trait dispatch + cross-crate minimal const/encoding. |
+| 2026-05-13 | 94         | 29   | v1.46.0        | **Bug E confirmed**: slot 91 FAIL (Index/IndexMut dispatch on tuple struct). Bug F confirmed separate: slot 93 FAIL, 92 PASS. |
+| pending    | 97         | ?    | next           | +3 probes (94-96): subtle Choice/ConditionallySelectable/EncodedPoint construction. |
 
 ---
 
@@ -307,6 +309,90 @@ dispatch is broken for tuple-struct wrappers, that wouldn't explain
 base58 since `[u32; 10]` is a raw array (not tuple struct). Base58 41/42
 likely has a *different* bug — left for the next probe round once Index
 is either confirmed or ruled out.
+
+---
+
+## Bug E (CONFIRMED) — Index/IndexMut trait dispatch on tuple struct
+
+**Status.** ✅ Confirmed by slot 91 FAIL on v1.46.0. Minimal repro ready.
+
+**Repro (≈18 lines, in [logic/src/self_test.rs](logic/src/self_test.rs) under
+`check_index_trait_dispatch`):**
+```rust
+pub struct IdxProbe(pub [u64; 5]);
+
+impl core::ops::Index<usize> for IdxProbe {
+    type Output = u64;
+    fn index(&self, i: usize) -> &u64 { &(self.0[i]) }
+}
+impl core::ops::IndexMut<usize> for IdxProbe {
+    fn index_mut(&mut self, i: usize) -> &mut u64 { &mut (self.0[i]) }
+}
+
+pub fn check_index_trait_dispatch() -> u32 {
+    let mut p = IdxProbe([0u64; 5]);
+    let idx = core::hint::black_box(2usize);
+    let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+    p[idx] = val;
+    let read = core::hint::black_box(p[idx]);
+    (read == val) as u32
+}
+```
+
+**Failures explained by this bug:**
+- Slot 71 — dalek `Scalar::from_bytes_mod_order` (Scalar52 uses `a[i]` throughout)
+- Slot 72 — cascade of 71
+- Slots 2 / 3 / 11 / 12 — cascade of 71 via the solana derive chain
+- (Slot 41/42 is NOT this — base58 uses raw arrays only)
+
+**Next steps — cuda-oxide compiler side:**
+1. Hand slot 91 source as the minimal repro.
+2. Look at how `Index::index(&self, i: usize) -> &Self::Output` is lowered
+   for tuple structs wrapping `[u64; N]` — likely the `&u64` reference
+   returned by `index()` has bad address-space tagging or the GEP through
+   the tuple field projection is mis-computed.
+
+---
+
+## Bug F (CONFIRMED separate from E) — k256 AffinePoint→bytes chain
+
+**Status.** ✅ Confirmed exists (slot 93 FAIL on v1.46.0 rerun). Not the
+same as Bug E — k256/elliptic-curve/crypto-bigint have **no** `Index`
+trait impls (grepped). Three sub-probes now in suite to narrow it.
+
+**Failing chain ([k256/src/arithmetic/affine.rs:273](k256/arithmetic/affine.rs:273)):**
+```rust
+fn to_encoded_point(&self, compress: bool) -> EncodedPoint {
+    EncodedPoint::conditional_select(
+        &EncodedPoint::from_affine_coordinates(
+            &self.x.to_bytes(),     // FieldElement → bytes
+            &self.y.to_bytes(),     // FieldElement → bytes
+            compress,
+        ),
+        &EncodedPoint::identity(),
+        self.is_identity(),         // Choice (always false here)
+    )
+}
+```
+
+**Bisect probes (slots 94-96, in suite awaiting next run):**
+
+| Slot | Probe | If FAIL |
+|---|---|---|
+| 94 | `Choice::from(0u8).into() == false`, `Choice::from(1u8).into() == true` | bug is in `subtle::Choice` u8↔bool conversion |
+| 95 | `u64::conditional_select(&a, &b, Choice(0)) == a` and `(Choice(1)) == b` | bug is in `ConditionallySelectable` impl (slot 53/54's hand-rolled mask passes but real subtle trait fails) |
+| 96 | `EncodedPoint::from_affine_coordinates(&GX, &GY, true) == G` (hardcoded x/y bytes; bypasses `is_identity` + `conditional_select`) | bug is in `EncodedPoint::from_affine_coordinates` itself |
+
+**Decision table (next vast run):**
+
+| 94 | 95 | 96 | Diagnosis |
+|---|---|---|---|
+| F | — | — | `Choice` u8↔bool conversion broken |
+| P | F | — | `ConditionallySelectable::conditional_select` broken — fits slot 93's symptom (picks wrong arm) |
+| P | P | F | `EncodedPoint::from_affine_coordinates` broken |
+| P | P | P | Bug is elsewhere (`FieldElement::to_bytes` or AffinePoint's own `is_identity`) — needs another round |
+
+If P/F/—, that's also the prime suspect for slots 74/75 (k256 derive ×1, ×2) — both go through `conditional_select` in `mul_by_generator`'s windowed scalar mult.
 
 ---
 
