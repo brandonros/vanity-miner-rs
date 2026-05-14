@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 108;
+pub const SELF_TEST_NUM_CHECKS: usize = 110;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -407,6 +407,20 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     //        105 FAIL, the bug is in the `seq!` expansion specifically.
     "named-field struct return (Scalar shape)",
     "base58 hand-rolled no-seq! single-nonzero",
+    // Slots 108-109: post-round-7 probes. Slots 106/107 PASS falsified
+    // struct-return-ABI (Bug-71) and seq!-macro (Bug-41) hypotheses.
+    //   108 (Bug-41) — `<[u8]>::reverse()` on a partial sub-slice. The
+    //        only operation in `base58_encode_32` that slot 107 hand-rolls
+    //        differently (slot 107 uses manual swap; original uses
+    //        `output[..result_len].reverse()`). If 108 FAIL → that's the
+    //        Bug-41 repro.
+    //   109 (Bug-71) — `Scalar::from_bytes_mod_order([0; 32]) == Scalar::ZERO`
+    //        via dalek's `PartialEq` instead of comparing bytes. Separates
+    //        "is the Scalar value correct?" from "is to_bytes broken?".
+    //        If 109 PASS but 102 FAIL → bug is specifically in `to_bytes`.
+    //        If 109 FAIL → the Scalar value itself is wrong.
+    "<[u8]>::reverse() partial sub-slice",
+    "dalek Scalar(0) == Scalar::ZERO (no to_bytes)",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2551,6 +2565,45 @@ pub fn check_named_field_struct_return() -> u32 {
 //
 // If 107 PASS but 105 FAIL, the bug is in something specific to seq!'s
 // expansion (function size, code layout, etc).
+// Slot 108: `<[u8]>::reverse()` on a partial sub-slice. The only
+// operation in `base58_encode_32` that slot 107 (which PASSed) hand-
+// rolls — slot 107 uses manual swap pairs, while the original calls
+// `output[..result_len].reverse()`. If 108 FAILs, that's the Bug-41
+// minimal repro.
+pub fn check_slice_reverse_partial() -> u32 {
+    let mut arr = [0u8; 64];
+    // Populate a non-trivial prefix with a recognizable pattern
+    arr[0] = 0x11;
+    arr[1] = 0x22;
+    arr[2] = 0x33;
+    arr[3] = 0x44;
+    arr[4] = 0x55;
+    let result_len = core::hint::black_box(5usize);
+    arr[..result_len].reverse();
+    // Expected after reverse: [0x55, 0x44, 0x33, 0x22, 0x11, 0, 0, ...]
+    let mut expected = [0u8; 64];
+    expected[0] = 0x55;
+    expected[1] = 0x44;
+    expected[2] = 0x33;
+    expected[3] = 0x22;
+    expected[4] = 0x11;
+    (arr == expected) as u32
+}
+
+// Slot 109: `Scalar::from_bytes_mod_order([0; 32]) == Scalar::ZERO`
+// using dalek's `PartialEq` (which uses constant-time equality
+// internally) instead of comparing the bytes output of `to_bytes`.
+// Disambiguates: is the Scalar VALUE correct, or is `to_bytes` broken?
+//   If 109 PASS but 102 FAIL → bug is specifically in `to_bytes`.
+//   If 109 FAIL → the Scalar value from `from_bytes_mod_order` is wrong.
+pub fn check_dalek_scalar_eq_zero() -> u32 {
+    use curve25519_dalek::Scalar;
+    let input = core::hint::black_box([0u8; 32]);
+    let s = Scalar::from_bytes_mod_order(input);
+    let zero = Scalar::ZERO;
+    (s == zero) as u32
+}
+
 pub fn check_base58_handrolled_no_seq() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];
@@ -2781,6 +2834,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[105] = check_base58_min_nonzero();
     results[106] = check_named_field_struct_return();
     results[107] = check_base58_handrolled_no_seq();
+    results[108] = check_slice_reverse_partial();
+    results[109] = check_dalek_scalar_eq_zero();
 }
 
 #[cfg(test)]

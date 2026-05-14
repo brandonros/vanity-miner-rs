@@ -2,7 +2,7 @@
 
 set -e
 
-PORT=18447
+PORT=19991
 HOST=ssh5.vast.ai
 USER=root
 VERSION="${VANITY_MINER_VERSION:-$(gh release view --repo brandonros/vanity-miner-rs --json tagName -q .tagName)}"

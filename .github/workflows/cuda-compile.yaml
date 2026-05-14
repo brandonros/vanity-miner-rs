@@ -29,7 +29,6 @@ jobs:
         with:
           primary-key: nix-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-${{ matrix.arch }}-
-          gc-max-store-size-linux: 5G
           purge: true
           purge-prefixes: nix-${{ runner.os }}-${{ matrix.arch }}-
           purge-created: 0

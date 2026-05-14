@@ -1070,4 +1070,19 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_base58_handrolled_no_seq(results: &mut [u32]) {
         results[107] = logic::check_base58_handrolled_no_seq();
     }
+
+    // Slots 108-109: post-round-7 probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_slice_reverse_partial(results: &mut [u32]) {
+        results[108] = logic::check_slice_reverse_partial();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar_eq_zero(results: &mut [u32]) {
+        results[109] = logic::check_dalek_scalar_eq_zero();
+    }
 }
