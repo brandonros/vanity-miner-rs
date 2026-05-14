@@ -42,9 +42,16 @@ the name points to the minimal repro.
 
 ### Bug-71 — dalek `Scalar::from_bytes_mod_order` chain
 
+Tracked in `cuda-oxide` as cluster **DALEK-1**. Five-rung ladder of
+committed minimal repros under
+`cuda-oxide/crates/rustc-codegen-cuda/examples/dalek_*_repro/`. See
+that repo's `examples/README.md` for the full ladder description.
+
 **Status.** Direct repro slot 71 FAILs every run. No isolated minimal
 repro yet — slots 81-90 (ladder of every intermediate step of dalek's
-`Scalar::reduce`, ported verbatim into `logic`) all PASS.
+`Scalar::reduce`, ported verbatim into `logic`) all PASS. Smallest
+upstream reproducer: `dalek_from_canonical_bytes_zero_repro` (mirrors
+slot 112).
 
 **Slot 71 (smoking gun):**
 ```rust
@@ -105,11 +112,19 @@ of unpack, mul_internal, montgomery_reduce in isolation.)
 
 ### Bug-96 — `sec1::EncodedPoint::from_affine_coordinates` — minimal repro LOST
 
+Tracked in `cuda-oxide` as cluster **K256-1**. Five-rung ladder of
+committed minimal repros under
+`cuda-oxide/crates/rustc-codegen-cuda/examples/k256_*_repro/`. See
+that repo's `examples/README.md` for the full ladder description.
+
 **Status.** Slot 96 still FAILs in v1.55.0, but slot 101 (our previous
 minimal repro) FLIPPED to PASS. The compiler agent likely fixed the
 exact `&GenericArray<u8, U32>::as_slice().last()` pattern via cuda-oxide
 HEAD updates. But `from_affine_coordinates` still miscompiles —
-something else inside it is the bug.
+something else inside it is the bug. Smallest upstream reproducer:
+`k256_encoded_point_from_affine_coords_repro` (mirrors slot 96, with
+slot 100's raw `[u8; 33]` replica still passing as the in-tree
+baseline).
 
 **Ruled out (all PASS):**
 - Slot 98 — basic GA index by fixed offset.
@@ -138,23 +153,26 @@ from a `&GenericArray<u8, U32>` source works. The shape inside
 Each slot is blocked by ≥1 of the three open bugs. Slots blocked by
 multiple bugs need ALL of them fixed before they pass.
 
-**Current minimal repros:**
-- Bug-96: **none currently** (slot 110 PASSed too; need new shape — see Bug-96 section)
-- Bug-71: **slot 112** confirms `Scalar::reduce()` on zero is broken; cross-crate composition hypothesis — slots 116/117 next
+**Current minimal repros (committed in cuda-oxide):**
+- Bug-96 → `k256_encoded_point_from_affine_coords_repro` (mirrors slot 96, baseline: slot 100 raw `[u8; 33]` replica still PASS). Earlier in-tree minimum (slot 101) FLIPPED PASS on v1.55.0 but slot 96 still FAILs — bug is some other shape inside `from_affine_coordinates`.
+- Bug-71 → `dalek_from_canonical_bytes_zero_repro` (mirrors slot 112, baseline: slots 113-117 verbatim Scalar52 ladder all PASS). Cross-crate-composition hypothesis: real-dalek's `reduce()` body fires the bug, the byte-for-byte port doesn't.
 
 ### Blocked by `dalek-scalar-reduce` only — 9 slots
 
-| #   | Slot name                            | Where it touches the bug |
-|-----|--------------------------------------|--------------------------|
-| 71  | dalek scalar from-bytes round-trip   | **direct hit / smoking gun** |
-| 72  | dalek mul_base scalar=1              | calls 71's path then `mul_base` |
-|  2  | ed25519 derive                       | `ed25519_derive_public_key` calls `Scalar::from_bytes_mod_order` |
-| 11  | solana pub                           | runs ed25519 derive (= slot 2's path) |
-| 12  | solana encoded                       | ed25519 → base58; base58 now works, so just dalek |
-| 102 | dalek scalar round-trip ZERO          | same reduce path, zero input |
-| 103 | dalek from_bytes_mod_order_wide zero  | `from_bytes_mod_order_wide` path on zero |
-| 109 | dalek Scalar(0) == Scalar::ZERO       | reduce on zero, no `to_bytes` |
-| 112 | dalek from_canonical_bytes(0) == ZERO | reduce via `is_canonical` |
+cuda-oxide cluster: **DALEK-1**. Ladder rungs L0–L4 listed in the
+"cuda-oxide repro" column.
+
+| #   | Slot name                            | Where it touches the bug | cuda-oxide repro |
+|-----|--------------------------------------|--------------------------|------------------|
+| 71  | dalek scalar from-bytes round-trip   | **direct hit / smoking gun** | `dalek_from_bytes_mod_order_nonzero_repro` (L2) |
+| 72  | dalek mul_base scalar=1              | calls 71's path then `mul_base` | `dalek_edwards_mul_base_one_repro` (L3) |
+|  2  | ed25519 derive                       | `ed25519_derive_public_key` calls `Scalar::from_bytes_mod_order` | `dalek_ed25519_derive_repro` (L4) |
+| 11  | solana pub                           | runs ed25519 derive (= slot 2's path) | *(downstream of L4 — integration only)* |
+| 12  | solana encoded                       | ed25519 → base58; base58 now works, so just dalek | *(downstream of L4 — integration only)* |
+| 102 | dalek scalar round-trip ZERO          | same reduce path, zero input | `dalek_from_bytes_mod_order_zero_repro` (L1) |
+| 103 | dalek from_bytes_mod_order_wide zero  | `from_bytes_mod_order_wide` path on zero | *(no dedicated repro — DALEK-1 cluster covers it)* |
+| 109 | dalek Scalar(0) == Scalar::ZERO       | reduce on zero, no `to_bytes` | *(no dedicated repro — DALEK-1 cluster covers it)* |
+| 112 | dalek from_canonical_bytes(0) == ZERO | reduce via `is_canonical` | `dalek_from_canonical_bytes_zero_repro` (L0) |
 
 ### Blocked by `k256-encodedpoint` only — 16 slots
 
@@ -162,24 +180,27 @@ These all execute k256's `to_encoded_point` chain (which calls the
 broken `EncodedPoint::from_affine_coordinates`). Once that's fixed, all
 sixteen clear.
 
-| #  | Slot name                            | Where it touches the bug |
-|----|--------------------------------------|--------------------------|
-| 96 | EncodedPoint::from_affine_coordinates| **direct hit / smoking gun** |
-| 93 | k256 AffinePoint encode              | `AffinePoint::GENERATOR.to_encoded_point()` |
-| 78 | k256 encode generator (no mul)       | `ProjectivePoint::GENERATOR.to_affine().to_encoded_point()` |
-| 79 | k256 double generator + encode       | 78 + doubling |
-| 74 | k256 derive scalar=1                 | full derive ending in `to_encoded_point` |
-| 75 | k256 derive scalar=2                 | same as 74 |
-| 80 | k256 Scalar::ONE round-trip          | `Scalar::to_repr` returns `GenericArray<u8, U32>` (same GA dep — likely) |
-|  4 | secp256k1 compressed                 | `secp256k1_derive_public_key` calls the same chain |
-|  5 | secp256k1 uncompressed               | `secp256k1_derive_public_key_uncompressed` |
-| 13 | ethereum priv                        | ethereum pipeline calls secp256k1 derive |
-| 14 | ethereum pub                         | same |
-| 15 | ethereum address                     | same + keccak |
-| 16 | bitcoin priv                         | bitcoin pipeline calls secp256k1 derive |
-| 17 | bitcoin pub                          | same |
-| 18 | bitcoin pkh                          | same + sha+rip |
-| 20 | bitcoin matches                      | full bitcoin pipeline |
+cuda-oxide cluster: **K256-1**. Ladder rungs L0–L4 listed in the
+"cuda-oxide repro" column.
+
+| #  | Slot name                            | Where it touches the bug | cuda-oxide repro |
+|----|--------------------------------------|--------------------------|------------------|
+| 96 | EncodedPoint::from_affine_coordinates| **direct hit / smoking gun** | `k256_encoded_point_from_affine_coords_repro` (L0) |
+| 93 | k256 AffinePoint encode              | `AffinePoint::GENERATOR.to_encoded_point()` | `k256_affine_generator_to_encoded_repro` (L1) |
+| 78 | k256 encode generator (no mul)       | `ProjectivePoint::GENERATOR.to_affine().to_encoded_point()` | `k256_projective_generator_to_encoded_repro` (L2) |
+| 79 | k256 double generator + encode       | 78 + doubling | *(no dedicated repro — K256-1 cluster covers it)* |
+| 74 | k256 derive scalar=1                 | full derive ending in `to_encoded_point` | `k256_secret_key_derive_one_repro` (L3) |
+| 75 | k256 derive scalar=2                 | same as 74 | *(no dedicated repro — K256-1 cluster covers it)* |
+| 80 | k256 Scalar::ONE round-trip          | `Scalar::to_repr` returns `GenericArray<u8, U32>` (same GA dep — likely) | *(no dedicated; currently PASSes per run-history)* |
+|  4 | secp256k1 compressed                 | `secp256k1_derive_public_key` calls the same chain | *(downstream of L3 — same path, compressed flag)* |
+|  5 | secp256k1 uncompressed               | `secp256k1_derive_public_key_uncompressed` | `k256_uncompressed_pubkey_derive_repro` (L4) |
+| 13 | ethereum priv                        | ethereum pipeline calls secp256k1 derive | *(downstream of L4 — integration only)* |
+| 14 | ethereum pub                         | same | *(downstream of L4 — integration only)* |
+| 15 | ethereum address                     | same + keccak | *(downstream of L4 — integration only)* |
+| 16 | bitcoin priv                         | bitcoin pipeline calls secp256k1 derive | *(downstream of L3 — integration only)* |
+| 17 | bitcoin pub                          | same | *(downstream of L3 — integration only)* |
+| 18 | bitcoin pkh                          | same + sha+rip | *(downstream of L3 — integration only)* |
+| 20 | bitcoin matches                      | full bitcoin pipeline | *(downstream of L3 — integration only)* |
 
 ### What clears when each bug is fixed
 
