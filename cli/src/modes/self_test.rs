@@ -136,6 +136,8 @@ pub mod gpu {
         //   78-80 k256 Bug-B triangulation (encode, double, Scalar)
         //   81-83 post-v1.46 re-bisect (u128 shr, deep newtype, rev iter)
         //   84-87 dalek Scalar52 ladder bisect of slot 71 chain
+        //   88-90 dalek Scalar52::sub probes (the call missing from
+        //         our ladder copy that's present in real dalek)
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -224,6 +226,9 @@ pub mod gpu {
         run_slot!(85, kernel_self_test_dalek_scalar52_montgomery_reduce_r);
         run_slot!(86, kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r);
         run_slot!(87, kernel_self_test_dalek_scalar52_as_bytes_one);
+        run_slot!(88, kernel_self_test_dalek_scalar52_sub_no_underflow);
+        run_slot!(89, kernel_self_test_dalek_scalar52_sub_with_underflow);
+        run_slot!(90, kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub);
 
         report(&results)
     }

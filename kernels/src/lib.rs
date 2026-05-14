@@ -920,4 +920,27 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_dalek_scalar52_as_bytes_one(results: &mut [u32]) {
         results[87] = logic::check_dalek_scalar52_as_bytes_one();
     }
+
+    // Slots 88-90: Scalar52::sub probes added after slot 86 PASSed
+    // without the final sub call (a difference from real dalek).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_sub_no_underflow(results: &mut [u32]) {
+        results[88] = logic::check_dalek_scalar52_sub_no_underflow();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_sub_with_underflow(results: &mut [u32]) {
+        results[89] = logic::check_dalek_scalar52_sub_with_underflow();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub(results: &mut [u32]) {
+        results[90] = logic::check_dalek_scalar52_montgomery_reduce_with_sub();
+    }
 }

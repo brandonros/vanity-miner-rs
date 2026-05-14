@@ -11,7 +11,9 @@ execute, so this doc alone is enough context to hand to the compiler agent.
 |------------|------------|------|----------------|---------------------------------------|
 | 2026-05-13 | 76         | 25   | v1.43.0        | First Bug A hypothesis (now falsified). |
 | 2026-05-13 | 81         | 27   | v1.46.0        | Bug C fixed. Bug A falsified by 76/77. Re-bisecting via slots 81-83. |
-| pending    | 88         | ?    | next           | +3 hypothesis probes (81-83) and +4 ladder rungs (84-87). |
+| pending    | 88         | ?    | v1.46 (rerun)  | +3 hypothesis probes (81-83) and +4 ladder rungs (84-87). |
+| 2026-05-13 | 88         | 27   | v1.46.0        | All 81-87 PASSed. New finding: ladder copy missing `Scalar52::sub` from montgomery_reduce. |
+| pending    | 91         | ?    | next           | +3 sub probes (88-90) added; 85/86 kept on `_no_sub` variant for direct comparison. |
 
 ---
 
@@ -209,6 +211,40 @@ Outcome decoding (subset, assuming 71 still FAILs in the run):
 
 Combined with slots 81-83 results, this should pin the bug to a single
 function with a known input.
+
+### Ladder-round-1 result (v1.46 rerun)
+
+All four ladder rungs PASSed. Re-examining the port revealed that my
+copy of `montgomery_reduce` **dropped the final `Scalar52::sub(result, L)`
+call** that dalek's real implementation ends with. That meant the ladder
+was technically incomplete — `sub` is part of montgomery_reduce in dalek
+but wasn't exercised by any of slots 84-87.
+
+### Sub probes (slots 88-90) — added after ladder round 1
+
+Adding `Scalar52::sub` to the port + 3 probes:
+
+| Slot | Probe | Tests | If FAIL |
+|---|---|---|---|
+| 88 | `Scalar52::sub(R, R) == 0` | 5-limb borrow chain, no underflow | basic borrow propagation broken |
+| 89 | `Scalar52::sub(ZERO, ONE)` underflow → `L - 1` | borrow chain + underflow_mask + conditional-add-L (volatile `black_box`) | underflow-path conditional add broken |
+| 90 | `montgomery_reduce(widened_R)` *with* final sub | same as slot 85 but calls `montgomery_reduce` (with sub) instead of `montgomery_reduce_no_sub` | sub is what's broken in real dalek path |
+
+Slots 85 and 86 now explicitly use `montgomery_reduce_no_sub` so their
+result preserves the v1.46 PASSing-meaning. Comparing slot 85 (passes,
+no sub) vs slot 90 (same input, with sub) directly isolates whether sub
+is the bug.
+
+Outcome decoding:
+- 85 P / 88 F or 89 F / 90 F → `Scalar52::sub` is the bug. Likely culprit:
+  the volatile-load `black_box` (cuda-oxide may be miscompiling
+  `core::ptr::read_volatile` to nvptx) or the 5-limb borrow chain.
+- 85 P / 88 P / 89 P / 90 F → the bug isn't in sub itself, but in the
+  *sequencing* of mul_internal → reduce → sub (some pass-pipeline issue).
+- 85 P / 88 P / 89 P / 90 P / 71 still F → it's truly cross-crate. Bug
+  manifests when the same code is compiled inside `curve25519-dalek` but
+  not when compiled inside `logic`. Time to spin up a separate-crate
+  experiment.
 
 ---
 

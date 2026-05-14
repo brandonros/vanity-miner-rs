@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 88;
+pub const SELF_TEST_NUM_CHECKS: usize = 91;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -291,6 +291,19 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "dalek Scalar52::from_montgomery(R) == 1",
     "dalek Scalar52::ONE.as_montgomery() == R",
     "dalek Scalar52([1,..]).as_bytes() == [1,0,..]",
+    // Slots 88-90: post-ladder-PASS investigation. Slot 86 PASSed without
+    // the final `Scalar52::sub(result, L)` call that dalek's
+    // montgomery_reduce ends with. Now that's restored. If 89 (the
+    // re-run of 86 with sub) FAILs while 86 still PASSes (different
+    // identity), the bug is specifically in `Scalar52::sub`'s borrow
+    // chain or the volatile-load `black_box` — neither of which is
+    // covered by any existing tier-1/tier-2 arith slot.
+    //   88 — `Scalar52::sub(R, R) == ZERO`: borrow chain, no underflow path.
+    //   89 — `Scalar52::sub(ZERO, ONE)`: triggers underflow + conditional-add-L.
+    //   90 — full montgomery_reduce-with-sub of widened R → expect ONE.
+    "dalek Scalar52::sub(R, R) == 0 (no underflow)",
+    "dalek Scalar52::sub(0, 1) underflow path",
+    "dalek montgomery_reduce(R) with final sub",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -1913,7 +1926,66 @@ mod bisect_scalar52 {
             z
         }
 
-        /// Compute `limbs / R` (mod L) — exactly dalek's montgomery_reduce.
+        /// Compute `a - b` (mod L). Verbatim from dalek's u64 scalar.rs.
+        ///
+        /// The trailing conditional-add (when the borrow underflows the
+        /// low 52 bits, add L back) makes this a constant-time signed-vs-
+        /// unsigned bridge. Uses a per-function `black_box` via volatile
+        /// load to prevent LLVM from inserting `jns` branches.
+        pub fn sub(a: &Scalar52, b: &Scalar52) -> Scalar52 {
+            fn black_box(value: u64) -> u64 {
+                // Same as dalek: ptr::read_volatile to defeat optimization
+                unsafe { core::ptr::read_volatile(&value) }
+            }
+            let mut difference = Scalar52::ZERO;
+            let mask = (1u64 << 52) - 1;
+            let mut borrow: u64 = 0;
+            for i in 0..5 {
+                borrow = a.0[i].wrapping_sub(b.0[i] + (borrow >> 63));
+                difference.0[i] = borrow & mask;
+            }
+            let underflow_mask = ((borrow >> 63) ^ 1).wrapping_sub(1);
+            let mut carry: u64 = 0;
+            for i in 0..5 {
+                carry = (carry >> 52) + difference.0[i] + (L.0[i] & black_box(underflow_mask));
+                difference.0[i] = carry & mask;
+            }
+            difference
+        }
+
+        /// Same as `montgomery_reduce` but stops before the final
+        /// `Scalar52::sub(result, L)` call. Used by slot 85 — preserves
+        /// the test point from the v1.46 run where 85 was confirmed to
+        /// PASS without sub. Keeping this separate lets us directly
+        /// compare "reduce without sub" (slot 85) vs "reduce with sub"
+        /// (slot 90) results on each subsequent vast run.
+        pub fn montgomery_reduce_no_sub(limbs: &[u128; 9]) -> Scalar52 {
+            #[inline(always)]
+            fn part1(sum: u128) -> (u128, u64) {
+                let p = (sum as u64).wrapping_mul(LFACTOR) & ((1u64 << 52) - 1);
+                ((sum + m(p, L.0[0])) >> 52, p)
+            }
+            #[inline(always)]
+            fn part2(sum: u128) -> (u128, u64) {
+                let w = (sum as u64) & ((1u64 << 52) - 1);
+                (sum >> 52, w)
+            }
+            let l = &L;
+            let (carry, n0) = part1(        limbs[0]);
+            let (carry, n1) = part1(carry + limbs[1] + m(n0, l.0[1]));
+            let (carry, n2) = part1(carry + limbs[2] + m(n0, l.0[2]) + m(n1, l.0[1]));
+            let (carry, n3) = part1(carry + limbs[3]                 + m(n1, l.0[2]) + m(n2, l.0[1]));
+            let (carry, n4) = part1(carry + limbs[4] + m(n0, l.0[4])                 + m(n2, l.0[2]) + m(n3, l.0[1]));
+            let (carry, r0) = part2(carry + limbs[5]                 + m(n1, l.0[4])                 + m(n3, l.0[2]) + m(n4, l.0[1]));
+            let (carry, r1) = part2(carry + limbs[6]                                 + m(n2, l.0[4])                 + m(n4, l.0[2]));
+            let (carry, r2) = part2(carry + limbs[7]                                                 + m(n3, l.0[4]));
+            let (carry, r3) = part2(carry + limbs[8]                                                                 + m(n4, l.0[4]));
+            let         r4 = carry as u64;
+            Scalar52([r0, r1, r2, r3, r4])
+        }
+
+        /// Compute `limbs / R` (mod L) — exactly dalek's montgomery_reduce
+        /// including the final `Scalar52::sub(result, L)` call.
         pub fn montgomery_reduce(limbs: &[u128; 9]) -> Scalar52 {
             #[inline(always)]
             fn part1(sum: u128) -> (u128, u64) {
@@ -1936,11 +2008,12 @@ mod bisect_scalar52 {
             let (carry, r2) = part2(carry + limbs[7]                                                 + m(n3, l.0[4]));
             let (carry, r3) = part2(carry + limbs[8]                                                                 + m(n4, l.0[4]));
             let         r4 = carry as u64;
-            // result may be >= L; dalek then subtracts L if so. For our
-            // smoke tests (input = small canonical 1), the unreduced
-            // result already equals 1 / R or R, so we skip the final
-            // sub.
-            Scalar52([r0, r1, r2, r3, r4])
+            // The full dalek implementation: result may be >= L, so
+            // attempt to subtract L. This was missing from earlier
+            // iterations of the port — slot 86 PASSed without it, which
+            // told us mul_internal + reduce-without-sub are fine but
+            // hid the fact that sub itself might be the bug.
+            Scalar52::sub(&Scalar52([r0, r1, r2, r3, r4]), l)
         }
     }
 }
@@ -1957,10 +2030,10 @@ pub fn check_dalek_scalar52_from_bytes() -> u32 {
     (s.0 == DALEK_ONE_LIMBS) as u32
 }
 
-// Slot 85 — Rung C alone: montgomery_reduce on a synthetic widened input.
-// Build `[u128; 9]` from R's limbs (zero-padding 5..9) — semantically
-// this is "R in [u128; 9] form" — then run montgomery_reduce. Result
-// should be R / R = 1.
+// Slot 85 — Rung C alone (WITHOUT the final sub call). Calls the
+// `montgomery_reduce_no_sub` variant so this slot's result is directly
+// comparable to the v1.46 run where it PASSed. Slot 90 calls the same
+// pipeline WITH the sub — if 85 PASSes and 90 FAILs, the bug is in sub.
 pub fn check_dalek_scalar52_montgomery_reduce_r() -> u32 {
     let r = bisect_scalar52::R;
     let mut widened = [0u128; 9];
@@ -1968,21 +2041,19 @@ pub fn check_dalek_scalar52_montgomery_reduce_r() -> u32 {
         widened[i] = *x as u128;
     }
     let widened = core::hint::black_box(widened);
-    let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
+    let result = bisect_scalar52::Scalar52::montgomery_reduce_no_sub(&widened);
     (result.0 == DALEK_ONE_LIMBS) as u32
 }
 
-// Slot 86 — Rungs B+C: full mul_internal + montgomery_reduce. Slot 71's
-// exact internal call. For input ONE and constant R, mul_internal yields
-// R as [u128; 9] (limbs 0..5 = R, limbs 5..9 = 0), then montgomery_reduce
-// yields R / R = 1. If 85 PASSes and 86 FAILs, mul_internal is the bug.
+// Slot 86 — Rungs B+C: mul_internal + montgomery_reduce_no_sub.
+// Keeps "without sub" semantics for direct comparison to the v1.46 run.
 pub fn check_dalek_scalar52_mul_internal_then_reduce_one_r() -> u32 {
     use bisect_scalar52::Scalar52;
     const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
     let one = core::hint::black_box(ONE);
     let r = core::hint::black_box(bisect_scalar52::R);
     let x_r = Scalar52::mul_internal(&one, &r);
-    let result = Scalar52::montgomery_reduce(&x_r);
+    let result = Scalar52::montgomery_reduce_no_sub(&x_r);
     (result.0 == DALEK_ONE_LIMBS) as u32
 }
 
@@ -1995,6 +2066,52 @@ pub fn check_dalek_scalar52_as_bytes_one() -> u32 {
     let mut expected = [0u8; 32];
     expected[0] = 1;
     (bytes == expected) as u32
+}
+
+// Slot 88: `Scalar52::sub(R, R) == ZERO`. Pure borrow chain across 5 u64
+// limbs, no underflow, no conditional add-L. If this FAILs, the basic
+// borrow propagation is broken (Slot 47's overflowing_sub is a SINGLE
+// op; this is a 5-limb chain).
+pub fn check_dalek_scalar52_sub_no_underflow() -> u32 {
+    let r = core::hint::black_box(bisect_scalar52::R);
+    let result = bisect_scalar52::Scalar52::sub(&r, &r);
+    (result.0 == [0u64; 5]) as u32
+}
+
+// Slot 89: `Scalar52::sub(ZERO, ONE)` — triggers the underflow path.
+// borrow propagates to the top bit; underflow_mask = all-1s; the
+// conditional-add loop adds L back. Mathematically: 0 - 1 mod L = L - 1.
+// L - 1 in 5x52-bit limbs:
+//   limb[0] = 0x0002631a5cf5d3ec  (L[0] - 1)
+//   limb[1..4] = L[1..4] unchanged
+pub fn check_dalek_scalar52_sub_with_underflow() -> u32 {
+    use bisect_scalar52::Scalar52;
+    let zero = core::hint::black_box(Scalar52::ZERO);
+    let one = core::hint::black_box(Scalar52(DALEK_ONE_LIMBS));
+    let result = Scalar52::sub(&zero, &one);
+    let expected: [u64; 5] = [
+        0x0002631a5cf5d3ec, // L[0] - 1
+        0x000dea2f79cd6581, // L[1]
+        0x000000000014def9, // L[2]
+        0x0000000000000000, // L[3]
+        0x0000100000000000, // L[4]
+    ];
+    (result.0 == expected) as u32
+}
+
+// Slot 90: full montgomery_reduce(widened R) with the final sub call now
+// included. Compare to slot 85 (same input, sub-less version): if 85
+// PASS and 90 FAIL, the bug is in `Scalar52::sub` specifically — that's
+// also what makes the real dalek path (slot 71) FAIL.
+pub fn check_dalek_scalar52_montgomery_reduce_with_sub() -> u32 {
+    let r = bisect_scalar52::R;
+    let mut widened = [0u128; 9];
+    for (i, x) in r.0.iter().enumerate() {
+        widened[i] = *x as u128;
+    }
+    let widened = core::hint::black_box(widened);
+    let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
+    (result.0 == DALEK_ONE_LIMBS) as u32
 }
 
 pub fn run_self_test(results: &mut [u32]) {
@@ -2086,6 +2203,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[85] = check_dalek_scalar52_montgomery_reduce_r();
     results[86] = check_dalek_scalar52_mul_internal_then_reduce_one_r();
     results[87] = check_dalek_scalar52_as_bytes_one();
+    results[88] = check_dalek_scalar52_sub_no_underflow();
+    results[89] = check_dalek_scalar52_sub_with_underflow();
+    results[90] = check_dalek_scalar52_montgomery_reduce_with_sub();
 }
 
 #[cfg(test)]
