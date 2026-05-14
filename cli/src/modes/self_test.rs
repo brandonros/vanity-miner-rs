@@ -138,6 +138,7 @@ pub mod gpu {
         //   84-87 dalek Scalar52 ladder bisect of slot 71 chain
         //   88-90 dalek Scalar52::sub probes (the call missing from
         //         our ladder copy that's present in real dalek)
+        //   91-93 Index trait dispatch + minimal cross-crate const probes
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -229,6 +230,9 @@ pub mod gpu {
         run_slot!(88, kernel_self_test_dalek_scalar52_sub_no_underflow);
         run_slot!(89, kernel_self_test_dalek_scalar52_sub_with_underflow);
         run_slot!(90, kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub);
+        run_slot!(91, kernel_self_test_index_trait_dispatch);
+        run_slot!(92, kernel_self_test_dalek_scalar_one_to_bytes_direct);
+        run_slot!(93, kernel_self_test_k256_affine_generator_encode);
 
         report(&results)
     }

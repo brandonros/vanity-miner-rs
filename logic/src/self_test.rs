@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 91;
+pub const SELF_TEST_NUM_CHECKS: usize = 94;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -304,6 +304,20 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "dalek Scalar52::sub(R, R) == 0 (no underflow)",
     "dalek Scalar52::sub(0, 1) underflow path",
     "dalek montgomery_reduce(R) with final sub",
+    // Slots 91-93: post-round-2 probes. Ladder rungs 84-90 all PASSed,
+    // yet slot 71 still FAILs. The smoking gun: my Scalar52 port uses
+    // `a.0[i]` direct field access, but dalek's real Scalar52 implements
+    // custom Index/IndexMut traits and uses `a[i]` syntax throughout
+    // mul_internal / montgomery_reduce / sub. If `Index<usize>` trait
+    // dispatch on a tuple struct miscompiles, my port works but dalek
+    // doesn't — exactly the observed pattern.
+    //   91 — focused Index/IndexMut trait dispatch probe (custom struct)
+    //   92 — `Scalar::ONE.to_bytes()` cross-crate const baseline (no math)
+    //   93 — `AffinePoint::GENERATOR.to_encoded_point()` k256 minimal
+    //        (no scalar mult, no projective→affine, just const + encode)
+    "Index/IndexMut trait dispatch",
+    "dalek Scalar::ONE.to_bytes() direct",
+    "k256 AffinePoint::GENERATOR.to_encoded_point()",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2114,6 +2128,67 @@ pub fn check_dalek_scalar52_montgomery_reduce_with_sub() -> u32 {
     (result.0 == DALEK_ONE_LIMBS) as u32
 }
 
+// Slot 91: focused Index/IndexMut trait dispatch probe on a tuple
+// struct. Mirrors dalek's Scalar52 Index impl shape EXACTLY: tuple
+// struct wrapping `[u64; 5]`, Index returns `&u64`, IndexMut returns
+// `&mut u64`. If this FAILs, trait dispatch on `[i]` syntax is broken
+// on the cuda-oxide alpha-NVPTX backend — explains why dalek (uses
+// `a[i]`) fails while our port (uses `a.0[i]`) passes.
+pub struct IdxProbe(pub [u64; 5]);
+
+impl core::ops::Index<usize> for IdxProbe {
+    type Output = u64;
+    fn index(&self, i: usize) -> &u64 {
+        &(self.0[i])
+    }
+}
+
+impl core::ops::IndexMut<usize> for IdxProbe {
+    fn index_mut(&mut self, i: usize) -> &mut u64 {
+        &mut (self.0[i])
+    }
+}
+
+pub fn check_index_trait_dispatch() -> u32 {
+    let mut p = IdxProbe([0u64; 5]);
+    let idx = core::hint::black_box(2usize);
+    let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+    p[idx] = val;
+    let read = core::hint::black_box(p[idx]);
+    (read == val) as u32
+}
+
+// Slot 92: dalek `Scalar::ONE.to_bytes()` direct. Cross-crate access to
+// a `pub const Scalar` followed by trivial byte copy (Scalar's internal
+// rep IS the bytes; to_bytes just copies them out). No reduce, no math.
+// If this FAILs, the bug is at the cross-crate const-access layer.
+pub fn check_dalek_scalar_one_to_bytes_direct() -> u32 {
+    let s = curve25519_dalek::Scalar::ONE;
+    let bytes = s.to_bytes();
+    let mut expected = [0u8; 32];
+    expected[0] = 1;
+    (bytes == expected) as u32
+}
+
+// Slot 93: k256 `AffinePoint::GENERATOR.to_encoded_point(true)`. Skips
+// the projective→affine conversion that slot 78 includes (no z-coord
+// inversion). Tests cross-crate const access for AffinePoint::GENERATOR
+// + the encoded_point serialization chain. If 93 PASSes and 78 FAILs,
+// the bug in 78 is specifically in `to_affine()` (the field inversion).
+pub fn check_k256_affine_generator_encode() -> u32 {
+    use k256::AffinePoint;
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    let g = AffinePoint::GENERATOR;
+    let encoded = g.to_encoded_point(true);
+    let bytes = encoded.as_bytes();
+    if bytes.len() != 33 {
+        return 0;
+    }
+    let mut out = [0u8; 33];
+    out.copy_from_slice(bytes);
+    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -2206,6 +2281,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[88] = check_dalek_scalar52_sub_no_underflow();
     results[89] = check_dalek_scalar52_sub_with_underflow();
     results[90] = check_dalek_scalar52_montgomery_reduce_with_sub();
+    results[91] = check_index_trait_dispatch();
+    results[92] = check_dalek_scalar_one_to_bytes_direct();
+    results[93] = check_k256_affine_generator_encode();
 }
 
 #[cfg(test)]

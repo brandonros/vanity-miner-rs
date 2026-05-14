@@ -13,7 +13,9 @@ execute, so this doc alone is enough context to hand to the compiler agent.
 | 2026-05-13 | 81         | 27   | v1.46.0        | Bug C fixed. Bug A falsified by 76/77. Re-bisecting via slots 81-83. |
 | pending    | 88         | ?    | v1.46 (rerun)  | +3 hypothesis probes (81-83) and +4 ladder rungs (84-87). |
 | 2026-05-13 | 88         | 27   | v1.46.0        | All 81-87 PASSed. New finding: ladder copy missing `Scalar52::sub` from montgomery_reduce. |
-| pending    | 91         | ?    | next           | +3 sub probes (88-90) added; 85/86 kept on `_no_sub` variant for direct comparison. |
+| pending    | 91         | ?    | v1.46 (rerun)  | +3 sub probes (88-90) added; 85/86 kept on `_no_sub` variant for direct comparison. |
+| 2026-05-13 | 91         | 27   | v1.46.0        | All 81-90 PASSed. Smoking gun: my port uses `a.0[i]`, dalek uses `a[i]` via custom Index trait. |
+| pending    | 94         | ?    | next           | +3 probes (91-93): Index trait dispatch + cross-crate minimal const/encoding. |
 
 ---
 
@@ -245,6 +247,66 @@ Outcome decoding:
   manifests when the same code is compiled inside `curve25519-dalek` but
   not when compiled inside `logic`. Time to spin up a separate-crate
   experiment.
+
+### Round-2 result (v1.46 rerun, suite 91)
+
+**All slots 81-90 PASSed.** Slot 71 still FAILs. So the bug is not in any
+isolated Rust shape we've tested, not in the cross-crate boundary alone
+(slot 41/42 in `logic` also fail), and not in `Scalar52::sub` itself.
+
+Re-reading dalek's source: **`Scalar52` implements custom `Index<usize>`
+and `IndexMut<usize>` traits**, and `from_bytes` / `as_bytes` /
+`mul_internal` / `montgomery_reduce` / `sub` all use `a[i]` syntax —
+which dispatches through `Index::index(&self, i)` returning `&u64`. My
+port uses `a.0[i]` everywhere, which is direct array access on a public
+tuple field, bypassing the trait entirely.
+
+If cuda-oxide miscompiles `Index<usize>` trait dispatch on tuple-struct
+wrappers, dalek's code fails but my port works. Exactly the observed
+pattern.
+
+### Index-trait probes (slots 91-93)
+
+| Slot | Probe | Tests | If FAIL |
+|---|---|---|---|
+| 91 | `IdxProbe(pub [u64;5])` with custom `Index`/`IndexMut` impls; write+read via `[i]` syntax | trait dispatch through `Index<usize>` returning `&u64` | **smoking gun**: explains slot 71, base58 (if it uses `[i]` on a tuple struct anywhere), and likely slot 78/80 |
+| 92 | `Scalar::ONE.to_bytes() == [1,0,…]` | cross-crate `pub const` access + 32-byte copy (Scalar's bytes field IS the const data) | cross-crate const access broken (smaller surface than 71) |
+| 93 | `AffinePoint::GENERATOR.to_encoded_point(true)` | k256 cross-crate `pub const` + FieldElement→bytes encoding, but NO projective→affine field inversion | encoding broken; or, if 93 PASS and 78 FAIL, the bug is specifically in `to_affine()` (field inversion) |
+
+### Code — slot 91
+
+```rust
+pub struct IdxProbe(pub [u64; 5]);
+
+impl core::ops::Index<usize> for IdxProbe {
+    type Output = u64;
+    fn index(&self, i: usize) -> &u64 { &(self.0[i]) }
+}
+impl core::ops::IndexMut<usize> for IdxProbe {
+    fn index_mut(&mut self, i: usize) -> &mut u64 { &mut (self.0[i]) }
+}
+
+pub fn check_index_trait_dispatch() -> u32 {
+    let mut p = IdxProbe([0u64; 5]);
+    let idx = core::hint::black_box(2usize);
+    let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+    p[idx] = val;                                  // ← IndexMut dispatch
+    let read = core::hint::black_box(p[idx]);      // ← Index dispatch
+    (read == val) as u32
+}
+```
+
+This mirrors dalek's exact Index/IndexMut shape. If 91 FAILs on next
+run, hand its source to the compiler agent — it's the minimum repro for
+"miscompile Index trait dispatch on tuple-struct wrapper of `[u64; N]`".
+
+### What about base58 41/42?
+
+base58_encode_32 is in `logic`, not cross-crate. But if `Index` trait
+dispatch is broken for tuple-struct wrappers, that wouldn't explain
+base58 since `[u32; 10]` is a raw array (not tuple struct). Base58 41/42
+likely has a *different* bug — left for the next probe round once Index
+is either confirmed or ruled out.
 
 ---
 

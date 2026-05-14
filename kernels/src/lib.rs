@@ -943,4 +943,27 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub(results: &mut [u32]) {
         results[90] = logic::check_dalek_scalar52_montgomery_reduce_with_sub();
     }
+
+    // Slots 91-93: post-round-2 probes (Index trait dispatch + cross-crate
+    // minimal probes).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_index_trait_dispatch(results: &mut [u32]) {
+        results[91] = logic::check_index_trait_dispatch();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar_one_to_bytes_direct(results: &mut [u32]) {
+        results[92] = logic::check_dalek_scalar_one_to_bytes_direct();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_k256_affine_generator_encode(results: &mut [u32]) {
+        results[93] = logic::check_k256_affine_generator_encode();
+    }
 }
