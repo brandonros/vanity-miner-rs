@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 116;
+pub const SELF_TEST_NUM_CHECKS: usize = 118;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -458,6 +458,22 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "dalek bisect Scalar52::from_bytes(0)",
     "dalek bisect Scalar52::mul_internal(0, R)",
     "dalek bisect Scalar52::montgomery_reduce(0)",
+    // Slots 116-117: post-round-10 probes. Round-10 win: Bug-41 FIXED
+    // (slot 108 + cascade all PASS). Slots 113-115 ALL PASS = every
+    // individual step of `Scalar::reduce()` works on zero in our verbatim
+    // port. But real dalek `reduce()` on zero still FAILs (slot 102/109/112).
+    //   116 (Bug-71) — `Scalar52::ZERO.as_bytes() == [0; 32]`. Closes the
+    //        every-primitive-on-zero loop (slot 87 was pack of ONE; this
+    //        is pack of ZERO).
+    //   117 (Bug-71) — Compose the full `reduce()` pipeline inside our
+    //        crate on zero input: from_bytes → mul_internal(R) →
+    //        montgomery_reduce → as_bytes. If FAIL, we've reproduced
+    //        Bug-71 in `logic` (huge — minimal repro at last). If PASS,
+    //        Bug-71 is a cross-crate-composition bug (real dalek's
+    //        reduce only fires the bug when monomorphized in dalek's
+    //        crate, not ours).
+    "dalek bisect Scalar52::ZERO.as_bytes()",
+    "dalek bisect full reduce pipeline (zero in)",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2720,6 +2736,33 @@ pub fn check_dalek_scalar52_montgomery_reduce_zero() -> u32 {
     (result.0 == [0u64; 5]) as u32
 }
 
+// Slot 116: `Scalar52::ZERO.as_bytes() == [0; 32]` — pack of zero via
+// the verbatim port. Slot 87 covered pack of ONE. Completing this
+// confirms every individual reduce primitive works on zero in isolation.
+pub fn check_dalek_scalar52_as_bytes_zero() -> u32 {
+    use bisect_scalar52::Scalar52;
+    let zero = core::hint::black_box(Scalar52::ZERO);
+    let bytes = zero.as_bytes();
+    (bytes == [0u8; 32]) as u32
+}
+
+// Slot 117: full `Scalar::reduce()` pipeline composed inside our crate on
+// zero input. Identical body to real dalek's `reduce()`, but every call
+// resolves to the verbatim port in this same crate. If this FAILs, we
+// have a Bug-71 minimal repro inside `logic` — first time. If it PASSes
+// (which slots 113-115 individually doing so suggests), Bug-71 is
+// genuinely cross-crate-only: only the real-dalek monomorphization of
+// these same steps fires the miscompile.
+pub fn check_dalek_reduce_pipeline_zero() -> u32 {
+    use bisect_scalar52::{R, Scalar52};
+    let bytes = core::hint::black_box([0u8; 32]);
+    let x = Scalar52::from_bytes(&bytes);
+    let x_r = Scalar52::mul_internal(&x, &R);
+    let reduced = Scalar52::montgomery_reduce(&x_r);
+    let out = reduced.as_bytes();
+    (out == [0u8; 32]) as u32
+}
+
 pub fn check_base58_handrolled_no_seq() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];
@@ -2958,6 +3001,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[113] = check_dalek_scalar52_from_bytes_zero();
     results[114] = check_dalek_scalar52_mul_internal_zero();
     results[115] = check_dalek_scalar52_montgomery_reduce_zero();
+    results[116] = check_dalek_scalar52_as_bytes_zero();
+    results[117] = check_dalek_reduce_pipeline_zero();
 }
 
 #[cfg(test)]

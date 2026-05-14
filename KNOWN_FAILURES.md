@@ -30,6 +30,8 @@ to the compiler agent.
 | pending    | 113   | ?    | next       | +3 probes (110-112): GA-source `copy_from_slice`, `Scalar::ZERO==ZERO`, `from_canonical_bytes(0)`. |
 | 2026-05-14 | 113   | 34   | v1.55.0    | **Bug-71 pinned to `reduce()` on zero**: 112 FAIL (`from_canonical_bytes([0;32])`), 111 PASS (PartialEq ok), 110 PASS (GA-source `copy_from_slice` ok; Bug-96 repro still elusive). |
 | pending    | 116   | ?    | next       | +3 probes (113-115): zero-input bisect ladder — `from_bytes(0)`, `mul_internal(0, R)`, `montgomery_reduce(0)` via verbatim port. |
+| 2026-05-14 | 116   | **25** | v1.56+     | **🎉 Bug-41 FIXED**: slot 108 + cascade (3, 21-24, 41, 42, 105) all PASS. **All three new zero-input probes (113/114/115) PASS** → every reduce step works on zero in our crate; real-dalek `reduce()` failing on zero is a cross-crate-composition bug. |
+| pending    | 118   | ?    | next       | +2 probes (116-117): pack-of-zero (closes verbatim-on-zero loop), full reduce pipeline composed in our crate. |
 
 ---
 
@@ -62,90 +64,42 @@ pub fn check_dalek_scalar_round_trip_one() -> u32 {
 - `Scalar52::from_bytes`, `mul_internal`, `montgomery_reduce_no_sub`, `sub`, `as_bytes` (verbatim ports — slots 84-90)
 - Simple `Index<usize>`/`IndexMut<usize>` trait dispatch with `black_box(idx)` (slot 91 PASS)
 
-**Update (v1.55.0): bug pinned to `Scalar::reduce()` on zero input.**
+**Update (v1.56+): every reduce step works on zero IN ISOLATION.**
+Slots 113/114/115 ALL PASS:
+- 113 — `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]`
+- 114 — `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]`
+- 115 — `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]`
 
-- Slot 111 PASS: `Scalar::ZERO == Scalar::ZERO` — dalek's `PartialEq`
-  (byte compare via `subtle`) works.
-- Slot 112 FAIL: `Scalar::from_canonical_bytes([0; 32]).unwrap() == ZERO`.
-  `from_canonical_bytes` calls `Scalar::from_bits(bytes)` (just stores
-  bytes) then `is_canonical()` → `self.ct_eq(&self.reduce())`. With 111
-  PASS confirming PartialEq, the only remaining way for 112 to FAIL is
-  `reduce()` of zero producing non-zero bytes (so `is_canonical` returns
-  Choice(0) → `CtOption` is None → match arm returns 0).
-- Slot 109 FAIL with same root cause: `from_bytes_mod_order` calls
-  `reduce()` directly.
-- Slot 102, 103 FAIL with same root cause.
+But slot 102/109/112 still FAIL (real dalek `Scalar::reduce()` on zero).
+Real dalek's `reduce()` body:
+```rust
+fn reduce(&self) -> Scalar {
+    let x = self.unpack();                       // = Scalar52::from_bytes(&self.bytes)
+    let xR = Scalar52::mul_internal(&x, &Scalar52::R);
+    let x_mod_l = Scalar52::montgomery_reduce(&xR);
+    x_mod_l.pack()                               // = Scalar52::as_bytes(&x_mod_l)
+}
+```
 
-Slots 84-90 PASS for the verbatim port, but they all tested value=1 or
-R as inputs — **zero was never tested through the port**. Slots 113-115
-fix that:
-- Slot 113 — `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]`
-- Slot 114 — `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]`
-- Slot 115 — `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]`
+Every step works in our crate. The bug only fires when these same steps
+are composed inside dalek's crate. Strong hint: **cross-crate
+inlining / monomorphization issue specific to dalek's Scalar reduce path**.
 
-If any FAILs → that step is the smoking gun, and we have a minimal
-repro. If all PASS → real-dalek codegen diverges from our port despite
-identical source (likely cross-crate inlining / monomorphization).
+**Probes in flight:**
+- Slot 116 — `Scalar52::ZERO.as_bytes() == [0; 32]`. Closes the
+  every-primitive-on-zero loop (slot 87 was pack of ONE).
+- Slot 117 — Full reduce pipeline composed in *our* crate on zero:
+  `from_bytes → mul_internal(R) → montgomery_reduce → as_bytes`.
+  - If FAIL → first Bug-71 minimal repro inside `logic`. Huge.
+  - If PASS → confirmed cross-crate-only. Compiler agent will need to
+    bisect dalek's monomorphization specifically.
 
 (Slots 97, 102, 103, 106, 111 ruled out: const-idx Index, input-
 dependence, entry-point-dependence, intra-crate struct-return-ABI,
-PartialEq itself.)
+PartialEq itself. Slots 113/114/115 ruled out: zero-input miscompile
+of unpack, mul_internal, montgomery_reduce in isolation.)
 
-**Failures owned:** 5 (slots 2, 11, 12, 71, 72) + partial 3/12.
-
----
-
-### Bug-41 — base58 encoding with non-zero input
-
-**Status.** Direct repro slots 41/42 FAIL every run. Slot 43 (all-zero
-input) PASSes because the all-zero path skips the digit-extraction loop.
-Every building-block primitive PASSes in isolation; bug is in an
-interaction we haven't isolated.
-
-**Slot 41 (smoking gun):**
-```rust
-pub fn check_base58_var_len() -> u32 {
-    let input: [u8; 32] = [/* non-zero 32 bytes */];
-    let mut out = [0u8; 64];
-    let n = base58_encode_32(&input, &mut out);
-    n == BASE58_VAR_EXPECTED.len()
-        && &out[..n] == BASE58_VAR_EXPECTED
-}
-```
-
-**Ruled out** (all PASS in isolation):
-- Reverse range iter `(0..n).rev()` (slot 83)
-- Phase A inner-mutate loop body (slot 69)
-- Phase B grow-tail (slot 67)
-- `dividend = carry + (limb << 32); /D; %D` shape (slot 66)
-- `&'static [u64; 5]` DIVISORS reads (slots 76/77)
-- `BASE58_ALPHABET` lookup (slots 60-62)
-
-**Update:** Slot 105 FAILed → Bug-41 fires even at `limb_count == 1`.
-Single non-zero byte is enough to trigger. The previous "needs multi-
-iter digit extraction" hypothesis is dead.
-
-**✅ MINIMAL REPRO CONFIRMED:** Slot 108 FAILs on v1.55.0. The bug is
-in `<[u8]>::reverse()` on a partial sub-slice. ~12 lines.
-
-**Slot 108 (smoking gun):**
-```rust
-pub fn check_slice_reverse_partial() -> u32 {
-    let mut arr = [0u8; 64];
-    arr[0] = 0x11; arr[1] = 0x22; arr[2] = 0x33; arr[3] = 0x44; arr[4] = 0x55;
-    let result_len = core::hint::black_box(5usize);
-    arr[..result_len].reverse();
-    // Expected: arr[0..5] = [0x55, 0x44, 0x33, 0x22, 0x11], rest = 0
-    /* compare to expected */
-}
-```
-
-`base58_encode_32` calls `output[..result_len].reverse()` after the
-digit-extraction + alphabet-map. Slot 107's hand-rolled-reverse version
-PASSes; the original (using `<[u8]>::reverse()`) FAILs. Send slot 108
-source to compiler agent.
-
-**Failures owned:** 2 direct (41, 42) + partial cascade in 3, 12, 19, 21-24.
+**Failures owned (post Bug-41 fix):** 9 slots — 71, 72, 2, 11, 12, 102, 103, 109, 112.
 
 ---
 
@@ -185,31 +139,22 @@ Each slot is blocked by ≥1 of the three open bugs. Slots blocked by
 multiple bugs need ALL of them fixed before they pass.
 
 **Current minimal repros:**
-- Bug-41: **slot 108** (`<[u8]>::reverse()` on partial sub-slice) ✅ ready to ship
 - Bug-96: **none currently** (slot 110 PASSed too; need new shape — see Bug-96 section)
-- Bug-71: **slot 112** confirms `Scalar::reduce()` on zero is broken; slots 113-115 should pinpoint which inner step
+- Bug-71: **slot 112** confirms `Scalar::reduce()` on zero is broken; cross-crate composition hypothesis — slots 116/117 next
 
-### Blocked by `dalek-scalar-reduce` only — 4 slots
+### Blocked by `dalek-scalar-reduce` only — 9 slots
 
-These all execute dalek's broken `Scalar::from_bytes_mod_order` /
-`reduce` chain. Once that's fixed, all four clear.
-
-| #  | Slot name                            | Where it touches the bug |
-|----|--------------------------------------|--------------------------|
-| 71 | dalek scalar from-bytes round-trip   | **direct hit / smoking gun** |
-| 72 | dalek mul_base scalar=1               | calls 71's path then `mul_base` |
-|  2 | ed25519 derive                       | `ed25519_derive_public_key` calls `Scalar::from_bytes_mod_order` |
-| 11 | solana pub                           | runs ed25519 derive (= slot 2's path) |
-
-### Blocked by `base58-encode-32` only — 2 slots
-
-Just the two direct probes. Once `base58_encode_32` with non-zero input
-is fixed, both clear.
-
-| #  | Slot name                            | Where it touches the bug |
-|----|--------------------------------------|--------------------------|
-| 41 | base58 var-len                       | **direct hit / smoking gun** |
-| 42 | base58 var-len leading-zero          | variant of 41 |
+| #   | Slot name                            | Where it touches the bug |
+|-----|--------------------------------------|--------------------------|
+| 71  | dalek scalar from-bytes round-trip   | **direct hit / smoking gun** |
+| 72  | dalek mul_base scalar=1              | calls 71's path then `mul_base` |
+|  2  | ed25519 derive                       | `ed25519_derive_public_key` calls `Scalar::from_bytes_mod_order` |
+| 11  | solana pub                           | runs ed25519 derive (= slot 2's path) |
+| 12  | solana encoded                       | ed25519 → base58; base58 now works, so just dalek |
+| 102 | dalek scalar round-trip ZERO          | same reduce path, zero input |
+| 103 | dalek from_bytes_mod_order_wide zero  | `from_bytes_mod_order_wide` path on zero |
+| 109 | dalek Scalar(0) == Scalar::ZERO       | reduce on zero, no `to_bytes` |
+| 112 | dalek from_canonical_bytes(0) == ZERO | reduce via `is_canonical` |
 
 ### Blocked by `k256-encodedpoint` only — 16 slots
 
@@ -236,36 +181,18 @@ sixteen clear.
 | 18 | bitcoin pkh                          | same + sha+rip |
 | 20 | bitcoin matches                      | full bitcoin pipeline |
 
-### Compound — blocked by multiple bugs — 7 slots
-
-These slots need MORE than one bug fixed before they pass. Fixing just
-one of their blockers won't help.
-
-| #  | Slot name                  | Blocked by                                  | Why |
-|----|----------------------------|---------------------------------------------|-----|
-|  3 | base58 encode pub          | dalek-scalar-reduce + base58-encode-32      | base58 of dalek's output: both the input *and* the encoder are broken |
-| 12 | solana encoded             | dalek-scalar-reduce + base58-encode-32      | ed25519 → base58 in solana pipeline |
-| 19 | bitcoin encoded            | k256-encodedpoint + base58-encode-32        | secp256k1 → sha+rip → base58 |
-| 21 | wif compressed mainnet     | k256-encodedpoint + base58-encode-32        | secp256k1 → base58 (WIF) |
-| 22 | wif uncompressed mainnet   | k256-encodedpoint + base58-encode-32        | same |
-| 23 | wif compressed testnet     | k256-encodedpoint + base58-encode-32        | same |
-| 24 | wif uncompressed testnet   | k256-encodedpoint + base58-encode-32        | same |
-
 ### What clears when each bug is fixed
+
+(Bug-41 is fixed; remaining 25 failures split cleanly.)
 
 | Fix | Slots cleared | Cumulative |
 |---|---|---|
-| `dalek-scalar-reduce` alone | 4 (71, 72, 2, 11) | 4 / 29 |
-| `base58-encode-32` alone | 2 (41, 42) | 2 / 29 |
-| `k256-encodedpoint` alone | 16 (see above) | 16 / 29 |
-| dalek + base58 | 4 + 2 + 2 compound (3, 12) | 8 / 29 |
-| dalek + k256 | 4 + 16 | 20 / 29 |
-| base58 + k256 | 2 + 16 + 5 compound (19, 21-24) | 23 / 29 |
-| **all three** | 4 + 2 + 16 + 7 compound | **29 / 29** |
+| `dalek-scalar-reduce` alone | 9 (71, 72, 2, 11, 12, 102, 103, 109, 112) | 9 / 25 |
+| `k256-encodedpoint` alone | 16 (see above) | 16 / 25 |
+| **both** | 25 | **25 / 25** |
 
-So `k256-encodedpoint` is the highest-leverage fix (16 slots), followed
-by `dalek-scalar-reduce` (4 direct + unlocks 2 compound). `base58-encode-32`
-only directly clears 2 slots but is a prerequisite for the 7 compound failures.
+`k256-encodedpoint` is the higher-leverage fix (16 slots).
+`dalek-scalar-reduce` clears 9. No compound failures remain.
 
 ---
 
@@ -273,9 +200,8 @@ only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 
 | Slot | Targets | Probe |
 |---|---|---|
-| 113 | Bug-71 | `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]` — zero unpack via verbatim port |
-| 114 | Bug-71 | `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]` — 5×5 widening mul with zero operand |
-| 115 | Bug-71 | `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]` — full reduce of zero-widened limbs |
+| 116 | Bug-71 | `Scalar52::ZERO.as_bytes() == [0; 32]` — pack-of-zero (closes verbatim-on-zero loop) |
+| 117 | Bug-71 | Full reduce pipeline composed in *our* crate on zero input |
 
 ---
 
@@ -297,6 +223,21 @@ only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 Slot 65 was the direct hit. Standalone upstream repro lived at
 `crates/rustc-codegen-cuda/examples/i128_add_carry_chain` (commit
 b6fe7ff in cuda-oxide). Fixed in v1.46.0.
+
+### Bug-41 (FIXED in v1.56+) — `<[u8]>::reverse()` on partial sub-slice
+
+Slot 108 was the minimal repro:
+```rust
+let mut arr = [0u8; 64];
+arr[0] = 0x11; arr[1] = 0x22; arr[2] = 0x33; arr[3] = 0x44; arr[4] = 0x55;
+let result_len = core::hint::black_box(5usize);
+arr[..result_len].reverse();
+// Expected: arr[0..5] = [0x55, 0x44, 0x33, 0x22, 0x11]
+```
+
+Cascade slots cleared by this fix: 3, 21, 22, 23, 24, 41, 42, 105, 108 (9 slots).
+Slot 19 (bitcoin encoded) was a compound failure also blocked by Bug-96
+and stays FAIL until Bug-96 is fixed.
 
 ---
 
@@ -330,6 +271,9 @@ briefly so we don't re-test the same shape.
 | Bug-71 is only in `to_bytes` (= `Scalar52::as_bytes`) | slot 109 FAIL (`Scalar::from_bytes_mod_order(0) != Scalar::ZERO` via PartialEq, no `to_bytes` involved) | The Scalar VALUE itself is wrong, not just byte serialization |
 | Bug-71 is in dalek's `PartialEq` impl | slot 111 PASS (`Scalar::ZERO == Scalar::ZERO`) | PartialEq itself works; 109/112 failures come from wrong-value Scalar, not wrong-eq |
 | Bug-96 is `dst_ga[a..b].copy_from_slice(src_ga)` | slot 110 PASS on v1.55.0 | plain copy from `&GenericArray<u8, U32>` source works; the bug is some other shape inside `from_affine_coordinates` |
+| Bug-71 is `Scalar52::from_bytes` on zero | slot 113 PASS on v1.56+ | unpack of `[0; 32]` via verbatim port works |
+| Bug-71 is `Scalar52::mul_internal` with a zero operand | slot 114 PASS on v1.56+ | 5×5 widening mul with one zero operand works |
+| Bug-71 is `Scalar52::montgomery_reduce` on zero limbs | slot 115 PASS on v1.56+ | reduce of `[0; 9]` widened limbs via verbatim port works |
 
 ---
 

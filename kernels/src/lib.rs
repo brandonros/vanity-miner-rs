@@ -1129,4 +1129,19 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_dalek_scalar52_montgomery_reduce_zero(results: &mut [u32]) {
         results[115] = logic::check_dalek_scalar52_montgomery_reduce_zero();
     }
+
+    // Slots 116-117: post-round-10 probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_as_bytes_zero(results: &mut [u32]) {
+        results[116] = logic::check_dalek_scalar52_as_bytes_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_reduce_pipeline_zero(results: &mut [u32]) {
+        results[117] = logic::check_dalek_reduce_pipeline_zero();
+    }
 }
