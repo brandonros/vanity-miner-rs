@@ -26,6 +26,8 @@ to the compiler agent.
 | pending    | 108   | ?    | next       | +2 probes (106-107): named-field struct return ABI test, hand-rolled base58 without `seq!`. |
 | 2026-05-14 | 108   | 32   | v1.54.0    | Slot 106 PASS (struct ABI not the bug), 107 PASS (seq! not the bug). Both new hypotheses falsified. |
 | pending    | 110   | ?    | next       | +2 probes (108-109): `<[u8]>::reverse()` partial-slice, dalek Scalar `==` eq without to_bytes. |
+| 2026-05-14 | 110   | 33   | v1.55.0    | **Slot 108 FAIL → Bug-41 minimal repro confirmed.** Slot 109 FAIL (Scalar value wrong). Slot 101 FLIPPED PASS (previous Bug-96 repro lost). |
+| pending    | 113   | ?    | next       | +3 probes (110-112): GA-source `copy_from_slice`, `Scalar::ZERO==ZERO`, `from_canonical_bytes(0)`. |
 
 ---
 
@@ -58,15 +60,22 @@ pub fn check_dalek_scalar_round_trip_one() -> u32 {
 - `Scalar52::from_bytes`, `mul_internal`, `montgomery_reduce_no_sub`, `sub`, `as_bytes` (verbatim ports — slots 84-90)
 - Simple `Index<usize>`/`IndexMut<usize>` trait dispatch with `black_box(idx)` (slot 91 PASS)
 
-**Live hypothesis (after slot 106 PASS):** Struct-return ABI is NOT the
-bug. The remaining differentiator is **cross-crate boundary** —
-dalek's `pub fn` lives in a separate compilation unit; our in-crate
-clones don't.
+**Update (after slot 109 FAIL):** The Scalar VALUE returned by
+`from_bytes_mod_order([0; 32])` is wrong — `s == Scalar::ZERO` returns
+false via dalek's `PartialEq`. So the bug is not just in `to_bytes`; the
+construction itself produces a non-zero Scalar.
 
-**Probe in flight:** Slot 109 — `Scalar::from_bytes_mod_order([0; 32])
-== Scalar::ZERO` via dalek's `PartialEq` instead of comparing bytes.
-- If 109 PASS but 102 FAIL → bug is specifically in `to_bytes` (= `Scalar52::as_bytes`)
-- If 109 FAIL → the Scalar VALUE itself is wrong (deeper bug)
+This makes Bug-71 deeper than expected. Possible remaining causes:
+- `Scalar::reduce()` itself produces wrong value (despite slots 84-90 PASSing for each isolated step)
+- The Scalar struct construction `Scalar { bytes }` is corrupted at the public-API boundary
+
+**Probes in flight:**
+- Slot 111 — `Scalar::ZERO == Scalar::ZERO` (pure const PartialEq sanity).
+  If FAIL, PartialEq itself is broken. If PASS (likely), slot 109 confirms
+  genuine value miscompile.
+- Slot 112 — `Scalar::from_canonical_bytes([0; 32]).unwrap() == Scalar::ZERO`.
+  Alternate entry point that does NOT call `reduce()`. If 112 PASS but
+  109 FAIL → bug is in `reduce()` specifically.
 
 (Slots 97, 102, 103, 106 ruled out: const-idx Index, input-dependence,
 entry-point-dependence, intra-crate struct-return-ABI.)
@@ -105,53 +114,49 @@ pub fn check_base58_var_len() -> u32 {
 Single non-zero byte is enough to trigger. The previous "needs multi-
 iter digit extraction" hypothesis is dead.
 
-**Update:** Slot 107 PASSed → `seq!` macro is NOT the bug. The
-hand-rolled version of `base58_encode_32` works fine. The remaining
-differentiator between slot 107 (works) and `base58_encode_32` (fails)
-is `output[..result_len].reverse()` — slot 107 hand-rolls the reverse
-loop, the original calls `<[u8]>::reverse()`.
+**✅ MINIMAL REPRO CONFIRMED:** Slot 108 FAILs on v1.55.0. The bug is
+in `<[u8]>::reverse()` on a partial sub-slice. ~12 lines.
 
-**Probe in flight:** Slot 108 — `<[u8]>::reverse()` on a partial sub-
-slice in isolation. If FAILs, that's the Bug-41 minimal repro.
+**Slot 108 (smoking gun):**
+```rust
+pub fn check_slice_reverse_partial() -> u32 {
+    let mut arr = [0u8; 64];
+    arr[0] = 0x11; arr[1] = 0x22; arr[2] = 0x33; arr[3] = 0x44; arr[4] = 0x55;
+    let result_len = core::hint::black_box(5usize);
+    arr[..result_len].reverse();
+    // Expected: arr[0..5] = [0x55, 0x44, 0x33, 0x22, 0x11], rest = 0
+    /* compare to expected */
+}
+```
+
+`base58_encode_32` calls `output[..result_len].reverse()` after the
+digit-extraction + alphabet-map. Slot 107's hand-rolled-reverse version
+PASSes; the original (using `<[u8]>::reverse()`) FAILs. Send slot 108
+source to compiler agent.
 
 **Failures owned:** 2 direct (41, 42) + partial cascade in 3, 12, 19, 21-24.
 
 ---
 
-### Bug-96 — `&GenericArray<u8, N>::as_slice().last()` miscompiles ✅ MINIMAL REPRO READY
+### Bug-96 — `sec1::EncodedPoint::from_affine_coordinates` — minimal repro LOST
 
-**Status.** Slot 101 FAILed in v1.53.0. ~10-line minimal repro confirmed.
-**Send this to compiler agent now.**
-
-**Repro (slot 101):**
-```rust
-#[inline(never)]
-fn last_via_as_slice(ga: &GenericArray<u8, U32>) -> u8 {
-    *ga.as_slice().last().expect("non-empty")
-}
-
-pub fn check_generic_array_as_slice_last() -> u32 {
-    let ga: &GenericArray<u8, U32> = (&SECP256K1_GY_BYTES).into();
-    let last = last_via_as_slice(ga);
-    (last == 0xB8) as u32   // SECP256K1_GY_BYTES[31] = 0xB8
-}
-```
-
-**Why slot 96's whole chain fails:** `EncodedPoint::from_affine_coordinates`
-calls `Tag::compress_y(y.as_slice())` to compute the parity bit. That
-calls `y.as_slice().last()` on the `&GenericArray<u8, U32>` parameter.
-If `last()` returns wrong byte, the tag is wrong → encoded bytes are
-wrong.
+**Status.** Slot 96 still FAILs in v1.55.0, but slot 101 (our previous
+minimal repro) FLIPPED to PASS. The compiler agent likely fixed the
+exact `&GenericArray<u8, U32>::as_slice().last()` pattern via cuda-oxide
+HEAD updates. But `from_affine_coordinates` still miscompiles —
+something else inside it is the bug.
 
 **Ruled out (all PASS):**
 - Slot 98 — basic GA index by fixed offset.
 - Slot 99 — GA write-side `copy_from_slice` from `&[u8]` source.
 - Slot 100 — same algorithm with raw `[u8; 33]` instead of GA.
+- Slot 101 — `&GA::as_slice().last()` (was FAIL in v1.53/v1.54, now PASS).
 - Slot 104 — `(&[u8; N]).into() → &GenericArray<u8, N>` conversion.
 
-The narrowed shape: `GenericArray::as_slice()` (which deref-casts to
-`&[T]` then takes `as_slice()`) followed by `.last()` on the result —
-specifically when the GA is a `&` parameter, not a local.
+**Probe in flight:** Slot 110 — `dst_ga[a..b].copy_from_slice(src_ga)`
+where source is a `&GenericArray<u8, U32>` (not `&[u8; 32]` like slot
+99). Tests the remaining unfound GA-related shape used inside
+`from_affine_coordinates`. If 110 FAIL, that's the new minimal repro.
 
 **Failures owned:** 21 (slots 4, 5, 13-24, 74, 75, 78, 79, 93, 96; slot 80 now PASSes).
 
@@ -161,6 +166,11 @@ specifically when the GA is a `&` parameter, not a local.
 
 Each slot is blocked by ≥1 of the three open bugs. Slots blocked by
 multiple bugs need ALL of them fixed before they pass.
+
+**Current minimal repros:**
+- Bug-41: **slot 108** (`<[u8]>::reverse()` on partial sub-slice) ✅ ready to ship
+- Bug-96: **none currently** (slot 101 flipped PASS on v1.55.0; need new probe — slot 110 in flight)
+- Bug-71: **none** (slot 109 confirmed value-level, deeper than expected)
 
 ### Blocked by `dalek-scalar-reduce` only — 4 slots
 
@@ -246,8 +256,9 @@ only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 
 | Slot | Targets | Probe |
 |---|---|---|
-| 108 | Bug-41 | `<[u8]>::reverse()` on partial sub-slice |
-| 109 | Bug-71 | dalek `Scalar::from_bytes_mod_order(0) == Scalar::ZERO` (no `to_bytes`) |
+| 110 | Bug-96 | `dst_ga.copy_from_slice(src_ga_as_slice)` — slice copy from GA-typed source |
+| 111 | Bug-71 | `Scalar::ZERO == Scalar::ZERO` (PartialEq sanity) |
+| 112 | Bug-71 | `Scalar::from_canonical_bytes([0; 32]).unwrap() == Scalar::ZERO` (no `reduce()`) |
 
 ---
 
@@ -298,6 +309,8 @@ briefly so we don't re-test the same shape.
 | Bug-41 needs multi-iteration digit extraction | slot 105 FAIL (limb_count=1 also fails) | Bug-41 fires for any non-zero input |
 | Bug-71 is struct-return-ABI miscompile (intra-crate) | slot 106 PASS (named-field struct wrapping `[u8; 32]` returns correctly inside `logic`) | Struct-return ABI works; bug is cross-crate or in a more specific dalek path |
 | Bug-41 is `seq!` macro expansion | slot 107 PASS (hand-rolled while-loop version works) | seq! isn't the bug; remaining diff is `<[u8]>::reverse()` |
+| Bug-96 is `&GenericArray<u8, U32>::as_slice().last()` (slot 101) | slot 101 FLIPPED to PASS on v1.55.0 (was FAIL in v1.53/v1.54) | The compiler agent fixed THIS shape, but slot 96 still FAILs → the bug inside `from_affine_coordinates` is some other shape |
+| Bug-71 is only in `to_bytes` (= `Scalar52::as_bytes`) | slot 109 FAIL (`Scalar::from_bytes_mod_order(0) != Scalar::ZERO` via PartialEq, no `to_bytes` involved) | The Scalar VALUE itself is wrong, not just byte serialization |
 
 ---
 

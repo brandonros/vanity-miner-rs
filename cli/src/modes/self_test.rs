@@ -145,6 +145,7 @@ pub mod gpu {
         //   103-105 dalek from_bytes_wide(0) + FieldBytes::into() + base58 min-nonzero
         //   106-107 named-field struct return (Scalar shape) + hand-rolled no-seq base58
         //   108-109 <[u8]>::reverse() partial + dalek Scalar(0) == ZERO eq
+        //   110-112 GA-source copy_from_slice + dalek ZERO==ZERO + from_canonical_bytes(0)
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -255,6 +256,9 @@ pub mod gpu {
         run_slot!(107, kernel_self_test_base58_handrolled_no_seq);
         run_slot!(108, kernel_self_test_slice_reverse_partial);
         run_slot!(109, kernel_self_test_dalek_scalar_eq_zero);
+        run_slot!(110, kernel_self_test_generic_array_copy_from_ga_source);
+        run_slot!(111, kernel_self_test_dalek_zero_eq_zero);
+        run_slot!(112, kernel_self_test_dalek_from_canonical_zero);
 
         report(&results)
     }

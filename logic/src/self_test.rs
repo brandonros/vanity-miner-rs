@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 110;
+pub const SELF_TEST_NUM_CHECKS: usize = 113;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -421,6 +421,25 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     //        If 109 FAIL → the Scalar value itself is wrong.
     "<[u8]>::reverse() partial sub-slice",
     "dalek Scalar(0) == Scalar::ZERO (no to_bytes)",
+    // Slots 110-112: post-round-8 probes. Slot 108 confirmed Bug-41
+    // minimal repro (slice.reverse partial sub-slice). Slot 109 FAIL
+    // confirms Bug-71 is value-level (not just to_bytes). Slot 101
+    // flipped PASS — our previous Bug-96 minimal repro no longer
+    // reproduces, so we need a new shape.
+    //   110 (Bug-96) — `dst_ga.copy_from_slice(src_ga_as_slice)`. Slot 99
+    //        used `&[u8; 32]` source; this uses `&GenericArray` source,
+    //        the actual shape used by `from_affine_coordinates(x, y, _)`.
+    //   111 (Bug-71) — `Scalar::ZERO == Scalar::ZERO`. Pure const-vs-
+    //        const PartialEq. If FAIL, PartialEq is broken; if PASS,
+    //        slot 109's FAIL is genuinely from from_bytes_mod_order
+    //        returning wrong value.
+    //   112 (Bug-71) — `Scalar::from_canonical_bytes([0;32]).unwrap() ==
+    //        Scalar::ZERO`. Alternate entry point that doesn't go through
+    //        `reduce()`. If 112 PASS but 109 FAIL, the bug is in
+    //        `Scalar::reduce()` specifically.
+    "GenericArray dst.copy_from_slice(src GA)",
+    "dalek Scalar::ZERO == Scalar::ZERO (PartialEq)",
+    "dalek Scalar::from_canonical_bytes(0) == ZERO",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2604,6 +2623,53 @@ pub fn check_dalek_scalar_eq_zero() -> u32 {
     (s == zero) as u32
 }
 
+// Slot 110: `dst_ga.copy_from_slice(src_ga)` where source IS a
+// `&GenericArray<u8, U32>` (not `&[u8; 32]`). Slot 99 already covered
+// `&[u8; 32]` source. The function `EncodedPoint::from_affine_coordinates`
+// uses `bytes[1..33].copy_from_slice(x)` where `x: &GenericArray`, so
+// the source-side Deref→slice conversion happens implicitly.
+pub fn check_generic_array_copy_from_ga_source() -> u32 {
+    use k256::elliptic_curve::generic_array::GenericArray;
+    use k256::elliptic_curve::generic_array::typenum::{U32, U33};
+    let src_arr = SECP256K1_GX_BYTES;
+    let src: &GenericArray<u8, U32> = (&src_arr).into();
+    let mut dst: GenericArray<u8, U33> = GenericArray::default();
+    dst[0] = 0x02;
+    dst[1..33].copy_from_slice(src);
+    let mut got = [0u8; 33];
+    got.copy_from_slice(&dst);
+    (got == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
+// Slot 111: `Scalar::ZERO == Scalar::ZERO`. Pure const-vs-const
+// PartialEq, no function call producing a Scalar. If FAIL, dalek's
+// PartialEq impl itself is broken; if PASS, slot 109's FAIL is
+// genuinely from from_bytes_mod_order returning a non-zero value.
+pub fn check_dalek_zero_eq_zero() -> u32 {
+    use curve25519_dalek::Scalar;
+    let a = core::hint::black_box(Scalar::ZERO);
+    let b = core::hint::black_box(Scalar::ZERO);
+    (a == b) as u32
+}
+
+// Slot 112: `Scalar::from_canonical_bytes([0; 32]).unwrap() == ZERO`.
+// `from_canonical_bytes` does NOT call `reduce()` — it just validates
+// the bytes are < ℓ and wraps. For [0; 32], 0 < ℓ so it returns
+// `CtOption::Some(Scalar { bytes: [0; 32] })`. If 112 PASSes but slot
+// 109 FAILs, the bug is in `reduce()` specifically (not the wider
+// Scalar construction).
+pub fn check_dalek_from_canonical_zero() -> u32 {
+    use curve25519_dalek::Scalar;
+    let opt = Scalar::from_canonical_bytes(core::hint::black_box([0u8; 32]));
+    let s_opt: Option<Scalar> = opt.into();
+    let s = match s_opt {
+        Some(s) => s,
+        None => return 0,
+    };
+    let zero = Scalar::ZERO;
+    (s == zero) as u32
+}
+
 pub fn check_base58_handrolled_no_seq() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];
@@ -2836,6 +2902,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[107] = check_base58_handrolled_no_seq();
     results[108] = check_slice_reverse_partial();
     results[109] = check_dalek_scalar_eq_zero();
+    results[110] = check_generic_array_copy_from_ga_source();
+    results[111] = check_dalek_zero_eq_zero();
+    results[112] = check_dalek_from_canonical_zero();
 }
 
 #[cfg(test)]

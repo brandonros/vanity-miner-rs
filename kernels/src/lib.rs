@@ -1085,4 +1085,26 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_dalek_scalar_eq_zero(results: &mut [u32]) {
         results[109] = logic::check_dalek_scalar_eq_zero();
     }
+
+    // Slots 110-112: post-round-8 probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_generic_array_copy_from_ga_source(results: &mut [u32]) {
+        results[110] = logic::check_generic_array_copy_from_ga_source();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_zero_eq_zero(results: &mut [u32]) {
+        results[111] = logic::check_dalek_zero_eq_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_from_canonical_zero(results: &mut [u32]) {
+        results[112] = logic::check_dalek_from_canonical_zero();
+    }
 }
