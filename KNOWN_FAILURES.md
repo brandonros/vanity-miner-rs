@@ -22,6 +22,8 @@ to the compiler agent.
 | 2026-05-14 | 100   | 28   | v1.52.0    | Identical results — 28 failures stable across 6 cuda-oxide version bumps. |
 | pending    | 103   | ?    | next       | +3 probes (100-102): replica of `from_affine_coords`, GA `as_slice().last()`, dalek scalar=0 round-trip. |
 | pending    | 106   | ?    | next       | +3 more probes (103-105): one per open bug — `from_bytes_mod_order_wide(0)`, `(&[u8;32]).into() &FieldBytes`, base58 single-nonzero-byte. |
+| 2026-05-14 | 106   | 32   | v1.53.0    | **Breakthrough**: 101 FAIL (Bug-96 minimal repro!), 102/103 FAIL (Bug-71 fires for any input/entry-point), 105 FAIL (Bug-41 fires at limb_count=1). 100/104 PASS. |
+| pending    | 108   | ?    | next       | +2 probes (106-107): named-field struct return ABI test, hand-rolled base58 without `seq!`. |
 
 ---
 
@@ -54,21 +56,24 @@ pub fn check_dalek_scalar_round_trip_one() -> u32 {
 - `Scalar52::from_bytes`, `mul_internal`, `montgomery_reduce_no_sub`, `sub`, `as_bytes` (verbatim ports — slots 84-90)
 - Simple `Index<usize>`/`IndexMut<usize>` trait dispatch with `black_box(idx)` (slot 91 PASS)
 
-**Live hypothesis.** Dalek's `Scalar52` uses `s[0] = …; s[1] = …` with
-LITERAL const indices via custom `Index<usize>` trait. Slot 91 used
-`black_box(idx)` (runtime) — different LLVM IR shape. Const indices may
-fold the trait call into a direct GEP that miscompiles separately.
+**Live hypothesis (NEW, after slots 102/103 FAILed):** Returning a
+**named-field struct wrapping `[u8; 32]` by value** is miscompiled.
+Dalek's `Scalar` is `pub struct Scalar { pub(crate) bytes: [u8; 32] }`.
 
-**Probes in flight:**
-- Slot 102 — `Scalar::from_bytes_mod_order([0u8; 32])` round-trip
-  (all-zeros variant of slot 71). Disambiguates input-dependent vs
-  general.
-- Slot 103 — `Scalar::from_bytes_mod_order_wide(&[0u8; 64])` — different
-  entry point (uses `from_bytes_wide` + `montgomery_mul(R)/montgomery_mul(RR)`,
-  not `reduce`). If 103 PASS but 71 FAIL, the bug is in `Scalar::reduce`'s
-  exact call sequence, not the wider scalar arithmetic.
+Evidence:
+- Returns `[u8; 32]` direct: slots 70 (clamp_integer), 92 (Scalar::ONE.to_bytes) PASS.
+- Returns tuple-struct wrapping `[u64; 5]` with pub field: slot 84 (`Scalar52::from_bytes`) PASS.
+- Returns named-field struct wrapping `[u8; 32]` with pub(crate) field: slot 71, 102, 103 FAIL.
 
-(Slot 97 already PASSed — const-index Index dispatch wasn't it.)
+Bug-71 fires for ALL inputs (zero, one, anything) through BOTH entry
+points (`from_bytes_mod_order`, `from_bytes_mod_order_wide`). The
+common factor is the return type.
+
+**Probe in flight:** Slot 106 — `make_wrap_named(input) -> WrapNamed`
+where `WrapNamed { pub bytes: [u8; 32] }` mirrors dalek's Scalar shape.
+If FAIL, that's the Bug-71 minimal repro (~15 lines).
+
+(Slots 97, 102, 103 ruled out: const-idx Index, input-dependence, entry-point-dependence.)
 
 **Failures owned:** 5 (slots 2, 11, 12, 71, 72) + partial 3/12.
 
@@ -100,63 +105,56 @@ pub fn check_base58_var_len() -> u32 {
 - `&'static [u64; 5]` DIVISORS reads (slots 76/77)
 - `BASE58_ALPHABET` lookup (slots 60-62)
 
-**Probe in flight:** Slot 105 — `base58_encode_32([0; 31] ++ [0x01])`
-(31 leading zeros + 1 byte of value 1). Forces `limb_count == 1` after
-the outer loop. Slot 41 hits much higher limb_counts. If 105 PASS but
-41 FAIL, the bug requires multi-iteration digit extraction (`for idx in
-(0..limb_count).rev()` running ≥ 2 times).
+**Update:** Slot 105 FAILed → Bug-41 fires even at `limb_count == 1`.
+Single non-zero byte is enough to trigger. The previous "needs multi-
+iter digit extraction" hypothesis is dead.
+
+**Probe in flight:** Slot 107 — hand-rolled `base58_encode_32` without
+the `seq!` macro (which proc-macro-unrolls the outer 8-iteration loop).
+Plain `while k < 8 { … }` instead. If 107 PASS but 105 FAIL, the bug is
+in something specific to `seq!`'s expansion (function size, code layout,
+or some shape that the proc-macro produces).
 
 **Failures owned:** 2 direct (41, 42) + partial cascade in 3, 12, 19, 21-24.
 
 ---
 
-### Bug-96 — `sec1::EncodedPoint::from_affine_coordinates`
+### Bug-96 — `&GenericArray<u8, N>::as_slice().last()` miscompiles ✅ MINIMAL REPRO READY
 
-**Status.** Narrowed by slot 96 FAIL (slots 94/95 PASS — `subtle::Choice`
-and `ConditionallySelectable` are fine). The bug is inside
-`from_affine_coordinates` or its `GenericArray` dependency.
+**Status.** Slot 101 FAILed in v1.53.0. ~10-line minimal repro confirmed.
+**Send this to compiler agent now.**
 
-**Slot 96 (smoking gun):**
+**Repro (slot 101):**
 ```rust
-pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
-    let x: &FieldBytes<Secp256k1> = (&SECP256K1_GX_BYTES).into();
-    let y: &FieldBytes<Secp256k1> = (&SECP256K1_GY_BYTES).into();
-    let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
-    // Compare 33 bytes to SECP256K1_GENERATOR_COMPRESSED
+#[inline(never)]
+fn last_via_as_slice(ga: &GenericArray<u8, U32>) -> u8 {
+    *ga.as_slice().last().expect("non-empty")
+}
+
+pub fn check_generic_array_as_slice_last() -> u32 {
+    let ga: &GenericArray<u8, U32> = (&SECP256K1_GY_BYTES).into();
+    let last = last_via_as_slice(ga);
+    (last == 0xB8) as u32   // SECP256K1_GY_BYTES[31] = 0xB8
 }
 ```
 
-**Downstream** ([sec1-0.7.3/src/point.rs:121](sec1/point.rs)):
-```rust
-pub fn from_affine_coordinates(x: &GA<u8,N>, y: &GA<u8,N>, compress: bool) -> Self {
-    let tag = if compress { Tag::compress_y(y.as_slice()) } else { Tag::Uncompressed };
-    let mut bytes = GenericArray::default();
-    bytes[0] = tag.into();                                // IndexMut on GA
-    bytes[1..(Size::to_usize() + 1)].copy_from_slice(x);  // slice copy
-    if !compress { bytes[(Size::to_usize() + 1)..].copy_from_slice(y); }
-    Self { bytes }
-}
-```
-
-**Suspect.** `GenericArray<T, N>` has no custom `Index` impl — it
-`Deref`s to `[T]` via `unsafe { slice::from_raw_parts(self as *const
-Self as *const T, N::USIZE) }`. If that raw-ptr-cast Deref is
-miscompiled, every `bytes[i]` and `bytes[a..b]` on a GenericArray is
+**Why slot 96's whole chain fails:** `EncodedPoint::from_affine_coordinates`
+calls `Tag::compress_y(y.as_slice())` to compute the parity bit. That
+calls `y.as_slice().last()` on the `&GenericArray<u8, U32>` parameter.
+If `last()` returns wrong byte, the tag is wrong → encoded bytes are
 wrong.
 
-**Probes in flight:**
-- Slot 100 — local re-impl of `from_affine_coordinates` using raw
-  `[u8; 33]` instead of `GenericArray<u8, U33>`. Same algorithm, no GA.
-- Slot 101 — `&GenericArray<u8, U32>` parameter then `.as_slice().last()`
-  inside fn. Tests `Tag::compress_y` shape.
-- Slot 104 — `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then index.
-  Tests the `From<&[u8; N]> for &GenericArray<u8, N>` conversion. Slot 98
-  used `default()` constructor; this tests the conversion path.
+**Ruled out (all PASS):**
+- Slot 98 — basic GA index by fixed offset.
+- Slot 99 — GA write-side `copy_from_slice` from `&[u8]` source.
+- Slot 100 — same algorithm with raw `[u8; 33]` instead of GA.
+- Slot 104 — `(&[u8; N]).into() → &GenericArray<u8, N>` conversion.
 
-(Slots 98/99 already PASSed — basic GA index and write-side copy aren't
-it.)
+The narrowed shape: `GenericArray::as_slice()` (which deref-casts to
+`&[T]` then takes `as_slice()`) followed by `.last()` on the result —
+specifically when the GA is a `&` parameter, not a local.
 
-**Failures owned:** 22 (slots 4, 5, 13-24, 74, 75, 78, 79, 80, 93, 96).
+**Failures owned:** 21 (slots 4, 5, 13-24, 74, 75, 78, 79, 93, 96; slot 80 now PASSes).
 
 ---
 
@@ -249,12 +247,8 @@ only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 
 | Slot | Targets | Probe |
 |---|---|---|
-| 100 | Bug-96 | local re-impl of `from_affine_coordinates` using raw `[u8; 33]` |
-| 101 | Bug-96 | `&GenericArray<u8, U32>` parameter then `.as_slice().last()` inside fn |
-| 102 | Bug-71 | dalek `Scalar::from_bytes_mod_order([0u8; 32])` round-trip |
-| 103 | Bug-71 | dalek `Scalar::from_bytes_mod_order_wide(&[0u8; 64])` round-trip |
-| 104 | Bug-96 | `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then index |
-| 105 | Bug-41 | `base58_encode_32([0;31] ++ [0x01])` — single non-zero byte, `limb_count == 1` |
+| 106 | Bug-71 | named-field struct wrapping `[u8; 32]` return-by-value (mirrors dalek `Scalar`) |
+| 107 | Bug-41 | hand-rolled `base58_encode_32` without `seq!` macro |
 
 ---
 
@@ -298,6 +292,11 @@ briefly so we don't re-test the same shape.
 | `GenericArray<u8, N>` basic index broken | slot 98 PASS | GA Deref + IndexMut at fixed offsets works |
 | `GenericArray<u8, N>` write-side `copy_from_slice` broken | slot 99 PASS | dst `ga[a..b].copy_from_slice(&src[..])` works for raw `&[u8]` source |
 | k256 `Scalar::ONE` round-trip broken (slot 80) | slot 80 silently flipped PASS | likely fixed by a cuda-oxide HEAD update between v1.46 and v1.52 |
+| Bug-71 is input-dependent | slot 102 FAIL (all-zero input also fails) | Bug-71 fires for any input |
+| Bug-71 is specific to `from_bytes_mod_order` entry point | slot 103 FAIL (`from_bytes_mod_order_wide` also fails) | Bug-71 fires for both entry points |
+| Bug-96 is the basic GA Deref impl | slots 98/99/100/104 PASS, slot 101 FAIL | Bug-96 is specifically `.as_slice().last()` on `&GenericArray<T, N>` parameter |
+| Bug-96 is the GA-typed parameter conversion | slot 104 PASS | `(&[u8; N]).into()` works; only `.as_slice().last()` on the result fails |
+| Bug-41 needs multi-iteration digit extraction | slot 105 FAIL (limb_count=1 also fails) | Bug-41 fires for any non-zero input |
 
 ---
 

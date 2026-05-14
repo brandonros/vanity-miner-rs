@@ -1055,4 +1055,19 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_base58_min_nonzero(results: &mut [u32]) {
         results[105] = logic::check_base58_min_nonzero();
     }
+
+    // Slots 106-107: breakthrough probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_named_field_struct_return(results: &mut [u32]) {
+        results[106] = logic::check_named_field_struct_return();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_handrolled_no_seq(results: &mut [u32]) {
+        results[107] = logic::check_base58_handrolled_no_seq();
+    }
 }

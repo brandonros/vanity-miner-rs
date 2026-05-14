@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 106;
+pub const SELF_TEST_NUM_CHECKS: usize = 108;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -394,6 +394,19 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "dalek from_bytes_mod_order_wide zero",
     "k256 (&[u8; 32]).into() &FieldBytes",
     "base58 single-nonzero-byte (limb_count=1)",
+    // Slots 106-107: post-round-6 breakthrough probes.
+    //   106 (Bug-71) — Named-field `struct WrapNamed { bytes: [u8; 32] }`
+    //        return-by-value. dalek's `Scalar` is exactly this shape.
+    //        Slot 70 (return [u8; 32] direct) and slot 84 (return tuple-
+    //        struct Scalar52 with pub field) both PASS. Slot 71/102/103
+    //        (return Scalar with pub(crate) field) all FAIL. Suspect:
+    //        named-field-struct-wrapping-array return ABI is broken.
+    //   107 (Bug-41) — Hand-rolled base58 of [0;31]+[0x01], without the
+    //        `seq!` macro (which unrolls 8 iterations of the outer loop
+    //        in `base58_encode_32`). Plain Rust loops. If 107 PASS but
+    //        105 FAIL, the bug is in the `seq!` expansion specifically.
+    "named-field struct return (Scalar shape)",
+    "base58 hand-rolled no-seq! single-nonzero",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2491,6 +2504,174 @@ pub fn check_base58_min_nonzero() -> u32 {
     1
 }
 
+// Slot 106: Named-field struct wrapping `[u8; 32]` return-by-value test.
+// This is the EXACT shape of dalek's `Scalar`:
+//   pub struct Scalar { pub(crate) bytes: [u8; 32] }
+// All known-passing return shapes:
+//   - `clamp_integer` returns `[u8; 32]` direct (slot 70 PASS)
+//   - `Scalar52::from_bytes` returns tuple-struct `Scalar52(pub [u64; 5])` (slot 84 PASS)
+//   - `Scalar::ONE.to_bytes()` returns `[u8; 32]` direct (slot 92 PASS)
+// All known-failing through dalek's Scalar:
+//   - `Scalar::from_bytes_mod_order` returns Scalar (named-field struct) (slot 71/102/103 FAIL)
+// Hypothesis: returning a named-field struct wrapping `[u8; 32]` by
+// value is miscompiled. If 106 FAILs, that's the minimum Bug-71 repro.
+#[repr(C)]
+pub struct WrapNamed {
+    pub bytes: [u8; 32],
+}
+
+#[inline(never)]
+fn make_wrap_named(input: [u8; 32]) -> WrapNamed {
+    let mut bytes = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        bytes[i] = input[i].wrapping_add(1);
+        i += 1;
+    }
+    WrapNamed { bytes }
+}
+
+pub fn check_named_field_struct_return() -> u32 {
+    let input = core::hint::black_box([0u8; 32]);
+    let out = make_wrap_named(input);
+    let mut expected = [0u8; 32];
+    let mut i = 0;
+    while i < 32 {
+        expected[i] = 1;
+        i += 1;
+    }
+    (out.bytes == expected) as u32
+}
+
+// Slot 107: hand-rolled base58 of [0; 31] + [0x01] without the `seq!`
+// macro. base58_encode_32 uses `seq!(I in 0..8 { ... })` which proc-macro-
+// unrolls the outer loop 8 times. This replica uses a plain `for I in
+// 0..8` instead, with otherwise-identical body. Same algorithm, same
+// constants, just no seq! expansion.
+//
+// If 107 PASS but 105 FAIL, the bug is in something specific to seq!'s
+// expansion (function size, code layout, etc).
+pub fn check_base58_handrolled_no_seq() -> u32 {
+    const D: u64 = 58_u64.pow(5);
+    const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];
+    const BASE58_ALPHABET: &[u8; 58] =
+        b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+    let mut input = [0u8; 32];
+    input[31] = 1;
+    let input = core::hint::black_box(input);
+
+    // num_leading_zeros
+    let mut num_leading_zeros: usize = 0;
+    let mut i = 0;
+    while i < 32 {
+        if input[i] == 0 {
+            num_leading_zeros += 1;
+        } else {
+            break;
+        }
+        i += 1;
+    }
+
+    // chunks
+    let mut chunks = [0u32; 8];
+    let mut c = 0;
+    while c < 8 {
+        chunks[c] = u32::from_be_bytes([
+            input[c * 4],
+            input[c * 4 + 1],
+            input[c * 4 + 2],
+            input[c * 4 + 3],
+        ]);
+        c += 1;
+    }
+
+    // outer loop — same body as base58_encode_32 but plain Rust, no seq!
+    let mut limbs = [0u32; 10];
+    let mut limb_count: usize = 0;
+    let mut k = 0;
+    while k < 8 {
+        let chunk = chunks[k];
+        let carry = chunk as u64;
+        let mut remaining_carry = carry;
+
+        let mut j = 0;
+        while j < limb_count {
+            remaining_carry += (limbs[j] as u64) << 32;
+            limbs[j] = (remaining_carry % D) as u32;
+            remaining_carry /= D;
+            j += 1;
+        }
+
+        if remaining_carry > 0 && limb_count < 10 {
+            limbs[limb_count] = (remaining_carry % D) as u32;
+            remaining_carry /= D;
+            limb_count += 1;
+            if remaining_carry > 0 && limb_count < 10 {
+                limbs[limb_count] = remaining_carry as u32;
+                limb_count += 1;
+            }
+        }
+        k += 1;
+    }
+
+    // digit extraction
+    let mut output = [0u8; 64];
+    let mut idx = limb_count;
+    while idx > 0 {
+        idx -= 1;
+        let limb_value = limbs[idx] as u64;
+        let output_offset = idx * 5;
+        let mut di = 0;
+        while di < 5 {
+            output[output_offset + di] = ((limb_value / DIVISORS[di]) % 58) as u8;
+            di += 1;
+        }
+    }
+
+    let mut result_len = limb_count * 5;
+    while result_len > 0 && output[result_len - 1] == 0 {
+        result_len -= 1;
+    }
+
+    let mut z = 0;
+    while z < num_leading_zeros {
+        output[result_len] = 0;
+        result_len += 1;
+        z += 1;
+    }
+
+    let mut a = 0;
+    while a < result_len {
+        output[a] = BASE58_ALPHABET[output[a] as usize];
+        a += 1;
+    }
+
+    // reverse output[..result_len]
+    let mut lo = 0;
+    let mut hi = result_len;
+    while lo + 1 < hi {
+        hi -= 1;
+        let tmp = output[lo];
+        output[lo] = output[hi];
+        output[hi] = tmp;
+        lo += 1;
+    }
+
+    let expected: &[u8] = b"11111111111111111111111111111112";
+    if result_len != expected.len() {
+        return 0;
+    }
+    let mut x = 0;
+    while x < result_len {
+        if output[x] != expected[x] {
+            return 0;
+        }
+        x += 1;
+    }
+    1
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -2598,6 +2779,8 @@ pub fn run_self_test(results: &mut [u32]) {
     results[103] = check_dalek_scalar_from_bytes_wide_zero();
     results[104] = check_field_bytes_into_conversion();
     results[105] = check_base58_min_nonzero();
+    results[106] = check_named_field_struct_return();
+    results[107] = check_base58_handrolled_no_seq();
 }
 
 #[cfg(test)]

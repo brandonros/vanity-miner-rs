@@ -143,6 +143,7 @@ pub mod gpu {
         //   97-99 const-idx Index trait + GenericArray basic index + copy_from_slice
         //   100-102 from_affine_coords replica + GA as_slice().last() + dalek scalar=0 round-trip
         //   103-105 dalek from_bytes_wide(0) + FieldBytes::into() + base58 min-nonzero
+        //   106-107 named-field struct return (Scalar shape) + hand-rolled no-seq base58
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -249,6 +250,8 @@ pub mod gpu {
         run_slot!(103, kernel_self_test_dalek_scalar_from_bytes_wide_zero);
         run_slot!(104, kernel_self_test_field_bytes_into_conversion);
         run_slot!(105, kernel_self_test_base58_min_nonzero);
+        run_slot!(106, kernel_self_test_named_field_struct_return);
+        run_slot!(107, kernel_self_test_base58_handrolled_no_seq);
 
         report(&results)
     }
