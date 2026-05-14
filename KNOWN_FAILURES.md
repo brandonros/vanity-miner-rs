@@ -17,7 +17,70 @@ execute, so this doc alone is enough context to hand to the compiler agent.
 | 2026-05-13 | 91         | 27   | v1.46.0        | All 81-90 PASSed. Smoking gun: my port uses `a.0[i]`, dalek uses `a[i]` via custom Index trait. |
 | pending    | 94         | ?    | v1.46 (rerun)  | +3 probes (91-93): Index trait dispatch + cross-crate minimal const/encoding. |
 | 2026-05-13 | 94         | 29   | v1.46.0        | **Bug E confirmed**: slot 91 FAIL (Index/IndexMut dispatch on tuple struct). Bug F confirmed separate: slot 93 FAIL, 92 PASS. |
-| pending    | 97         | ?    | next           | +3 probes (94-96): subtle Choice/ConditionallySelectable/EncodedPoint construction. |
+| pending    | 97         | ?    | v1.46 (rerun)  | +3 probes (94-96): subtle Choice/ConditionallySelectable/EncodedPoint construction. |
+| 2026-05-13 | 97         | 29   | v1.46.0        | **Slot 91 FLIPPED to PASS** (Bug E minimal repro lost). 94/95 PASS, 96 FAIL → Bug F is in `EncodedPoint::from_affine_coordinates` itself. |
+| pending    | 100        | ?    | next           | +3 probes (97-99): const-idx Index dispatch + GenericArray basic + copy_from_slice. |
+
+---
+
+## Per-failure inventory (29 failures, v1.46.0)
+
+Each failing slot is mapped to its **primary suspected compiler bug**. We
+name bugs by their direct-hit slot number (smoking gun) — that way the
+name points to the actual probe source. Three open bugs:
+
+- **Bug-71** — dalek `Scalar::from_bytes_mod_order` chain (something
+  about how dalek's reduce/Montgomery code is compiled — slot 91's
+  minimal Index-trait probe doesn't reproduce it).
+- **Bug-41** — base58 with non-zero input. All building blocks PASS in
+  isolation (slots 66/67/69/76/77/83), so there's an interaction we
+  haven't isolated.
+- **Bug-96** — `sec1::EncodedPoint::from_affine_coordinates` (or its
+  `GenericArray` dependency). The smoking gun for the entire k256
+  cascade.
+
+| #  | Slot name                            | Suspected bug   | Why |
+|----|--------------------------------------|-----------------|-----|
+|  2 | ed25519 derive                       | Bug-71          | cascade — calls `Scalar::from_bytes_mod_order` (slot 71) |
+|  3 | base58 encode pub                    | Bug-71 + Bug-41 | feeds slot 2's broken output into `base58_encode_32` |
+|  4 | secp256k1 compressed                 | Bug-96          | cascade — k256 derive ends in `to_encoded_point` (slot 96) |
+|  5 | secp256k1 uncompressed               | Bug-96          | cascade of 4 |
+| 11 | solana pub                           | Bug-71          | cascade of 2 |
+| 12 | solana encoded                       | Bug-71 + Bug-41 | cascade of 2 + base58 |
+| 13 | ethereum priv                        | Bug-96          | cascade of 4 |
+| 14 | ethereum pub                         | Bug-96          | cascade of 4 |
+| 15 | ethereum address                     | Bug-96          | cascade of 4 |
+| 16 | bitcoin priv                         | Bug-96          | cascade of 4 |
+| 17 | bitcoin pub                          | Bug-96          | cascade of 4 |
+| 18 | bitcoin pkh                          | Bug-96          | cascade of 4 |
+| 19 | bitcoin encoded                      | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 20 | bitcoin matches                      | Bug-96          | cascade of 4 |
+| 21 | wif compressed mainnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 22 | wif uncompressed mainnet             | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 23 | wif compressed testnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 24 | wif uncompressed testnet             | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 41 | base58 var-len                       | Bug-41          | **direct hit — smoking gun for base58** |
+| 42 | base58 var-len leading-zero          | Bug-41          | direct hit (variant of 41) |
+| 71 | dalek scalar from-bytes round-trip   | Bug-71          | **direct hit — smoking gun for dalek** |
+| 72 | dalek mul_base scalar=1 == basepoint | Bug-71          | depends on 71 |
+| 74 | k256 derive scalar=1 == generator    | Bug-96          | calls `to_encoded_point` |
+| 75 | k256 derive scalar=2 == 2G           | Bug-96          | calls `to_encoded_point` |
+| 78 | k256 encode generator (no mul)       | Bug-96          | calls `ProjectivePoint::GENERATOR.to_affine().to_encoded_point()` |
+| 79 | k256 double generator + encode       | Bug-96          | same as 78 + doubling |
+| 80 | k256 Scalar::ONE round-trip          | Bug-96 (likely) | `Scalar::to_repr` returns `GenericArray<u8, U32>` — same dependency as 96 |
+| 93 | k256 AffinePoint encode              | Bug-96          | direct k256 path to `to_encoded_point` |
+| 96 | EncodedPoint::from_affine_coordinates| Bug-96          | **direct hit — smoking gun for k256** |
+
+Coverage check: 29 rows = 29 failing slots. Each is accounted for; none
+in the "we don't know" column right now (every failure has a primary
+suspect, even if speculative).
+
+If/when slots 97-99 land, the table updates as follows:
+- 97 FAIL → Bug-71 confirms as "const-index Index trait dispatch"
+- 98 FAIL → Bug-96 confirms as "GenericArray basic Deref"
+- 99 FAIL → Bug-96 confirms as "slice copy_from_slice into GenericArray"
+- Any combo PASS → corresponding sub-hypothesis falsified; the bug
+  column for affected slots reverts to the parent suspect.
 
 ---
 
@@ -312,9 +375,23 @@ is either confirmed or ruled out.
 
 ---
 
-## Bug E (CONFIRMED) — Index/IndexMut trait dispatch on tuple struct
+## Bug E (FALSIFIED at minimal-repro level — needs refined probe)
 
-**Status.** ✅ Confirmed by slot 91 FAIL on v1.46.0. Minimal repro ready.
+**Status.** ⚠️ Slot 91 FLIPPED from FAIL → PASS on the v1.46.0 rerun.
+Same compiler version, but our minimal repro no longer reproduces the
+bug, while slot 71 (full dalek path) still FAILs. So **the bug is not
+captured by a simple `IdxProbe[idx] = val; let v = IdxProbe[idx];`**.
+
+Most likely refinement: dalek uses **literal const indices** (`s[0] = …;
+s[1] = …`) while slot 91 used `black_box(idx)` (runtime). LLVM IR shape
+differs — const indices fold the trait dispatch into a direct GEP at
+compile time; runtime indices preserve the call.
+
+**Probe added:** Slot 97 — same `IdxProbe` but written/read with 5
+literal const indices in a row (mirrors dalek `from_bytes`'s
+`s[0]..=s[4]` pattern).
+
+Originally-stated:
 
 **Repro (≈18 lines, in [logic/src/self_test.rs](logic/src/self_test.rs) under
 `check_index_trait_dispatch`):**
@@ -354,11 +431,52 @@ pub fn check_index_trait_dispatch() -> u32 {
 
 ---
 
-## Bug F (CONFIRMED separate from E) — k256 AffinePoint→bytes chain
+## Bug F (NARROWED) — `EncodedPoint::from_affine_coordinates` (or its dependencies)
 
-**Status.** ✅ Confirmed exists (slot 93 FAIL on v1.46.0 rerun). Not the
-same as Bug E — k256/elliptic-curve/crypto-bigint have **no** `Index`
-trait impls (grepped). Three sub-probes now in suite to narrow it.
+**Status.** ✅ Narrowed by slot 96 FAIL on v1.46.0 (slots 94/95 PASS).
+`subtle::Choice` u8↔bool works, `ConditionallySelectable::conditional_select`
+works. The bug is inside `EncodedPoint::from_affine_coordinates` itself.
+
+**Implementation ([sec1-0.7.3/src/point.rs:121](sec1/point.rs:121)):**
+```rust
+pub fn from_affine_coordinates(x: &GA<u8,N>, y: &GA<u8,N>, compress: bool) -> Self {
+    let tag = if compress { Tag::compress_y(y.as_slice()) } else { Tag::Uncompressed };
+    let mut bytes = GenericArray::default();              // GA<u8, EncodedSize>
+    bytes[0] = tag.into();                                // IndexMut on GA via Deref
+    bytes[1..(Size::to_usize() + 1)].copy_from_slice(x);  // slice copy
+    if !compress {
+        bytes[(Size::to_usize() + 1)..].copy_from_slice(y);
+    }
+    Self { bytes }
+}
+```
+
+**Smoking-gun suspect: `GenericArray<u8, N>` Deref.** It has no custom
+Index impl — instead it `Deref`s to `[T]` via:
+```rust
+fn deref(&self) -> &[T] {
+    unsafe { slice::from_raw_parts(self as *const Self as *const T, N::USIZE) }
+}
+```
+If that raw-ptr-cast Deref miscompiles, every `bytes[i]` and
+`bytes[a..b]` operation on a `GenericArray` is wrong.
+
+**Probes added (slots 98-99):**
+
+| Slot | Probe | If FAIL |
+|---|---|---|
+| 98 | `GenericArray<u8, U33>::default()`; write `ga[0]`, `ga[32]`; read back | GenericArray Deref/Index broken — explains 96 directly |
+| 99 | `GenericArray<u8, U33>` populated via `ga[1..33].copy_from_slice(&src[..])` then `ga[..]` slice extraction | slice copy into GA is broken |
+
+**Decision table (next vast run):**
+
+| 98 | 99 | Diagnosis |
+|---|---|---|
+| F | — | GA basic index broken → fixes 96 → likely fixes 4/5/13-24/74/75/78/79/80 too |
+| P | F | GA slice copy broken (more specific) |
+| P | P | Bug is in `Tag::compress_y(y.as_slice())` (uses `.last()` on slice) — needs another probe |
+
+(Original Bug F intro, now superseded:)
 
 **Failing chain ([k256/src/arithmetic/affine.rs:273](k256/arithmetic/affine.rs:273)):**
 ```rust
@@ -393,6 +511,25 @@ fn to_encoded_point(&self, compress: bool) -> EncodedPoint {
 | P | P | P | Bug is elsewhere (`FieldElement::to_bytes` or AffinePoint's own `is_identity`) — needs another round |
 
 If P/F/—, that's also the prime suspect for slots 74/75 (k256 derive ×1, ×2) — both go through `conditional_select` in `mul_by_generator`'s windowed scalar mult.
+
+---
+
+## Round-4 result (v1.46 rerun, suite 97)
+
+- **Slot 91 PASS** (was FAIL): minimal Index/IndexMut probe lost — Bug E doesn't reproduce in our simple repro anymore. Slot 71 still FAILs, so something more specific.
+- **Slot 92 PASS**: cross-crate `Scalar::ONE.to_bytes()` works.
+- **Slot 93 FAIL** (re-confirmed): k256 `AffinePoint::GENERATOR.to_encoded_point()`.
+- **Slot 94 PASS**: subtle Choice u8↔bool works.
+- **Slot 95 PASS**: `u64::conditional_select` via subtle works.
+- **Slot 96 FAIL**: `EncodedPoint::from_affine_coordinates(&GX, &GY, true)` with hardcoded bytes. ← Bug F is here.
+
+### Probes for next round (97-99)
+
+Targets the two surviving mysteries:
+
+- **Slot 97**: refined Index probe with literal const indices (mirrors dalek's `s[0]..=s[4]`).
+- **Slot 98**: bare `GenericArray<u8, U33>` index test.
+- **Slot 99**: `GenericArray<u8, U33>` populated via `copy_from_slice`.
 
 ---
 

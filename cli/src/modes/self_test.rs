@@ -140,6 +140,7 @@ pub mod gpu {
         //         our ladder copy that's present in real dalek)
         //   91-93 Index trait dispatch + minimal cross-crate const probes
         //   94-96 subtle::Choice + ConditionallySelectable + EncodedPoint construction
+        //   97-99 const-idx Index trait + GenericArray basic index + copy_from_slice
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -237,6 +238,9 @@ pub mod gpu {
         run_slot!(94, kernel_self_test_subtle_choice_u8_into_bool);
         run_slot!(95, kernel_self_test_subtle_conditional_select_u64);
         run_slot!(96, kernel_self_test_k256_encoded_point_from_affine_coords);
+        run_slot!(97, kernel_self_test_index_trait_const_indices);
+        run_slot!(98, kernel_self_test_generic_array_basic_index);
+        run_slot!(99, kernel_self_test_generic_array_copy_from_slice);
 
         report(&results)
     }

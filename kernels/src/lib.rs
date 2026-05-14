@@ -989,4 +989,26 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_k256_encoded_point_from_affine_coords(results: &mut [u32]) {
         results[96] = logic::check_k256_encoded_point_from_affine_coords();
     }
+
+    // Slots 97-99: post-round-4 probes (const-idx Index trait + GenericArray).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_index_trait_const_indices(results: &mut [u32]) {
+        results[97] = logic::check_index_trait_const_indices();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_generic_array_basic_index(results: &mut [u32]) {
+        results[98] = logic::check_generic_array_basic_index();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_generic_array_copy_from_slice(results: &mut [u32]) {
+        results[99] = logic::check_generic_array_copy_from_slice();
+    }
 }

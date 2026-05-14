@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 97;
+pub const SELF_TEST_NUM_CHECKS: usize = 100;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -335,6 +335,26 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "subtle Choice from(u8) into bool",
     "subtle u64::conditional_select(0|1)",
     "k256 EncodedPoint::from_affine_coordinates(GX, GY)",
+    // Slots 97-99: post-round-4 probes.
+    //   91 (PREVIOUSLY FAILed, now PASSes!) with black_box runtime index.
+    //      But slot 71 still FAILs. Dalek uses CONST literal indices
+    //      (s[0], s[1], ...). Need to probe const-index Index dispatch.
+    //   96 FAILs but 94/95 PASS — bug is inside `from_affine_coordinates`,
+    //      not in Choice or conditional_select. Suspects: GenericArray
+    //      Deref impl (uses unsafe ptr cast), or copy_from_slice into it.
+    //
+    //   97 — `IdxProbe` written/read with LITERAL const indices (mirror
+    //        of dalek's `s[0] = …; s[1] = …` pattern). If 97 FAILs, the
+    //        bug is specifically constant-index Index trait dispatch.
+    //   98 — `GenericArray<u8, U33>::default()` then `ga[i] = v; ga[i]`.
+    //        Tests GenericArray's Deref-based indexing. If FAILs, every
+    //        GenericArray op is broken → explains slot 96 directly.
+    //   99 — `GenericArray<u8, U33>` constructed via `copy_from_slice`.
+    //        Tests slice copy into a GenericArray, isolating the exact
+    //        operation `from_affine_coordinates` uses.
+    "Index trait const-idx (5 writes/reads)",
+    "GenericArray<u8, U33> basic index",
+    "GenericArray<u8, U33> copy_from_slice",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2273,6 +2293,66 @@ pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
     (out == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+// Slot 97: Index/IndexMut trait dispatch with LITERAL const indices.
+// Slot 91 used `black_box(idx)` → runtime index, and now PASSes. Dalek's
+// Scalar52::from_bytes uses `s[0] = …; s[1] = …; …; s[4] = …` with
+// const literal indices. Different IR shape — const indices typically
+// fold the trait call into a direct GEP at compile time.
+pub fn check_index_trait_const_indices() -> u32 {
+    let mut p = IdxProbe([0u64; 5]);
+    p[0] = core::hint::black_box(0x1111_1111_1111_1111_u64);
+    p[1] = core::hint::black_box(0x2222_2222_2222_2222_u64);
+    p[2] = core::hint::black_box(0x3333_3333_3333_3333_u64);
+    p[3] = core::hint::black_box(0x4444_4444_4444_4444_u64);
+    p[4] = core::hint::black_box(0x5555_5555_5555_5555_u64);
+    let r0 = p[0];
+    let r1 = p[1];
+    let r2 = p[2];
+    let r3 = p[3];
+    let r4 = p[4];
+    (r0 == 0x1111_1111_1111_1111
+        && r1 == 0x2222_2222_2222_2222
+        && r2 == 0x3333_3333_3333_3333
+        && r3 == 0x4444_4444_4444_4444
+        && r4 == 0x5555_5555_5555_5555) as u32
+}
+
+// Slot 98: `GenericArray<u8, U33>` basic index. GenericArray doesn't have
+// a custom Index impl; it Derefs to `[T]` via:
+//   `unsafe { slice::from_raw_parts(self as *const Self as *const T, N::USIZE) }`
+// If that raw-ptr-cast Deref miscompiles, every GenericArray op breaks.
+// k256::EncodedPoint stores its bytes in a `GenericArray<u8, EncodedSize>`.
+pub fn check_generic_array_basic_index() -> u32 {
+    use k256::elliptic_curve::generic_array::GenericArray;
+    use k256::elliptic_curve::generic_array::typenum::U33;
+    let mut ga: GenericArray<u8, U33> = GenericArray::default();
+    let i0 = core::hint::black_box(0usize);
+    let i32 = core::hint::black_box(32usize);
+    ga[i0] = 0xAA;
+    ga[i32] = 0xBB;
+    let v0 = ga[i0];
+    let v32 = ga[i32];
+    (v0 == 0xAA && v32 == 0xBB) as u32
+}
+
+// Slot 99: `GenericArray<u8, U33>` populated via `copy_from_slice` from a
+// regular byte array. This is exactly what EncodedPoint::from_affine_
+// coordinates does:
+//   bytes[1..33].copy_from_slice(x);
+// If this FAILs, the slice-copy-into-GenericArray-slice is the bug.
+pub fn check_generic_array_copy_from_slice() -> u32 {
+    use k256::elliptic_curve::generic_array::GenericArray;
+    use k256::elliptic_curve::generic_array::typenum::U33;
+    let src: [u8; 32] = SECP256K1_GX_BYTES;
+    let mut ga: GenericArray<u8, U33> = GenericArray::default();
+    ga[0] = 0x02;
+    ga[1..33].copy_from_slice(&src);
+    // Compare against the known compressed-generator encoding.
+    let mut got = [0u8; 33];
+    got.copy_from_slice(&ga[..]);
+    (got == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -2371,6 +2451,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[94] = check_subtle_choice_u8_into_bool();
     results[95] = check_subtle_conditional_select_u64();
     results[96] = check_k256_encoded_point_from_affine_coords();
+    results[97] = check_index_trait_const_indices();
+    results[98] = check_generic_array_basic_index();
+    results[99] = check_generic_array_copy_from_slice();
 }
 
 #[cfg(test)]
