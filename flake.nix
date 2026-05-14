@@ -20,30 +20,36 @@
           };
           lib = pkgs.lib;
 
-          # ---- CUDA toolkit (Nix-managed) ----
-          # CUDA 13.2 → NVVM 22.0 → PTX 9.2 → needs driver 580.x+ (CUDA 13) at runtime.
-          # `cudatoolkit` is the kitchen-sink symlinkJoin maintained by nixpkgs —
-          # every header path and lib layout is already wired correctly. The host
-          # NVIDIA driver (libcuda.so.1) is needed at runtime; it is *not* shimmed
-          # in here — supply it via the system or extend LD_LIBRARY_PATH yourself
-          # before running CUDA programs.
+          # ---- CUDA toolkit ----
+          # cuda-oxide does NOT link libNVVM. We only need cuda.h + libcuda
+          # stubs (for cuda-bindings bindgen) and ptxas / cuobjdump (for runtime
+          # PTX → SASS via the driver). CUDA 12.x+ is fine; 13.2 is what was
+          # already pinned.
           cudaRoot = pkgs.cudaPackages_13_2.cudatoolkit;
 
           # Single source of truth for channel + components lives in
           # rust-toolchain.toml. Update there, not here.
           toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
-          # ---- LLVM 19 ----
-          llvm19 = pkgs.llvmPackages_19;
-          llvm19Bin = lib.getBin llvm19.llvm;
-          llvm19Dev = lib.getDev llvm19.llvm;
-          llvm19CompatTools = pkgs.symlinkJoin {
-            name = "llvm19-compat-tools";
+          # ---- LLVM 21 ----
+          # cuda-oxide emits LLVM IR with NVPTX intrinsics (TMA / tcgen05 /
+          # WGMMA) that require llc 21+. cuda-oxide auto-discovers `llc-22`
+          # then `llc-21` on PATH; we pin to 21 via CUDA_OXIDE_LLC for
+          # determinism. `bindgen` (in cuda-bindings) needs libclang from the
+          # same family.
+          llvm21 = pkgs.llvmPackages_21;
+          llvm21Bin = lib.getBin llvm21.llvm;
+          llvm21Dev = lib.getDev llvm21.llvm;
+          # cuda-oxide auto-discovers `llc-21` / `llc-22` but upstream LLVM
+          # builds only provide unversioned `llc`. Shim a `llc-21` so PATH
+          # discovery works regardless of the CUDA_OXIDE_LLC override.
+          llvm21CompatTools = pkgs.symlinkJoin {
+            name = "llvm21-compat-tools";
             paths = [
-              (pkgs.writeShellScriptBin "opt-19" ''exec ${llvm19Bin}/bin/opt "$@"'')
-              (pkgs.writeShellScriptBin "llvm-as-19" ''exec ${llvm19Bin}/bin/llvm-as "$@"'')
-              (pkgs.writeShellScriptBin "llvm-dis-19" ''exec ${llvm19Bin}/bin/llvm-dis "$@"'')
-              (pkgs.writeShellScriptBin "llc-19" ''exec ${llvm19Bin}/bin/llc "$@"'')
+              (pkgs.writeShellScriptBin "llc-21" ''exec ${llvm21Bin}/bin/llc "$@"'')
+              (pkgs.writeShellScriptBin "llvm-as-21" ''exec ${llvm21Bin}/bin/llvm-as "$@"'')
+              (pkgs.writeShellScriptBin "llvm-dis-21" ''exec ${llvm21Bin}/bin/llvm-dis "$@"'')
+              (pkgs.writeShellScriptBin "opt-21" ''exec ${llvm21Bin}/bin/opt "$@"'')
             ];
           };
         in
@@ -52,33 +58,37 @@
           CUDA_ROOT = "${cudaRoot}";
           CUDA_PATH = "${cudaRoot}";
           CUDA_TOOLKIT_ROOT_DIR = "${cudaRoot}";
+          # cuda-bindings (cuda-oxide) reads CUDA_TOOLKIT_PATH specifically;
+          # default fallback would be /usr/local/cuda which doesn't exist on nix.
+          CUDA_TOOLKIT_PATH = "${cudaRoot}";
           # Cover both lib/ (nix-style) and lib64/ (FHS-style) so downstream
-          # build.rs scripts that probe either layout resolve libcudart + stubs.
+          # bindgen / build.rs scripts that probe either layout resolve
+          # libcudart + stubs.
           CUDA_LIBRARY_PATH =
             "${cudaRoot}/lib:${cudaRoot}/lib64:${cudaRoot}/lib/stubs:${cudaRoot}/lib64/stubs";
-          LLVM_CONFIG_19 = "${llvm19Dev}/bin/llvm-config";
-          LIBCLANG_PATH = "${lib.getLib llvm19.libclang}/lib";
 
-          # nativeBuildInputs: tools invoked *during* the build — compilers,
-          # codegen, build systems. End up on $PATH. cudaRoot lives here because
-          # build-cuda.sh shells out to ptxas/nvcc; its libraries are picked up
-          # via LD_LIBRARY_PATH/LIBRARY_PATH below.
+          # cuda-bindings runs bindgen, which loads libclang at *runtime* of
+          # the build script. Point at LLVM 21's libclang.so.
+          LIBCLANG_PATH = "${lib.getLib llvm21.libclang}/lib";
+          LLVM_CONFIG = "${llvm21Dev}/bin/llvm-config";
+          # Pin the llc invoked by cuda-oxide's pipeline. cuda-oxide's auto-
+          # discovery looks for llc-22, then llc-21; honoring this env var
+          # short-circuits that search.
+          CUDA_OXIDE_LLC = "${llvm21Bin}/bin/llc";
+
           nativeBuildInputs = [
             toolchain
-            pkgs.gcc
             pkgs.pkg-config
             pkgs.cmake
             pkgs.ninja
             pkgs.patchelf
             cudaRoot
-            llvm19.clang
-            llvm19.libclang
-            llvm19Bin
-            llvm19Dev
-            llvm19CompatTools
+            llvm21.clang
+            llvm21.libclang
+            llvm21Bin
+            llvm21Dev
+            llvm21CompatTools
           ];
-          # buildInputs: libraries our binaries link against at compile time.
-          # These get wired into the C/C++ include and link search paths.
           buildInputs = [
             pkgs.openssl
             pkgs.libxml2
@@ -90,15 +100,33 @@
 
           shellHook = ''
             export CARGO_TARGET_DIR="$PWD/target"
-            export PATH="${llvm19CompatTools}/bin:${llvm19Bin}/bin:${llvm19Dev}/bin:${cudaRoot}/bin:${cudaRoot}/nvvm/bin:$PATH"
-            export LD_LIBRARY_PATH="${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-            # LIBRARY_PATH is the *link-time* analog of LD_LIBRARY_PATH — needed
-            # so cc/ld can resolve `-lnvvm` (from #[link(name = "nvvm")]) etc.
-            export LIBRARY_PATH="${cudaRoot}/nvvm/lib64:${cudaRoot}/nvvm/lib:${cudaRoot}/lib64:${cudaRoot}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+            export PATH="${llvm21CompatTools}/bin:${llvm21Bin}/bin:${llvm21Dev}/bin:${cudaRoot}/bin:$PATH"
 
-            echo "rust-cuda llvm19 shell"
+            # libcuda.so.1 is provided by the host NVIDIA driver, not nix.
+            # LD_LIBRARY_PATH covers libcudart + libcublas etc. for runtime.
+            export LD_LIBRARY_PATH="${cudaRoot}/lib64:${cudaRoot}/lib:${lib.getLib llvm21.libclang}/lib:${pkgs.ncurses.out}/lib:${pkgs.libxml2.out}/lib:${pkgs.zlib.out}/lib:${pkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            
+            # cuda-bindings' build.rs only adds lib64/{,stubs} to the rustc link
+            # search path; on aarch64 CUDA toolkits the stubs live under
+            # lib/stubs, so add both layouts to LIBRARY_PATH so -lcuda resolves.
+            export LIBRARY_PATH="${cudaRoot}/lib64:${cudaRoot}/lib64/stubs:${cudaRoot}/lib:${cudaRoot}/lib/stubs''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+
+            # Point cargo-oxide at the codegen backend .so produced by the
+            # local fork clone at ~/cuda-oxide. Override CUDA_OXIDE_FORK_DIR
+            # to use a different checkout, or unset CUDA_OXIDE_BACKEND to let
+            # cargo-oxide auto-fetch+build from ~/.cargo/cuda-oxide/.
+            export CUDA_OXIDE_FORK_DIR="''${CUDA_OXIDE_FORK_DIR:-$HOME/cuda-oxide}"
+            export CUDA_OXIDE_BACKEND="$CUDA_OXIDE_FORK_DIR/target/debug/librustc_codegen_cuda.so"
+
+            echo "cuda-oxide llvm21 shell"
             echo "  CUDA_HOME=$CUDA_HOME"
-            echo "  LLVM_CONFIG_19=$LLVM_CONFIG_19"
+            echo "  LIBCLANG_PATH=$LIBCLANG_PATH"
+            echo "  CUDA_OXIDE_LLC=$CUDA_OXIDE_LLC"
+            echo "  CUDA_OXIDE_FORK_DIR=$CUDA_OXIDE_FORK_DIR"
+            if [ ! -f "$CUDA_OXIDE_BACKEND" ]; then
+              echo "  ⚠  CUDA_OXIDE_BACKEND not built yet: $CUDA_OXIDE_BACKEND"
+              echo "     run: (cd $CUDA_OXIDE_FORK_DIR && cargo build -p rustc_codegen_cuda)"
+            fi
           '';
         };
     in

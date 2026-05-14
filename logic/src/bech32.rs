@@ -185,31 +185,6 @@ pub fn encode_p2tr_address(pubkey: &[u8; 32], mainnet: bool, output: &mut [u8]) 
     bech32_encode(hrp, &witness_program[..converted_len + 1], Bech32Variant::Bech32m, output)
 }
 
-/// NEW: Generic witness program encoder
-pub fn encode_witness_program(version: u8, program: &[u8], mainnet: bool, output: &mut [u8]) -> usize {
-    let hrp = if mainnet { b"bc" } else { b"tb" };
-    
-    let mut witness_program = [0u8; 64];
-    witness_program[0] = version;
-    
-    let converted = convert_bits(program, 8, 5, true);
-    // Calculate actual converted length based on program length
-    let converted_len = (program.len() * 8 + 4) / 5;
-    
-    for i in 0..converted_len {
-        witness_program[i + 1] = converted[i];
-    }
-    
-    // Use Bech32 for v0, Bech32m for v1+
-    let variant = if version == 0 {
-        Bech32Variant::Bech32
-    } else {
-        Bech32Variant::Bech32m
-    };
-    
-    bech32_encode(hrp, &witness_program[..converted_len + 1], variant, output)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

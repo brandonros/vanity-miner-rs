@@ -2,56 +2,56 @@
 
 set -e
 
-PORT=15975
-HOST=ssh1.vast.ai
+PORT=34749
+HOST=ssh8.vast.ai
 USER=root
+VERSION="${VANITY_MINER_VERSION:-$(gh release view --repo brandonros/vanity-miner-rs --json tagName -q .tagName)}"
+echo "==> deploying vanity-miner $VERSION to $USER@$HOST:$PORT"
 
-ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.23.0"
-
+ssh -o StrictHostKeyChecking=no -p "$PORT" "$USER@$HOST" <<EOF
+echo "==> vanity-miner version: $VERSION"
 banner() {
     echo ""
     echo "=================================================================="
-    echo "==  $1"
+    echo "==  \$1"
     echo "=================================================================="
 }
 
 banner "ENV CHECK :: killall"
-if ! command -v killall &> /dev/null
-then
-    apt update
-    apt install -y psmisc
+if ! command -v killall &> /dev/null; then
+    apt update && apt install -y psmisc
 else
     echo "killall already installed"
 fi
 
-banner "CLEANUP :: previous binary + running processes"
-rm -f vanity-miner
+banner "CLEANUP :: stop any running miner + previous binary"
 killall vanity-miner || true
+rm -f vanity-miner kernels.ptx
 
-banner "DOWNLOAD :: vanity-miner $VERSION"
-ARCH=$(uname -m)  # x86_64 or aarch64
-echo "arch=$ARCH version=$VERSION"
-curl -fL -o vanity-miner https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/vanity-miner-$ARCH
+banner "DOWNLOAD :: vanity-miner $VERSION (x86_64) + kernels.ptx"
+curl -fL -o vanity-miner \
+    https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/vanity-miner-x86_64
+curl -fL -o kernels.ptx \
+    https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/kernels.ptx
 chmod +x vanity-miner
-ls -lh vanity-miner
+ls -lh vanity-miner kernels.ptx
 
 banner "GPU INFO :: nvidia-smi"
 nvidia-smi --query-gpu=name,compute_cap --format=csv
 
 banner "RUNTIME ENV"
 export CUDA_LOG_FILE="stdout"
-export BLOCKS_PER_SM="1024"
-export THREADS_PER_BLOCK="256"
-export STACK_SIZE="8192"
-echo "CUDA_LOG_FILE=$CUDA_LOG_FILE"
-echo "BLOCKS_PER_SM=$BLOCKS_PER_SM"
-echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
-echo "STACK_SIZE=$STACK_SIZE"
+# PTX_PATH tells the runner to load kernels from this file instead of the
+# (currently-broken) embedded .oxart ELF section.
+export PTX_PATH="\$PWD/kernels.ptx"
+# Bump per-thread stack from the CUDA default (~1 KiB) so the self-test
+# kernels' heaviest primitive (ed25519 scalar mult inside the solana check)
+# has room. GpuContext::new picks this up and calls cuCtxSetLimit.
+export STACK_SIZE=65536
+echo "CUDA_LOG_FILE=\$CUDA_LOG_FILE"
+echo "PTX_PATH=\$PTX_PATH"
+echo "STACK_SIZE=\$STACK_SIZE"
 
-banner "RUN :: vanity-miner"
-./vanity-miner solana-vanity aaaa ""
-#./vanity-miner bitcoin-vanity bc1qqqqqq ""
-#./vanity-miner ethereum-vanity 55555555 ""
-#./vanity-miner shallenge brandonros 0000000000bd0310ff0f88ac484f7fcd256ef78ae0deecd5693ed0ead124d17b
+banner "RUN :: vanity-miner self-test"
+compute-sanitizer --tool memcheck --print-limit 0 --show-backtrace device ./vanity-miner self-test
 EOF

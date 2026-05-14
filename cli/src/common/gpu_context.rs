@@ -1,43 +1,50 @@
-use cust::context::ResourceLimit;
-use cust::device::Device;
-use cust::prelude::Context;
-use cust::stream::{Stream, StreamFlags};
+use cuda_core::sys::{
+    CUdevice_attribute_enum_CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+    CUlimit_enum_CU_LIMIT_STACK_SIZE, cuCtxSetLimit, cuDeviceGetAttribute,
+};
+use cuda_core::{CudaContext, CudaStream, IntoResult};
 use std::error::Error;
+use std::ffi::c_int;
+use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 pub struct GpuContext {
-    pub stream: Stream,
+    pub stream: Arc<CudaStream>,
     pub blocks_per_grid: usize,
     pub threads_per_block: usize,
     pub operations_per_launch: usize,
-    // Keep context alive for the lifetime of GpuContext
-    #[allow(dead_code)]
-    ctx: Context,
 }
 
 impl GpuContext {
-    pub fn new(ordinal: usize) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let device = Device::get_device(ordinal as u32)?;
-        let ctx = Context::new(device)?;
-        cust::context::CurrentContext::set_current(&ctx)?;
+    pub fn new(ctx: &Arc<CudaContext>) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        ctx.bind_to_thread()?;
 
-        // Optionally override stack size
-        if let Some(stack_size) = std::env::var("STACK_SIZE").ok() {
-            let stack_size = stack_size.parse::<usize>().unwrap();
-            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack_size)?;
+        if let Ok(stack_size) = std::env::var("STACK_SIZE") {
+            let stack_size = stack_size.parse::<usize>()?;
+            unsafe {
+                cuCtxSetLimit(CUlimit_enum_CU_LIMIT_STACK_SIZE, stack_size).result()?;
+            }
         }
 
-        let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+        let stream = ctx.new_stream()?;
 
-        let number_of_streaming_multiprocessors =
-            device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
+        let number_of_streaming_multiprocessors = unsafe {
+            let mut count = MaybeUninit::<c_int>::uninit();
+            cuDeviceGetAttribute(
+                count.as_mut_ptr(),
+                CUdevice_attribute_enum_CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+                ctx.cu_device(),
+            )
+            .result()?;
+            count.assume_init() as usize
+        };
+
         let blocks_per_sm = std::env::var("BLOCKS_PER_SM")
-            .unwrap_or("128".to_string())
-            .parse::<usize>()
-            .unwrap();
+            .unwrap_or_else(|_| "128".to_string())
+            .parse::<usize>()?;
         let threads_per_block = std::env::var("THREADS_PER_BLOCK")
-            .unwrap_or("256".to_string())
-            .parse::<usize>()
-            .unwrap();
+            .unwrap_or_else(|_| "256".to_string())
+            .parse::<usize>()?;
         let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
         let operations_per_launch = blocks_per_grid * threads_per_block;
 
@@ -46,7 +53,6 @@ impl GpuContext {
             blocks_per_grid,
             threads_per_block,
             operations_per_launch,
-            ctx,
         })
     }
 

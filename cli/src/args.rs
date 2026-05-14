@@ -39,6 +39,8 @@ pub enum Command {
         /// Target hash to beat (hex)
         target_hash: String,
     },
+    /// Run on-device self-test (validates PTX codegen against CPU expectations)
+    SelfTest,
 }
 
 impl Command {
@@ -71,6 +73,7 @@ impl Command {
             Command::Shallenge { target_hash, .. } => {
                 crate::common::validate_hex_string(target_hash)?;
             }
+            Command::SelfTest => {}
         }
         Ok(())
     }
@@ -81,6 +84,7 @@ impl Command {
             Command::BitcoinVanity { prefix, .. } => prefix.len(),
             Command::EthereumVanity { prefix, .. } => prefix.len(),
             Command::Shallenge { username, .. } => username.len(),
+            Command::SelfTest => 0,
         }
     }
 
@@ -90,6 +94,7 @@ impl Command {
             Command::BitcoinVanity { suffix, .. } => suffix.len(),
             Command::EthereumVanity { suffix, .. } => suffix.len(),
             Command::Shallenge { .. } => 0,
+            Command::SelfTest => 0,
         }
     }
 
@@ -106,6 +111,9 @@ impl Command {
             }
             Command::Shallenge { username, target_hash } => {
                 format!("Starting shallenge for username '{}' with target hash '{}'", username, target_hash)
+            }
+            Command::SelfTest => {
+                "Running on-device self-test".to_string()
             }
         }
     }
