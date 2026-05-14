@@ -141,6 +141,8 @@ pub mod gpu {
         //   91-93 Index trait dispatch + minimal cross-crate const probes
         //   94-96 subtle::Choice + ConditionallySelectable + EncodedPoint construction
         //   97-99 const-idx Index trait + GenericArray basic index + copy_from_slice
+        //   100-102 from_affine_coords replica + GA as_slice().last() + dalek scalar=0 round-trip
+        //   103-105 dalek from_bytes_wide(0) + FieldBytes::into() + base58 min-nonzero
         run_slot!(0,  kernel_self_test_primitive_xoroshiro);
         run_slot!(1,  kernel_self_test_primitive_sha512);
         run_slot!(2,  kernel_self_test_primitive_ed25519);
@@ -241,6 +243,12 @@ pub mod gpu {
         run_slot!(97, kernel_self_test_index_trait_const_indices);
         run_slot!(98, kernel_self_test_generic_array_basic_index);
         run_slot!(99, kernel_self_test_generic_array_copy_from_slice);
+        run_slot!(100, kernel_self_test_from_affine_coords_replica);
+        run_slot!(101, kernel_self_test_generic_array_as_slice_last);
+        run_slot!(102, kernel_self_test_dalek_scalar_round_trip_zero);
+        run_slot!(103, kernel_self_test_dalek_scalar_from_bytes_wide_zero);
+        run_slot!(104, kernel_self_test_field_bytes_into_conversion);
+        run_slot!(105, kernel_self_test_base58_min_nonzero);
 
         report(&results)
     }

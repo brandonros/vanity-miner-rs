@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 100;
+pub const SELF_TEST_NUM_CHECKS: usize = 106;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -355,6 +355,45 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "Index trait const-idx (5 writes/reads)",
     "GenericArray<u8, U33> basic index",
     "GenericArray<u8, U33> copy_from_slice",
+    // Slots 100-102: post-round-5 probes. Round-5 result: every isolated
+    // shape inside Bug-71 and Bug-96 has passed; the bugs only manifest
+    // through the actual dalek/sec1 crate compilation. New probes try
+    // to narrow further:
+    //   100 — local re-impl of sec1's `from_affine_coordinates` body
+    //         using raw `[u8; 33]` (no GenericArray). If PASS, sec1's
+    //         GenericArray-typed parameter handling is what breaks; if
+    //         FAIL, the algorithm shape itself triggers it.
+    //   101 — `Tag::compress_y(y.as_slice())` shape: pass `&GenericArray
+    //         <u8, U32>` to a function, take `.as_slice().last()` inside.
+    //         Tests the only GA-related path slots 98/99 didn't cover.
+    //   102 — dalek `Scalar::from_bytes_mod_order([0u8; 32]).to_bytes()`.
+    //         All-zero input variant of slot 71. If PASS but 71 FAILs,
+    //         the bug is input-dependent (only triggers for non-zero
+    //         scalars); if FAIL, the bug is general.
+    "k256 from_affine_coords replica (raw [u8; 33])",
+    "GenericArray y.as_slice().last() shape",
+    "dalek scalar round-trip ZERO",
+    // Slots 103-105: one fresh probe per open bug. Most isolated shapes
+    // already PASS; these target less-explored surface area.
+    //   103 (Bug-71) — `Scalar::from_bytes_mod_order_wide(&[0; 64])`.
+    //        Different entry point than slot 71/102 — uses
+    //        `from_bytes_wide` → montgomery_mul(R) / montgomery_mul(RR)
+    //        composition instead of plain `reduce`. If 71 FAIL but
+    //        103 PASS, the bug is in the specific call sequence inside
+    //        `Scalar::reduce`, not the wider field of scalar arithmetic.
+    //   104 (Bug-96) — `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then
+    //        index. Tests the From-impl conversion that slot 96 uses to
+    //        wrap raw byte arrays as `&GenericArray<u8, U32>`. Slot 98
+    //        used `GenericArray::default()` to construct; this tests
+    //        the conversion-from-raw-array path.
+    //   105 (Bug-41) — `base58_encode_32([0; 31] ++ [0x01])`. Single
+    //        non-zero byte; expected output is 31 '1's + '2' (= 32 chars).
+    //        Tests the digit-extraction loop with `limb_count == 1`
+    //        (slot 41 hits much higher limb_counts). If 105 PASS but 41
+    //        FAIL, bug requires multi-iter digit extraction.
+    "dalek from_bytes_mod_order_wide zero",
+    "k256 (&[u8; 32]).into() &FieldBytes",
+    "base58 single-nonzero-byte (limb_count=1)",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2353,6 +2392,105 @@ pub fn check_generic_array_copy_from_slice() -> u32 {
     (got == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+// Slot 100: local re-impl of sec1's `from_affine_coordinates` body using
+// raw `[u8; 33]` instead of `GenericArray<u8, U33>`. Same algorithm:
+//   tag = 0x02/0x03 based on y[31]&1
+//   bytes[0] = tag
+//   bytes[1..33] = x
+// If 100 PASSes and 96 still FAILs, the bug is in sec1's
+// GenericArray-typed parameter handling, not the algorithm.
+pub fn check_from_affine_coords_replica() -> u32 {
+    let x_bytes = &SECP256K1_GX_BYTES;
+    let y_bytes = &SECP256K1_GY_BYTES;
+    // Compute tag: even y → 0x02, odd y → 0x03
+    let last_y = core::hint::black_box(y_bytes[31]);
+    let tag: u8 = if last_y & 1 == 1 { 0x03 } else { 0x02 };
+    let mut bytes = [0u8; 33];
+    bytes[0] = tag;
+    bytes[1..33].copy_from_slice(x_bytes);
+    (bytes == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
+// Slot 101: probes the exact `y.as_slice().last()` shape inside
+// `Tag::compress_y`. Pass a `&GenericArray<u8, U32>` to a function, do
+// `as_slice().last()` inside. Slot 99 tested write-side copy; this
+// tests read-side slice access via Deref then `.last()`.
+#[inline(never)]
+fn last_via_as_slice(ga: &k256::elliptic_curve::generic_array::GenericArray<u8, k256::elliptic_curve::generic_array::typenum::U32>) -> u8 {
+    *ga.as_slice().last().expect("non-empty")
+}
+
+pub fn check_generic_array_as_slice_last() -> u32 {
+    use k256::elliptic_curve::generic_array::GenericArray;
+    use k256::elliptic_curve::generic_array::typenum::U32;
+    let ga: &GenericArray<u8, U32> = (&SECP256K1_GY_BYTES).into();
+    let last = last_via_as_slice(ga);
+    (last == 0xB8) as u32   // SECP256K1_GY_BYTES[31]
+}
+
+// Slot 102: dalek `Scalar::from_bytes_mod_order([0; 32])` should
+// round-trip to all-zeros (the canonical encoding of 0). Mirror of slot
+// 71 with a different input value. If 102 PASS but 71 FAIL, the bug is
+// input-dependent (only non-zero scalars). If 102 FAIL too, the bug is
+// general to any Scalar::from_bytes_mod_order call.
+pub fn check_dalek_scalar_round_trip_zero() -> u32 {
+    let input = [0u8; 32];
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(core::hint::black_box(input));
+    let bytes = scalar.to_bytes();
+    (bytes == input) as u32
+}
+
+// Slot 103: `Scalar::from_bytes_mod_order_wide(&[0; 64])` — uses a
+// different reduction entry point than slot 71/102. Internally it calls
+// `Scalar52::from_bytes_wide` + `montgomery_mul(R)` / `montgomery_mul(RR)`
+// composition, NOT `Scalar::reduce`. For all-zero input the result is
+// canonically 0.
+pub fn check_dalek_scalar_from_bytes_wide_zero() -> u32 {
+    let input = [0u8; 64];
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order_wide(
+        &core::hint::black_box(input),
+    );
+    let bytes = scalar.to_bytes();
+    (bytes == [0u8; 32]) as u32
+}
+
+// Slot 104: `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then read first
+// and last bytes. Tests the `From<&[u8; N]> for &GenericArray<u8, N>`
+// conversion (the only GA-related path slot 98/99 didn't cover — they
+// constructed via `GenericArray::default()` instead).
+pub fn check_field_bytes_into_conversion() -> u32 {
+    use k256::elliptic_curve::FieldBytes;
+    let arr: [u8; 32] = SECP256K1_GX_BYTES;
+    let arr = core::hint::black_box(arr);
+    let ga: &FieldBytes<k256::Secp256k1> = (&arr).into();
+    let first = ga[0];
+    let last = ga[31];
+    (first == 0x79 && last == 0x98) as u32
+}
+
+// Slot 105: `base58_encode_32` with minimum non-zero input: 31 leading
+// zero bytes + 1 byte of value 1. Forces `limb_count == 1` after the
+// outer loop (vs slot 41 which has higher limb_count). Expected output
+// is 31 '1's followed by '2' = 32 chars.
+pub fn check_base58_min_nonzero() -> u32 {
+    let mut input = [0u8; 32];
+    input[31] = 1;
+    let mut out = [0u8; 64];
+    let n = base58_encode_32(&input, &mut out);
+    let expected: &[u8] = b"11111111111111111111111111111112";
+    if n != expected.len() {
+        return 0;
+    }
+    let mut i = 0;
+    while i < n {
+        if out[i] != expected[i] {
+            return 0;
+        }
+        i += 1;
+    }
+    1
+}
+
 pub fn run_self_test(results: &mut [u32]) {
     results[0] = check_primitive_xoroshiro();
     results[1] = check_primitive_sha512();
@@ -2454,6 +2592,12 @@ pub fn run_self_test(results: &mut [u32]) {
     results[97] = check_index_trait_const_indices();
     results[98] = check_generic_array_basic_index();
     results[99] = check_generic_array_copy_from_slice();
+    results[100] = check_from_affine_coords_replica();
+    results[101] = check_generic_array_as_slice_last();
+    results[102] = check_dalek_scalar_round_trip_zero();
+    results[103] = check_dalek_scalar_from_bytes_wide_zero();
+    results[104] = check_field_bytes_into_conversion();
+    results[105] = check_base58_min_nonzero();
 }
 
 #[cfg(test)]

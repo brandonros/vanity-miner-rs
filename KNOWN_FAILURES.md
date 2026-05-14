@@ -17,7 +17,11 @@ to the compiler agent.
 | 2026-05-13 | 91    | 27   | v1.46.0    | Sub probes 88-90 PASS. |
 | 2026-05-13 | 94    | 29   | v1.46.0    | Slot 91 FAIL (later flipped). |
 | 2026-05-13 | 97    | 29   | v1.46.0    | Slot 91 PASS (Bug E lost), 96 FAIL (Bug-96 narrowed). |
-| pending    | 100   | ?    | next       | +3 probes (97-99). |
+| pending    | 100   | ?    | v1.52.0    | +3 probes (97-99). |
+| 2026-05-13 | 100   | 28   | v1.46.0    | Slot 80 flipped PASS (silent cuda-oxide update). 97/98/99 all PASS. |
+| 2026-05-14 | 100   | 28   | v1.52.0    | Identical results — 28 failures stable across 6 cuda-oxide version bumps. |
+| pending    | 103   | ?    | next       | +3 probes (100-102): replica of `from_affine_coords`, GA `as_slice().last()`, dalek scalar=0 round-trip. |
+| pending    | 106   | ?    | next       | +3 more probes (103-105): one per open bug — `from_bytes_mod_order_wide(0)`, `(&[u8;32]).into() &FieldBytes`, base58 single-nonzero-byte. |
 
 ---
 
@@ -55,8 +59,16 @@ LITERAL const indices via custom `Index<usize>` trait. Slot 91 used
 `black_box(idx)` (runtime) — different LLVM IR shape. Const indices may
 fold the trait call into a direct GEP that miscompiles separately.
 
-**Probe in flight:** Slot 97 — `IdxProbe` with 5 literal const indices
-in a row (mirrors dalek `Scalar52::from_bytes`'s `s[0]..=s[4]` pattern).
+**Probes in flight:**
+- Slot 102 — `Scalar::from_bytes_mod_order([0u8; 32])` round-trip
+  (all-zeros variant of slot 71). Disambiguates input-dependent vs
+  general.
+- Slot 103 — `Scalar::from_bytes_mod_order_wide(&[0u8; 64])` — different
+  entry point (uses `from_bytes_wide` + `montgomery_mul(R)/montgomery_mul(RR)`,
+  not `reduce`). If 103 PASS but 71 FAIL, the bug is in `Scalar::reduce`'s
+  exact call sequence, not the wider scalar arithmetic.
+
+(Slot 97 already PASSed — const-index Index dispatch wasn't it.)
 
 **Failures owned:** 5 (slots 2, 11, 12, 71, 72) + partial 3/12.
 
@@ -88,10 +100,11 @@ pub fn check_base58_var_len() -> u32 {
 - `&'static [u64; 5]` DIVISORS reads (slots 76/77)
 - `BASE58_ALPHABET` lookup (slots 60-62)
 
-**Next move.** No probe queued. Strategy: wait on Bug-71 and Bug-96 to
-settle — one of those fixes may cascade here. If not, write a minimized
-`base58_encode_8` (just 2 outer iterations) to find the threshold where
-the bug appears.
+**Probe in flight:** Slot 105 — `base58_encode_32([0; 31] ++ [0x01])`
+(31 leading zeros + 1 byte of value 1). Forces `limb_count == 1` after
+the outer loop. Slot 41 hits much higher limb_counts. If 105 PASS but
+41 FAIL, the bug requires multi-iteration digit extraction (`for idx in
+(0..limb_count).rev()` running ≥ 2 times).
 
 **Failures owned:** 2 direct (41, 42) + partial cascade in 3, 12, 19, 21-24.
 
@@ -132,52 +145,103 @@ miscompiled, every `bytes[i]` and `bytes[a..b]` on a GenericArray is
 wrong.
 
 **Probes in flight:**
-- Slot 98 — `GenericArray<u8, U33>::default()` then `ga[0]/ga[32]` write+read.
-- Slot 99 — `GenericArray<u8, U33>` via `ga[1..33].copy_from_slice(&src)`.
+- Slot 100 — local re-impl of `from_affine_coordinates` using raw
+  `[u8; 33]` instead of `GenericArray<u8, U33>`. Same algorithm, no GA.
+- Slot 101 — `&GenericArray<u8, U32>` parameter then `.as_slice().last()`
+  inside fn. Tests `Tag::compress_y` shape.
+- Slot 104 — `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then index.
+  Tests the `From<&[u8; N]> for &GenericArray<u8, N>` conversion. Slot 98
+  used `default()` constructor; this tests the conversion path.
 
-Decoding: 98 FAIL → GA Deref broken (explains everything). 99 FAIL → GA
-slice copy broken. Both PASS → bug is in `Tag::compress_y(y.as_slice())`
-or elsewhere — need a new probe round.
+(Slots 98/99 already PASSed — basic GA index and write-side copy aren't
+it.)
 
 **Failures owned:** 22 (slots 4, 5, 13-24, 74, 75, 78, 79, 80, 93, 96).
 
 ---
 
-## Per-failure inventory (29 failures, v1.46.0)
+## Failures grouped by bug
 
-| #  | Slot name                              | Bug             | Why |
-|----|----------------------------------------|-----------------|-----|
-|  2 | ed25519 derive                         | Bug-71          | cascade of 71 |
-|  3 | base58 encode pub                      | Bug-71 + Bug-41 | base58 of dalek output |
-|  4 | secp256k1 compressed                   | Bug-96          | k256 derive ends in `to_encoded_point` |
-|  5 | secp256k1 uncompressed                 | Bug-96          | cascade of 4 |
-| 11 | solana pub                             | Bug-71          | cascade of 2 |
-| 12 | solana encoded                         | Bug-71 + Bug-41 | cascade of 2 + base58 |
-| 13 | ethereum priv                          | Bug-96          | cascade of 4 |
-| 14 | ethereum pub                           | Bug-96          | cascade of 4 |
-| 15 | ethereum address                       | Bug-96          | cascade of 4 |
-| 16 | bitcoin priv                           | Bug-96          | cascade of 4 |
-| 17 | bitcoin pub                            | Bug-96          | cascade of 4 |
-| 18 | bitcoin pkh                            | Bug-96          | cascade of 4 |
-| 19 | bitcoin encoded                        | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 20 | bitcoin matches                        | Bug-96          | cascade of 4 |
-| 21 | wif compressed mainnet                 | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 22 | wif uncompressed mainnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 23 | wif compressed testnet                 | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 24 | wif uncompressed testnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 41 | base58 var-len                         | Bug-41          | **direct hit** |
-| 42 | base58 var-len leading-zero            | Bug-41          | variant of 41 |
-| 71 | dalek scalar from-bytes round-trip     | Bug-71          | **direct hit** |
-| 72 | dalek mul_base scalar=1                | Bug-71          | depends on 71 |
-| 74 | k256 derive scalar=1                   | Bug-96          | calls `to_encoded_point` |
-| 75 | k256 derive scalar=2                   | Bug-96          | calls `to_encoded_point` |
-| 78 | k256 encode generator (no mul)         | Bug-96          | direct path to `to_encoded_point` |
-| 79 | k256 double generator + encode         | Bug-96          | 78 + doubling |
-| 80 | k256 Scalar::ONE round-trip            | Bug-96 (likely) | `Scalar::to_repr` returns `GenericArray<u8, U32>` |
-| 93 | k256 AffinePoint encode                | Bug-96          | direct k256 path |
-| 96 | EncodedPoint::from_affine_coordinates  | Bug-96          | **direct hit** |
+Each slot is blocked by ≥1 of the three open bugs. Slots blocked by
+multiple bugs need ALL of them fixed before they pass.
 
-29 rows = 29 failing slots; every failure has a primary suspect.
+### Blocked by `dalek-scalar-reduce` only — 4 slots
+
+These all execute dalek's broken `Scalar::from_bytes_mod_order` /
+`reduce` chain. Once that's fixed, all four clear.
+
+| #  | Slot name                            | Where it touches the bug |
+|----|--------------------------------------|--------------------------|
+| 71 | dalek scalar from-bytes round-trip   | **direct hit / smoking gun** |
+| 72 | dalek mul_base scalar=1               | calls 71's path then `mul_base` |
+|  2 | ed25519 derive                       | `ed25519_derive_public_key` calls `Scalar::from_bytes_mod_order` |
+| 11 | solana pub                           | runs ed25519 derive (= slot 2's path) |
+
+### Blocked by `base58-encode-32` only — 2 slots
+
+Just the two direct probes. Once `base58_encode_32` with non-zero input
+is fixed, both clear.
+
+| #  | Slot name                            | Where it touches the bug |
+|----|--------------------------------------|--------------------------|
+| 41 | base58 var-len                       | **direct hit / smoking gun** |
+| 42 | base58 var-len leading-zero          | variant of 41 |
+
+### Blocked by `k256-encodedpoint` only — 16 slots
+
+These all execute k256's `to_encoded_point` chain (which calls the
+broken `EncodedPoint::from_affine_coordinates`). Once that's fixed, all
+sixteen clear.
+
+| #  | Slot name                            | Where it touches the bug |
+|----|--------------------------------------|--------------------------|
+| 96 | EncodedPoint::from_affine_coordinates| **direct hit / smoking gun** |
+| 93 | k256 AffinePoint encode              | `AffinePoint::GENERATOR.to_encoded_point()` |
+| 78 | k256 encode generator (no mul)       | `ProjectivePoint::GENERATOR.to_affine().to_encoded_point()` |
+| 79 | k256 double generator + encode       | 78 + doubling |
+| 74 | k256 derive scalar=1                 | full derive ending in `to_encoded_point` |
+| 75 | k256 derive scalar=2                 | same as 74 |
+| 80 | k256 Scalar::ONE round-trip          | `Scalar::to_repr` returns `GenericArray<u8, U32>` (same GA dep — likely) |
+|  4 | secp256k1 compressed                 | `secp256k1_derive_public_key` calls the same chain |
+|  5 | secp256k1 uncompressed               | `secp256k1_derive_public_key_uncompressed` |
+| 13 | ethereum priv                        | ethereum pipeline calls secp256k1 derive |
+| 14 | ethereum pub                         | same |
+| 15 | ethereum address                     | same + keccak |
+| 16 | bitcoin priv                         | bitcoin pipeline calls secp256k1 derive |
+| 17 | bitcoin pub                          | same |
+| 18 | bitcoin pkh                          | same + sha+rip |
+| 20 | bitcoin matches                      | full bitcoin pipeline |
+
+### Compound — blocked by multiple bugs — 7 slots
+
+These slots need MORE than one bug fixed before they pass. Fixing just
+one of their blockers won't help.
+
+| #  | Slot name                  | Blocked by                                  | Why |
+|----|----------------------------|---------------------------------------------|-----|
+|  3 | base58 encode pub          | dalek-scalar-reduce + base58-encode-32      | base58 of dalek's output: both the input *and* the encoder are broken |
+| 12 | solana encoded             | dalek-scalar-reduce + base58-encode-32      | ed25519 → base58 in solana pipeline |
+| 19 | bitcoin encoded            | k256-encodedpoint + base58-encode-32        | secp256k1 → sha+rip → base58 |
+| 21 | wif compressed mainnet     | k256-encodedpoint + base58-encode-32        | secp256k1 → base58 (WIF) |
+| 22 | wif uncompressed mainnet   | k256-encodedpoint + base58-encode-32        | same |
+| 23 | wif compressed testnet     | k256-encodedpoint + base58-encode-32        | same |
+| 24 | wif uncompressed testnet   | k256-encodedpoint + base58-encode-32        | same |
+
+### What clears when each bug is fixed
+
+| Fix | Slots cleared | Cumulative |
+|---|---|---|
+| `dalek-scalar-reduce` alone | 4 (71, 72, 2, 11) | 4 / 29 |
+| `base58-encode-32` alone | 2 (41, 42) | 2 / 29 |
+| `k256-encodedpoint` alone | 16 (see above) | 16 / 29 |
+| dalek + base58 | 4 + 2 + 2 compound (3, 12) | 8 / 29 |
+| dalek + k256 | 4 + 16 | 20 / 29 |
+| base58 + k256 | 2 + 16 + 5 compound (19, 21-24) | 23 / 29 |
+| **all three** | 4 + 2 + 16 + 7 compound | **29 / 29** |
+
+So `k256-encodedpoint` is the highest-leverage fix (16 slots), followed
+by `dalek-scalar-reduce` (4 direct + unlocks 2 compound). `base58-encode-32`
+only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 
 ---
 
@@ -185,9 +249,12 @@ or elsewhere — need a new probe round.
 
 | Slot | Targets | Probe |
 |---|---|---|
-| 97 | Bug-71 | `IdxProbe` with 5 literal-const-index writes/reads |
-| 98 | Bug-96 | `GenericArray<u8, U33>` basic write/read at fixed indices |
-| 99 | Bug-96 | `GenericArray<u8, U33>` populated via `copy_from_slice` |
+| 100 | Bug-96 | local re-impl of `from_affine_coordinates` using raw `[u8; 33]` |
+| 101 | Bug-96 | `&GenericArray<u8, U32>` parameter then `.as_slice().last()` inside fn |
+| 102 | Bug-71 | dalek `Scalar::from_bytes_mod_order([0u8; 32])` round-trip |
+| 103 | Bug-71 | dalek `Scalar::from_bytes_mod_order_wide(&[0u8; 64])` round-trip |
+| 104 | Bug-96 | `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then index |
+| 105 | Bug-41 | `base58_encode_32([0;31] ++ [0x01])` — single non-zero byte, `limb_count == 1` |
 
 ---
 
@@ -223,10 +290,14 @@ briefly so we don't re-test the same shape.
 | `u128 >> 52` immediate right shift broken (Bug D1) | slot 81 PASS | u128 immediate shifts work |
 | Depth-4 `&'static` newtype nesting broken (Bug D2) | slot 82 PASS | 4-level newtype field projections work |
 | `(0..n).rev()` reverse range iterator broken (Bug D3) | slot 83 PASS | reverse range writes work |
-| Simple `Index<usize>` trait dispatch broken (Bug E v1) | slot 91 FLIPPED to PASS | runtime-index Index works; const-index under test (slot 97) |
+| Simple `Index<usize>` trait dispatch broken (Bug E v1) | slot 91 FLIPPED to PASS | runtime-index Index dispatch works |
+| Const-index Index trait dispatch broken (Bug E v2) | slot 97 PASS | 5-write `p[0]..=p[4]` literal-index pattern works |
 | Some intermediate of dalek's Scalar reduce path miscompiles | slots 84-90 all PASS | each step is correct in isolation; bug only emerges in dalek's exact compilation |
 | `Scalar52::sub` borrow-chain / volatile `black_box` broken | slots 88-90 PASS | sub works correctly |
 | k256 cascade is `Lazy<>` / once_cell init failure | (not tested directly — folded into Bug-96 narrowing) | superseded by slot-96 narrowing |
+| `GenericArray<u8, N>` basic index broken | slot 98 PASS | GA Deref + IndexMut at fixed offsets works |
+| `GenericArray<u8, N>` write-side `copy_from_slice` broken | slot 99 PASS | dst `ga[a..b].copy_from_slice(&src[..])` works for raw `&[u8]` source |
+| k256 `Scalar::ONE` round-trip broken (slot 80) | slot 80 silently flipped PASS | likely fixed by a cuda-oxide HEAD update between v1.46 and v1.52 |
 
 ---
 

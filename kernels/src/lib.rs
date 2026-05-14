@@ -1011,4 +1011,48 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_generic_array_copy_from_slice(results: &mut [u32]) {
         results[99] = logic::check_generic_array_copy_from_slice();
     }
+
+    // Slots 100-102: post-round-5 probes.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_from_affine_coords_replica(results: &mut [u32]) {
+        results[100] = logic::check_from_affine_coords_replica();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_generic_array_as_slice_last(results: &mut [u32]) {
+        results[101] = logic::check_generic_array_as_slice_last();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar_round_trip_zero(results: &mut [u32]) {
+        results[102] = logic::check_dalek_scalar_round_trip_zero();
+    }
+
+    // Slots 103-105: one fresh probe per open bug (Bug-71, Bug-96, Bug-41).
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar_from_bytes_wide_zero(results: &mut [u32]) {
+        results[103] = logic::check_dalek_scalar_from_bytes_wide_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_field_bytes_into_conversion(results: &mut [u32]) {
+        results[104] = logic::check_field_bytes_into_conversion();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_base58_min_nonzero(results: &mut [u32]) {
+        results[105] = logic::check_base58_min_nonzero();
+    }
 }

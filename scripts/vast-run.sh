@@ -2,8 +2,8 @@
 
 set -e
 
-PORT=19411
-HOST=ssh6.vast.ai
+PORT=18447
+HOST=ssh5.vast.ai
 USER=root
 VERSION="${VANITY_MINER_VERSION:-$(gh release view --repo brandonros/vanity-miner-rs --json tagName -q .tagName)}"
 echo "==> deploying vanity-miner $VERSION to $USER@$HOST:$PORT"
