@@ -259,6 +259,9 @@ pub mod gpu {
         run_slot!(110, kernel_self_test_generic_array_copy_from_ga_source);
         run_slot!(111, kernel_self_test_dalek_zero_eq_zero);
         run_slot!(112, kernel_self_test_dalek_from_canonical_zero);
+        run_slot!(113, kernel_self_test_dalek_scalar52_from_bytes_zero);
+        run_slot!(114, kernel_self_test_dalek_scalar52_mul_internal_zero);
+        run_slot!(115, kernel_self_test_dalek_scalar52_montgomery_reduce_zero);
 
         report(&results)
     }

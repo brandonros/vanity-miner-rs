@@ -20,7 +20,7 @@ use crate::{
     sha256_32_from_bytes, sha256_from_bytes, sha512_32bytes_from_bytes,
 };
 
-pub const SELF_TEST_NUM_CHECKS: usize = 113;
+pub const SELF_TEST_NUM_CHECKS: usize = 116;
 
 /// Slot labels in order; useful for printing results.
 ///
@@ -440,6 +440,24 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
     "GenericArray dst.copy_from_slice(src GA)",
     "dalek Scalar::ZERO == Scalar::ZERO (PartialEq)",
     "dalek Scalar::from_canonical_bytes(0) == ZERO",
+    // Slots 113-115: post-round-9 narrowing. Slot 112 FAIL combined with
+    // slot 111 PASS pins Bug-71 to `Scalar::reduce()` on zero input
+    // (since `from_canonical_bytes(0)` only goes through `from_bits` +
+    // `is_canonical()` which itself calls `reduce()`, and PartialEq
+    // itself works). The verbatim Scalar52 port (slots 84-90) covered
+    // each reduce step for value=1/R but NEVER tested zero input.
+    //   113 (Bug-71) — `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]`.
+    //        Zero unpack via the verbatim port.
+    //   114 (Bug-71) — `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]`.
+    //        Zero · R widening multiply via the verbatim port.
+    //   115 (Bug-71) — `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]`.
+    //        Full reduce of zero-widened limbs via the verbatim port.
+    // If all three PASS, Bug-71 is real-dalek-codegen-vs-port (same source,
+    // different compilation). If any FAIL, that step is the smoking gun
+    // and we have our minimal repro.
+    "dalek bisect Scalar52::from_bytes(0)",
+    "dalek bisect Scalar52::mul_internal(0, R)",
+    "dalek bisect Scalar52::montgomery_reduce(0)",
 ];
 
 // === Solana per-primitive bisect (slots 0-3) ===
@@ -2670,6 +2688,38 @@ pub fn check_dalek_from_canonical_zero() -> u32 {
     (s == zero) as u32
 }
 
+// Slot 113: zero-input `from_bytes` via the verbatim Scalar52 port. Slot
+// 84 covered value=1; this is the analogous zero variant. If FAIL,
+// limb-unpack of all-zero bytes is broken (likely a const-fold or zero-
+// special-case codegen). If PASS, the unpack step is not Bug-71's locus.
+pub fn check_dalek_scalar52_from_bytes_zero() -> u32 {
+    let bytes = core::hint::black_box([0u8; 32]);
+    let s = bisect_scalar52::Scalar52::from_bytes(&bytes);
+    (s.0 == [0u64; 5]) as u32
+}
+
+// Slot 114: `Scalar52::mul_internal(ZERO, R)` via the verbatim port. The
+// 5x5 widening multiply matrix should produce all-zero u128 limbs when
+// one operand is zero. Slot 86 covered ONE * R; this is the zero case.
+pub fn check_dalek_scalar52_mul_internal_zero() -> u32 {
+    use bisect_scalar52::Scalar52;
+    let zero = core::hint::black_box(Scalar52::ZERO);
+    let r = core::hint::black_box(bisect_scalar52::R);
+    let product = Scalar52::mul_internal(&zero, &r);
+    (product == [0u128; 9]) as u32
+}
+
+// Slot 115: full `montgomery_reduce(&[0; 9])` via the verbatim port —
+// the final step `Scalar::reduce()` performs on a zero scalar. Slot 85
+// covered widened R; slot 90 covered montgomery_reduce-with-sub on R.
+// This tests the zero-input variant, which exercises the underflow-mask
+// + conditional-add-L branch differently.
+pub fn check_dalek_scalar52_montgomery_reduce_zero() -> u32 {
+    let widened = core::hint::black_box([0u128; 9]);
+    let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
+    (result.0 == [0u64; 5]) as u32
+}
+
 pub fn check_base58_handrolled_no_seq() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];
@@ -2905,6 +2955,9 @@ pub fn run_self_test(results: &mut [u32]) {
     results[110] = check_generic_array_copy_from_ga_source();
     results[111] = check_dalek_zero_eq_zero();
     results[112] = check_dalek_from_canonical_zero();
+    results[113] = check_dalek_scalar52_from_bytes_zero();
+    results[114] = check_dalek_scalar52_mul_internal_zero();
+    results[115] = check_dalek_scalar52_montgomery_reduce_zero();
 }
 
 #[cfg(test)]

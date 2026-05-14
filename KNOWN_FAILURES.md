@@ -28,6 +28,8 @@ to the compiler agent.
 | pending    | 110   | ?    | next       | +2 probes (108-109): `<[u8]>::reverse()` partial-slice, dalek Scalar `==` eq without to_bytes. |
 | 2026-05-14 | 110   | 33   | v1.55.0    | **Slot 108 FAIL → Bug-41 minimal repro confirmed.** Slot 109 FAIL (Scalar value wrong). Slot 101 FLIPPED PASS (previous Bug-96 repro lost). |
 | pending    | 113   | ?    | next       | +3 probes (110-112): GA-source `copy_from_slice`, `Scalar::ZERO==ZERO`, `from_canonical_bytes(0)`. |
+| 2026-05-14 | 113   | 34   | v1.55.0    | **Bug-71 pinned to `reduce()` on zero**: 112 FAIL (`from_canonical_bytes([0;32])`), 111 PASS (PartialEq ok), 110 PASS (GA-source `copy_from_slice` ok; Bug-96 repro still elusive). |
+| pending    | 116   | ?    | next       | +3 probes (113-115): zero-input bisect ladder — `from_bytes(0)`, `mul_internal(0, R)`, `montgomery_reduce(0)` via verbatim port. |
 
 ---
 
@@ -60,25 +62,34 @@ pub fn check_dalek_scalar_round_trip_one() -> u32 {
 - `Scalar52::from_bytes`, `mul_internal`, `montgomery_reduce_no_sub`, `sub`, `as_bytes` (verbatim ports — slots 84-90)
 - Simple `Index<usize>`/`IndexMut<usize>` trait dispatch with `black_box(idx)` (slot 91 PASS)
 
-**Update (after slot 109 FAIL):** The Scalar VALUE returned by
-`from_bytes_mod_order([0; 32])` is wrong — `s == Scalar::ZERO` returns
-false via dalek's `PartialEq`. So the bug is not just in `to_bytes`; the
-construction itself produces a non-zero Scalar.
+**Update (v1.55.0): bug pinned to `Scalar::reduce()` on zero input.**
 
-This makes Bug-71 deeper than expected. Possible remaining causes:
-- `Scalar::reduce()` itself produces wrong value (despite slots 84-90 PASSing for each isolated step)
-- The Scalar struct construction `Scalar { bytes }` is corrupted at the public-API boundary
+- Slot 111 PASS: `Scalar::ZERO == Scalar::ZERO` — dalek's `PartialEq`
+  (byte compare via `subtle`) works.
+- Slot 112 FAIL: `Scalar::from_canonical_bytes([0; 32]).unwrap() == ZERO`.
+  `from_canonical_bytes` calls `Scalar::from_bits(bytes)` (just stores
+  bytes) then `is_canonical()` → `self.ct_eq(&self.reduce())`. With 111
+  PASS confirming PartialEq, the only remaining way for 112 to FAIL is
+  `reduce()` of zero producing non-zero bytes (so `is_canonical` returns
+  Choice(0) → `CtOption` is None → match arm returns 0).
+- Slot 109 FAIL with same root cause: `from_bytes_mod_order` calls
+  `reduce()` directly.
+- Slot 102, 103 FAIL with same root cause.
 
-**Probes in flight:**
-- Slot 111 — `Scalar::ZERO == Scalar::ZERO` (pure const PartialEq sanity).
-  If FAIL, PartialEq itself is broken. If PASS (likely), slot 109 confirms
-  genuine value miscompile.
-- Slot 112 — `Scalar::from_canonical_bytes([0; 32]).unwrap() == Scalar::ZERO`.
-  Alternate entry point that does NOT call `reduce()`. If 112 PASS but
-  109 FAIL → bug is in `reduce()` specifically.
+Slots 84-90 PASS for the verbatim port, but they all tested value=1 or
+R as inputs — **zero was never tested through the port**. Slots 113-115
+fix that:
+- Slot 113 — `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]`
+- Slot 114 — `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]`
+- Slot 115 — `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]`
 
-(Slots 97, 102, 103, 106 ruled out: const-idx Index, input-dependence,
-entry-point-dependence, intra-crate struct-return-ABI.)
+If any FAILs → that step is the smoking gun, and we have a minimal
+repro. If all PASS → real-dalek codegen diverges from our port despite
+identical source (likely cross-crate inlining / monomorphization).
+
+(Slots 97, 102, 103, 106, 111 ruled out: const-idx Index, input-
+dependence, entry-point-dependence, intra-crate struct-return-ABI,
+PartialEq itself.)
 
 **Failures owned:** 5 (slots 2, 11, 12, 71, 72) + partial 3/12.
 
@@ -153,10 +164,16 @@ something else inside it is the bug.
 - Slot 101 — `&GA::as_slice().last()` (was FAIL in v1.53/v1.54, now PASS).
 - Slot 104 — `(&[u8; N]).into() → &GenericArray<u8, N>` conversion.
 
-**Probe in flight:** Slot 110 — `dst_ga[a..b].copy_from_slice(src_ga)`
-where source is a `&GenericArray<u8, U32>` (not `&[u8; 32]` like slot
-99). Tests the remaining unfound GA-related shape used inside
-`from_affine_coordinates`. If 110 FAIL, that's the new minimal repro.
+**Probe in flight:** *(none for next round — Bug-71 narrowing took
+priority; 113-115 are dalek-side.)* Slot 110 PASSed → `copy_from_slice`
+from a `&GenericArray<u8, U32>` source works. The shape inside
+`from_affine_coordinates` that breaks is still unidentified.
+
+**Next candidates (not yet wired):**
+- typenum-computed slice index: `let n = <U32 as Add<U1>>::Output::USIZE;
+  dst[1..n].copy_from_slice(src)` — slot 110 used literal `1..33`
+- `Tag::compress_y(y.last().expect()).into()` — enum tag computation
+- `GenericArray::default()` then mutation (vs constructed via `into()`)
 
 **Failures owned:** 21 (slots 4, 5, 13-24, 74, 75, 78, 79, 93, 96; slot 80 now PASSes).
 
@@ -169,8 +186,8 @@ multiple bugs need ALL of them fixed before they pass.
 
 **Current minimal repros:**
 - Bug-41: **slot 108** (`<[u8]>::reverse()` on partial sub-slice) ✅ ready to ship
-- Bug-96: **none currently** (slot 101 flipped PASS on v1.55.0; need new probe — slot 110 in flight)
-- Bug-71: **none** (slot 109 confirmed value-level, deeper than expected)
+- Bug-96: **none currently** (slot 110 PASSed too; need new shape — see Bug-96 section)
+- Bug-71: **slot 112** confirms `Scalar::reduce()` on zero is broken; slots 113-115 should pinpoint which inner step
 
 ### Blocked by `dalek-scalar-reduce` only — 4 slots
 
@@ -256,9 +273,9 @@ only directly clears 2 slots but is a prerequisite for the 7 compound failures.
 
 | Slot | Targets | Probe |
 |---|---|---|
-| 110 | Bug-96 | `dst_ga.copy_from_slice(src_ga_as_slice)` — slice copy from GA-typed source |
-| 111 | Bug-71 | `Scalar::ZERO == Scalar::ZERO` (PartialEq sanity) |
-| 112 | Bug-71 | `Scalar::from_canonical_bytes([0; 32]).unwrap() == Scalar::ZERO` (no `reduce()`) |
+| 113 | Bug-71 | `bisect::Scalar52::from_bytes(&[0; 32]).0 == [0; 5]` — zero unpack via verbatim port |
+| 114 | Bug-71 | `bisect::Scalar52::mul_internal(&ZERO, &R) == [0; 9]` — 5×5 widening mul with zero operand |
+| 115 | Bug-71 | `bisect::Scalar52::montgomery_reduce(&[0; 9]).0 == [0; 5]` — full reduce of zero-widened limbs |
 
 ---
 
@@ -311,6 +328,8 @@ briefly so we don't re-test the same shape.
 | Bug-41 is `seq!` macro expansion | slot 107 PASS (hand-rolled while-loop version works) | seq! isn't the bug; remaining diff is `<[u8]>::reverse()` |
 | Bug-96 is `&GenericArray<u8, U32>::as_slice().last()` (slot 101) | slot 101 FLIPPED to PASS on v1.55.0 (was FAIL in v1.53/v1.54) | The compiler agent fixed THIS shape, but slot 96 still FAILs → the bug inside `from_affine_coordinates` is some other shape |
 | Bug-71 is only in `to_bytes` (= `Scalar52::as_bytes`) | slot 109 FAIL (`Scalar::from_bytes_mod_order(0) != Scalar::ZERO` via PartialEq, no `to_bytes` involved) | The Scalar VALUE itself is wrong, not just byte serialization |
+| Bug-71 is in dalek's `PartialEq` impl | slot 111 PASS (`Scalar::ZERO == Scalar::ZERO`) | PartialEq itself works; 109/112 failures come from wrong-value Scalar, not wrong-eq |
+| Bug-96 is `dst_ga[a..b].copy_from_slice(src_ga)` | slot 110 PASS on v1.55.0 | plain copy from `&GenericArray<u8, U32>` source works; the bug is some other shape inside `from_affine_coordinates` |
 
 ---
 

@@ -1107,4 +1107,26 @@ pub mod kernels {
     pub unsafe fn kernel_self_test_dalek_from_canonical_zero(results: &mut [u32]) {
         results[112] = logic::check_dalek_from_canonical_zero();
     }
+
+    // Slots 113-115: post-round-9 zero-input verbatim-port ladder.
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_from_bytes_zero(results: &mut [u32]) {
+        results[113] = logic::check_dalek_scalar52_from_bytes_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_mul_internal_zero(results: &mut [u32]) {
+        results[114] = logic::check_dalek_scalar52_mul_internal_zero();
+    }
+
+    #[cfg(feature = "kernel_self_test")]
+    #[kernel]
+    #[allow(clippy::missing_safety_doc)]
+    pub unsafe fn kernel_self_test_dalek_scalar52_montgomery_reduce_zero(results: &mut [u32]) {
+        results[115] = logic::check_dalek_scalar52_montgomery_reduce_zero();
+    }
 }
