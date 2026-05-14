@@ -3,577 +3,230 @@
 Tracks failures from `compute-sanitizer --tool memcheck ./vanity-miner self-test`
 against the current cuda-oxide alpha-NVPTX compiler. Updated after every vast run.
 
-Self-contained: includes both our self-test layer (the `check_*` functions
-each slot calls) and the downstream-crate Rust the call paths actually
-execute, so this doc alone is enough context to hand to the compiler agent.
+Self-contained: includes both our self-test layer and the downstream-crate
+Rust the failing call paths execute, so this doc is enough context to hand
+to the compiler agent.
 
-| Date       | Suite size | FAIL | cuda-oxide rev | Notes                                 |
-|------------|------------|------|----------------|---------------------------------------|
-| 2026-05-13 | 76         | 25   | v1.43.0        | First Bug A hypothesis (now falsified). |
-| 2026-05-13 | 81         | 27   | v1.46.0        | Bug C fixed. Bug A falsified by 76/77. Re-bisecting via slots 81-83. |
-| pending    | 88         | ?    | v1.46 (rerun)  | +3 hypothesis probes (81-83) and +4 ladder rungs (84-87). |
-| 2026-05-13 | 88         | 27   | v1.46.0        | All 81-87 PASSed. New finding: ladder copy missing `Scalar52::sub` from montgomery_reduce. |
-| pending    | 91         | ?    | v1.46 (rerun)  | +3 sub probes (88-90) added; 85/86 kept on `_no_sub` variant for direct comparison. |
-| 2026-05-13 | 91         | 27   | v1.46.0        | All 81-90 PASSed. Smoking gun: my port uses `a.0[i]`, dalek uses `a[i]` via custom Index trait. |
-| pending    | 94         | ?    | v1.46 (rerun)  | +3 probes (91-93): Index trait dispatch + cross-crate minimal const/encoding. |
-| 2026-05-13 | 94         | 29   | v1.46.0        | **Bug E confirmed**: slot 91 FAIL (Index/IndexMut dispatch on tuple struct). Bug F confirmed separate: slot 93 FAIL, 92 PASS. |
-| pending    | 97         | ?    | v1.46 (rerun)  | +3 probes (94-96): subtle Choice/ConditionallySelectable/EncodedPoint construction. |
-| 2026-05-13 | 97         | 29   | v1.46.0        | **Slot 91 FLIPPED to PASS** (Bug E minimal repro lost). 94/95 PASS, 96 FAIL → Bug F is in `EncodedPoint::from_affine_coordinates` itself. |
-| pending    | 100        | ?    | next           | +3 probes (97-99): const-idx Index dispatch + GenericArray basic + copy_from_slice. |
+## Run history
+
+| Date       | Suite | FAIL | cuda-oxide | Notes |
+|------------|-------|------|------------|-------|
+| 2026-05-13 | 76    | 25   | v1.43.0    | Bug C still failing. First Bug A hypothesis. |
+| 2026-05-13 | 81    | 27   | v1.46.0    | Bug C fixed. Static-array hypothesis falsified. |
+| 2026-05-13 | 88    | 27   | v1.46.0    | Ladder slots 84-87 PASS — verbatim Scalar52 port works inside `logic`. |
+| 2026-05-13 | 91    | 27   | v1.46.0    | Sub probes 88-90 PASS. |
+| 2026-05-13 | 94    | 29   | v1.46.0    | Slot 91 FAIL (later flipped). |
+| 2026-05-13 | 97    | 29   | v1.46.0    | Slot 91 PASS (Bug E lost), 96 FAIL (Bug-96 narrowed). |
+| pending    | 100   | ?    | next       | +3 probes (97-99). |
+
+---
+
+## Currently open bugs
+
+Three open compiler bugs. Names use the direct-hit probe's slot number —
+the name points to the minimal repro.
+
+### Bug-71 — dalek `Scalar::from_bytes_mod_order` chain
+
+**Status.** Direct repro slot 71 FAILs every run. No isolated minimal
+repro yet — slots 81-90 (ladder of every intermediate step of dalek's
+`Scalar::reduce`, ported verbatim into `logic`) all PASS.
+
+**Slot 71 (smoking gun):**
+```rust
+pub fn check_dalek_scalar_round_trip_one() -> u32 {
+    let mut input = [0u8; 32];
+    input[0] = 1;
+    let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(input);
+    let bytes = scalar.to_bytes();
+    (bytes == input) as u32   // For scalar=1, should round-trip identity
+}
+```
+
+**Ruled out** (all PASS):
+- `u128 >> 52` immediate shift (slot 81)
+- `u128 + u128` carry chains (slot 65)
+- `&'static [u64; N]` reads, raw or newtype-wrapped (slots 76/77/82)
+- `Scalar52::from_bytes`, `mul_internal`, `montgomery_reduce_no_sub`, `sub`, `as_bytes` (verbatim ports — slots 84-90)
+- Simple `Index<usize>`/`IndexMut<usize>` trait dispatch with `black_box(idx)` (slot 91 PASS)
+
+**Live hypothesis.** Dalek's `Scalar52` uses `s[0] = …; s[1] = …` with
+LITERAL const indices via custom `Index<usize>` trait. Slot 91 used
+`black_box(idx)` (runtime) — different LLVM IR shape. Const indices may
+fold the trait call into a direct GEP that miscompiles separately.
+
+**Probe in flight:** Slot 97 — `IdxProbe` with 5 literal const indices
+in a row (mirrors dalek `Scalar52::from_bytes`'s `s[0]..=s[4]` pattern).
+
+**Failures owned:** 5 (slots 2, 11, 12, 71, 72) + partial 3/12.
+
+---
+
+### Bug-41 — base58 encoding with non-zero input
+
+**Status.** Direct repro slots 41/42 FAIL every run. Slot 43 (all-zero
+input) PASSes because the all-zero path skips the digit-extraction loop.
+Every building-block primitive PASSes in isolation; bug is in an
+interaction we haven't isolated.
+
+**Slot 41 (smoking gun):**
+```rust
+pub fn check_base58_var_len() -> u32 {
+    let input: [u8; 32] = [/* non-zero 32 bytes */];
+    let mut out = [0u8; 64];
+    let n = base58_encode_32(&input, &mut out);
+    n == BASE58_VAR_EXPECTED.len()
+        && &out[..n] == BASE58_VAR_EXPECTED
+}
+```
+
+**Ruled out** (all PASS in isolation):
+- Reverse range iter `(0..n).rev()` (slot 83)
+- Phase A inner-mutate loop body (slot 69)
+- Phase B grow-tail (slot 67)
+- `dividend = carry + (limb << 32); /D; %D` shape (slot 66)
+- `&'static [u64; 5]` DIVISORS reads (slots 76/77)
+- `BASE58_ALPHABET` lookup (slots 60-62)
+
+**Next move.** No probe queued. Strategy: wait on Bug-71 and Bug-96 to
+settle — one of those fixes may cascade here. If not, write a minimized
+`base58_encode_8` (just 2 outer iterations) to find the threshold where
+the bug appears.
+
+**Failures owned:** 2 direct (41, 42) + partial cascade in 3, 12, 19, 21-24.
+
+---
+
+### Bug-96 — `sec1::EncodedPoint::from_affine_coordinates`
+
+**Status.** Narrowed by slot 96 FAIL (slots 94/95 PASS — `subtle::Choice`
+and `ConditionallySelectable` are fine). The bug is inside
+`from_affine_coordinates` or its `GenericArray` dependency.
+
+**Slot 96 (smoking gun):**
+```rust
+pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
+    let x: &FieldBytes<Secp256k1> = (&SECP256K1_GX_BYTES).into();
+    let y: &FieldBytes<Secp256k1> = (&SECP256K1_GY_BYTES).into();
+    let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
+    // Compare 33 bytes to SECP256K1_GENERATOR_COMPRESSED
+}
+```
+
+**Downstream** ([sec1-0.7.3/src/point.rs:121](sec1/point.rs)):
+```rust
+pub fn from_affine_coordinates(x: &GA<u8,N>, y: &GA<u8,N>, compress: bool) -> Self {
+    let tag = if compress { Tag::compress_y(y.as_slice()) } else { Tag::Uncompressed };
+    let mut bytes = GenericArray::default();
+    bytes[0] = tag.into();                                // IndexMut on GA
+    bytes[1..(Size::to_usize() + 1)].copy_from_slice(x);  // slice copy
+    if !compress { bytes[(Size::to_usize() + 1)..].copy_from_slice(y); }
+    Self { bytes }
+}
+```
+
+**Suspect.** `GenericArray<T, N>` has no custom `Index` impl — it
+`Deref`s to `[T]` via `unsafe { slice::from_raw_parts(self as *const
+Self as *const T, N::USIZE) }`. If that raw-ptr-cast Deref is
+miscompiled, every `bytes[i]` and `bytes[a..b]` on a GenericArray is
+wrong.
+
+**Probes in flight:**
+- Slot 98 — `GenericArray<u8, U33>::default()` then `ga[0]/ga[32]` write+read.
+- Slot 99 — `GenericArray<u8, U33>` via `ga[1..33].copy_from_slice(&src)`.
+
+Decoding: 98 FAIL → GA Deref broken (explains everything). 99 FAIL → GA
+slice copy broken. Both PASS → bug is in `Tag::compress_y(y.as_slice())`
+or elsewhere — need a new probe round.
+
+**Failures owned:** 22 (slots 4, 5, 13-24, 74, 75, 78, 79, 80, 93, 96).
 
 ---
 
 ## Per-failure inventory (29 failures, v1.46.0)
 
-Each failing slot is mapped to its **primary suspected compiler bug**. We
-name bugs by their direct-hit slot number (smoking gun) — that way the
-name points to the actual probe source. Three open bugs:
+| #  | Slot name                              | Bug             | Why |
+|----|----------------------------------------|-----------------|-----|
+|  2 | ed25519 derive                         | Bug-71          | cascade of 71 |
+|  3 | base58 encode pub                      | Bug-71 + Bug-41 | base58 of dalek output |
+|  4 | secp256k1 compressed                   | Bug-96          | k256 derive ends in `to_encoded_point` |
+|  5 | secp256k1 uncompressed                 | Bug-96          | cascade of 4 |
+| 11 | solana pub                             | Bug-71          | cascade of 2 |
+| 12 | solana encoded                         | Bug-71 + Bug-41 | cascade of 2 + base58 |
+| 13 | ethereum priv                          | Bug-96          | cascade of 4 |
+| 14 | ethereum pub                           | Bug-96          | cascade of 4 |
+| 15 | ethereum address                       | Bug-96          | cascade of 4 |
+| 16 | bitcoin priv                           | Bug-96          | cascade of 4 |
+| 17 | bitcoin pub                            | Bug-96          | cascade of 4 |
+| 18 | bitcoin pkh                            | Bug-96          | cascade of 4 |
+| 19 | bitcoin encoded                        | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 20 | bitcoin matches                        | Bug-96          | cascade of 4 |
+| 21 | wif compressed mainnet                 | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 22 | wif uncompressed mainnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 23 | wif compressed testnet                 | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 24 | wif uncompressed testnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
+| 41 | base58 var-len                         | Bug-41          | **direct hit** |
+| 42 | base58 var-len leading-zero            | Bug-41          | variant of 41 |
+| 71 | dalek scalar from-bytes round-trip     | Bug-71          | **direct hit** |
+| 72 | dalek mul_base scalar=1                | Bug-71          | depends on 71 |
+| 74 | k256 derive scalar=1                   | Bug-96          | calls `to_encoded_point` |
+| 75 | k256 derive scalar=2                   | Bug-96          | calls `to_encoded_point` |
+| 78 | k256 encode generator (no mul)         | Bug-96          | direct path to `to_encoded_point` |
+| 79 | k256 double generator + encode         | Bug-96          | 78 + doubling |
+| 80 | k256 Scalar::ONE round-trip            | Bug-96 (likely) | `Scalar::to_repr` returns `GenericArray<u8, U32>` |
+| 93 | k256 AffinePoint encode                | Bug-96          | direct k256 path |
+| 96 | EncodedPoint::from_affine_coordinates  | Bug-96          | **direct hit** |
 
-- **Bug-71** — dalek `Scalar::from_bytes_mod_order` chain (something
-  about how dalek's reduce/Montgomery code is compiled — slot 91's
-  minimal Index-trait probe doesn't reproduce it).
-- **Bug-41** — base58 with non-zero input. All building blocks PASS in
-  isolation (slots 66/67/69/76/77/83), so there's an interaction we
-  haven't isolated.
-- **Bug-96** — `sec1::EncodedPoint::from_affine_coordinates` (or its
-  `GenericArray` dependency). The smoking gun for the entire k256
-  cascade.
-
-| #  | Slot name                            | Suspected bug   | Why |
-|----|--------------------------------------|-----------------|-----|
-|  2 | ed25519 derive                       | Bug-71          | cascade — calls `Scalar::from_bytes_mod_order` (slot 71) |
-|  3 | base58 encode pub                    | Bug-71 + Bug-41 | feeds slot 2's broken output into `base58_encode_32` |
-|  4 | secp256k1 compressed                 | Bug-96          | cascade — k256 derive ends in `to_encoded_point` (slot 96) |
-|  5 | secp256k1 uncompressed               | Bug-96          | cascade of 4 |
-| 11 | solana pub                           | Bug-71          | cascade of 2 |
-| 12 | solana encoded                       | Bug-71 + Bug-41 | cascade of 2 + base58 |
-| 13 | ethereum priv                        | Bug-96          | cascade of 4 |
-| 14 | ethereum pub                         | Bug-96          | cascade of 4 |
-| 15 | ethereum address                     | Bug-96          | cascade of 4 |
-| 16 | bitcoin priv                         | Bug-96          | cascade of 4 |
-| 17 | bitcoin pub                          | Bug-96          | cascade of 4 |
-| 18 | bitcoin pkh                          | Bug-96          | cascade of 4 |
-| 19 | bitcoin encoded                      | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 20 | bitcoin matches                      | Bug-96          | cascade of 4 |
-| 21 | wif compressed mainnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 22 | wif uncompressed mainnet             | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 23 | wif compressed testnet               | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 24 | wif uncompressed testnet             | Bug-96 + Bug-41 | cascade of 4 + base58 |
-| 41 | base58 var-len                       | Bug-41          | **direct hit — smoking gun for base58** |
-| 42 | base58 var-len leading-zero          | Bug-41          | direct hit (variant of 41) |
-| 71 | dalek scalar from-bytes round-trip   | Bug-71          | **direct hit — smoking gun for dalek** |
-| 72 | dalek mul_base scalar=1 == basepoint | Bug-71          | depends on 71 |
-| 74 | k256 derive scalar=1 == generator    | Bug-96          | calls `to_encoded_point` |
-| 75 | k256 derive scalar=2 == 2G           | Bug-96          | calls `to_encoded_point` |
-| 78 | k256 encode generator (no mul)       | Bug-96          | calls `ProjectivePoint::GENERATOR.to_affine().to_encoded_point()` |
-| 79 | k256 double generator + encode       | Bug-96          | same as 78 + doubling |
-| 80 | k256 Scalar::ONE round-trip          | Bug-96 (likely) | `Scalar::to_repr` returns `GenericArray<u8, U32>` — same dependency as 96 |
-| 93 | k256 AffinePoint encode              | Bug-96          | direct k256 path to `to_encoded_point` |
-| 96 | EncodedPoint::from_affine_coordinates| Bug-96          | **direct hit — smoking gun for k256** |
-
-Coverage check: 29 rows = 29 failing slots. Each is accounted for; none
-in the "we don't know" column right now (every failure has a primary
-suspect, even if speculative).
-
-If/when slots 97-99 land, the table updates as follows:
-- 97 FAIL → Bug-71 confirms as "const-index Index trait dispatch"
-- 98 FAIL → Bug-96 confirms as "GenericArray basic Deref"
-- 99 FAIL → Bug-96 confirms as "slice copy_from_slice into GenericArray"
-- Any combo PASS → corresponding sub-hypothesis falsified; the bug
-  column for affected slots reverts to the parent suspect.
+29 rows = 29 failing slots; every failure has a primary suspect.
 
 ---
 
-## (FIXED in v1.46) Bug C — u128/i128 carry chain
+## Active probes awaiting next run
 
-**Status.** ✅ Fixed in v1.46.0. Slot 65 PASSes.
-
-Kept here for historical context. Standalone repro lived at
-`crates/rustc-codegen-cuda/examples/i128_add_carry_chain` (commit b6fe7ff in
-cuda-oxide).
-
----
-
-## (FALSIFIED) Bug A v1 — `&'static` newtype-wrapped `[u64; N]` reads
-
-**Status.** ❌ Hypothesis falsified. Slot 76 (`&'static [u64; 5]` indexed
-read) and slot 77 (`&'static StructWrap([u64; 5])` indexed read) both PASS
-in v1.46. The "element width > 1 byte breaks static reads" theory is dead.
-
-Slots 71, 41, 42 still FAIL, so the actual root cause is elsewhere.
-
----
-
-## Bug D (new) — three competing hypotheses for slot 71 / 41 / 42
-
-**Status.** Three triangulation probes added (slots 81-83). Next vast run
-selects between them.
-
-### What we still know
-
-- Slot 71 — `Scalar::from_bytes_mod_order([1,0,…,0]).to_bytes() == input` FAILs
-- Slot 41/42 — base58 with non-zero input FAILs (slot 43 with all-zero PASSes)
-- Slot 65 (i128 chain add) PASSes. So pure u128 add chains work.
-- Slot 68 (3-term widening mul + add chain) PASSes. So that shape works.
-- Slot 76/77 (`&'static [u64; N]` reads) PASS. So static reads work.
-
-### Candidate root causes (testing now)
-
-#### Hypothesis D1 — `u128 >> 52` immediate right shift miscompiles
-
-Inside dalek's `montgomery_reduce::part1`:
-```rust
-((sum + m(p, constants::L[0])) >> 52, p)
-```
-LLVM lowers `u128 >> imm` to a multi-step 64-bit shift sequence. Slot 55/56
-cover u64 var shifts, slot 65 covers pure u128 add — neither covers this.
-
-**Probe:** Slot 81 — `check_arith_u128_imm_shr_52()`.
-
-If 81 FAILs, this is the one. Explains slot 71 (dalek
-montgomery_reduce), slots 78/79 (k256 `mul_inner` reduction uses
-the same shape), and the cascades.
-
-#### Hypothesis D2 — Deeper `&'static` newtype nesting (depth > 2) broken
-
-k256's `Scalar::ONE` is:
-```rust
-Scalar(U256)
-  U256 = Uint<4> { limbs: [Limb; 4] }
-    Limb(u64)
-```
-Accessing inner u64 = `scalar.0.limbs[i].0` = depth-4 GEP. Slot 77 only
-tested depth-2 (`Wrap([u64; 5])`).
-
-**Probe:** Slot 82 — `check_static_depth4_newtype_nesting()` with
-`ProbeScalar(ProbeUint4 { limbs: [ProbeLimb(u64); 4] })`.
-
-If 81 PASSes and 82 FAILs, this is it. Explains slot 80 directly.
-
-#### Hypothesis D3 — Reverse range iterator `(0..N).rev()` broken
-
-base58's digit-extraction loop is the one shape slots 60-69 don't cover:
-```rust
-for idx in (0..limb_count).rev() {
-    let output_offset = idx * DIGITS_PER_LIMB;
-    output[output_offset + i] = ...;
-}
-```
-
-**Probe:** Slot 83 — `check_reverse_range_write()`.
-
-If 81/82 PASS and 83 FAILs, this is base58's specific bug — separate from
-slot 71's bug (which would need yet another probe).
-
-### Decision table (next vast run)
-
-| 81 | 82 | 83 | Diagnosis |
-|---|---|---|---|
-| F | — | — | u128 imm shr broken. Likely explains 71/78/79 (modular reduction shape) and the dalek/k256 cascades. base58 41/42 may still need 83's signal. |
-| P | F | — | Deeper static-newtype nesting broken. Explains 80 directly; 71 (Scalar52 is depth-2 so wouldn't be hit) needs another probe. |
-| P | P | F | Reverse range iterator broken. Explains 41/42 base58 digit extraction. Doesn't explain 71/80. |
-| P | P | P | None of these — need fresh probe round. |
-
-### Code — our layer
-
-```rust
-// Slot 81
-pub fn check_arith_u128_imm_shr_52() -> u32 {
-    const SUM: u128 = 0xFEDC_BA98_7654_3210_0123_4567_89AB_CDEF;
-    const EXPECTED: u128 = SUM >> 52;
-    let sum = core::hint::black_box(SUM);
-    let shifted = sum >> 52;
-    (shifted == EXPECTED) as u32
-}
-
-// Slot 82
-#[repr(transparent)] pub struct ProbeLimb(pub u64);
-#[repr(C)]           pub struct ProbeUint4 { pub limbs: [ProbeLimb; 4] }
-#[repr(transparent)] pub struct ProbeScalar(pub ProbeUint4);
-
-static NESTED_ONE_PROBE: ProbeScalar = ProbeScalar(ProbeUint4 {
-    limbs: [ProbeLimb(...), ProbeLimb(...), ProbeLimb(...), ProbeLimb(...)],
-});
-
-pub fn check_static_depth4_newtype_nesting() -> u32 {
-    let idx = core::hint::black_box(2usize);
-    let v = NESTED_ONE_PROBE.0.limbs[idx].0;  // depth-4 field projection
-    (v == 0x9999_AAAA_BBBB_CCCC) as u32
-}
-
-// Slot 83
-pub fn check_reverse_range_write() -> u32 {
-    let limb_count: usize = core::hint::black_box(3);
-    let mut out = [0u32; 10];
-    for idx in (0..limb_count).rev() {
-        out[idx] = (idx as u32) * 100;
-    }
-    // compare to const-eval baseline
-}
-```
-
-### Code — downstream (where each candidate would bite)
-
-D1 — dalek `src/backend/serial/u64/scalar.rs`:
-```rust
-fn part1(sum: u128) -> (u128, u64) {
-    let p = (sum as u64).wrapping_mul(constants::LFACTOR) & ((1u64 << 52) - 1);
-    ((sum + m(p, constants::L[0])) >> 52, p)   // ← u128 >> 52
-}
-```
-
-D2 — k256 `src/arithmetic/scalar.rs` + crypto-bigint:
-```rust
-pub const ONE: Self = Self(U256::ONE);                  // Scalar
-// where U256 = Uint<4> { pub(crate) limbs: [Limb; 4] }
-// where Limb = pub struct Limb(pub Word)               // Word = u64
-```
-
-D3 — `logic/src/base58.rs:73`:
-```rust
-for idx in (0..limb_count).rev() {                      // ← reverse range
-    let limb_value = limbs[idx] as u64;
-    let output_offset = idx * DIGITS_PER_LIMB;
-    for i in 0..DIGITS_PER_LIMB {
-        let temp = (limb_value / DIVISORS[i]) % 58;
-        output[output_offset + i] = temp as u8;
-    }
-}
-```
-
-### Next steps — cuda-oxide compiler side
-
-1. Run vast with slots 81-83 in suite.
-2. Decision table above maps result directly to root cause.
-3. If 81 FAIL: hand slot 81 source as the minimal repro for u128 immediate
-   shift. Codegen likely emits a `shr` sequence on the i128 split that
-   gets the carry/upper bits wrong.
-4. If 82 FAIL: hand slot 82 source. Codegen likely mis-computes GEP offsets
-   when going through nested `#[repr(transparent)]` field projections.
-5. If 83 FAIL: hand slot 83. Likely `core::ops::Range::next_back` (used by
-   `Rev<Range>`) doesn't lower correctly — either the decrement-then-yield
-   pattern or how `DoubleEndedIterator` dispatches.
-
-### Ladder bisect (slots 84-87) — falls back to step-by-step if 81-83 are inconclusive
-
-dalek's `backend` module is `pub(crate)`, so we **verbatim-copied** the
-relevant Scalar52 code into [`logic/src/self_test.rs`](logic/src/self_test.rs)
-under `mod bisect_scalar52`. This lets us call each step in isolation
-without touching dalek API. The copy includes: `Scalar52` struct,
-`from_bytes`, `as_bytes`, `mul_internal`, `montgomery_reduce`, plus the
-`L`, `LFACTOR`, `R` constants. Same Rust source, just inside our crate.
-
-| Slot | Rung | Tests | If FAIL |
-|---|---|---|---|
-| 84 | A | `Scalar52::from_bytes(&[1,0,…])` returns `[1,0,0,0,0]` | byte→limb bit-shift/OR loop broken |
-| 85 | C alone | `Scalar52::montgomery_reduce(widened R as [u128;9])` returns `[1,0,0,0,0]` | montgomery_reduce broken (u128 chain + L reads + `u128>>52`) |
-| 86 | B+C | `Scalar52::montgomery_reduce(mul_internal(ONE, R))` returns `[1,0,0,0,0]` | mul_internal 5×5 widening matrix broken (if 85 PASS), else cascade |
-| 87 | D | `Scalar52([1,0,0,0,0]).as_bytes()` returns `[1,0,…]` | limb→byte pack broken |
-
-Outcome decoding (subset, assuming 71 still FAILs in the run):
-- 84 P / 85 P / 86 P / 87 P → bug isn't in dalek's Scalar52 math at all; must be in `Scalar` wrapper or `from_bytes_mod_order` plumbing
-- 84 P / 85 F → montgomery_reduce broken; report part1/part2 lowering
-- 84 P / 85 P / 86 F → mul_internal broken; report 5×5 partial-product matrix
-- 84 F or 87 F → byte/limb bit packing broken; trivial PTX repro
-
-Combined with slots 81-83 results, this should pin the bug to a single
-function with a known input.
-
-### Ladder-round-1 result (v1.46 rerun)
-
-All four ladder rungs PASSed. Re-examining the port revealed that my
-copy of `montgomery_reduce` **dropped the final `Scalar52::sub(result, L)`
-call** that dalek's real implementation ends with. That meant the ladder
-was technically incomplete — `sub` is part of montgomery_reduce in dalek
-but wasn't exercised by any of slots 84-87.
-
-### Sub probes (slots 88-90) — added after ladder round 1
-
-Adding `Scalar52::sub` to the port + 3 probes:
-
-| Slot | Probe | Tests | If FAIL |
-|---|---|---|---|
-| 88 | `Scalar52::sub(R, R) == 0` | 5-limb borrow chain, no underflow | basic borrow propagation broken |
-| 89 | `Scalar52::sub(ZERO, ONE)` underflow → `L - 1` | borrow chain + underflow_mask + conditional-add-L (volatile `black_box`) | underflow-path conditional add broken |
-| 90 | `montgomery_reduce(widened_R)` *with* final sub | same as slot 85 but calls `montgomery_reduce` (with sub) instead of `montgomery_reduce_no_sub` | sub is what's broken in real dalek path |
-
-Slots 85 and 86 now explicitly use `montgomery_reduce_no_sub` so their
-result preserves the v1.46 PASSing-meaning. Comparing slot 85 (passes,
-no sub) vs slot 90 (same input, with sub) directly isolates whether sub
-is the bug.
-
-Outcome decoding:
-- 85 P / 88 F or 89 F / 90 F → `Scalar52::sub` is the bug. Likely culprit:
-  the volatile-load `black_box` (cuda-oxide may be miscompiling
-  `core::ptr::read_volatile` to nvptx) or the 5-limb borrow chain.
-- 85 P / 88 P / 89 P / 90 F → the bug isn't in sub itself, but in the
-  *sequencing* of mul_internal → reduce → sub (some pass-pipeline issue).
-- 85 P / 88 P / 89 P / 90 P / 71 still F → it's truly cross-crate. Bug
-  manifests when the same code is compiled inside `curve25519-dalek` but
-  not when compiled inside `logic`. Time to spin up a separate-crate
-  experiment.
-
-### Round-2 result (v1.46 rerun, suite 91)
-
-**All slots 81-90 PASSed.** Slot 71 still FAILs. So the bug is not in any
-isolated Rust shape we've tested, not in the cross-crate boundary alone
-(slot 41/42 in `logic` also fail), and not in `Scalar52::sub` itself.
-
-Re-reading dalek's source: **`Scalar52` implements custom `Index<usize>`
-and `IndexMut<usize>` traits**, and `from_bytes` / `as_bytes` /
-`mul_internal` / `montgomery_reduce` / `sub` all use `a[i]` syntax —
-which dispatches through `Index::index(&self, i)` returning `&u64`. My
-port uses `a.0[i]` everywhere, which is direct array access on a public
-tuple field, bypassing the trait entirely.
-
-If cuda-oxide miscompiles `Index<usize>` trait dispatch on tuple-struct
-wrappers, dalek's code fails but my port works. Exactly the observed
-pattern.
-
-### Index-trait probes (slots 91-93)
-
-| Slot | Probe | Tests | If FAIL |
-|---|---|---|---|
-| 91 | `IdxProbe(pub [u64;5])` with custom `Index`/`IndexMut` impls; write+read via `[i]` syntax | trait dispatch through `Index<usize>` returning `&u64` | **smoking gun**: explains slot 71, base58 (if it uses `[i]` on a tuple struct anywhere), and likely slot 78/80 |
-| 92 | `Scalar::ONE.to_bytes() == [1,0,…]` | cross-crate `pub const` access + 32-byte copy (Scalar's bytes field IS the const data) | cross-crate const access broken (smaller surface than 71) |
-| 93 | `AffinePoint::GENERATOR.to_encoded_point(true)` | k256 cross-crate `pub const` + FieldElement→bytes encoding, but NO projective→affine field inversion | encoding broken; or, if 93 PASS and 78 FAIL, the bug is specifically in `to_affine()` (field inversion) |
-
-### Code — slot 91
-
-```rust
-pub struct IdxProbe(pub [u64; 5]);
-
-impl core::ops::Index<usize> for IdxProbe {
-    type Output = u64;
-    fn index(&self, i: usize) -> &u64 { &(self.0[i]) }
-}
-impl core::ops::IndexMut<usize> for IdxProbe {
-    fn index_mut(&mut self, i: usize) -> &mut u64 { &mut (self.0[i]) }
-}
-
-pub fn check_index_trait_dispatch() -> u32 {
-    let mut p = IdxProbe([0u64; 5]);
-    let idx = core::hint::black_box(2usize);
-    let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
-    p[idx] = val;                                  // ← IndexMut dispatch
-    let read = core::hint::black_box(p[idx]);      // ← Index dispatch
-    (read == val) as u32
-}
-```
-
-This mirrors dalek's exact Index/IndexMut shape. If 91 FAILs on next
-run, hand its source to the compiler agent — it's the minimum repro for
-"miscompile Index trait dispatch on tuple-struct wrapper of `[u64; N]`".
-
-### What about base58 41/42?
-
-base58_encode_32 is in `logic`, not cross-crate. But if `Index` trait
-dispatch is broken for tuple-struct wrappers, that wouldn't explain
-base58 since `[u32; 10]` is a raw array (not tuple struct). Base58 41/42
-likely has a *different* bug — left for the next probe round once Index
-is either confirmed or ruled out.
-
----
-
-## Bug E (FALSIFIED at minimal-repro level — needs refined probe)
-
-**Status.** ⚠️ Slot 91 FLIPPED from FAIL → PASS on the v1.46.0 rerun.
-Same compiler version, but our minimal repro no longer reproduces the
-bug, while slot 71 (full dalek path) still FAILs. So **the bug is not
-captured by a simple `IdxProbe[idx] = val; let v = IdxProbe[idx];`**.
-
-Most likely refinement: dalek uses **literal const indices** (`s[0] = …;
-s[1] = …`) while slot 91 used `black_box(idx)` (runtime). LLVM IR shape
-differs — const indices fold the trait dispatch into a direct GEP at
-compile time; runtime indices preserve the call.
-
-**Probe added:** Slot 97 — same `IdxProbe` but written/read with 5
-literal const indices in a row (mirrors dalek `from_bytes`'s
-`s[0]..=s[4]` pattern).
-
-Originally-stated:
-
-**Repro (≈18 lines, in [logic/src/self_test.rs](logic/src/self_test.rs) under
-`check_index_trait_dispatch`):**
-```rust
-pub struct IdxProbe(pub [u64; 5]);
-
-impl core::ops::Index<usize> for IdxProbe {
-    type Output = u64;
-    fn index(&self, i: usize) -> &u64 { &(self.0[i]) }
-}
-impl core::ops::IndexMut<usize> for IdxProbe {
-    fn index_mut(&mut self, i: usize) -> &mut u64 { &mut (self.0[i]) }
-}
-
-pub fn check_index_trait_dispatch() -> u32 {
-    let mut p = IdxProbe([0u64; 5]);
-    let idx = core::hint::black_box(2usize);
-    let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
-    p[idx] = val;
-    let read = core::hint::black_box(p[idx]);
-    (read == val) as u32
-}
-```
-
-**Failures explained by this bug:**
-- Slot 71 — dalek `Scalar::from_bytes_mod_order` (Scalar52 uses `a[i]` throughout)
-- Slot 72 — cascade of 71
-- Slots 2 / 3 / 11 / 12 — cascade of 71 via the solana derive chain
-- (Slot 41/42 is NOT this — base58 uses raw arrays only)
-
-**Next steps — cuda-oxide compiler side:**
-1. Hand slot 91 source as the minimal repro.
-2. Look at how `Index::index(&self, i: usize) -> &Self::Output` is lowered
-   for tuple structs wrapping `[u64; N]` — likely the `&u64` reference
-   returned by `index()` has bad address-space tagging or the GEP through
-   the tuple field projection is mis-computed.
-
----
-
-## Bug F (NARROWED) — `EncodedPoint::from_affine_coordinates` (or its dependencies)
-
-**Status.** ✅ Narrowed by slot 96 FAIL on v1.46.0 (slots 94/95 PASS).
-`subtle::Choice` u8↔bool works, `ConditionallySelectable::conditional_select`
-works. The bug is inside `EncodedPoint::from_affine_coordinates` itself.
-
-**Implementation ([sec1-0.7.3/src/point.rs:121](sec1/point.rs:121)):**
-```rust
-pub fn from_affine_coordinates(x: &GA<u8,N>, y: &GA<u8,N>, compress: bool) -> Self {
-    let tag = if compress { Tag::compress_y(y.as_slice()) } else { Tag::Uncompressed };
-    let mut bytes = GenericArray::default();              // GA<u8, EncodedSize>
-    bytes[0] = tag.into();                                // IndexMut on GA via Deref
-    bytes[1..(Size::to_usize() + 1)].copy_from_slice(x);  // slice copy
-    if !compress {
-        bytes[(Size::to_usize() + 1)..].copy_from_slice(y);
-    }
-    Self { bytes }
-}
-```
-
-**Smoking-gun suspect: `GenericArray<u8, N>` Deref.** It has no custom
-Index impl — instead it `Deref`s to `[T]` via:
-```rust
-fn deref(&self) -> &[T] {
-    unsafe { slice::from_raw_parts(self as *const Self as *const T, N::USIZE) }
-}
-```
-If that raw-ptr-cast Deref miscompiles, every `bytes[i]` and
-`bytes[a..b]` operation on a `GenericArray` is wrong.
-
-**Probes added (slots 98-99):**
-
-| Slot | Probe | If FAIL |
+| Slot | Targets | Probe |
 |---|---|---|
-| 98 | `GenericArray<u8, U33>::default()`; write `ga[0]`, `ga[32]`; read back | GenericArray Deref/Index broken — explains 96 directly |
-| 99 | `GenericArray<u8, U33>` populated via `ga[1..33].copy_from_slice(&src[..])` then `ga[..]` slice extraction | slice copy into GA is broken |
+| 97 | Bug-71 | `IdxProbe` with 5 literal-const-index writes/reads |
+| 98 | Bug-96 | `GenericArray<u8, U33>` basic write/read at fixed indices |
+| 99 | Bug-96 | `GenericArray<u8, U33>` populated via `copy_from_slice` |
 
-**Decision table (next vast run):**
+---
 
-| 98 | 99 | Diagnosis |
+## Not bugs (clarifications)
+
+- **Slot 43 (base58 all-zeros) PASS**: all-zero input → `limb_count` stays
+  0 → digit-extraction loop with `DIVISORS[i]` never runs.
+- **Slot 73 (`SecretKey::from_bytes(1)`) PASS** but 74/80 FAIL: 73 only
+  checks validation ok-ness; doesn't inspect the inner scalar.
+- **Slots 76/77 PASS** despite 41/42 FAIL: `&'static [u64; N]` reads
+  work. base58 bug is not in `DIVISORS` reads.
+- **Slot 65 PASS now** (was FAIL): Bug-C fixed in v1.46.
+
+---
+
+## History — fixed
+
+### Bug-C (FIXED in v1.46) — u128/i128 carry chain
+Slot 65 was the direct hit. Standalone upstream repro lived at
+`crates/rustc-codegen-cuda/examples/i128_add_carry_chain` (commit
+b6fe7ff in cuda-oxide). Fixed in v1.46.0.
+
+---
+
+## History — falsified hypotheses
+
+Each was a live hypothesis at some point; new probe data killed it. Kept
+briefly so we don't re-test the same shape.
+
+| Hypothesis | Falsified by | What we know now |
 |---|---|---|
-| F | — | GA basic index broken → fixes 96 → likely fixes 4/5/13-24/74/75/78/79/80 too |
-| P | F | GA slice copy broken (more specific) |
-| P | P | Bug is in `Tag::compress_y(y.as_slice())` (uses `.last()` on slice) — needs another probe |
-
-(Original Bug F intro, now superseded:)
-
-**Failing chain ([k256/src/arithmetic/affine.rs:273](k256/arithmetic/affine.rs:273)):**
-```rust
-fn to_encoded_point(&self, compress: bool) -> EncodedPoint {
-    EncodedPoint::conditional_select(
-        &EncodedPoint::from_affine_coordinates(
-            &self.x.to_bytes(),     // FieldElement → bytes
-            &self.y.to_bytes(),     // FieldElement → bytes
-            compress,
-        ),
-        &EncodedPoint::identity(),
-        self.is_identity(),         // Choice (always false here)
-    )
-}
-```
-
-**Bisect probes (slots 94-96, in suite awaiting next run):**
-
-| Slot | Probe | If FAIL |
-|---|---|---|
-| 94 | `Choice::from(0u8).into() == false`, `Choice::from(1u8).into() == true` | bug is in `subtle::Choice` u8↔bool conversion |
-| 95 | `u64::conditional_select(&a, &b, Choice(0)) == a` and `(Choice(1)) == b` | bug is in `ConditionallySelectable` impl (slot 53/54's hand-rolled mask passes but real subtle trait fails) |
-| 96 | `EncodedPoint::from_affine_coordinates(&GX, &GY, true) == G` (hardcoded x/y bytes; bypasses `is_identity` + `conditional_select`) | bug is in `EncodedPoint::from_affine_coordinates` itself |
-
-**Decision table (next vast run):**
-
-| 94 | 95 | 96 | Diagnosis |
-|---|---|---|---|
-| F | — | — | `Choice` u8↔bool conversion broken |
-| P | F | — | `ConditionallySelectable::conditional_select` broken — fits slot 93's symptom (picks wrong arm) |
-| P | P | F | `EncodedPoint::from_affine_coordinates` broken |
-| P | P | P | Bug is elsewhere (`FieldElement::to_bytes` or AffinePoint's own `is_identity`) — needs another round |
-
-If P/F/—, that's also the prime suspect for slots 74/75 (k256 derive ×1, ×2) — both go through `conditional_select` in `mul_by_generator`'s windowed scalar mult.
-
----
-
-## Round-4 result (v1.46 rerun, suite 97)
-
-- **Slot 91 PASS** (was FAIL): minimal Index/IndexMut probe lost — Bug E doesn't reproduce in our simple repro anymore. Slot 71 still FAILs, so something more specific.
-- **Slot 92 PASS**: cross-crate `Scalar::ONE.to_bytes()` works.
-- **Slot 93 FAIL** (re-confirmed): k256 `AffinePoint::GENERATOR.to_encoded_point()`.
-- **Slot 94 PASS**: subtle Choice u8↔bool works.
-- **Slot 95 PASS**: `u64::conditional_select` via subtle works.
-- **Slot 96 FAIL**: `EncodedPoint::from_affine_coordinates(&GX, &GY, true)` with hardcoded bytes. ← Bug F is here.
-
-### Probes for next round (97-99)
-
-Targets the two surviving mysteries:
-
-- **Slot 97**: refined Index probe with literal const indices (mirrors dalek's `s[0]..=s[4]`).
-- **Slot 98**: bare `GenericArray<u8, U33>` index test.
-- **Slot 99**: `GenericArray<u8, U33>` populated via `copy_from_slice`.
-
----
-
-## Remaining open failures (mapped to candidate root causes)
-
-After v1.46.0 run:
-
-| Slot | Name | Suspected root cause | Notes |
-|---|---|---|---|
-|  2 | ed25519 derive | D1 or D2 | cascade of slot 71 |
-|  3 | base58 encode pub | D1 + D3 | cascade of slot 2 + base58 issue |
-|  4 | secp256k1 compressed | D1 or D2 | cascade of slot 78 |
-|  5 | secp256k1 uncompressed | D1 or D2 | cascade of slot 78 |
-| 11-12 | solana pub/encoded | D1 or D2 | cascade |
-| 13-15 | ethereum | D1 or D2 | cascade |
-| 16-24 | bitcoin / WIF | D1 or D2 + D3 | cascade |
-| 41 | base58 var-len | D3 (most likely) | direct |
-| 42 | base58 var-len leading-zero | D3 | direct |
-| 71 | dalek scalar round-trip | D1 (most likely) | direct |
-| 72 | dalek mul_base scalar=1 | D1 | direct, depends on 71 |
-| 74 | k256 derive scalar=1 | D1 or D2 | direct |
-| 75 | k256 derive scalar=2 | D1 or D2 | direct |
-| 78 | k256 encode generator | D1 | direct |
-| 79 | k256 double generator | D1 | direct |
-| 80 | k256 Scalar round-trip | D2 (most likely) | direct |
-
----
-
-## Not bugs (clarifications for future readers)
-
-- **Slot 43 (base58 all-zeros) PASSes** despite slots 41/42 FAILing because
-  all-zero input causes `limb_count` to stay 0, so the digit-extraction
-  loop with `(0..limb_count).rev()` and `DIVISORS[i]` access never runs.
-
-- **Slot 73 (k256 SecretKey::from_bytes(1)) PASSes** while slot 74/80 FAIL.
-  Correct: `from_bytes` returns Result, not CtOption, and its caller only
-  inspects ok-ness, not the inner scalar's bytes.
-
-- **Slot 76/77 PASS** despite slot 41/42 FAILing. Falsifies the static-
-  multi-byte-array hypothesis. The base58 bug is not in the DIVISORS read.
-
-- **Slots 65, 68 PASS** (u128 add chain, 3-term widening). Falsifies the
-  "wide u128 chain" hypothesis at that depth. If D1 confirms, the issue is
-  specifically immediate-amount shifts on u128, not add or mul chains.
+| `&'static` multi-byte-element array reads broken (Bug A v1) | slots 76/77 PASS | `[u64; N]` static reads work, raw and depth-1 newtype-wrapped |
+| `u128 >> 52` immediate right shift broken (Bug D1) | slot 81 PASS | u128 immediate shifts work |
+| Depth-4 `&'static` newtype nesting broken (Bug D2) | slot 82 PASS | 4-level newtype field projections work |
+| `(0..n).rev()` reverse range iterator broken (Bug D3) | slot 83 PASS | reverse range writes work |
+| Simple `Index<usize>` trait dispatch broken (Bug E v1) | slot 91 FLIPPED to PASS | runtime-index Index works; const-index under test (slot 97) |
+| Some intermediate of dalek's Scalar reduce path miscompiles | slots 84-90 all PASS | each step is correct in isolation; bug only emerges in dalek's exact compilation |
+| `Scalar52::sub` borrow-chain / volatile `black_box` broken | slots 88-90 PASS | sub works correctly |
+| k256 cascade is `Lazy<>` / once_cell init failure | (not tested directly — folded into Bug-96 narrowing) | superseded by slot-96 narrowing |
 
 ---
 
@@ -581,8 +234,11 @@ After v1.46.0 run:
 
 For each new vast run:
 
-1. Update the run table at the top with date / counts / cuda-oxide rev.
-2. If a slot moves PASS↔FAIL, update its row in the open-failures table.
-3. If a hypothesis is falsified, move its section under a `## (FALSIFIED)`
-   heading and keep it for historical context.
-4. If a hypothesis is confirmed and fixed, rename to `## (FIXED in vX.Y.Z)`.
+1. Update the run-history table with date / counts / cuda-oxide rev.
+2. If a slot moves PASS↔FAIL, update its row in the per-failure inventory.
+3. If a probe falsifies a hypothesis, move it to "History — falsified"
+   with a one-row entry.
+4. If a bug is fixed, move its section to "History — fixed" with the
+   version tag.
+5. Add new probes under the relevant "Currently open" bug section
+   (and in "Active probes awaiting next run").
