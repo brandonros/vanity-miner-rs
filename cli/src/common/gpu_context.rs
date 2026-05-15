@@ -24,6 +24,15 @@ impl GpuContext {
         if let Some(stack_size) = std::env::var("STACK_SIZE").ok() {
             let stack_size = stack_size.parse::<usize>().unwrap();
             cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack_size)?;
+        } else {
+            // CUDA's default per-thread stack is 1024 bytes. Rust-CUDA's NVVM
+            // backend aggressively inlines whole pipelines, so any kernel that
+            // composes k256/dalek + xoroshiro needs much more — bisected at
+            // 8 KiB FAIL / 16 KiB PASS for the eth-priv-bisect's simplest
+            // composed kernel. The full self-test ladder has bigger kernels
+            // (depot up to 1856 bytes + deeper k256/dalek call chains), so
+            // give 2× headroom over the measured floor.
+            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, 16384)?;
         }
 
         let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;

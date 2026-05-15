@@ -2,9 +2,10 @@
 resolver = "3"
 members = [
   "cli",
-  "logic"
+  "logic",
+  "investigations/eth-priv-bisect"
 ]
-exclude = ["kernels"]
+exclude = ["kernels", "investigations/eth-priv-bisect/kernels"]
 
 [patch.crates-io]
 # put compiler_fence behind a feature flag that is disabled by default
