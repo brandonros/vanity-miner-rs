@@ -40,6 +40,7 @@ impl Runner for CpuRunner {
                 let target_hash_bytes = hex::decode(target_hash)?;
                 modes::shallenge::cpu::run(self.num_threads, username.clone(), target_hash_bytes, stats)
             }
+            Command::SelfTest => modes::self_test::cpu::run(),
         }
     }
 }

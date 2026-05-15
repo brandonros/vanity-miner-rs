@@ -16,6 +16,7 @@ mod vanity;
 mod solana_vanity;
 mod bitcoin_vanity;
 mod ethereum_vanity;
+mod self_test;
 
 pub use xoroshiro::*;
 pub use base58::*;
@@ -30,3 +31,4 @@ pub use keccak256::*;
 pub use solana_vanity::*;
 pub use bitcoin_vanity::*;
 pub use ethereum_vanity::*;
+pub use self_test::*;

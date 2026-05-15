@@ -32,5 +32,6 @@ optional = true
 git = "https://github.com/brandonros/Rust-CUDA.git"
 rev = "2f4fd1d"
 default-features = false
-features = ["rustc_codegen_nvvm", "llvm19"]
+# add llvm19 feature for llvm19
+features = ["rustc_codegen_nvvm"]
 optional = true

@@ -172,6 +172,10 @@ impl Runner for GpuRunner {
                         let shared = shared_best_hash_clone.expect("SharedBestHash required for shallenge mode");
                         modes::shallenge::gpu::run(i, username, shared, &module, stats_clone)
                     }
+                    Command::SelfTest => {
+                        let _ = stats_clone;
+                        modes::self_test::gpu::run(i, &module)
+                    }
                 }.map_err(|e| {
                     let bt = Backtrace::new();
                     eprintln!("Error in device {}: {}", i, e);

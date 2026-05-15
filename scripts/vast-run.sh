@@ -2,12 +2,12 @@
 
 set -e
 
-PORT=15975
+PORT=31329
 HOST=ssh1.vast.ai
 USER=root
 
 ssh -o StrictHostKeyChecking=no -p $PORT $USER@$HOST <<'EOF'
-VERSION="v1.23.0"
+VERSION="v1.24.0"
 
 banner() {
     echo ""
