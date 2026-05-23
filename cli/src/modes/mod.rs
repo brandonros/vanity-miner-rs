@@ -15,8 +15,13 @@
 //! The previous trait hierarchy (VanityMode, GpuVanityMode, GpuBuffers) was removed
 //! because it added complexity without real benefit for 4 concrete types.
 
+#[cfg(feature = "bitcoin")]
 pub mod bitcoin;
+#[cfg(feature = "ethereum")]
 pub mod ethereum;
+#[cfg(feature = "self_test")]
 pub mod self_test;
+#[cfg(feature = "shallenge")]
 pub mod shallenge;
+#[cfg(feature = "solana")]
 pub mod solana;

@@ -134,6 +134,7 @@ impl Runner for GpuRunner {
         }));
 
         // Create shared state for shallenge mode
+        #[cfg(feature = "shallenge")]
         let shared_best_hash: Option<Arc<RwLock<SharedBestHash>>> = match command {
             Command::Shallenge { target_hash, .. } => {
                 let target_hash_bytes = hex::decode(target_hash)?;
@@ -141,6 +142,7 @@ impl Runner for GpuRunner {
                 initial_target.copy_from_slice(&target_hash_bytes);
                 Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))
             }
+            #[allow(unreachable_patterns)]
             _ => None,
         };
 
@@ -149,6 +151,7 @@ impl Runner for GpuRunner {
         for i in 0..self.num_devices {
             println!("Starting device {}", i);
             let command_clone = command.clone();
+            #[cfg(feature = "shallenge")]
             let shared_best_hash_clone = shared_best_hash.clone();
             let stats_clone = Arc::clone(&stats);
 
@@ -159,19 +162,24 @@ impl Runner for GpuRunner {
                 let (_ctx, module) = Self::load_module(i)?;
 
                 match command_clone {
+                    #[cfg(feature = "solana")]
                     Command::SolanaVanity { prefix, suffix } => {
                         modes::solana::gpu::run(i, prefix, suffix, &module, stats_clone)
                     }
+                    #[cfg(feature = "bitcoin")]
                     Command::BitcoinVanity { prefix, suffix } => {
                         modes::bitcoin::gpu::run(i, prefix, suffix, &module, stats_clone)
                     }
+                    #[cfg(feature = "ethereum")]
                     Command::EthereumVanity { prefix, suffix } => {
                         modes::ethereum::gpu::run(i, prefix, suffix, &module, stats_clone)
                     }
+                    #[cfg(feature = "shallenge")]
                     Command::Shallenge { username, .. } => {
                         let shared = shared_best_hash_clone.expect("SharedBestHash required for shallenge mode");
                         modes::shallenge::gpu::run(i, username, shared, &module, stats_clone)
                     }
+                    #[cfg(feature = "self_test")]
                     Command::SelfTest => {
                         let _ = stats_clone;
                         modes::self_test::gpu::run(i, &module)

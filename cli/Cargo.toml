@@ -4,11 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = []
+default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
+solana = ["logic/solana"]
+bitcoin = ["logic/bitcoin"]
+ethereum = ["logic/ethereum"]
+shallenge = ["logic/shallenge"]
+self_test = ["logic/self_test"]
 
 [dependencies]
-logic = { path = "../logic", features = ["self_test"] }
+logic = { path = "../logic", default-features = false }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"
 rand = "0.8"

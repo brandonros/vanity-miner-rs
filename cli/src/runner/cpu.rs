@@ -27,19 +27,24 @@ impl Runner for CpuRunner {
         println!("Starting CPU mode with {} threads", self.num_threads);
 
         match command {
+            #[cfg(feature = "solana")]
             Command::SolanaVanity { prefix, suffix } => {
                 modes::solana::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
+            #[cfg(feature = "bitcoin")]
             Command::BitcoinVanity { prefix, suffix } => {
                 modes::bitcoin::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
+            #[cfg(feature = "ethereum")]
             Command::EthereumVanity { prefix, suffix } => {
                 modes::ethereum::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
+            #[cfg(feature = "shallenge")]
             Command::Shallenge { username, target_hash } => {
                 let target_hash_bytes = hex::decode(target_hash)?;
                 modes::shallenge::cpu::run(self.num_threads, username.clone(), target_hash_bytes, stats)
             }
+            #[cfg(feature = "self_test")]
             Command::SelfTest => modes::self_test::cpu::run(),
         }
     }
