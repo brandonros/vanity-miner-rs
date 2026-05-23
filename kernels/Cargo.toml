@@ -6,8 +6,16 @@ edition = "2024"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+default = ["shallenge"]
+solana = ["logic/solana"]
+bitcoin = ["logic/bitcoin"]
+ethereum = ["logic/ethereum"]
+shallenge = ["logic/shallenge"]
+self_test = ["logic/self_test"]
+
 [dependencies]
-logic = { path = "../logic" }
+logic = { path = "../logic", default-features = false }
 cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "2f4fd1d" }
 
 [workspace]

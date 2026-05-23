@@ -8,7 +8,7 @@ default = []
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
 
 [dependencies]
-logic = { path = "../logic" }
+logic = { path = "../logic", features = ["self_test"] }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"
 rand = "0.8"

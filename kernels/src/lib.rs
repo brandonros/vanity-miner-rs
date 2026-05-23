@@ -30,14 +30,24 @@ mod atomic;
 mod match_handler;
 mod utilities;
 
+#[cfg(feature = "solana")]
 mod solana_vanity;
+#[cfg(feature = "bitcoin")]
 mod bitcoin_vanity;
+#[cfg(feature = "ethereum")]
 mod ethereum_vanity;
+#[cfg(feature = "shallenge")]
 mod shallenge;
+#[cfg(feature = "self_test")]
 mod self_test;
 
+#[cfg(feature = "solana")]
 pub use solana_vanity::*;
+#[cfg(feature = "bitcoin")]
 pub use bitcoin_vanity::*;
+#[cfg(feature = "ethereum")]
 pub use ethereum_vanity::*;
+#[cfg(feature = "shallenge")]
 pub use shallenge::*;
+#[cfg(feature = "self_test")]
 pub use self_test::*;
