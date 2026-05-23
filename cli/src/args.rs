@@ -79,8 +79,19 @@ impl Command {
                 }
             }
             #[cfg(feature = "shallenge")]
-            Command::Shallenge { target_hash, .. } => {
+            Command::Shallenge { username, target_hash } => {
                 crate::common::validate_hex_string(target_hash)?;
+                if username.is_empty() {
+                    return Err("username cannot be empty".into());
+                }
+                if username.len() > logic::MAX_USERNAME_LEN {
+                    return Err(format!(
+                        "username length {} exceeds max {} (preimage is fixed at {} bytes: username + '/' + nonce)",
+                        username.len(),
+                        logic::MAX_USERNAME_LEN,
+                        logic::PREIMAGE_LEN
+                    ).into());
+                }
             }
             #[cfg(feature = "self_test")]
             Command::SelfTest => {}

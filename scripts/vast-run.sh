@@ -9,7 +9,7 @@ USER=root
 LOCAL_BINARY="target/release/vanity-miner"
 
 if [ ! -f "$LOCAL_BINARY" ]; then
-    echo "ERROR: $LOCAL_BINARY not found. Build it first with: cargo build --release"
+    echo "ERROR: $LOCAL_BINARY not found. Build it first with: cargo build --release --features gpu --features shallenge"
     exit 1
 fi
 
@@ -92,5 +92,5 @@ banner "RUN :: vanity-miner"
 #./vanity-miner solana-vanity aaaa ""
 #./vanity-miner bitcoin-vanity bc1qqqqqq ""
 #./vanity-miner ethereum-vanity 55555555 ""
-./vanity-miner shallenge brandonros ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+./vanity-miner shallenge brandonros FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 EOF

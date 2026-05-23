@@ -3,6 +3,20 @@ use seq_macro::seq;
 use crate::sha256;
 use crate::xoroshiro;
 
+/// Total preimage size fed to sha256: `username || '/' || nonce`.
+pub const PREIMAGE_LEN: usize = 32;
+/// Largest username that still leaves room for the separator and at least one
+/// nonce byte. `username_len + 1 + nonce_len == PREIMAGE_LEN`.
+pub const MAX_USERNAME_LEN: usize = PREIMAGE_LEN - 1 - 1;
+/// Stack buffer for the nonce; sized so the smallest legal username (1 byte)
+/// still fits.
+pub const MAX_NONCE_LEN: usize = PREIMAGE_LEN - 1 - 1;
+
+#[inline]
+pub fn shallenge_nonce_len(username_len: usize) -> usize {
+    PREIMAGE_LEN - 1 - username_len
+}
+
 pub struct ShallengeRequest<'a> {
     pub username: &'a [u8],
     pub username_len: usize,
@@ -48,30 +62,32 @@ pub fn shallenge(username: &[u8], username_len: usize, nonce: &[u8], nonce_len: 
 pub fn test_nonce(
     thread_idx: usize,
     rng_seed: u64,
-    username: &[u8], 
-    username_len: usize, 
+    username: &[u8],
+    username_len: usize,
     target_hash: &[u8; 32]
 ) -> i32 {
-    let mut nonce = [0u8; 21];
-    xoroshiro::generate_base64_nonce(thread_idx, rng_seed, &mut nonce);
-    let hash = shallenge(username, username_len, &nonce, 21);
+    let nonce_len = shallenge_nonce_len(username_len);
+    let mut nonce = [0u8; MAX_NONCE_LEN];
+    xoroshiro::generate_base64_nonce(thread_idx, rng_seed, &mut nonce[..nonce_len]);
+    let hash = shallenge(username, username_len, &nonce, nonce_len);
     compare_hashes(&hash, target_hash)
 }
 
 pub fn generate_and_check_shallenge(request: &ShallengeRequest) -> ShallengeResult {
-    let mut nonce = [0u8; 21]; // Fixed nonce size for now
-    xoroshiro::generate_base64_nonce(request.thread_idx, request.rng_seed, &mut nonce);
-    
-    let hash = shallenge(request.username, request.username_len, &nonce, 21);
+    let nonce_len = shallenge_nonce_len(request.username_len);
+    let mut nonce = [0u8; MAX_NONCE_LEN];
+    xoroshiro::generate_base64_nonce(request.thread_idx, request.rng_seed, &mut nonce[..nonce_len]);
+
+    let hash = shallenge(request.username, request.username_len, &nonce, nonce_len);
     let is_better = compare_hashes(&hash, request.target_hash) < 0;
-    
+
     let mut result_nonce = [0u8; 64];
-    result_nonce[..21].copy_from_slice(&nonce);
-    
+    result_nonce[..nonce_len].copy_from_slice(&nonce[..nonce_len]);
+
     ShallengeResult {
         hash,
         nonce: result_nonce,
-        nonce_len: 21,
+        nonce_len,
         is_better,
     }
 }
