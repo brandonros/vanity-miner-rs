@@ -6,6 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
+llvm19 = ["gpu", "cuda_builder/llvm19"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
@@ -37,6 +38,5 @@ optional = true
 git = "https://github.com/brandonros/Rust-CUDA.git"
 rev = "2f4fd1d"
 default-features = false
-# add llvm19 feature for llvm19
 features = ["rustc_codegen_nvvm"]
 optional = true

@@ -13,7 +13,7 @@
       systems = [ "aarch64-linux" "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
-      mkDevShell = system:
+      mkDevShell = system: version:
         let
           # allowUnfree is required because CUDA is unfree.
           pkgs = import nixpkgs {
@@ -27,6 +27,9 @@
           # is 2.37, and unstable's libstdc++ / ncurses now demand 2.38+/2.42.
           pkgsLlvm7 = import nixpkgs-llvm7 { inherit system; };
           lib = pkgs.lib;
+          # Match the C toolchain and its runtime libraries to the selected LLVM.
+          compatPkgs = if version == 7 then pkgsLlvm7 else pkgs;
+          llvm = if version == 7 then pkgsLlvm7.llvmPackages_7 else pkgs.llvmPackages_19;
 
           # ---- CUDA toolkit (Nix-managed) ----
           # CUDA 13.2 → NVVM 22.0 → PTX 9.2 → needs driver 580.x+ (CUDA 13) at runtime.
@@ -41,17 +44,16 @@
           # rust-toolchain.toml. Update there, not here.
           toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
 
-          # ---- LLVM 7 (from pinned old nixpkgs) ----
-          llvm7 = pkgsLlvm7.llvmPackages_7;
-          llvm7Bin = lib.getBin llvm7.llvm;
-          llvm7Dev = lib.getDev llvm7.llvm;
-          llvm7CompatTools = pkgs.symlinkJoin {
-            name = "llvm7-compat-tools";
+          # Versioned tools used by the Rust-CUDA backend.
+          llvmBin = lib.getBin llvm.llvm;
+          llvmDev = lib.getDev llvm.llvm;
+          llvmCompatTools = pkgs.symlinkJoin {
+            name = "llvm${toString version}-compat-tools";
             paths = [
-              (pkgs.writeShellScriptBin "opt-7" ''exec ${llvm7Bin}/bin/opt "$@"'')
-              (pkgs.writeShellScriptBin "llvm-as-7" ''exec ${llvm7Bin}/bin/llvm-as "$@"'')
-              (pkgs.writeShellScriptBin "llvm-dis-7" ''exec ${llvm7Bin}/bin/llvm-dis "$@"'')
-              (pkgs.writeShellScriptBin "llc-7" ''exec ${llvm7Bin}/bin/llc "$@"'')
+              (pkgs.writeShellScriptBin "opt-${toString version}" ''exec ${llvmBin}/bin/opt "$@"'')
+              (pkgs.writeShellScriptBin "llvm-as-${toString version}" ''exec ${llvmBin}/bin/llvm-as "$@"'')
+              (pkgs.writeShellScriptBin "llvm-dis-${toString version}" ''exec ${llvmBin}/bin/llvm-dis "$@"'')
+              (pkgs.writeShellScriptBin "llc-${toString version}" ''exec ${llvmBin}/bin/llc "$@"'')
             ];
           };
         in
@@ -64,8 +66,8 @@
           # build.rs scripts that probe either layout resolve libcudart + stubs.
           CUDA_LIBRARY_PATH =
             "${cudaRoot}/lib:${cudaRoot}/lib64:${cudaRoot}/lib/stubs:${cudaRoot}/lib64/stubs";
-          LLVM_CONFIG = "${llvm7Dev}/bin/llvm-config";
-          LIBCLANG_PATH = "${lib.getLib llvm7.libclang}/lib";
+          ${if version == 7 then "LLVM_CONFIG" else "LLVM_CONFIG_19"} = "${llvmDev}/bin/llvm-config";
+          LIBCLANG_PATH = "${lib.getLib llvm.libclang}/lib";
 
           # nativeBuildInputs: tools invoked *during* the build — compilers,
           # codegen, build systems. End up on $PATH. cudaRoot lives here because
@@ -81,41 +83,41 @@
             pkgs.ninja
             pkgs.patchelf
             cudaRoot
-            llvm7.clang
-            llvm7.libclang
-            llvm7Bin
-            llvm7Dev
-            llvm7CompatTools
+            llvm.clang
+            llvm.libclang
+            llvmBin
+            llvmDev
+            llvmCompatTools
           ];
-          # All link-time libs come from pkgsLlvm7 (glibc 2.37) so they match
-          # clang 7's runtime ABI. The final Rust binary itself runs against
-          # the host's modern glibc, which is backwards-compatible with these.
+          # LLVM 7 uses the old package set; LLVM 19 uses current libraries.
           buildInputs = [
-            pkgsLlvm7.openssl
-            pkgsLlvm7.libxml2
-            pkgsLlvm7.zlib
-            pkgsLlvm7.ncurses
-            pkgsLlvm7.libffi
-            pkgsLlvm7.stdenv.cc.cc.lib
+            compatPkgs.openssl
+            compatPkgs.libxml2
+            compatPkgs.zlib
+            compatPkgs.ncurses
+            compatPkgs.libffi
+            compatPkgs.stdenv.cc.cc.lib
           ];
 
           shellHook = ''
-            export CARGO_TARGET_DIR="$PWD/target"
-            export PATH="${llvm7CompatTools}/bin:${llvm7Bin}/bin:${llvm7Dev}/bin:${cudaRoot}/bin:${cudaRoot}/nvvm/bin:$PATH"
-            export LD_LIBRARY_PATH="${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${pkgsLlvm7.ncurses.out}/lib:${pkgsLlvm7.libxml2.out}/lib:${pkgsLlvm7.zlib.out}/lib:${pkgsLlvm7.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            export CARGO_TARGET_DIR="$PWD/target/llvm${toString version}"
+            export PATH="${llvmCompatTools}/bin:${llvmBin}/bin:${llvmDev}/bin:${cudaRoot}/bin:${cudaRoot}/nvvm/bin:$PATH"
+            export LD_LIBRARY_PATH="${cudaRoot}/nvvm/lib:${cudaRoot}/nvvm/lib64:${cudaRoot}/lib64:${cudaRoot}/lib:${compatPkgs.ncurses.out}/lib:${compatPkgs.libxml2.out}/lib:${compatPkgs.zlib.out}/lib:${compatPkgs.stdenv.cc.cc.lib}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
             # LIBRARY_PATH is the *link-time* analog of LD_LIBRARY_PATH — needed
             # so cc/ld can resolve `-lnvvm` (from #[link(name = "nvvm")]) etc.
             export LIBRARY_PATH="${cudaRoot}/nvvm/lib64:${cudaRoot}/nvvm/lib:${cudaRoot}/lib64:${cudaRoot}/lib''${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
-            echo "rust-cuda llvm7 shell"
+            echo "rust-cuda llvm${toString version} shell"
             echo "  CUDA_HOME=$CUDA_HOME"
-            echo "  LLVM_CONFIG=$LLVM_CONFIG"
+            echo "  LLVM_CONFIG=${llvmDev}/bin/llvm-config"
           '';
         };
     in
     {
       devShells = forAllSystems (system: {
-        default = mkDevShell system;
+        default = mkDevShell system 7;
+        v7 = mkDevShell system 7;
+        v19 = mkDevShell system 19;
       });
     };
 }

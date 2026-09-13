@@ -42,9 +42,16 @@ fn build_gpu() {
         kernel_args.extend(["--features".to_owned(), kernel_features]);
     }
 
+    // The modern NVVM dialect requires a Blackwell-or-later target.
+    let arch = if cfg!(feature = "llvm19") {
+        NvvmArch::Compute100
+    } else {
+        NvvmArch::Compute89
+    };
+
     let ptx_path = out_path.join("kernels.ptx");
     CudaBuilder::new(&kernels_dir)
-        .arch(NvvmArch::Compute89)
+        .arch(arch)
         .build_args(&kernel_args)
         .copy_to(&ptx_path)
         .final_module_path(out_path.join("final-module.ll"))

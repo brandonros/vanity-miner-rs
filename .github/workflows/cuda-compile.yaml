@@ -2,6 +2,7 @@ name: cuda-compile
 
 on:
   workflow_dispatch:
+  pull_request:
 
 jobs:
   build:
@@ -11,8 +12,25 @@ jobs:
         include:
           - runs-on: ubuntu-24.04
             arch: x86_64
+            llvm: 7
+            extra-features: ""
+            suffix: ""
           - runs-on: ubuntu-24.04-arm
             arch: aarch64
+            llvm: 7
+            extra-features: ""
+            suffix: ""
+          - runs-on: ubuntu-24.04
+            arch: x86_64
+            llvm: 19
+            extra-features: ",llvm19"
+            suffix: "-llvm19"
+          - runs-on: ubuntu-24.04-arm
+            arch: aarch64
+            llvm: 19
+            extra-features: ",llvm19"
+            suffix: "-llvm19"
+    name: Build ${{ matrix.arch }} LLVM ${{ matrix.llvm }}
     runs-on: ${{ matrix.runs-on }}
     steps:
       - name: Checkout repository
@@ -34,19 +52,19 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/
-          key: miner-gpu-llvm7-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock', '.github/workflows/cuda-compile.yaml') }}-${{ github.sha }}
+          key: miner-full-llvm${{ matrix.llvm }}-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            miner-gpu-llvm7-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock', '.github/workflows/cuda-compile.yaml') }}-
+            miner-full-llvm${{ matrix.llvm }}-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
 
       - name: Build with nix devshell
         run: |
-          nix develop --command cargo build -p vanity-miner --features gpu --release
+          nix develop .#v${{ matrix.llvm }} --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test${{ matrix.extra-features }}" --release --locked
 
           mkdir -p artifacts
-          cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
+          cp target/llvm${{ matrix.llvm }}/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
 
-          # PTX is target-independent (nvptx64), so it's identical across host arches.
-          cp target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output.ptx
+          # PTX targets the selected GPU architecture, independently of the host.
+          cp target/llvm${{ matrix.llvm }}/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output${{ matrix.suffix }}.ptx
 
           echo "Copied build artifacts for ${{ matrix.arch }}"
 
@@ -60,13 +78,13 @@ jobs:
           else
             INTERP=/lib/ld-linux-aarch64.so.1
           fi
-          nix develop --command patchelf --set-interpreter "$INTERP" --remove-rpath \
-            ./artifacts/vanity-miner-${{ matrix.arch }}
+          nix develop .#v${{ matrix.llvm }} --command patchelf --set-interpreter "$INTERP" --remove-rpath \
+            ./artifacts/vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vanity-miner-${{ matrix.arch }}
+          name: vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
           path: artifacts/
 
       - name: Save Cargo cache even after compilation failures
@@ -80,6 +98,7 @@ jobs:
           key: ${{ steps.cargo-cache.outputs.cache-primary-key }}
 
   release:
+    if: github.event_name == 'workflow_dispatch'
     needs: build
     runs-on: ubuntu-24.04
     permissions:

@@ -4,8 +4,19 @@ GPU-accelerated vanity address generator for multiple blockchains
 ## How to build
 
 ```shell
+# Default: LLVM 7, compute_89
 nix develop --command cargo build -p vanity-miner --features gpu --release
+
+# Opt-in: LLVM 19, compute_100 (Blackwell or later)
+nix develop .#v19 --command cargo build -p vanity-miner --features gpu,llvm19 --release
 ```
+
+The default shell is also available as `.#v7`. Shell builds use
+`target/llvm7/` and `target/llvm19/` respectively. Add
+`solana,bitcoin,ethereum,shallenge,self_test` to build every kernel;
+`--all-features` also enables LLVM 19 and therefore requires the v19 shell.
+CI builds both backends for both Linux host architectures. LLVM 19 artifacts
+have an `-llvm19` suffix; existing release filenames continue to use LLVM 7.
 
 ## How to use
 
