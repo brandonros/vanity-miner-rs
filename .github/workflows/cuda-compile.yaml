@@ -11,9 +11,12 @@ jobs:
         include:
           - runs-on: ubuntu-24.04
             arch: x86_64
-          - runs-on: ubuntu-24.04-arm
-            arch: aarch64
+          # - runs-on: ubuntu-24.04-arm
+          #   arch: aarch64
     runs-on: ${{ matrix.runs-on }}
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,19 +24,29 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-${{ matrix.arch }}-
+          purge: true
+          purge-prefixes: nix-${{ runner.os }}-${{ matrix.arch }}-
+          purge-created: 0
+          purge-primary-key: never
 
-      - name: Build with nix devshell
+      - name: Build (via scripts/build-gpu.sh)
         run: |
-          nix develop --command cargo build -p vanity-miner --features gpu --release
+          # Single script for CI + local debugging. Mirrors cargo-oxide's full
+          # RUSTFLAGS set including -Z always-encode-mir=yes (without which
+          # cross-crate pub fn calls into logic/ get dropped at the collector).
+          nix develop --command bash scripts/build-gpu.sh
 
           mkdir -p artifacts
           cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
-
-          # PTX is target-independent (nvptx64), so it's identical across host arches.
-          cp target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output.ptx
-
+          # kernels.ptx is host-arch-independent (nvptx64), but copy it from
+          # both arch jobs so the release step can pick either one — they're
+          # identical. download-artifact will merge under one name.
+          cp target/ptx/kernels.ptx ./artifacts/kernels.ptx
           echo "Copied build artifacts for ${{ matrix.arch }}"
 
       - name: Patch ELF interpreter for portability
@@ -131,22 +144,22 @@ jobs:
           asset_name: vanity-miner-x86_64
           asset_content_type: application/octet-stream
 
-      - name: Upload aarch64 binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
-          asset_name: vanity-miner-aarch64
-          asset_content_type: application/octet-stream
+      # - name: Upload aarch64 binary
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
+      #     asset_name: vanity-miner-aarch64
+      #     asset_content_type: application/octet-stream
 
-      - name: Upload output.ptx
+      - name: Upload kernels.ptx
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64/output.ptx
-          asset_name: output.ptx
-          asset_content_type: application/octet-stream
+          asset_path: dist/vanity-miner-x86_64/kernels.ptx
+          asset_name: kernels.ptx
+          asset_content_type: text/plain

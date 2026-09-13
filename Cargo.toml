@@ -2,9 +2,16 @@
 resolver = "3"
 members = [
   "cli",
+  "kernels",
   "logic"
 ]
-exclude = ["kernels"]
+
+[workspace.dependencies]
+# Track the cuda-oxide branch we're iterating on. Cargo.lock pins the
+# resolved commit per-build; bump via `cargo update -p cuda-core` etc.
+cuda-core = { git = "https://github.com/brandonros/cuda-oxide.git", branch = "reproduce-errors" }
+cuda-host = { git = "https://github.com/brandonros/cuda-oxide.git", branch = "reproduce-errors" }
+cuda-device = { git = "https://github.com/brandonros/cuda-oxide.git", branch = "reproduce-errors" }
 
 [patch.crates-io]
 # put compiler_fence behind a feature flag that is disabled by default

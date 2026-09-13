@@ -87,32 +87,37 @@ pub mod cpu {
 pub mod gpu {
     use super::*;
     use crate::common::GpuContext;
-    use cust::launch;
-    use cust::memory::CopyDestination;
-    use cust::module::Module;
-    use cust::util::SliceExt;
+    use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
+    use kernels::kernels::LoadedModule;
     use rand::Rng;
 
     pub fn run(
         ordinal: usize,
         prefix: String,
         suffix: String,
-        module: &Module,
+        ctx: &Arc<CudaContext>,
+        module: &LoadedModule,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Ethereum uses hex-encoded prefix/suffix
         let prefix_bytes = hex::decode(&prefix)?;
         let suffix_bytes = hex::decode(&suffix)?;
 
-        let gpu = GpuContext::new(ordinal)?;
-        let kernel = module.get_function("kernel_find_ethereum_vanity_private_key")?;
+        let gpu = GpuContext::new(ctx)?;
         gpu.print_launch_info(ordinal, "ethereum vanity");
 
         let mut rng = rand::thread_rng();
+        let stream = &gpu.stream;
 
         // Allocate static input buffers once (they don't change between iterations)
-        let prefix_dev = prefix_bytes.as_slice().as_dbuf()?;
-        let suffix_dev = suffix_bytes.as_slice().as_dbuf()?;
+        let prefix_dev = DeviceBuffer::from_host(stream, prefix_bytes.as_slice())?;
+        let suffix_dev = DeviceBuffer::from_host(stream, suffix_bytes.as_slice())?;
+
+        let launch_config = LaunchConfig {
+            grid_dim: (gpu.blocks_per_grid as u32, 1, 1),
+            block_dim: (gpu.threads_per_block as u32, 1, 1),
+            shared_mem_bytes: 0,
+        };
 
         loop {
             let rng_seed: u64 = rng.r#gen::<u64>();
@@ -122,40 +127,37 @@ pub mod gpu {
             let mut found_public_key = [0u8; 64];
             let mut found_address = [0u8; 20];
             let mut found_thread_idx_slice = [0u32; 1];
-            let found_matches_dev = found_matches_slice.as_dbuf()?;
-            let found_private_key_dev = found_private_key.as_dbuf()?;
-            let found_public_key_dev = found_public_key.as_dbuf()?;
-            let found_address_dev = found_address.as_dbuf()?;
-            let found_thread_idx_dev = found_thread_idx_slice.as_dbuf()?;
+            let mut found_matches_dev = DeviceBuffer::<u32>::zeroed(stream, 1)?;
+            let mut found_private_key_dev = DeviceBuffer::<u8>::zeroed(stream, 32)?;
+            let mut found_public_key_dev = DeviceBuffer::<u8>::zeroed(stream, 64)?;
+            let mut found_address_dev = DeviceBuffer::<u8>::zeroed(stream, 20)?;
+            let mut found_thread_idx_dev = DeviceBuffer::<u32>::zeroed(stream, 1)?;
 
-            let stream = &gpu.stream;
             unsafe {
-                launch!(
-                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, stream>>>(
-                        prefix_dev.as_device_ptr(),
-                        prefix_bytes.len(),
-                        suffix_dev.as_device_ptr(),
-                        suffix_bytes.len(),
-                        rng_seed,
-                        found_matches_dev.as_device_ptr(),
-                        found_private_key_dev.as_device_ptr(),
-                        found_public_key_dev.as_device_ptr(),
-                        found_address_dev.as_device_ptr(),
-                        found_thread_idx_dev.as_device_ptr(),
-                    )
+                module.kernel_find_ethereum_vanity_private_key(
+                    stream,
+                    launch_config,
+                    &prefix_dev,
+                    &suffix_dev,
+                    rng_seed,
+                    &mut found_matches_dev,
+                    &mut found_private_key_dev,
+                    &mut found_public_key_dev,
+                    &mut found_address_dev,
+                    &mut found_thread_idx_dev,
                 )?;
             }
 
-            gpu.stream.synchronize()?;
+            found_matches_dev.copy_to_host(stream, &mut found_matches_slice)?;
+            stream.synchronize()?;
             global_stats.add_launch(gpu.operations_per_launch);
 
-            found_matches_dev.copy_to(&mut found_matches_slice)?;
-
             if found_matches_slice[0] != 0 {
-                found_private_key_dev.copy_to(&mut found_private_key)?;
-                found_public_key_dev.copy_to(&mut found_public_key)?;
-                found_address_dev.copy_to(&mut found_address)?;
-                found_thread_idx_dev.copy_to(&mut found_thread_idx_slice)?;
+                found_private_key_dev.copy_to_host(stream, &mut found_private_key)?;
+                found_public_key_dev.copy_to_host(stream, &mut found_public_key)?;
+                found_address_dev.copy_to_host(stream, &mut found_address)?;
+                found_thread_idx_dev.copy_to_host(stream, &mut found_thread_idx_slice)?;
+                stream.synchronize()?;
 
                 let found_thread_idx = found_thread_idx_slice[0];
                 let encoded_address_str = hex::encode(found_address);
