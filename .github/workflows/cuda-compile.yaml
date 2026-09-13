@@ -14,22 +14,18 @@ jobs:
             arch: x86_64
             llvm: 7
             extra-features: ""
-            suffix: ""
           - runs-on: ubuntu-24.04-arm
             arch: aarch64
             llvm: 7
             extra-features: ""
-            suffix: ""
           - runs-on: ubuntu-24.04
             arch: x86_64
             llvm: 19
             extra-features: ",llvm19"
-            suffix: "-llvm19"
           - runs-on: ubuntu-24.04-arm
             arch: aarch64
             llvm: 19
             extra-features: ",llvm19"
-            suffix: "-llvm19"
     name: Build ${{ matrix.arch }} LLVM ${{ matrix.llvm }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -61,10 +57,10 @@ jobs:
           nix develop .#v${{ matrix.llvm }} --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test${{ matrix.extra-features }}" --release --locked
 
           mkdir -p artifacts
-          cp target/llvm${{ matrix.llvm }}/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
+          cp target/llvm${{ matrix.llvm }}/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}-llvm${{ matrix.llvm }}
 
           # PTX targets the selected GPU architecture, independently of the host.
-          cp target/llvm${{ matrix.llvm }}/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output${{ matrix.suffix }}.ptx
+          cp target/llvm${{ matrix.llvm }}/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output-llvm${{ matrix.llvm }}.ptx
 
           echo "Copied build artifacts for ${{ matrix.arch }}"
 
@@ -79,12 +75,12 @@ jobs:
             INTERP=/lib/ld-linux-aarch64.so.1
           fi
           nix develop .#v${{ matrix.llvm }} --command patchelf --set-interpreter "$INTERP" --remove-rpath \
-            ./artifacts/vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
+            ./artifacts/vanity-miner-${{ matrix.arch }}-llvm${{ matrix.llvm }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vanity-miner-${{ matrix.arch }}${{ matrix.suffix }}
+          name: vanity-miner-${{ matrix.arch }}-llvm${{ matrix.llvm }}
           path: artifacts/
 
       - name: Save Cargo cache even after compilation failures
@@ -156,6 +152,12 @@ jobs:
           body: |
             ## CUDA Vanity Miner ${{ steps.version.outputs.new_version }}
 
+            ### GPU builds
+            - Assets ending in `-llvm7` use LLVM 7 and target `compute_89`.
+            - Assets ending in `-llvm19` use LLVM 19 and target `compute_100` (Blackwell or later).
+            - `x86_64` and `aarch64` identify the Linux host CPU, not the GPU.
+            - Each LLVM version includes both host binaries and a standalone PTX file.
+
             ### Build Information
             - **Workflow**: ${{ github.workflow }}
             - **Run ID**: ${{ github.run_id }}
@@ -164,32 +166,62 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload x86_64 binary
+      - name: Upload x86_64 LLVM 7 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64/vanity-miner-x86_64
-          asset_name: vanity-miner-x86_64
+          asset_path: dist/vanity-miner-x86_64-llvm7/vanity-miner-x86_64-llvm7
+          asset_name: vanity-miner-x86_64-llvm7
           asset_content_type: application/octet-stream
 
-      - name: Upload aarch64 binary
+      - name: Upload aarch64 LLVM 7 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-aarch64/vanity-miner-aarch64
-          asset_name: vanity-miner-aarch64
+          asset_path: dist/vanity-miner-aarch64-llvm7/vanity-miner-aarch64-llvm7
+          asset_name: vanity-miner-aarch64-llvm7
           asset_content_type: application/octet-stream
 
-      - name: Upload output.ptx
+      - name: Upload LLVM 7 PTX
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64/output.ptx
-          asset_name: output.ptx
+          asset_path: dist/vanity-miner-x86_64-llvm7/output-llvm7.ptx
+          asset_name: output-llvm7.ptx
+          asset_content_type: application/octet-stream
+
+      - name: Upload x86_64 LLVM 19 binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-x86_64-llvm19/vanity-miner-x86_64-llvm19
+          asset_name: vanity-miner-x86_64-llvm19
+          asset_content_type: application/octet-stream
+
+      - name: Upload aarch64 LLVM 19 binary
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-aarch64-llvm19/vanity-miner-aarch64-llvm19
+          asset_name: vanity-miner-aarch64-llvm19
+          asset_content_type: application/octet-stream
+
+      - name: Upload LLVM 19 PTX
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: dist/vanity-miner-x86_64-llvm19/output-llvm19.ptx
+          asset_name: output-llvm19.ptx
           asset_content_type: application/octet-stream
