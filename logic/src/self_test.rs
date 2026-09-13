@@ -10,8 +10,8 @@
 //!
 //! Keep known-answer inputs opaque before the operation under test. A barrier
 //! around the final boolean is too late: the operation can already be folded.
-//! `black_box` is best effort; the PTX artifact gate independently rejects
-//! self-tests reduced to constant-result stores (except the launch stub).
+//! `black_box` is best effort; inspect emitted PTX to verify the computation
+//! survives optimization.
 
 use crate::{
     BitcoinVanityKeyRequest, BitcoinVanityKeyResult, EthereumVanityKeyRequest,
