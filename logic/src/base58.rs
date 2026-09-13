@@ -220,4 +220,23 @@ mod test {
         let expected = hex::decode("355177385441616239385172516D796D637A7A78776B5A7A61634D444C344D654548").unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
     }
+
+    // Bitcoin Genesis P2PKH: input starts with 0x00 (mainnet version byte).
+    // Exercises the leading-zero pad path that emits a '1' for each zero byte.
+    #[test]
+    fn should_encode_leading_zero_correctly() {
+        let input: [u8; 25] = hex::decode("0062e907b15cbf27d5425399ebf6f0fb50ebb88f18c29b7d93").unwrap().try_into().unwrap();
+        let mut output = [0u8; 64];
+        let len = base58_encode(&input, &mut output);
+        assert_eq!(&output[..len], b"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+    }
+
+    // 32 zero bytes must encode to 32 '1' chars (one '1' per leading zero).
+    #[test]
+    fn should_encode_32_all_zeros_correctly() {
+        let input = [0u8; 32];
+        let mut output = [0u8; 64];
+        let len = base58_encode_32(&input, &mut output);
+        assert_eq!(&output[..len], b"11111111111111111111111111111111");
+    }
 }

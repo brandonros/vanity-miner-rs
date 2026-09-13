@@ -74,13 +74,29 @@ mod test {
         // Assert
         assert_eq!(result.matches, true);
         assert_eq!(
-            result.private_key, 
+            result.private_key,
             <[u8; 32]>::try_from(
                 hex::decode("d32ef33913a75aada4fc64d153de08338e169234f3432cc0294510df9fd0ccf8")
                     .unwrap()
                     .as_slice()
             ).unwrap()
         );
-        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"aaLs2GEHDEajV3kgXsr7FPDRc4mcKVJLQDXnWWcyJCr");   
+        assert_eq!(
+            result.hashed_private_key,
+            <[u8; 64]>::try_from(
+                hex::decode("775b2371688f9c1d6b0fcda270d4c174e00612ce4ed498240c44dbc14058cfc732f083ad905f54fb4ca029e115d02e3a8bd68681e94116eba8459b0883ce4c99")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
+        assert_eq!(
+            result.public_key,
+            <[u8; 32]>::try_from(
+                hex::decode("0899ddfc8862a73570657c47c4ec289233a5c0543b2f83aa4e6dcbb196547ee3")
+                    .unwrap()
+                    .as_slice()
+            ).unwrap()
+        );
+        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"aaLs2GEHDEajV3kgXsr7FPDRc4mcKVJLQDXnWWcyJCr");
     }
 }
