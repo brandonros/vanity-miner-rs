@@ -232,26 +232,14 @@ fn sha256_variable_length(input: &[u8]) -> [u32; 8] {
         last_word_bytes[remaining_bytes_in_word] = 0x80;
         final_block[complete_words_in_final] = u32::from_be_bytes(last_word_bytes);
     } else {
-        // If remaining bytes is exactly divisible by 4, add padding in next word
-        if complete_words_in_final < 16 {
-            final_block[complete_words_in_final] = 0x80000000;
-        } else {
-            // Need another block for padding
-            process_block(&final_block, &mut state);
-            final_block = [0u32; 16];
-            final_block[0] = 0x80000000;
-        }
+        // remaining_bytes ∈ [0,63] ⇒ complete_words_in_final = remaining_bytes/4 ∈ [0,15],
+        // so this index is always in range and the "no room" branch is unreachable.
+        final_block[complete_words_in_final] = 0x80000000;
     }
     
-    // Check if we have room for the length (need 2 words = 8 bytes)
-    let padding_word_idx = if remaining_bytes_in_word > 0 {
-        complete_words_in_final + 1
-    } else {
-        complete_words_in_final + 1
-    };
-    
-    if padding_word_idx > 14 {
-        // Not enough room for length, need another block
+    // If 0x80 lands in word 14 or 15, the 8-byte length (words 14 and 15)
+    // doesn't fit in this block — push it and start a fresh padding block.
+    if complete_words_in_final + 1 > 14 {
         process_block(&final_block, &mut state);
         final_block = [0u32; 16];
     }
