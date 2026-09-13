@@ -1,44 +1,46 @@
-use cust::context::ResourceLimit;
-use cust::device::Device;
-use cust::prelude::Context;
-use cust::stream::{Stream, StreamFlags};
+use cuda_core::sys::{
+    CUdevice_attribute_enum_CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+    CUlimit_enum_CU_LIMIT_STACK_SIZE, cuCtxSetLimit, cuDeviceGetAttribute,
+};
+use cuda_core::{CudaContext, CudaStream, IntoResult};
 use std::error::Error;
+use std::ffi::c_int;
+use std::mem::MaybeUninit;
+use std::sync::Arc;
 
 pub struct GpuContext {
-    pub stream: Stream,
+    pub stream: Arc<CudaStream>,
     pub blocks_per_grid: usize,
     pub threads_per_block: usize,
     pub operations_per_launch: usize,
-    // Keep context alive for the lifetime of GpuContext
-    #[allow(dead_code)]
-    ctx: Context,
 }
 
 impl GpuContext {
-    pub fn new(ordinal: usize) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let device = Device::get_device(ordinal as u32)?;
-        let ctx = Context::new(device)?;
-        cust::context::CurrentContext::set_current(&ctx)?;
+    pub fn new(ctx: &Arc<CudaContext>) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        ctx.bind_to_thread()?;
 
-        // Optionally override stack size
-        if let Ok(stack_size) = std::env::var("STACK_SIZE") {
-            let stack_size = stack_size.parse::<usize>()?;
-            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack_size)?;
-        } else {
-            // CUDA's default per-thread stack is 1024 bytes. Rust-CUDA's NVVM
-            // backend aggressively inlines whole pipelines, so any kernel that
-            // composes k256/dalek + xoroshiro needs much more — bisected at
-            // 8 KiB FAIL / 16 KiB PASS for the eth-priv-bisect's simplest
-            // composed kernel. The full self-test ladder has bigger kernels
-            // (depot up to 1856 bytes + deeper k256/dalek call chains), so
-            // give 2× headroom over the measured floor.
-            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, 16384)?;
+        // Retain master's stack headroom through the CUDA Oxide driver API.
+        // STACK_SIZE still overrides this (the compiler repro script uses 64 KiB).
+        let stack_size = std::env::var("STACK_SIZE")
+            .unwrap_or_else(|_| "16384".to_string())
+            .parse::<usize>()?;
+        unsafe {
+            cuCtxSetLimit(CUlimit_enum_CU_LIMIT_STACK_SIZE, stack_size).result()?;
         }
 
-        let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
+        let stream = ctx.new_stream()?;
 
-        let number_of_streaming_multiprocessors =
-            device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
+        let number_of_streaming_multiprocessors = unsafe {
+            let mut count = MaybeUninit::<c_int>::uninit();
+            cuDeviceGetAttribute(
+                count.as_mut_ptr(),
+                CUdevice_attribute_enum_CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+                ctx.cu_device(),
+            )
+            .result()?;
+            count.assume_init() as usize
+        };
+
         let blocks_per_sm = std::env::var("BLOCKS_PER_SM")
             .unwrap_or_else(|_| "128".to_string())
             .parse::<usize>()?;
@@ -53,7 +55,6 @@ impl GpuContext {
             blocks_per_grid,
             threads_per_block,
             operations_per_launch,
-            ctx,
         })
     }
 

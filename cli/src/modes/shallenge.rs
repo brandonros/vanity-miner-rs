@@ -95,30 +95,36 @@ pub mod cpu {
 pub mod gpu {
     use super::*;
     use crate::common::GpuContext;
-    use cust::launch;
-    use cust::memory::CopyDestination;
-    use cust::module::Module;
-    use cust::util::SliceExt;
+    use cuda_core::{CudaContext, DeviceBuffer, LaunchConfig};
+    use kernels::kernels::LoadedModule;
     use rand::Rng;
 
     pub fn run(
         ordinal: usize,
         username: String,
         shared_best_hash: Arc<RwLock<SharedBestHash>>,
-        module: &Module,
+        ctx: &Arc<CudaContext>,
+        module: &LoadedModule,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let username_bytes = username.as_bytes();
         let username_len: usize = username_bytes.len();
 
-        let gpu = GpuContext::new(ordinal)?;
-        let kernel = module.get_function("kernel_find_better_shallenge_nonce")?;
+        let gpu = GpuContext::new(ctx)?;
         gpu.print_launch_info(ordinal, "shallenge");
 
         let mut rng = rand::thread_rng();
+        let stream = &gpu.stream;
 
         // Allocate static input buffer once (username doesn't change between iterations)
-        let username_dev = username_bytes.as_dbuf()?;
+        let username_dev = DeviceBuffer::from_host(stream, username_bytes)?;
+        let _ = username_len;
+
+        let launch_config = LaunchConfig {
+            grid_dim: (gpu.blocks_per_grid as u32, 1, 1),
+            block_dim: (gpu.threads_per_block as u32, 1, 1),
+            shared_mem_bytes: 0,
+        };
 
         loop {
             let rng_seed: u64 = rng.r#gen::<u64>();
@@ -137,41 +143,40 @@ pub mod gpu {
             let mut found_thread_idx_slice = [0u32; 1];
 
             // target_hash_dev stays in loop - it changes when a better hash is found
-            let target_hash_dev = current_target.as_dbuf()?;
-            let found_matches_slice_dev = found_matches_slice.as_dbuf()?;
-            let found_hash_dev = found_hash.as_dbuf()?;
-            let found_nonce_dev = found_nonce.as_dbuf()?;
-            let found_nonce_len_dev = found_nonce_len.as_dbuf()?;
-            let found_thread_idx_slice_dev = found_thread_idx_slice.as_dbuf()?;
+            let target_hash_dev = DeviceBuffer::from_host(stream, &current_target)?;
+            let mut found_matches_slice_dev = DeviceBuffer::<u32>::zeroed(stream, 1)?;
+            let mut found_hash_dev = DeviceBuffer::<u8>::zeroed(stream, 32)?;
+            let mut found_nonce_dev = DeviceBuffer::<u8>::zeroed(stream, 64)?;
+            let mut found_nonce_len_dev = DeviceBuffer::<usize>::zeroed(stream, 1)?;
+            let mut found_thread_idx_slice_dev = DeviceBuffer::<u32>::zeroed(stream, 1)?;
 
-            let stream = &gpu.stream;
             unsafe {
-                launch!(
-                    kernel<<<gpu.blocks_per_grid as u32, gpu.threads_per_block as u32, 0, stream>>>(
-                        username_dev.as_device_ptr(),
-                        username_len,
-                        target_hash_dev.as_device_ptr(),
-                        rng_seed,
-                        found_matches_slice_dev.as_device_ptr(),
-                        found_hash_dev.as_device_ptr(),
-                        found_nonce_dev.as_device_ptr(),
-                        found_nonce_len_dev.as_device_ptr(),
-                        found_thread_idx_slice_dev.as_device_ptr(),
-                    )
+                module.kernel_find_better_shallenge_nonce(
+                    stream,
+                    launch_config,
+                    &username_dev,
+                    &target_hash_dev,
+                    rng_seed,
+                    &mut found_matches_slice_dev,
+                    &mut found_hash_dev,
+                    &mut found_nonce_dev,
+                    &mut found_nonce_len_dev,
+                    &mut found_thread_idx_slice_dev,
                 )?;
             }
 
-            gpu.stream.synchronize()?;
+            found_matches_slice_dev.copy_to_host(stream, &mut found_matches_slice)?;
+            stream.synchronize()?;
             global_stats.add_launch(gpu.operations_per_launch);
-
-            found_matches_slice_dev.copy_to(&mut found_matches_slice)?;
 
             let found_matches = found_matches_slice[0];
             if found_matches != 0 {
-                found_hash_dev.copy_to(&mut found_hash)?;
-                found_nonce_dev.copy_to(&mut found_nonce)?;
-                found_nonce_len_dev.copy_to(&mut found_nonce_len)?;
-                found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
+                found_hash_dev.copy_to_host(stream, &mut found_hash)?;
+                found_nonce_dev.copy_to_host(stream, &mut found_nonce)?;
+                found_nonce_len_dev.copy_to_host(stream, &mut found_nonce_len)?;
+                found_thread_idx_slice_dev
+                    .copy_to_host(stream, &mut found_thread_idx_slice)?;
+                stream.synchronize()?;
 
                 let found_thread_idx = found_thread_idx_slice[0];
                 let nonce_len = found_nonce_len[0];
