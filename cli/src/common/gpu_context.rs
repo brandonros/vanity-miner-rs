@@ -19,11 +19,13 @@ impl GpuContext {
     pub fn new(ctx: &Arc<CudaContext>) -> Result<Self, Box<dyn Error + Send + Sync>> {
         ctx.bind_to_thread()?;
 
-        if let Ok(stack_size) = std::env::var("STACK_SIZE") {
-            let stack_size = stack_size.parse::<usize>()?;
-            unsafe {
-                cuCtxSetLimit(CUlimit_enum_CU_LIMIT_STACK_SIZE, stack_size).result()?;
-            }
+        // Retain master's stack headroom through the CUDA Oxide driver API.
+        // STACK_SIZE still overrides this (the compiler repro script uses 64 KiB).
+        let stack_size = std::env::var("STACK_SIZE")
+            .unwrap_or_else(|_| "16384".to_string())
+            .parse::<usize>()?;
+        unsafe {
+            cuCtxSetLimit(CUlimit_enum_CU_LIMIT_STACK_SIZE, stack_size).result()?;
         }
 
         let stream = ctx.new_stream()?;

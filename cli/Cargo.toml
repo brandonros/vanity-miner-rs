@@ -4,20 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = []
-gpu = [
-    "dep:kernels",
-    "dep:cuda-core",
-    "dep:cuda-host",
-    "kernels/kernel_bitcoin",
-    "kernels/kernel_ethereum",
-    "kernels/kernel_solana",
-    "kernels/kernel_shallenge",
-    "kernels/kernel_self_test",
-]
+# Preserve CUDA Oxide's existing all-mode build while allowing selective builds.
+default = ["solana", "bitcoin", "ethereum", "shallenge", "self_test"]
+gpu = ["dep:kernels", "dep:cuda-core", "dep:cuda-host"]
+solana = ["logic/solana", "kernels?/kernel_solana"]
+bitcoin = ["logic/bitcoin", "kernels?/kernel_bitcoin"]
+ethereum = ["logic/ethereum", "kernels?/kernel_ethereum"]
+shallenge = ["logic/shallenge", "kernels?/kernel_shallenge"]
+self_test = ["logic/self_test", "kernels?/kernel_self_test"]
 
 [dependencies]
-logic = { path = "../logic" }
+logic = { path = "../logic", default-features = false }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"
 rand = "0.8"
@@ -25,6 +22,7 @@ paste = "1.0"
 
 [dependencies.kernels]
 path = "../kernels"
+default-features = false
 optional = true
 
 [dependencies.cuda-core]

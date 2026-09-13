@@ -313,9 +313,8 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    // NIST FIPS 180-2 multi-block test vector: 112-byte input forces two
-    // 64-byte blocks plus an overflow padding block. Exercises the
-    // full-block loop and the length-doesn't-fit padding path.
+    // 112-byte test vector: one full block and a final padded block.
+    // Exercises the full-block loop and final-block padding.
     #[test]
     fn test_sha256_multi_block() {
         let input = b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
@@ -364,4 +363,30 @@ mod tests {
         let expected: [u8; 32] = hex::decode("2edc986847e209b4016e141a6dc8716d3207350f416969382d431539bf292e4a").unwrap().try_into().unwrap();
         assert_eq!(result, expected);
     }
+
+    // Fixed vectors generated independently with Python hashlib.sha256(bytes(range(len))).
+    #[test]
+    fn test_sha256_block_and_padding_boundaries() {
+        let cases = [
+            (0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+            (1, "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"),
+            (55, "463eb28e72f82e0a96c0a4cc53690c571281131f672aa229e0d45ae59b598b59"),
+            (56, "da2ae4d6b36748f2a318f23e7ab1dfdf45acdc9d049bd80e59de82a60895f562"),
+            (63, "29af2686fd53374a36b0846694cc342177e428d1647515f078784d69cdb9e488"),
+            (64, "fdeab9acf3710362bd2658cdc9a29e8f9c757fcf9811603a8c447cd1d9151108"),
+            (65, "4bfd2c8b6f1eec7a2afeb48b934ee4b2694182027e6d0fc075074f2fabb31781"),
+            (119, "da18797ed7c3a777f0847f429724a2d8cd5138e6ed2895c3fa1a6d39d18f7ec6"),
+            (120, "f52b23db1fbb6ded89ef42a23ce0c8922c45f25c50b568a93bf1c075420bbb7c"),
+            (127, "92ca0fa6651ee2f97b884b7246a562fa71250fedefe5ebf270d31c546bfea976"),
+            (128, "471fb943aa23c511f6f72f8d1652d9c880cfa392ad80503120547703e56a2be5"),
+        ];
+        let mut input = [0u8; 128];
+        for (i, byte) in input.iter_mut().enumerate() {
+            *byte = i as u8;
+        }
+        for (len, expected) in cases {
+            assert_eq!(hex::encode(sha256_from_bytes(&input[..len])), expected, "length {len}");
+        }
+    }
+
 }

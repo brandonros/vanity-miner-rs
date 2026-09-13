@@ -1,5 +1,6 @@
 use std::error::Error;
 
+#[cfg(feature = "solana")]
 pub fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     let invalid_characters = ["l", "I", "0", "O"];
     for invalid_character in invalid_characters {
@@ -10,6 +11,7 @@ pub fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error +
     Ok(())
 }
 
+#[cfg(any(feature = "ethereum", feature = "shallenge"))]
 pub fn validate_hex_string(hex_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     match hex::decode(hex_string) {
         Ok(_) => Ok(()),
@@ -17,8 +19,10 @@ pub fn validate_hex_string(hex_string: &str) -> Result<(), Box<dyn Error + Send 
     }
 }
 
+#[cfg(feature = "bitcoin")]
 const BECH32_CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
 
+#[cfg(feature = "bitcoin")]
 pub fn validate_bech32_string(bech32_string: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Check for mixed case
     let has_lower = bech32_string.chars().any(|c| c.is_ascii_lowercase());

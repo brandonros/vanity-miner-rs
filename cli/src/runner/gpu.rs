@@ -1,13 +1,18 @@
 use crate::args::Command;
-use crate::common::{GlobalStats, SharedBestHash};
+use crate::common::GlobalStats;
+#[cfg(feature = "shallenge")]
+use crate::common::SharedBestHash;
 use crate::modes;
 use crate::runner::Runner;
 use cuda_core::{CudaContext, IntoResult, sys::cuDeviceGetCount};
 use kernels::kernels::LoadedModule;
+use std::backtrace::Backtrace;
 use std::error::Error;
 use std::ffi::c_int;
 use std::mem::MaybeUninit;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+#[cfg(feature = "shallenge")]
+use std::sync::RwLock;
 
 pub struct GpuRunner {
     num_devices: usize,
@@ -59,6 +64,13 @@ impl Runner for GpuRunner {
         command: &Command,
         stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        // Preserve master's device-thread diagnostics without a backend dependency.
+        std::panic::set_hook(Box::new(|panic_info| {
+            eprintln!("Thread panicked: {panic_info}");
+            eprintln!("Backtrace:\n{}", Backtrace::force_capture());
+        }));
+
+        #[cfg(feature = "shallenge")]
         let shared_best_hash: Option<Arc<RwLock<SharedBestHash>>> = match command {
             Command::Shallenge { target_hash, .. } => {
                 let target_hash_bytes = hex::decode(target_hash)?;
@@ -66,6 +78,7 @@ impl Runner for GpuRunner {
                 initial_target.copy_from_slice(&target_hash_bytes);
                 Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))
             }
+            #[allow(unreachable_patterns)]
             _ => None,
         };
 
@@ -73,6 +86,7 @@ impl Runner for GpuRunner {
         for i in 0..self.num_devices {
             println!("Starting device {}", i);
             let command_clone = command.clone();
+            #[cfg(feature = "shallenge")]
             let shared_best_hash_clone = shared_best_hash.clone();
             let stats_clone = Arc::clone(&stats);
 
@@ -84,15 +98,19 @@ impl Runner for GpuRunner {
                     let (ctx, module) = Self::load_module(i)?;
 
                     match command_clone {
+                        #[cfg(feature = "solana")]
                         Command::SolanaVanity { prefix, suffix } => {
                             modes::solana::gpu::run(i, prefix, suffix, &ctx, &module, stats_clone)
                         }
+                        #[cfg(feature = "bitcoin")]
                         Command::BitcoinVanity { prefix, suffix } => {
                             modes::bitcoin::gpu::run(i, prefix, suffix, &ctx, &module, stats_clone)
                         }
+                        #[cfg(feature = "ethereum")]
                         Command::EthereumVanity { prefix, suffix } => {
                             modes::ethereum::gpu::run(i, prefix, suffix, &ctx, &module, stats_clone)
                         }
+                        #[cfg(feature = "shallenge")]
                         Command::Shallenge { username, .. } => {
                             let shared = shared_best_hash_clone
                                 .expect("SharedBestHash required for shallenge mode");
@@ -105,12 +123,16 @@ impl Runner for GpuRunner {
                                 stats_clone,
                             )
                         }
+                        #[cfg(feature = "self_test")]
                         Command::SelfTest => {
                             let _ = stats_clone;
                             modes::self_test::gpu::run(i, &ctx, &module)
                         }
                     }
-                    .inspect_err(|e| eprintln!("Error in device {}: {}", i, e))
+                    .inspect_err(|e| {
+                        eprintln!("Error in device {}: {}", i, e);
+                        eprintln!("Backtrace:\n{}", Backtrace::force_capture());
+                    })
                 },
             ));
         }

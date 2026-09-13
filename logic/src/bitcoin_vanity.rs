@@ -172,8 +172,7 @@ mod test {
     }
 
     // The three remaining (compressed, testnet) flag combinations.
-    // Expected values derived via independent base58check implementation
-    // (see scripts/sanity_check.py-equivalent flow).
+    // Fixed Base58Check vectors cover both network and compression flags.
     #[test]
     fn should_encode_wif_uncompressed_mainnet_correctly() {
         let private_key: [u8; 32] = <[u8; 32]>::try_from(
