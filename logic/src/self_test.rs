@@ -7,6 +7,11 @@
 //! subsystem (and the kernels before it still produce reliable results
 //! before the context goes sticky-errored). CPU mode's `run_self_test`
 //! calls them all in sequence.
+//!
+//! Keep known-answer inputs opaque before the operation under test. A barrier
+//! around the final boolean is too late: the operation can already be folded.
+//! `black_box` is best effort; the PTX artifact gate independently rejects
+//! self-tests reduced to constant-result stores (except the launch stub).
 
 use crate::{
     BitcoinVanityKeyRequest, BitcoinVanityKeyResult, EthereumVanityKeyRequest,
@@ -625,17 +630,17 @@ pub fn check_primitive_keccak256() -> u32 {
 }
 
 pub fn check_primitive_ripemd160() -> u32 {
-    let hash = ripemd160_32bytes_from_bytes(&HASH_PRIMITIVE_INPUT_32);
+    let hash = ripemd160_32bytes_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_32));
     (hash == RIPEMD160_PRIMITIVE_OUTPUT) as u32
 }
 
 pub fn check_primitive_sha256_32() -> u32 {
-    let hash = sha256_32_from_bytes(&HASH_PRIMITIVE_INPUT_32);
+    let hash = sha256_32_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_32));
     (hash == SHA256_PRIMITIVE_OUTPUT_32) as u32
 }
 
 pub fn check_primitive_sha256_variable() -> u32 {
-    let hash = sha256_from_bytes(&HASH_PRIMITIVE_INPUT_33);
+    let hash = sha256_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_33));
     (hash == SHA256_PRIMITIVE_OUTPUT_VARIABLE) as u32
 }
 
@@ -854,7 +859,9 @@ pub fn check_shallenge_hash() -> u32 {
 }
 
 pub fn check_shallenge_nonce_len() -> u32 {
-    (shallenge_test().nonce_len == 21) as u32
+    // This slot tests length arithmetic; hash and nonce generation have separate checks.
+    let username_len = core::hint::black_box(10usize);
+    (crate::shallenge::shallenge_nonce_len(username_len) == 21) as u32
 }
 
 pub fn check_shallenge_is_better() -> u32 {
@@ -864,20 +871,21 @@ pub fn check_shallenge_is_better() -> u32 {
 // === compare_hashes (lt / gt / eq branches) ===
 
 pub fn check_compare_hashes_lt() -> u32 {
-    let zero = [0u8; 32];
-    let max = [0xffu8; 32];
+    let zero = core::hint::black_box([0u8; 32]);
+    let max = core::hint::black_box([0xffu8; 32]);
     (compare_hashes(&zero, &max) == -1) as u32
 }
 
 pub fn check_compare_hashes_gt() -> u32 {
-    let zero = [0u8; 32];
-    let max = [0xffu8; 32];
+    let zero = core::hint::black_box([0u8; 32]);
+    let max = core::hint::black_box([0xffu8; 32]);
     (compare_hashes(&max, &zero) == 1) as u32
 }
 
 pub fn check_compare_hashes_eq() -> u32 {
-    let zero = [0u8; 32];
-    (compare_hashes(&zero, &zero) == 0) as u32
+    let a = core::hint::black_box([0u8; 32]);
+    let b = core::hint::black_box([0u8; 32]);
+    (compare_hashes(&a, &b) == 0) as u32
 }
 
 // === Arithmetic primitive bisect (slots 31-40) ===
@@ -1056,7 +1064,7 @@ pub fn check_base58_var_len_leading_zero() -> u32 {
 }
 
 pub fn check_base58_all_zeros() -> u32 {
-    let input = [0u8; 32];
+    let input = core::hint::black_box([0u8; 32]);
     let mut out = [0u8; 64];
     let n = base58_encode_32(&input, &mut out);
     if n != BASE58_ALLZERO_EXPECTED.len() {
@@ -1688,7 +1696,7 @@ pub fn check_base58_inner_mutate_phase() -> u32 {
 //   byte[31] &= 0x7F        (clear bit 7)
 //   byte[31] |= 0x40        (set bit 6)
 pub fn check_dalek_clamp_integer() -> u32 {
-    let input: [u8; 32] = [0xFF; 32];
+    let input = core::hint::black_box([0xFFu8; 32]);
     let clamped = curve25519_dalek::scalar::clamp_integer(input);
     const EXPECTED: [u8; 32] = {
         let mut e = [0xFFu8; 32];
@@ -2319,7 +2327,7 @@ pub fn check_index_trait_dispatch() -> u32 {
 // rep IS the bytes; to_bytes just copies them out). No reduce, no math.
 // If this FAILs, the bug is at the cross-crate const-access layer.
 pub fn check_dalek_scalar_one_to_bytes_direct() -> u32 {
-    let s = curve25519_dalek::Scalar::ONE;
+    let s = core::hint::black_box(curve25519_dalek::Scalar::ONE);
     let bytes = s.to_bytes();
     let mut expected = [0u8; 32];
     expected[0] = 1;
@@ -2400,8 +2408,10 @@ const SECP256K1_GY_BYTES: [u8; 32] = [
 pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
     use k256::EncodedPoint;
     use k256::elliptic_curve::FieldBytes;
-    let x: &FieldBytes<k256::Secp256k1> = (&SECP256K1_GX_BYTES).into();
-    let y: &FieldBytes<k256::Secp256k1> = (&SECP256K1_GY_BYTES).into();
+    let x_bytes = core::hint::black_box(SECP256K1_GX_BYTES);
+    let y_bytes = core::hint::black_box(SECP256K1_GY_BYTES);
+    let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
+    let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
     let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
     let bytes = encoded.as_bytes();
     if bytes.len() != 33 {
@@ -2462,7 +2472,7 @@ pub fn check_generic_array_basic_index() -> u32 {
 pub fn check_generic_array_copy_from_slice() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::U33;
-    let src: [u8; 32] = SECP256K1_GX_BYTES;
+    let src: [u8; 32] = core::hint::black_box(SECP256K1_GX_BYTES);
     let mut ga: GenericArray<u8, U33> = GenericArray::default();
     ga[0] = 0x02;
     ga[1..33].copy_from_slice(&src);
@@ -2503,7 +2513,8 @@ fn last_via_as_slice(ga: &k256::elliptic_curve::generic_array::GenericArray<u8, 
 pub fn check_generic_array_as_slice_last() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::U32;
-    let ga: &GenericArray<u8, U32> = (&SECP256K1_GY_BYTES).into();
+    let input = core::hint::black_box(SECP256K1_GY_BYTES);
+    let ga: &GenericArray<u8, U32> = (&input).into();
     let last = last_via_as_slice(ga);
     (last == 0xB8) as u32   // SECP256K1_GY_BYTES[31]
 }
@@ -2665,7 +2676,7 @@ pub fn check_dalek_scalar_eq_zero() -> u32 {
 pub fn check_generic_array_copy_from_ga_source() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::{U32, U33};
-    let src_arr = SECP256K1_GX_BYTES;
+    let src_arr = core::hint::black_box(SECP256K1_GX_BYTES);
     let src: &GenericArray<u8, U32> = (&src_arr).into();
     let mut dst: GenericArray<u8, U33> = GenericArray::default();
     dst[0] = 0x02;

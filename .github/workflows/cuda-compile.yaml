@@ -25,7 +25,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Test PTX inventory gate
-        run: python3 scripts/test-verify-ptx-entries.py
+        run: |
+          python3 scripts/test-verify-ptx-entries.py
+          python3 scripts/test-verify-ptx-self-tests.py
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
@@ -58,6 +60,7 @@ jobs:
           cp target/cuda-builder/nvptx64-nvidia-cuda/release/kernels.ptx ./artifacts/output.ptx
 
           python3 scripts/verify-ptx-entries.py artifacts/output.ptx > artifacts/kernel-manifest.json
+          python3 scripts/verify-ptx-self-tests.py artifacts/output.ptx > artifacts/self-test-audit.json
           git rev-parse HEAD > artifacts/source-commit.txt
           nix develop --command rustc -Vv > artifacts/rustc-version.txt
           cp flake.lock Cargo.lock artifacts/
