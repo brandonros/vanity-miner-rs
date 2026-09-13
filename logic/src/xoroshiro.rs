@@ -26,3 +26,30 @@ pub fn generate_base64_nonce(thread_idx: usize, rng_seed: u64, nonce: &mut [u8])
         *byte = BASE64_CHARS[idx];
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn should_generate_private_key_correctly() {
+        let priv_key = generate_random_private_key(3, 583437459223573146);
+        let expected: [u8; 32] = hex::decode("fa9ce9b02dc28a48f7e9d15506d3d2c443d596565fa05214b0ff7c5ab5e7956b")
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert_eq!(priv_key, expected);
+    }
+
+    #[test]
+    fn should_generate_base64_nonce_in_alphabet_and_deterministically() {
+        let mut a = [0u8; 21];
+        let mut b = [0u8; 21];
+        generate_base64_nonce(7, 12345, &mut a);
+        generate_base64_nonce(7, 12345, &mut b);
+        assert_eq!(a, b, "same seed must yield same nonce");
+        for &byte in &a {
+            assert!(BASE64_CHARS.contains(&byte), "byte {:#x} not in base64 alphabet", byte);
+        }
+    }
+}

@@ -324,4 +324,81 @@ mod tests {
         let expected: [u8; 32] = hex::decode("062389936c519ed73f3371ef2e66d438e1cf0a6603f8b67c748a5d211e48b29d").unwrap().try_into().unwrap();
         assert_eq!(result, expected);
     }
+
+    // 112-byte test vector: one full block and a final padded block.
+    // Exercises the full-block loop and final-block padding.
+    #[test]
+    fn test_sha256_multi_block() {
+        let input = b"abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
+        assert_eq!(input.len(), 112);
+        let result = sha256_from_bytes(input);
+        let expected: [u8; 32] = hex::decode("cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    // NIST FIPS 180-2 vector at the padding boundary: 56-byte input means
+    // len % 64 == 56, so the 1-byte 0x80 marker + 8-byte length can't fit
+    // in the same block and a second padding block is required.
+    #[test]
+    fn test_sha256_padding_overflow() {
+        let input = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+        assert_eq!(input.len(), 56);
+        let result = sha256_from_bytes(input);
+        let expected: [u8; 32] = hex::decode("248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    // Cross-validation against Python's hashlib for long inputs that
+    // hammer the multi-block loop. Expected values computed via:
+    //   python3 -c "import hashlib; print(hashlib.sha256(MSG).hexdigest())"
+    #[test]
+    fn test_sha256_256_bytes_of_a() {
+        let input = [b'a'; 256];
+        let result = sha256_from_bytes(&input);
+        let expected: [u8; 32] = hex::decode("02d7160d77e18c6447be80c2e355c7ed4388545271702c50253b0914c65ce5fe").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_sha256_256_distinct_bytes() {
+        let mut input = [0u8; 256];
+        for i in 0..256 { input[i] = i as u8; }
+        let result = sha256_from_bytes(&input);
+        let expected: [u8; 32] = hex::decode("40aff2e9d2d8922e47afd4648e6967497158785fbd1da870e7110266bf944880").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_sha256_1024_bytes() {
+        let input = [b'a'; 1024];
+        let result = sha256_from_bytes(&input);
+        let expected: [u8; 32] = hex::decode("2edc986847e209b4016e141a6dc8716d3207350f416969382d431539bf292e4a").unwrap().try_into().unwrap();
+        assert_eq!(result, expected);
+    }
+
+    // Fixed vectors generated independently with Python hashlib.sha256(bytes(range(len))).
+    #[test]
+    fn test_sha256_block_and_padding_boundaries() {
+        let cases = [
+            (0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+            (1, "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"),
+            (55, "463eb28e72f82e0a96c0a4cc53690c571281131f672aa229e0d45ae59b598b59"),
+            (56, "da2ae4d6b36748f2a318f23e7ab1dfdf45acdc9d049bd80e59de82a60895f562"),
+            (63, "29af2686fd53374a36b0846694cc342177e428d1647515f078784d69cdb9e488"),
+            (64, "fdeab9acf3710362bd2658cdc9a29e8f9c757fcf9811603a8c447cd1d9151108"),
+            (65, "4bfd2c8b6f1eec7a2afeb48b934ee4b2694182027e6d0fc075074f2fabb31781"),
+            (119, "da18797ed7c3a777f0847f429724a2d8cd5138e6ed2895c3fa1a6d39d18f7ec6"),
+            (120, "f52b23db1fbb6ded89ef42a23ce0c8922c45f25c50b568a93bf1c075420bbb7c"),
+            (127, "92ca0fa6651ee2f97b884b7246a562fa71250fedefe5ebf270d31c546bfea976"),
+            (128, "471fb943aa23c511f6f72f8d1652d9c880cfa392ad80503120547703e56a2be5"),
+        ];
+        let mut input = [0u8; 128];
+        for (i, byte) in input.iter_mut().enumerate() {
+            *byte = i as u8;
+        }
+        for (len, expected) in cases {
+            assert_eq!(hex::encode(sha256_from_bytes(&input[..len])), expected, "length {len}");
+        }
+    }
+
 }
