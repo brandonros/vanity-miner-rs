@@ -10,7 +10,7 @@ fn build_gpu() {
     use std::env;
     use std::path::PathBuf;
 
-    use cuda_builder::{NvvmArch, CudaBuilder};
+    use cuda_builder::{CudaBuilder, NvvmArch};
 
     // On Windows, nanorand's entropy uses SystemFunction036 (RtlGenRandom) from advapi32.
     // Explicitly link it so the MSVC linker resolves the symbol (avoids LNK2019 when
@@ -24,9 +24,28 @@ fn build_gpu() {
 
     println!("cargo::rerun-if-changed={}", kernels_dir.display());
 
+    // `kernels` is a separate workspace; Cargo does not forward CLI features
+    // into CudaBuilder's nested build automatically.
+    let kernel_features = [
+        ("solana", cfg!(feature = "solana")),
+        ("bitcoin", cfg!(feature = "bitcoin")),
+        ("ethereum", cfg!(feature = "ethereum")),
+        ("shallenge", cfg!(feature = "shallenge")),
+        ("self_test", cfg!(feature = "self_test")),
+    ]
+    .into_iter()
+    .filter_map(|(name, enabled)| enabled.then_some(name))
+    .collect::<Vec<_>>()
+    .join(",");
+    let mut kernel_args = vec!["--no-default-features".to_owned(), "--locked".to_owned()];
+    if !kernel_features.is_empty() {
+        kernel_args.extend(["--features".to_owned(), kernel_features]);
+    }
+
     let ptx_path = out_path.join("kernels.ptx");
     CudaBuilder::new(&kernels_dir)
         .arch(NvvmArch::Compute89)
+        .build_args(&kernel_args)
         .copy_to(&ptx_path)
         .final_module_path(out_path.join("final-module.ll"))
         .emit_llvm_ir(true)
