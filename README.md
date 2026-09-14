@@ -2,9 +2,10 @@
 GPU-accelerated vanity address generator for multiple blockchains.
 
 Run commands from the repository root. Modes are selected at build time:
-the default build includes only `shallenge`. The `gpu` feature selects the GPU
-runner; it does not enable additional modes. A GPU-enabled binary requires CUDA
-and has no CPU fallback.
+the default build includes only `shallenge`. The `gpu` feature selects the NVIDIA
+CUDA runner; it does not enable additional modes and has no CPU fallback.
+The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon;
+see [the CuMetal guide](docs/cumetal.md). Select only one GPU backend.
 
 ## CPU mode (no CUDA required)
 

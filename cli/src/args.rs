@@ -5,6 +5,9 @@ use std::error::Error;
 #[command(name = "vanity-miner")]
 #[command(about = "GPU-accelerated vanity address generator for multiple blockchains")]
 pub struct Cli {
+    #[cfg(feature = "cumetal")]
+    #[command(flatten)]
+    pub cumetal: crate::runner::CumetalOptions,
     #[command(subcommand)]
     pub command: Command,
 }

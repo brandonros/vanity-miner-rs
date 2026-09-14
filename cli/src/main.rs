@@ -1,5 +1,9 @@
+#[cfg(all(feature = "gpu", feature = "cumetal"))]
+compile_error!("Select either gpu (NVIDIA CUDA) or cumetal, not both");
+
 mod args;
 mod common;
+#[cfg(not(feature = "cumetal"))]
 mod modes;
 mod runner;
 
@@ -10,7 +14,7 @@ use runner::Runner;
 use std::error::Error;
 use std::sync::Arc;
 
-#[cfg(not(feature = "gpu"))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
 use runner::CpuRunner;
 
 #[cfg(feature = "gpu")]
@@ -26,8 +30,11 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     #[cfg(feature = "gpu")]
     let runner = GpuRunner::new()?;
 
-    #[cfg(not(feature = "gpu"))]
+    #[cfg(not(any(feature = "gpu", feature = "cumetal")))]
     let runner = CpuRunner::new();
+
+    #[cfg(feature = "cumetal")]
+    let runner = runner::CumetalRunner::new(cli.cumetal.clone())?;
 
     // Create stats
     let stats = Arc::new(GlobalStats::new(

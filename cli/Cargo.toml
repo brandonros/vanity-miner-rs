@@ -6,6 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
+cumetal = ["dep:libloading", "dep:sha2"]
 llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
@@ -14,6 +15,8 @@ shallenge = ["logic/shallenge"]
 self_test = ["logic/self_test"]
 
 [dependencies]
+libloading = { version = "0.8", optional = true }
+sha2 = { version = "0.10", optional = true }
 logic = { path = "../logic", default-features = false }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"
