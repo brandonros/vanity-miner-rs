@@ -1,6 +1,6 @@
 //! Candidate evaluation and CUDA request layout for rsa-pss.
 //! Owners must clear secret records after synchronized device use.
-use crate::{candidate_result::CandidateResult, hex_pattern::HexPattern};
+use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -27,9 +27,9 @@ pub fn rsa_pss(
     pattern: &HexPattern,
 ) -> CandidateResult {
     use crate::{
-        crypto_search::{hash_message_counter, write_salt_counter},
-        rsa_crt::Rsa2048Crt,
-        rsa_pss::encode_sha256,
+        crypto::rsa_crt::Rsa2048Crt,
+        crypto::rsa_pss::encode_sha256,
+        search::crypto_search::{hash_message_counter, write_salt_counter},
     };
     let length = request.salt_length as usize;
     if length > 222 {

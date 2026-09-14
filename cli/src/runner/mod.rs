@@ -20,7 +20,11 @@ use std::sync::Arc;
 
 pub trait Runner {
     fn device_count(&self) -> usize;
-    fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> Result<(), Box<dyn Error + Send + Sync>>;
+    fn run(
+        &self,
+        command: &Command,
+        stats: Arc<GlobalStats>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>>;
 }
 
 #[cfg(all(feature = "gpu", feature = "crypto-cli"))]

@@ -89,8 +89,8 @@ echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
 echo "STACK_SIZE=$STACK_SIZE"
 
 banner "RUN :: vanity-miner"
-#./vanity-miner solana-vanity aaaa ""
-#./vanity-miner bitcoin-vanity bc1qqqqqq ""
-#./vanity-miner ethereum-vanity 55555555 ""
-./vanity-miner shallenge brandonros FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+#./vanity-miner solana-vanity --prefix aaaa
+#./vanity-miner bitcoin-vanity --prefix bc1qqqqqq
+#./vanity-miner ethereum-vanity --prefix 55555555
+./vanity-miner shallenge --username brandonros --target-hash FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 EOF

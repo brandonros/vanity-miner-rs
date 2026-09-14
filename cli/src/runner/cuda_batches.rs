@@ -5,14 +5,14 @@ use cust::{
     stream::Stream,
 };
 #[cfg(feature = "p256-public-key")]
-use logic::p256_public_key_vanity::P256PublicRequest;
+use logic::modes::p256_public_key_vanity::P256PublicRequest;
 #[cfg(feature = "p256-signature")]
-use logic::p256_signature_vanity::P256SignatureRequest;
+use logic::modes::p256_signature_vanity::P256SignatureRequest;
 #[cfg(feature = "rsa-modulus")]
-use logic::rsa_modulus_vanity::RsaModulusRequest;
+use logic::modes::rsa_modulus_vanity::RsaModulusRequest;
 #[cfg(feature = "rsa-pss")]
-use logic::rsa_pss_signature_vanity::RsaPssRequest;
-use logic::{candidate_result::BatchResult, hex_pattern::HexPattern};
+use logic::modes::rsa_pss_signature_vanity::RsaPssRequest;
+use logic::{search::candidate_result::BatchResult, search::hex_pattern::HexPattern};
 use zeroize::{Zeroize, Zeroizing};
 
 #[repr(transparent)]

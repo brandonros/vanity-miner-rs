@@ -11,5 +11,5 @@ pub unsafe extern "C" fn kernel_repro_nonce_sequence(input: *const u64, output: 
     let seed = unsafe { *input.add(1) };
     let length = (unsafe { *input.add(2) }).min(64) as usize;
     let bytes = unsafe { core::slice::from_raw_parts_mut(output.cast::<u8>(), length) };
-    logic::generate_base64_nonce(index, seed, bytes);
+    logic::search::xoroshiro::generate_base64_nonce(index, seed, bytes);
 }

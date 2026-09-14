@@ -1,4 +1,4 @@
-use rand_core::{SeedableRng, RngCore};
+use rand_core::{RngCore, SeedableRng};
 use rand_xoshiro::Xoroshiro128StarStar;
 
 const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -34,10 +34,11 @@ mod test {
     #[test]
     fn should_generate_private_key_correctly() {
         let priv_key = generate_random_private_key(3, 583437459223573146);
-        let expected: [u8; 32] = hex::decode("fa9ce9b02dc28a48f7e9d15506d3d2c443d596565fa05214b0ff7c5ab5e7956b")
-            .unwrap()
-            .try_into()
-            .unwrap();
+        let expected: [u8; 32] =
+            hex::decode("fa9ce9b02dc28a48f7e9d15506d3d2c443d596565fa05214b0ff7c5ab5e7956b")
+                .unwrap()
+                .try_into()
+                .unwrap();
         assert_eq!(priv_key, expected);
     }
 
@@ -49,7 +50,11 @@ mod test {
         generate_base64_nonce(7, 12345, &mut b);
         assert_eq!(a, b, "same seed must yield same nonce");
         for &byte in &a {
-            assert!(BASE64_CHARS.contains(&byte), "byte {:#x} not in base64 alphabet", byte);
+            assert!(
+                BASE64_CHARS.contains(&byte),
+                "byte {:#x} not in base64 alphabet",
+                byte
+            );
         }
     }
 }

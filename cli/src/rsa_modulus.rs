@@ -1,28 +1,20 @@
 //! Constructive RSA-2048 modulus search: interval and residue constraints on q.
 
 use crate::{
-    protected_output::{StagedOutput, validate_outputs},
     rsa_host::{fixed_bytes, sufficiently_separated, validate_rsa2048},
     search_control::SearchControl,
 };
-use logic::hex_pattern::HexPattern;
+use logic::search::hex_pattern::HexPattern;
 use num_bigint_dig::{BigUint, ModInverse, RandBigInt, prime::probably_prime};
 use rand::rngs::OsRng;
-use rsa::{
-    Pss, RsaPrivateKey,
-    pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding},
-    traits::PublicKeyParts,
-};
+use rsa::{Pss, RsaPrivateKey, pkcs8::EncodePrivateKey, traits::PublicKeyParts};
 use sha2::{Digest, Sha256};
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 use zeroize::Zeroizing;
 
 pub struct ModulusSearch {
     pub prefix: String,
     pub suffix: String,
-    pub private_out: PathBuf,
-    pub public_out: PathBuf,
-    pub force: bool,
     pub workers: usize,
 }
 
@@ -30,6 +22,7 @@ pub struct ModulusReport {
     pub q_candidates_tested: u64,
     pub elapsed: Duration,
     pub found: bool,
+    pub output: Option<String>,
 }
 
 pub struct ModulusConstraints {
@@ -138,8 +131,6 @@ impl ModulusSearch {
         if self.workers == 0 {
             return Err("worker count must be nonzero".into());
         }
-        validate_outputs(&[&self.private_out, &self.public_out], &[], self.force)
-            .map_err(|e| e.to_string())?;
         Ok(constraints)
     }
 }
@@ -208,7 +199,7 @@ fn construct_device(
     control: &SearchControl,
     device: &mut EvaluateBatch<'_>,
 ) -> Result<Option<RsaPrivateKey>, String> {
-    use logic::rsa_modulus_vanity::RsaModulusRequest;
+    use logic::modes::rsa_modulus_vanity::RsaModulusRequest;
     let _stop = control.cancel_on_exit();
     let one = BigUint::from(1u8);
     let e = BigUint::from(65537u32);
@@ -236,13 +227,7 @@ fn construct_device(
             if control.stopped() {
                 return Ok(None);
             }
-            let results = Zeroizing::new(device(
-                &request,
-                &constraints.pattern,
-                &[],
-                start,
-                64,
-            )?);
+            let results = Zeroizing::new(device(&request, &constraints.pattern, &[], start, 64)?);
             let winner = results.winner(64)?;
             control.add_tested(64);
             if let Some((lane, result)) = winner {
@@ -334,29 +319,27 @@ fn run(
         })?
     };
     let found = outcome.is_some();
+    let mut output = None;
     if let Some(key) = outcome {
         let private = key
-            .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|_| "RSA private PEM encoding failed")?;
-        let public = key
-            .to_public_key()
-            .to_public_key_pem(LineEnding::LF)
-            .map_err(|_| "RSA public PEM encoding failed")?;
-        let private_stage =
-            StagedOutput::new(&config.private_out, private.as_bytes(), config.force)
-                .map_err(|e| e.to_string())?;
-        let public_stage = StagedOutput::new(&config.public_out, public.as_bytes(), config.force)
-            .map_err(|e| e.to_string())?;
-        public_stage.publish().map_err(|e| e.to_string())?;
-        private_stage.publish().map_err(|e| {
-            format!("private output publication failed; public output may exist: {e}")
-        })?;
+            .to_pkcs8_der()
+            .map_err(|_| "RSA private key encoding failed")?;
+        output = Some(format!(
+            "[rsa-modulus] public_key={}\n[rsa-modulus] public_exponent={}\n[rsa-modulus] private_key_pkcs8={}",
+            hex::encode(key.n().to_bytes_be()),
+            hex::encode(key.e().to_bytes_be()),
+            hex::encode(private.as_bytes()),
+        ));
+    }
+    if let Some(record) = &output {
+        println!("{record}");
     }
     let (q_candidates_tested, elapsed) = control.statistics();
     Ok(ModulusReport {
         q_candidates_tested,
         elapsed,
         found,
+        output,
     })
 }
 
@@ -364,10 +347,12 @@ fn run(
 mod tests {
     use super::*;
     use rand::RngCore;
+    use rsa::pkcs8::{EncodePublicKey, LineEnding};
     use rsa::{
         pkcs8::{DecodePrivateKey, DecodePublicKey},
         traits::PrivateKeyParts,
     };
+    use std::path::PathBuf;
 
     struct Directory(PathBuf);
     impl Drop for Directory {
@@ -393,12 +378,12 @@ mod tests {
             .into_iter()
             .enumerate()
         {
+            let private_out = dir.0.join(format!("private-{i}.pem"));
+            let public_out = dir.0.join(format!("public-{i}.pem"));
             let config = ModulusSearch {
                 prefix: prefix.into(),
                 suffix: suffix.into(),
-                private_out: dir.0.join(format!("private-{i}.pem")),
-                public_out: dir.0.join(format!("public-{i}.pem")),
-                force: false,
+
                 workers: 2,
             };
             let control = Arc::new(SearchControl::new());
@@ -410,16 +395,36 @@ mod tests {
             .unwrap();
             assert!(report.found);
             assert!(report.q_candidates_tested > 0);
-            let pem = Zeroizing::new(std::fs::read_to_string(&config.private_out).unwrap());
-            let key = RsaPrivateKey::from_pkcs8_pem(&pem).unwrap();
+            let record = report.output.as_ref().unwrap();
+            let key = RsaPrivateKey::from_pkcs8_der(&crate::test_support::console_field(
+                record,
+                "private_key_pkcs8",
+            ))
+            .unwrap();
+            assert_eq!(
+                crate::test_support::console_field(record, "public_key"),
+                key.n().to_bytes_be()
+            );
+            std::fs::write(
+                &private_out,
+                key.to_pkcs8_pem(LineEnding::LF).unwrap().as_bytes(),
+            )
+            .unwrap();
+            std::fs::write(
+                &public_out,
+                key.to_public_key()
+                    .to_public_key_pem(LineEnding::LF)
+                    .unwrap(),
+            )
+            .unwrap();
             key.validate().unwrap();
             assert_eq!(key.n().bits(), 2048);
             assert!(key.primes().iter().all(|prime| prime.bits() == 1024));
             assert!(sufficiently_separated(&key.primes()[0], &key.primes()[1]));
-            assert!(config.validate().is_err()); // Existing private output is protected.
+            assert!(config.validate().is_ok());
             let constraints = ModulusConstraints::new(prefix, suffix).unwrap();
             assert!(constraints.pattern.matches(&key.n().to_bytes_be()));
-            let public_pem = std::fs::read_to_string(&config.public_out).unwrap();
+            let public_pem = std::fs::read_to_string(&public_out).unwrap();
             let public = rsa::RsaPublicKey::from_public_key_pem(&public_pem).unwrap();
             assert!(public == key.to_public_key());
             if std::process::Command::new("openssl")
@@ -429,7 +434,7 @@ mod tests {
             {
                 let result = std::process::Command::new("openssl")
                     .args(["rsa", "-in"])
-                    .arg(&config.private_out)
+                    .arg(&private_out)
                     .args(["-check", "-noout"])
                     .output()
                     .unwrap();
@@ -478,9 +483,10 @@ mod tests {
 /// Synchronized, ordered candidate evaluation for this mode. Implementations
 /// must clear secret device buffers before returning; this is not a CPU fallback.
 pub type EvaluateBatch<'a> = dyn FnMut(
-    &logic::rsa_modulus_vanity::RsaModulusRequest,
-    &logic::hex_pattern::HexPattern,
-    &[u8],
-    u64,
-    u32,
-) -> Result<logic::candidate_result::BatchResult, String> + 'a;
+        &logic::modes::rsa_modulus_vanity::RsaModulusRequest,
+        &logic::search::hex_pattern::HexPattern,
+        &[u8],
+        u64,
+        u32,
+    ) -> Result<logic::search::candidate_result::BatchResult, String>
+    + 'a;

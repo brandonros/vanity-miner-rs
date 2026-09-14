@@ -83,14 +83,14 @@ pub fn validate_rsa2048(key: &mut RsaPrivateKey) -> Result<(), String> {
 }
 
 #[cfg(feature = "rsa-pss")]
-pub fn crt_for_key(key: &RsaPrivateKey) -> Result<logic::rsa_crt::Rsa2048Crt, String> {
+pub fn crt_for_key(key: &RsaPrivateKey) -> Result<logic::crypto::rsa_crt::Rsa2048Crt, String> {
     let p = fixed_bytes(&key.primes()[0])?;
     let q = fixed_bytes(&key.primes()[1])?;
     let dp = fixed_bytes(key.dp().ok_or("missing RSA dp")?)?;
     let dq = fixed_bytes(key.dq().ok_or("missing RSA dq")?)?;
     let coefficient = Zeroizing::new(key.crt_coefficient().ok_or("invalid RSA CRT inverse")?);
     let q_inv = fixed_bytes(&coefficient)?;
-    logic::rsa_crt::Rsa2048Crt::new(&p, &q, &dp, &dq, &q_inv)
+    logic::crypto::rsa_crt::Rsa2048Crt::new(&p, &q, &dp, &dq, &q_inv)
         .ok_or_else(|| "RSA fixed-width CRT setup failed".into())
 }
 

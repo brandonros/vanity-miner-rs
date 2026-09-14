@@ -98,7 +98,8 @@ fn build_gpu() {
 #[cfg(feature = "self_test")]
 fn export_self_test_names() {
     use std::{env, fs, path::PathBuf};
-    let source = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src/self_test.rs");
+    let source =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src/self_test.rs");
     println!("cargo::rerun-if-changed={}", source.display());
     let mut names = std::collections::BTreeMap::new();
     let mut entry = None;
@@ -109,13 +110,25 @@ fn export_self_test_names() {
         if let Some(tail) = line.trim().strip_prefix("results[") {
             let slot: usize = tail.split(']').next().unwrap().parse().unwrap();
             if let Some(name) = entry.take() {
-                if name != "kernel_self_test_stub" { assert!(names.insert(slot, name).is_none()); }
+                if name != "kernel_self_test_stub" {
+                    assert!(names.insert(slot, name).is_none());
+                }
             }
         }
     }
     let count = names.len();
     assert!(count > 0);
-    assert_eq!(names.keys().copied().collect::<Vec<_>>(), (0..count).collect::<Vec<_>>());
-    let text = format!("const SELF_TEST_ENTRIES: [&str; {count}] = {:?};", names.values().collect::<Vec<_>>());
-    fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"), text).unwrap();
+    assert_eq!(
+        names.keys().copied().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
+    let text = format!(
+        "const SELF_TEST_ENTRIES: [&str; {count}] = {:?};",
+        names.values().collect::<Vec<_>>()
+    );
+    fs::write(
+        PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"),
+        text,
+    )
+    .unwrap();
 }

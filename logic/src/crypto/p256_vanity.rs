@@ -5,7 +5,7 @@ use zeroize::Zeroizing;
 
 /// Rejection sampling of uniformly distributed PRF outputs, without modulo bias.
 pub fn candidate_scalar(
-    deriver: &crate::crypto_search::CandidateDeriver,
+    deriver: &crate::search::crypto_search::CandidateDeriver,
     worker: u64,
     counter: u128,
 ) -> Option<Zeroizing<[u8; 32]>> {
@@ -54,7 +54,7 @@ pub fn public_point(private: &[u8; 32]) -> Option<[u8; 65]> {
 
 #[cfg(feature = "p256-signature")]
 pub mod signatures {
-    use crate::hex_pattern::HexPattern;
+    use crate::search::hex_pattern::HexPattern;
     use ecdsa::hazmat::SignPrimitive;
     use p256::ecdsa::{
         Signature, SigningKey, VerifyingKey,
@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn derived_scalars_are_valid_and_reproducible() {
-        use crate::crypto_search::{CandidateDeriver, CandidateDomain};
+        use crate::search::crypto_search::{CandidateDeriver, CandidateDomain};
         let deriver = CandidateDeriver::new(
             [0x42; 32],
             CandidateDomain::P256PrivateKey,
@@ -253,7 +253,7 @@ mod tests {
     #[cfg(feature = "p256-signature")]
     #[test]
     fn ephemeral_signatures_verify_and_reject_invalid_nonces() {
-        use crate::crypto_search::{CandidateDeriver, CandidateDomain};
+        use crate::search::crypto_search::{CandidateDeriver, CandidateDomain};
         use sha2::{Digest, Sha256};
         let private = test_scalar();
         let public = public_point(&private).unwrap();
@@ -271,7 +271,8 @@ mod tests {
             assert!(signatures::verify(&public, message, &raw));
             let r = signatures::ephemeral_r(&nonce).unwrap();
             assert_eq!(&raw[..32], &r);
-            let pattern = crate::hex_pattern::HexPattern::new(&hex::encode(r), "", 32).unwrap();
+            let pattern =
+                crate::search::hex_pattern::HexPattern::new(&hex::encode(r), "", 32).unwrap();
             let matched = signatures::matching_ephemeral_signature(
                 &private,
                 &digest,
@@ -296,7 +297,8 @@ mod tests {
         let mut message = *original;
         let mut previous = None;
         for counter in 0..4 {
-            crate::crypto_search::write_message_counter(&mut message, 6, 4, counter).unwrap();
+            crate::search::crypto_search::write_message_counter(&mut message, 6, 4, counter)
+                .unwrap();
             assert_eq!(&message[..6], &original[..6]);
             assert_eq!(&message[10..], &original[10..]);
             let signature = signatures::sign_message(&private, &message).unwrap();
@@ -345,7 +347,7 @@ mod tests {
     #[cfg(feature = "p256-signature")]
     #[test]
     fn signatures_and_exact_s_matching() {
-        use crate::hex_pattern::HexPattern;
+        use crate::search::hex_pattern::HexPattern;
         use signatures::*;
         let private = test_scalar();
         let public = public_point(&private).unwrap();

@@ -1,6 +1,6 @@
 //! Bounded batching, cancellation, and verified winner selection.
 use crate::search_control::SearchControl;
-use logic::candidate_result::{BatchResult, CandidateResult};
+use logic::search::candidate_result::{BatchResult, CandidateResult};
 use zeroize::Zeroizing;
 
 /// Verify the GPU-selected winner before claiming the output. Rejected winners

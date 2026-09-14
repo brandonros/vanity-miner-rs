@@ -38,7 +38,7 @@ pub mod cpu {
             };
 
             // Create the request with the current best target
-            let request = logic::ShallengeRequest {
+            let request = logic::modes::shallenge::ShallengeRequest {
                 username: data.username.as_bytes(),
                 username_len: data.username.len(),
                 target_hash: &current_target,
@@ -46,7 +46,7 @@ pub mod cpu {
                 rng_seed,
             };
 
-            let result = logic::generate_and_check_shallenge(&request);
+            let result = logic::modes::shallenge::generate_and_check_shallenge(&request);
 
             data.global_stats.add_launch(1);
 

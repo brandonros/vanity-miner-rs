@@ -61,7 +61,7 @@ pub fn base58_encode_32(input: &[u8; 32], output: &mut [u8; 64]) -> usize {
             limbs[limb_count] = (remaining_carry % NEXT_LIMB_DIVISOR) as u32;
             remaining_carry = (remaining_carry / NEXT_LIMB_DIVISOR) as u64;
             limb_count += 1;
-            
+
             if remaining_carry > 0 && limb_count < MAX_REQUIRED_LIMBS {
                 limbs[limb_count] = remaining_carry as u32;
                 limb_count += 1;
@@ -110,11 +110,14 @@ pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
     // Calculate required limbs based on input length
     // Each byte adds ~1.37 base58 digits, so we need more limbs for longer inputs
     let max_required_limbs = (input.len() * 2 + 7) / 8; // Conservative estimate
-    
+
     // Use a reasonable maximum to avoid stack overflow
     const MAX_LIMBS: usize = 16; // Should handle up to ~64 bytes of input
-    assert!(max_required_limbs <= MAX_LIMBS, "Input too large for base58 encoding");
-    
+    assert!(
+        max_required_limbs <= MAX_LIMBS,
+        "Input too large for base58 encoding"
+    );
+
     // Count leading zeros in advance
     let mut num_leading_zeros = 0;
     for &byte in input.iter() {
@@ -128,7 +131,7 @@ pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
     // Process input bytes through big integer arithmetic
     let mut limbs = [0u32; MAX_LIMBS];
     let mut limb_count = 0;
-    
+
     // Process each byte individually to avoid padding issues
     for &byte in input.iter() {
         let carry = byte as u64;
@@ -168,7 +171,7 @@ pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
 
     // Scale for remainder and apply alphabet
     let mut result_len = limb_count * DIGITS_PER_LIMB;
-    
+
     // Ensure we don't exceed output buffer
     result_len = result_len.min(output.len());
 
@@ -203,7 +206,11 @@ mod test {
 
     #[test]
     fn should_encode_32_correctly() {
-        let public_key_bytes: [u8; 32] = hex::decode("0af764c1b6133a3a0abd7ef9c853791b687ce1e235f9dc8466d886da314dbea7").unwrap().try_into().unwrap();
+        let public_key_bytes: [u8; 32] =
+            hex::decode("0af764c1b6133a3a0abd7ef9c853791b687ce1e235f9dc8466d886da314dbea7")
+                .unwrap()
+                .try_into()
+                .unwrap();
         let mut bs58_encoded_public_key = [0u8; 64];
         let encoded_len = base58_encode_32(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
@@ -213,11 +220,17 @@ mod test {
 
     #[test]
     fn should_encode_25_correctly() {
-        let public_key_bytes: [u8; 25] = hex::decode("0AF764C1B6133A3A0ABD7EF9C853791B687CE1E235F9DC8466").unwrap().try_into().unwrap();
+        let public_key_bytes: [u8; 25] =
+            hex::decode("0AF764C1B6133A3A0ABD7EF9C853791B687CE1E235F9DC8466")
+                .unwrap()
+                .try_into()
+                .unwrap();
         let mut bs58_encoded_public_key = [0u8; 64];
         let encoded_len = base58_encode(&public_key_bytes, &mut bs58_encoded_public_key);
         let bs58_encoded_public_key = &bs58_encoded_public_key[0..encoded_len];
-        let expected = hex::decode("355177385441616239385172516D796D637A7A78776B5A7A61634D444C344D654548").unwrap();
+        let expected =
+            hex::decode("355177385441616239385172516D796D637A7A78776B5A7A61634D444C344D654548")
+                .unwrap();
         assert_eq!(*bs58_encoded_public_key, *expected);
     }
 
@@ -225,7 +238,10 @@ mod test {
     // Exercises the leading-zero pad path that emits a '1' for each zero byte.
     #[test]
     fn should_encode_leading_zero_correctly() {
-        let input: [u8; 25] = hex::decode("0062e907b15cbf27d5425399ebf6f0fb50ebb88f18c29b7d93").unwrap().try_into().unwrap();
+        let input: [u8; 25] = hex::decode("0062e907b15cbf27d5425399ebf6f0fb50ebb88f18c29b7d93")
+            .unwrap()
+            .try_into()
+            .unwrap();
         let mut output = [0u8; 64];
         let len = base58_encode(&input, &mut output);
         assert_eq!(&output[..len], b"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");

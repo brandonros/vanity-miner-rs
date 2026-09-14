@@ -1,7 +1,7 @@
 //! Host execution adapters used only by tests and self-test.
 use logic::{
-    candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
+    search::candidate_result::{BatchResult, CandidateResult},
+    search::hex_pattern::HexPattern,
 };
 
 fn evaluate(
@@ -32,53 +32,53 @@ fn evaluate(
 
 #[cfg(feature = "p256-public-key")]
 pub fn p256_public(
-    request: &logic::p256_public_key_vanity::P256PublicRequest,
+    request: &logic::modes::p256_public_key_vanity::P256PublicRequest,
     pattern: &HexPattern,
     _message: &[u8],
     start: u64,
     count: u32,
 ) -> Result<BatchResult, String> {
     evaluate(start, count, |counter| {
-        logic::p256_public_key_vanity::p256_public(request, counter, pattern)
+        logic::modes::p256_public_key_vanity::p256_public(request, counter, pattern)
     })
 }
 
 #[cfg(feature = "p256-signature")]
 pub fn p256_signature(
-    request: &logic::p256_signature_vanity::P256SignatureRequest,
+    request: &logic::modes::p256_signature_vanity::P256SignatureRequest,
     pattern: &HexPattern,
     message: &[u8],
     start: u64,
     count: u32,
 ) -> Result<BatchResult, String> {
     evaluate(start, count, |counter| {
-        logic::p256_signature_vanity::p256_signature(request, message, counter, pattern)
+        logic::modes::p256_signature_vanity::p256_signature(request, message, counter, pattern)
     })
 }
 
 #[cfg(feature = "rsa-pss")]
 pub fn rsa_pss(
-    request: &logic::rsa_pss_signature_vanity::RsaPssRequest,
+    request: &logic::modes::rsa_pss_signature_vanity::RsaPssRequest,
     pattern: &HexPattern,
     message: &[u8],
     start: u64,
     count: u32,
 ) -> Result<BatchResult, String> {
     evaluate(start, count, |counter| {
-        logic::rsa_pss_signature_vanity::rsa_pss(request, message, counter, pattern)
+        logic::modes::rsa_pss_signature_vanity::rsa_pss(request, message, counter, pattern)
     })
 }
 
 #[cfg(feature = "rsa-modulus")]
 pub fn rsa_modulus(
-    request: &logic::rsa_modulus_vanity::RsaModulusRequest,
+    request: &logic::modes::rsa_modulus_vanity::RsaModulusRequest,
     pattern: &HexPattern,
     _message: &[u8],
     start: u64,
     count: u32,
 ) -> Result<BatchResult, String> {
     evaluate(start, count, |counter| {
-        logic::rsa_modulus_vanity::rsa_modulus(request, counter, pattern)
+        logic::modes::rsa_modulus_vanity::rsa_modulus(request, counter, pattern)
     })
 }
 
@@ -116,4 +116,17 @@ mod tests {
         assert_eq!(result.errors, 1);
         assert!(result.winner(2).is_err());
     }
+}
+
+#[cfg(test)]
+pub fn console_field(record: &str, name: &str) -> Vec<u8> {
+    let value = record
+        .lines()
+        .find_map(|line| {
+            let (_, field) = line.split_once("] ")?;
+            let (key, value) = field.split_once('=')?;
+            (key == name).then_some(value)
+        })
+        .expect("missing console output field");
+    hex::decode(value).unwrap()
 }

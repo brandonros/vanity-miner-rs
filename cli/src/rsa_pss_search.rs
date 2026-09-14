@@ -1,14 +1,13 @@
 //! Explicit-salt RSA-PSS searches using blinded CPU private operations.
 
 use crate::{
-    protected_output::{StagedOutput, validate_outputs},
     rsa_host::{fixed_bytes, validate_rsa2048},
     search_control::SearchControl,
 };
 use logic::{
-    crypto_search::{write_message_counter, write_salt_counter},
-    hex_pattern::HexPattern,
-    rsa_pss::encode_sha256,
+    crypto::rsa_pss::encode_sha256,
+    search::crypto_search::{write_message_counter, write_salt_counter},
+    search::hex_pattern::HexPattern,
 };
 use rand::{RngCore, rngs::OsRng};
 use rsa::{BigUint, Pss, RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
@@ -35,10 +34,6 @@ pub struct PssSearch {
     pub source: PssSource,
     pub prefix: String,
     pub suffix: String,
-    pub signature_out: PathBuf,
-    pub salt_out: PathBuf,
-    pub message_out: Option<PathBuf>,
-    pub force: bool,
     pub workers: usize,
 }
 
@@ -47,6 +42,7 @@ pub struct PssReport {
     pub candidate_unit: &'static str,
     pub elapsed: Duration,
     pub found: bool,
+    pub output: Option<String>,
 }
 struct Winner {
     counter: u64,
@@ -85,23 +81,12 @@ impl PssSearch {
                 if *salt_length > 222 {
                     return Err("RSA-2048/SHA-256 permits at most 222 salt bytes".into());
                 }
-                if self.message_out.is_none() {
-                    return Err(
-                        "message search requires an explicit winning-message output path".into(),
-                    );
-                }
                 if fixed_salt.as_ref().is_some_and(|salt| salt.len() > 222) {
                     return Err("RSA-2048/SHA-256 permits at most 222 salt bytes".into());
                 }
             }
             _ => {}
         }
-        let mut outputs = vec![self.signature_out.as_path(), self.salt_out.as_path()];
-        if let Some(path) = &self.message_out {
-            outputs.push(path);
-        }
-        validate_outputs(&outputs, &[&self.key, &self.message], self.force)
-            .map_err(|e| e.to_string())?;
         Ok(pattern)
     }
 }
@@ -194,7 +179,7 @@ fn run(
         u64::MAX
     };
     let outcome = if let Some(device) = device {
-        use logic::rsa_pss_signature_vanity::RsaPssRequest;
+        use logic::modes::rsa_pss_signature_vanity::RsaPssRequest;
         use rsa::traits::PrivateKeyParts;
         let (source, offset, length) = match config.source {
             PssSource::Salt { .. } => (0, 0, 0),
@@ -317,6 +302,7 @@ fn run(
         return Err("RSA-PSS search exhausted its unique candidate space without a match".into());
     }
     let found = outcome.is_some();
+    let mut output = None;
     if let Some(winner) = outcome {
         let mut message = original.clone();
         let mut salt = base_salt.clone();
@@ -339,23 +325,17 @@ fn run(
                 &reproduced,
             )
             .map_err(|_| "RSA-PSS final verification failed")?;
-        let signature_stage = StagedOutput::new(&config.signature_out, &reproduced, config.force)
-            .map_err(|e| e.to_string())?;
-        let salt_stage =
-            StagedOutput::new(&config.salt_out, &salt, config.force).map_err(|e| e.to_string())?;
-        let message_stage = config
-            .message_out
-            .as_ref()
-            .map(|path| StagedOutput::new(path, &message, config.force))
-            .transpose()
-            .map_err(|e| e.to_string())?;
-        salt_stage.publish().map_err(|e| e.to_string())?;
-        if let Some(stage) = message_stage {
-            stage.publish().map_err(|e| e.to_string())?;
-        }
-        signature_stage.publish().map_err(|e| {
-            format!("signature publication failed; companion outputs may exist: {e}")
-        })?;
+        use rsa::traits::PublicKeyParts;
+        output = Some(format!(
+            "[rsa-pss] public_key={}\n[rsa-pss] signature={}\n[rsa-pss] salt={}\n[rsa-pss] message={}",
+            hex::encode(public.n().to_bytes_be()),
+            hex::encode(reproduced),
+            hex::encode(&salt),
+            hex::encode(&message),
+        ));
+    }
+    if let Some(record) = &output {
+        println!("{record}");
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(PssReport {
@@ -367,6 +347,7 @@ fn run(
         },
         elapsed,
         found,
+        output,
     })
 }
 
@@ -398,10 +379,7 @@ mod tests {
         let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
         let pem = key.to_pkcs8_pem(LineEnding::LF).unwrap();
         let key_path = dir.0.join("private.pem");
-        StagedOutput::new(&key_path, pem.as_bytes(), false)
-            .unwrap()
-            .publish()
-            .unwrap();
+        std::fs::write(&key_path, pem.as_bytes()).unwrap();
         let public_path = dir.0.join("public.pem");
         std::fs::write(
             &public_path,
@@ -430,16 +408,16 @@ mod tests {
             PssSource::Salt { length: 0 },
         ];
         for (i, source) in sources.into_iter().enumerate() {
+            let signature_out = dir.0.join(format!("signature-{i}.bin"));
+            let salt_out = dir.0.join(format!("salt-{i}.bin"));
+            let message_out = Some(dir.0.join(format!("message-{i}.bin")));
             let config = PssSearch {
                 key: key_path.clone(),
                 message: message_path.clone(),
                 source,
                 prefix: if i == 3 { "" } else { "0" }.into(),
                 suffix: "".into(),
-                signature_out: dir.0.join(format!("signature-{i}.bin")),
-                salt_out: dir.0.join(format!("salt-{i}.bin")),
-                message_out: Some(dir.0.join(format!("message-{i}.bin"))),
-                force: false,
+
                 workers: 2,
             };
             let control = Arc::new(SearchControl::new());
@@ -453,12 +431,15 @@ mod tests {
             if i == 3 {
                 assert_eq!(report.candidates_tested, 1);
             }
-            let signature: [u8; 256] = std::fs::read(&config.signature_out)
-                .unwrap()
+            let record = report.output.as_ref().unwrap();
+            let signature: [u8; 256] = crate::test_support::console_field(record, "signature")
                 .try_into()
                 .unwrap();
-            let salt = std::fs::read(&config.salt_out).unwrap();
-            let winning_message = std::fs::read(config.message_out.as_ref().unwrap()).unwrap();
+            let salt = crate::test_support::console_field(record, "salt");
+            let winning_message = crate::test_support::console_field(record, "message");
+            std::fs::write(&signature_out, signature).unwrap();
+            std::fs::write(&salt_out, &salt).unwrap();
+            std::fs::write(message_out.as_ref().unwrap(), &winning_message).unwrap();
             if matches!(config.source, PssSource::Salt { .. }) {
                 assert_eq!(winning_message, message);
             }
@@ -485,10 +466,10 @@ mod tests {
                     .args(["dgst", "-sha256", "-verify"])
                     .arg(&public_path)
                     .arg("-signature")
-                    .arg(&config.signature_out)
+                    .arg(&signature_out)
                     .args(["-sigopt", "rsa_padding_mode:pss", "-sigopt"])
                     .arg(format!("rsa_pss_saltlen:{}", salt.len()))
-                    .arg(config.message_out.as_ref().unwrap())
+                    .arg(message_out.as_ref().unwrap())
                     .output()
                     .unwrap();
                 assert!(result.status.success());
@@ -500,9 +481,10 @@ mod tests {
 /// Synchronized, ordered candidate evaluation for this mode. Implementations
 /// must clear secret device buffers before returning; this is not a CPU fallback.
 pub type EvaluateBatch<'a> = dyn FnMut(
-    &logic::rsa_pss_signature_vanity::RsaPssRequest,
-    &logic::hex_pattern::HexPattern,
-    &[u8],
-    u64,
-    u32,
-) -> Result<logic::candidate_result::BatchResult, String> + 'a;
+        &logic::modes::rsa_pss_signature_vanity::RsaPssRequest,
+        &logic::search::hex_pattern::HexPattern,
+        &[u8],
+        u64,
+        u32,
+    ) -> Result<logic::search::candidate_result::BatchResult, String>
+    + 'a;

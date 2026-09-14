@@ -1,6 +1,6 @@
 //! Shared test inventory and reporting for CPU, CUDA, and CuMetal.
 include!(concat!(env!("OUT_DIR"), "/self_test_entries.rs"));
-const _: [(); logic::SELF_TEST_NUM_CHECKS] = [(); SELF_TEST_ENTRIES.len()];
+const _: [(); logic::self_test::SELF_TEST_NUM_CHECKS] = [(); SELF_TEST_ENTRIES.len()];
 
 #[derive(Clone, Copy)]
 pub struct Case {
@@ -18,7 +18,7 @@ pub fn inventory() -> Vec<Case> {
     for (slot, &kernel) in SELF_TEST_ENTRIES.iter().enumerate() {
         cases.push(Case {
             slot: Some(slot),
-            label: logic::SELF_TEST_LABELS[slot],
+            label: logic::self_test::SELF_TEST_LABELS[slot],
             kernel,
         });
     }
@@ -63,7 +63,10 @@ mod tests {
     fn inventory_preserves_legacy_slots_and_unique_entries() {
         let cases = inventory();
         let legacy: Vec<_> = cases.iter().filter_map(|case| case.slot).collect();
-        assert_eq!(legacy, (0..logic::SELF_TEST_NUM_CHECKS).collect::<Vec<_>>());
+        assert_eq!(
+            legacy,
+            (0..logic::self_test::SELF_TEST_NUM_CHECKS).collect::<Vec<_>>()
+        );
         let names: std::collections::HashSet<_> = cases.iter().map(|c| c.kernel).collect();
         assert_eq!(names.len(), cases.len());
     }

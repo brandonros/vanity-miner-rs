@@ -5,6 +5,7 @@ use clap::Args;
     feature = "rsa-pss"
 ))]
 use clap::ValueEnum;
+#[cfg(any(feature = "p256-signature", feature = "rsa-pss"))]
 use std::path::PathBuf;
 
 #[derive(Args, Clone)]
@@ -18,9 +19,6 @@ pub struct PatternArgs {
     /// CPU worker count (default: available parallelism)
     #[arg(long)]
     pub threads: Option<usize>,
-    /// Replace existing output files
-    #[arg(long)]
-    pub force: bool,
 }
 
 #[cfg(feature = "rsa-modulus")]
@@ -34,10 +32,6 @@ pub struct RsaModulusArgs {
     pub public_exponent: u32,
     #[arg(long, default_value = "constructive", value_parser = ["constructive"])]
     pub strategy: String,
-    #[arg(long)]
-    pub private_out: PathBuf,
-    #[arg(long)]
-    pub public_out: PathBuf,
 }
 
 #[cfg(feature = "rsa-modulus")]
@@ -55,9 +49,6 @@ impl RsaModulusArgs {
         Ok(vanity_miner::rsa_modulus::ModulusSearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
-            private_out: self.private_out.clone(),
-            public_out: self.public_out.clone(),
-            force: self.pattern.force,
             workers: self.pattern.threads.unwrap_or(workers),
         })
     }
@@ -71,12 +62,6 @@ pub enum PublicTarget {
     Xy,
     Uncompressed,
 }
-#[cfg(feature = "p256-public-key")]
-#[derive(ValueEnum, Clone, Copy)]
-pub enum PublicEncoding {
-    Sec1,
-    SpkiPem,
-}
 
 #[cfg(feature = "p256-public-key")]
 #[derive(Args, Clone)]
@@ -85,19 +70,12 @@ pub struct P256PublicArgs {
     pub pattern: PatternArgs,
     #[arg(long, value_enum, default_value = "xy")]
     pub target: PublicTarget,
-    #[arg(long)]
-    pub private_out: PathBuf,
-    #[arg(long)]
-    pub public_out: PathBuf,
-    #[arg(long, value_enum, default_value = "sec1")]
-    pub public_format: PublicEncoding,
 }
 
 #[cfg(feature = "p256-public-key")]
 impl P256PublicArgs {
     pub fn config(&self, workers: usize) -> vanity_miner::p256_public::PublicKeySearch {
-        use logic::p256_vanity::PublicTarget as Target;
-        use vanity_miner::p256_public::PublicEncoding as Encoding;
+        use logic::crypto::p256_vanity::PublicTarget as Target;
         vanity_miner::p256_public::PublicKeySearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
@@ -107,13 +85,6 @@ impl P256PublicArgs {
                 PublicTarget::Xy => Target::Xy,
                 PublicTarget::Uncompressed => Target::Uncompressed,
             },
-            private_out: self.private_out.clone(),
-            public_out: self.public_out.clone(),
-            public_encoding: match self.public_format {
-                PublicEncoding::Sec1 => Encoding::Sec1,
-                PublicEncoding::SpkiPem => Encoding::SpkiPem,
-            },
-            force: self.pattern.force,
             workers: self.pattern.threads.unwrap_or(workers),
         }
     }
@@ -161,12 +132,6 @@ pub struct P256SignatureArgs {
     pub target: SignatureTarget,
     #[arg(long, value_enum, default_value = "low")]
     pub s_form: SForm,
-    #[arg(long)]
-    pub signature_out: PathBuf,
-    #[arg(long)]
-    pub message_out: Option<PathBuf>,
-    #[arg(long)]
-    pub der_out: Option<PathBuf>,
 }
 
 #[cfg(feature = "p256-signature")]
@@ -175,7 +140,7 @@ impl P256SignatureArgs {
         &self,
         workers: usize,
     ) -> Result<vanity_miner::p256_signature::SignatureSearch, String> {
-        use logic::p256_vanity::signatures::{SForm as Form, SignatureTarget as Target};
+        use logic::crypto::p256_vanity::signatures::{SForm as Form, SignatureTarget as Target};
         use vanity_miner::p256_signature::SearchSource;
         if self.hash != "sha256" {
             return Err("only SHA-256 is supported".into());
@@ -212,10 +177,6 @@ impl P256SignatureArgs {
                 SForm::High => Form::High,
                 SForm::Either => Form::Either,
             },
-            signature_out: self.signature_out.clone(),
-            message_out: self.message_out.clone(),
-            der_out: self.der_out.clone(),
-            force: self.pattern.force,
             workers: self.pattern.threads.unwrap_or(workers),
         })
     }
@@ -249,12 +210,6 @@ pub struct RsaPssArgs {
     pub nonce_length: Option<usize>,
     #[arg(long)]
     pub fixed_salt_hex: Option<String>,
-    #[arg(long)]
-    pub signature_out: PathBuf,
-    #[arg(long)]
-    pub salt_out: PathBuf,
-    #[arg(long)]
-    pub message_out: Option<PathBuf>,
 }
 
 #[cfg(feature = "rsa-pss")]
@@ -312,10 +267,6 @@ impl RsaPssArgs {
             source,
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
-            signature_out: self.signature_out.clone(),
-            salt_out: self.salt_out.clone(),
-            message_out: self.message_out.clone(),
-            force: self.pattern.force,
             workers: self.pattern.threads.unwrap_or(workers),
         })
     }

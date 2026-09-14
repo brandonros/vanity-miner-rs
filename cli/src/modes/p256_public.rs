@@ -11,7 +11,8 @@ pub mod cpu {
         stats: std::sync::Arc<crate::common::GlobalStats>,
     ) -> RunResult {
         let config = args.config(workers);
-        let structural = if config.target == logic::p256_vanity::PublicTarget::Uncompressed {
+        let structural = if config.target == logic::crypto::p256_vanity::PublicTarget::Uncompressed
+        {
             8
         } else {
             0

@@ -4,7 +4,6 @@
 pub mod p256_public;
 #[cfg(feature = "p256-signature")]
 pub mod p256_signature;
-pub mod protected_output;
 #[cfg(feature = "rsa-common")]
 pub mod rsa_host;
 #[cfg(all(test, feature = "rsa-pss"))]
@@ -23,9 +22,16 @@ pub mod search_control;
 ))]
 pub mod search_batches;
 
-#[cfg(all(any(test, feature = "self_test"), any(feature = "p256-public-key", feature = "p256-signature", feature = "rsa-modulus", feature = "rsa-pss")))]
+#[cfg(all(
+    any(test, feature = "self_test"),
+    any(
+        feature = "p256-public-key",
+        feature = "p256-signature",
+        feature = "rsa-modulus",
+        feature = "rsa-pss"
+    )
+))]
 pub mod test_support;
-
 
 pub mod stats;
 

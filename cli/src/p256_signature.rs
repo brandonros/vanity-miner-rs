@@ -1,16 +1,13 @@
 //! Bounded P-256/SHA-256 signature searches with host winner verification.
 
-use crate::{
-    protected_output::{StagedOutput, validate_outputs},
-    search_control::SearchControl,
-};
+use crate::search_control::SearchControl;
 use logic::{
-    crypto_search::{CandidateDeriver, CandidateDomain, write_message_counter},
-    hex_pattern::HexPattern,
-    p256_vanity::{
+    crypto::p256_vanity::{
         candidate_scalar,
         signatures::{self, SForm, SignatureTarget},
     },
+    search::crypto_search::{CandidateDeriver, CandidateDomain, write_message_counter},
+    search::hex_pattern::HexPattern,
 };
 use p256::{
     SecretKey,
@@ -37,10 +34,6 @@ pub struct SignatureSearch {
     pub suffix: String,
     pub target: SignatureTarget,
     pub s_form: SForm,
-    pub signature_out: PathBuf,
-    pub message_out: Option<PathBuf>,
-    pub der_out: Option<PathBuf>,
-    pub force: bool,
     pub workers: usize,
 }
 
@@ -49,6 +42,7 @@ pub struct SignatureReport {
     pub candidate_unit: &'static str,
     pub elapsed: Duration,
     pub found: bool,
+    pub output: Option<String>,
 }
 
 struct Winner {
@@ -72,18 +66,7 @@ impl SignatureSearch {
         if self.workers == 0 {
             return Err("worker count must be nonzero".into());
         }
-        if matches!(self.source, SearchSource::Message { .. }) && self.message_out.is_none() {
-            return Err("message search requires an explicit winning-message output path".into());
-        }
-        let mut outputs = vec![self.signature_out.as_path()];
-        if let Some(path) = &self.message_out {
-            outputs.push(path.as_path());
-        }
-        if let Some(path) = &self.der_out {
-            outputs.push(path.as_path());
-        }
-        validate_outputs(&outputs, &[&self.key, &self.message], self.force)
-            .map_err(|e| e.to_string())
+        Ok(())
     }
 }
 
@@ -150,7 +133,7 @@ fn run(
         _ => u64::MAX,
     };
     let outcome = if let Some(device) = device {
-        use logic::p256_signature_vanity::P256SignatureRequest;
+        use logic::modes::p256_signature_vanity::P256SignatureRequest;
         let (source, offset, length) = match config.source {
             SearchSource::Message { offset, length } => (0, offset as u64, length as u64),
             SearchSource::Ephemeral => (1, 0, 0),
@@ -331,6 +314,7 @@ fn run(
         return Err("signature search exhausted its unique candidate space without a match".into());
     }
     let found = outcome.is_some();
+    let mut output = None;
     if let Some(winner) = outcome {
         // Reconstruct from metadata instead of trusting worker message buffers.
         let mut message = original.clone();
@@ -360,33 +344,15 @@ fn run(
         {
             return Err("P-256 winner failed final reconstruction and verification".into());
         }
-        let raw_stage = StagedOutput::new(&config.signature_out, &winner.signature, config.force)
-            .map_err(|e| e.to_string())?;
-        let message_stage = config
-            .message_out
-            .as_ref()
-            .map(|path| StagedOutput::new(path, &message, config.force))
-            .transpose()
-            .map_err(|e| e.to_string())?;
-        let der = Signature::from_slice(&winner.signature)
-            .map_err(|_| "invalid signature encoding")?
-            .to_der();
-        let der_stage = config
-            .der_out
-            .as_ref()
-            .map(|path| StagedOutput::new(path, der.as_bytes(), config.force))
-            .transpose()
-            .map_err(|e| e.to_string())?;
-        // Stage every artifact before publishing; the raw signature is last.
-        if let Some(staged) = message_stage {
-            staged.publish().map_err(|e| e.to_string())?;
-        }
-        if let Some(staged) = der_stage {
-            staged.publish().map_err(|e| e.to_string())?;
-        }
-        raw_stage.publish().map_err(|e| {
-            format!("signature publication failed; companion outputs may exist: {e}")
-        })?;
+        output = Some(format!(
+            "[p256-signature] public_key={}\n[p256-signature] signature={}\n[p256-signature] message={}",
+            hex::encode(&public[1..]),
+            hex::encode(winner.signature),
+            hex::encode(&message),
+        ));
+    }
+    if let Some(record) = &output {
+        println!("{record}");
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(SignatureReport {
@@ -397,6 +363,7 @@ fn run(
         },
         elapsed,
         found,
+        output,
     })
 }
 
@@ -428,10 +395,7 @@ mod tests {
         let key = SecretKey::random(&mut OsRng);
         let pem = key.to_pkcs8_pem(LineEnding::LF).unwrap();
         let key_path = dir.0.join("key.pem");
-        StagedOutput::new(&key_path, pem.as_bytes(), false)
-            .unwrap()
-            .publish()
-            .unwrap();
+        std::fs::write(&key_path, pem.as_bytes()).unwrap();
         let public_path = dir.0.join("public.pem");
         std::fs::write(
             &public_path,
@@ -461,6 +425,9 @@ mod tests {
         .into_iter()
         .enumerate()
         {
+            let signature_out = dir.0.join(format!("signature-{i}.bin"));
+            let message_out = Some(dir.0.join(format!("message-{i}.bin")));
+            let der_out = Some(dir.0.join(format!("signature-{i}.der")));
             let config = SignatureSearch {
                 key: key_path.clone(),
                 message: message_path.clone(),
@@ -469,10 +436,7 @@ mod tests {
                 suffix: "".into(),
                 target: SignatureTarget::R,
                 s_form: form,
-                signature_out: dir.0.join(format!("signature-{i}.bin")),
-                message_out: Some(dir.0.join(format!("message-{i}.bin"))),
-                der_out: Some(dir.0.join(format!("signature-{i}.der"))),
-                force: false,
+
                 workers: 4,
             };
             let control = Arc::new(SearchControl::new());
@@ -483,11 +447,19 @@ mod tests {
             }
             .unwrap();
             assert!(report.found);
-            let raw: [u8; 64] = std::fs::read(&config.signature_out)
-                .unwrap()
+            let record = report.output.as_ref().unwrap();
+            let raw: [u8; 64] = crate::test_support::console_field(record, "signature")
                 .try_into()
                 .unwrap();
-            let winning_message = std::fs::read(config.message_out.as_ref().unwrap()).unwrap();
+            let winning_message = crate::test_support::console_field(record, "message");
+            std::fs::write(&signature_out, raw).unwrap();
+            std::fs::write(message_out.as_ref().unwrap(), &winning_message).unwrap();
+            std::fs::write(
+                der_out.as_ref().unwrap(),
+                Signature::from_slice(&raw).unwrap().to_der().as_bytes(),
+            )
+            .unwrap();
+
             assert!(signatures::verify(&public, &winning_message, &raw));
             assert_eq!(raw[0] >> 4, 0xa);
             let parsed = Signature::from_slice(&raw).unwrap();
@@ -510,16 +482,19 @@ mod tests {
                     .args(["dgst", "-sha256", "-verify"])
                     .arg(&public_path)
                     .arg("-signature")
-                    .arg(config.der_out.as_ref().unwrap())
-                    .arg(config.message_out.as_ref().unwrap())
+                    .arg(der_out.as_ref().unwrap())
+                    .arg(message_out.as_ref().unwrap())
                     .output()
                     .unwrap();
                 assert!(verified.status.success());
             }
-            assert!(run_cpu(&config, Arc::new(SearchControl::new())).is_err());
+            assert!(config.validate().is_ok());
         }
         // r cannot be zero in a valid ECDSA signature. Exhausting a one-byte
         // window must test all 256 distinct messages, including reserved tails.
+        let signature_out = dir.0.join("exhausted.bin");
+        let message_out = Some(dir.0.join("exhausted-message.bin"));
+        let _der_out: Option<PathBuf> = None;
         let exhausted = SignatureSearch {
             key: key_path,
             message: message_path,
@@ -531,10 +506,7 @@ mod tests {
             suffix: "".into(),
             target: SignatureTarget::R,
             s_form: SForm::Low,
-            signature_out: dir.0.join("exhausted.bin"),
-            message_out: Some(dir.0.join("exhausted-message.bin")),
-            der_out: None,
-            force: false,
+
             workers: 8,
         };
         let control = Arc::new(SearchControl::new());
@@ -549,17 +521,18 @@ mod tests {
         };
         assert!(matches!(result, Err(error) if error.contains("exhausted")));
         assert_eq!(control.statistics().0, 256);
-        assert!(!exhausted.signature_out.exists());
-        assert!(!exhausted.message_out.unwrap().exists());
+        assert!(!signature_out.exists());
+        assert!(!message_out.unwrap().exists());
     }
 }
 
 /// Synchronized, ordered candidate evaluation for this mode. Implementations
 /// must clear secret device buffers before returning; this is not a CPU fallback.
 pub type EvaluateBatch<'a> = dyn FnMut(
-    &logic::p256_signature_vanity::P256SignatureRequest,
-    &logic::hex_pattern::HexPattern,
-    &[u8],
-    u64,
-    u32,
-) -> Result<logic::candidate_result::BatchResult, String> + 'a;
+        &logic::modes::p256_signature_vanity::P256SignatureRequest,
+        &logic::search::hex_pattern::HexPattern,
+        &[u8],
+        u64,
+        u32,
+    ) -> Result<logic::search::candidate_result::BatchResult, String>
+    + 'a;

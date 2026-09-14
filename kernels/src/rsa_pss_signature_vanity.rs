@@ -1,9 +1,9 @@
 //! CUDA entry point for rsa-pss: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
-    candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
-    rsa_pss_signature_vanity::{RsaPssRequest, rsa_pss},
+    search::candidate_result::{BatchResult, CandidateResult},
+    search::hex_pattern::HexPattern,
+    modes::rsa_pss_signature_vanity::{RsaPssRequest, rsa_pss},
 };
 
 /// # Safety

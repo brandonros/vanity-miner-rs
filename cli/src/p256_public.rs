@@ -1,36 +1,20 @@
 //! Bounded host runner for P-256 public-key searches.
 
-use crate::{
-    protected_output::{StagedOutput, validate_outputs},
-    search_control::SearchControl,
-};
+use crate::search_control::SearchControl;
 use logic::{
-    crypto_search::{CandidateDeriver, CandidateDomain},
-    hex_pattern::HexPattern,
-    p256_vanity::{PublicTarget, candidate_scalar, public_point},
+    crypto::p256_vanity::{PublicTarget, candidate_scalar, public_point},
+    search::crypto_search::{CandidateDeriver, CandidateDomain},
+    search::hex_pattern::HexPattern,
 };
-use p256::{
-    SecretKey,
-    pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding},
-};
+use p256::SecretKey;
 use rand::{RngCore, rngs::OsRng};
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 use zeroize::Zeroizing;
-
-#[derive(Clone, Copy)]
-pub enum PublicEncoding {
-    Sec1,
-    SpkiPem,
-}
 
 pub struct PublicKeySearch {
     pub prefix: String,
     pub suffix: String,
     pub target: PublicTarget,
-    pub private_out: PathBuf,
-    pub public_out: PathBuf,
-    pub public_encoding: PublicEncoding,
-    pub force: bool,
     pub workers: usize,
 }
 
@@ -38,6 +22,7 @@ pub struct SearchReport {
     pub candidates_tested: u64,
     pub elapsed: Duration,
     pub found: bool,
+    pub output: Option<String>,
 }
 
 struct Winner {
@@ -62,8 +47,7 @@ impl PublicKeySearch {
         if self.workers == 0 {
             return Err("worker count must be nonzero".into());
         }
-        validate_outputs(&[&self.private_out, &self.public_out], &[], self.force)
-            .map_err(|e| e.to_string())
+        Ok(())
     }
 }
 
@@ -115,7 +99,7 @@ fn run(
     let deriver = CandidateDeriver::new(*seed, CandidateDomain::P256PrivateKey, [0; 32], [0; 32]);
 
     let outcome = if let Some(device) = device {
-        use logic::p256_public_key_vanity::P256PublicRequest;
+        use logic::modes::p256_public_key_vanity::P256PublicRequest;
         let request = Zeroizing::new(P256PublicRequest {
             seed: *seed,
             worker: 0,
@@ -207,50 +191,36 @@ fn run(
         })?
     };
     let found = outcome.is_some();
+    let mut output = None;
     if let Some(winner) = outcome {
-        // Recheck immediately before serialization; never print private data.
+        // Recheck immediately before printing the matched key.
         if !verify_winner(&winner, config.target, &pattern) {
             return Err("P-256 winner failed final verification".into());
         }
-        let key =
-            SecretKey::from_slice(winner.private.as_ref()).map_err(|_| "invalid winning scalar")?;
-        let private_pem = key
-            .to_pkcs8_pem(LineEnding::LF)
-            .map_err(|_| "private PEM serialization failed")?;
-        let public = match config.public_encoding {
-            PublicEncoding::Sec1 => winner.public.to_vec(),
-            PublicEncoding::SpkiPem => key
-                .public_key()
-                .to_public_key_pem(LineEnding::LF)
-                .map_err(|_| "public PEM serialization failed")?
-                .into_bytes(),
-        };
-        let private_stage =
-            StagedOutput::new(&config.private_out, private_pem.as_bytes(), config.force)
-                .map_err(|e| format!("private output staging failed: {e}"))?;
-        let public_stage = StagedOutput::new(&config.public_out, &public, config.force)
-            .map_err(|e| format!("public output staging failed: {e}"))?;
-        // Publish the complete private key last. Each path is atomic; arbitrary
-        // multiple filesystem paths cannot be published as a single atomic rename.
-        public_stage
-            .publish()
-            .map_err(|e| format!("public output publication failed: {e}"))?;
-        private_stage.publish().map_err(|e| {
-            format!("private output publication failed; public output may exist: {e}")
-        })?;
+        output = Some(format!(
+            "[p256-public-key] public_key={}\n[p256-public-key] sec1_public_key={}\n[p256-public-key] private_key={}",
+            hex::encode(config.target.bytes(&winner.public)),
+            hex::encode(winner.public),
+            hex::encode(*winner.private),
+        ));
+    }
+    if let Some(record) = &output {
+        println!("{record}");
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(SearchReport {
         candidates_tested,
         elapsed,
         found,
+        output,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use p256::pkcs8::{DecodePrivateKey, DecodePublicKey};
+    use p256::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
+    use std::path::PathBuf;
 
     struct Cleanup(PathBuf);
     impl Drop for Cleanup {
@@ -271,20 +241,22 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("vanity-p256-test-{}", hex::encode(random)));
         std::fs::create_dir(&dir).unwrap();
         let _cleanup = Cleanup(dir.clone());
+        let private_out = dir.join("private.pem");
+        let public_out = dir.join("public.pem");
         let config = PublicKeySearch {
             prefix: "a".into(),
             suffix: "".into(),
             target: PublicTarget::X,
-            private_out: dir.join("private.pem"),
-            public_out: dir.join("public.pem"),
-            public_encoding: PublicEncoding::SpkiPem,
-            force: false,
+
             workers: 4,
         };
         if device {
-            let mut corrupt = |_: &logic::p256_public_key_vanity::P256PublicRequest,
-                               _: &HexPattern, _: &[u8], _: u64, _: u32| {
-                let mut results = logic::candidate_result::BatchResult::EMPTY;
+            let mut corrupt = |_: &logic::modes::p256_public_key_vanity::P256PublicRequest,
+                               _: &HexPattern,
+                               _: &[u8],
+                               _: u64,
+                               _: u32| {
+                let mut results = logic::search::candidate_result::BatchResult::EMPTY;
                 results.matches = 1;
                 results.lane = 0;
                 results.candidate.status = 1; // Invalid all-zero SEC1 point, claimed as a winner.
@@ -292,8 +264,8 @@ mod tests {
             };
             let rejected = run_device(&config, Arc::new(SearchControl::new()), &mut corrupt);
             assert!(matches!(rejected, Err(error) if error.contains("failed verification")));
-            assert!(!config.private_out.exists());
-            assert!(!config.public_out.exists());
+            assert!(!private_out.exists());
+            assert!(!public_out.exists());
         }
         let control = Arc::new(SearchControl::new());
         let report = if device {
@@ -304,14 +276,33 @@ mod tests {
         .unwrap();
         assert!(report.found);
         assert!(report.candidates_tested > 0);
-        let private_pem = Zeroizing::new(std::fs::read_to_string(&config.private_out).unwrap());
-        let private = SecretKey::from_pkcs8_pem(&private_pem).unwrap();
-        let public_pem = std::fs::read_to_string(&config.public_out).unwrap();
-        let public = p256::PublicKey::from_public_key_pem(&public_pem).unwrap();
+        let record = report.output.as_ref().unwrap();
+        let private =
+            SecretKey::from_slice(&crate::test_support::console_field(record, "private_key"))
+                .unwrap();
+        let public = p256::PublicKey::from_sec1_bytes(&crate::test_support::console_field(
+            record,
+            "sec1_public_key",
+        ))
+        .unwrap();
+        assert_eq!(
+            crate::test_support::console_field(record, "public_key"),
+            config.target.bytes(
+                public
+                    .to_encoded_point(false)
+                    .as_bytes()
+                    .try_into()
+                    .unwrap()
+            )
+        );
+        let private_pem = private.to_pkcs8_pem(LineEnding::LF).unwrap();
+        let public_pem = public.to_public_key_pem(LineEnding::LF).unwrap();
+        std::fs::write(&private_out, private_pem.as_bytes()).unwrap();
+        std::fs::write(&public_out, &public_pem).unwrap();
         assert!(private.public_key() == public);
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         assert_eq!(public.to_encoded_point(false).as_bytes()[1] >> 4, 0xa);
-        assert!(run_cpu(&config, Arc::new(SearchControl::new())).is_err());
+        assert!(config.validate().is_ok());
         // Check with an independent implementation when OpenSSL is installed.
         if std::process::Command::new("openssl")
             .arg("version")
@@ -320,7 +311,7 @@ mod tests {
         {
             let result = std::process::Command::new("openssl")
                 .args(["pkey", "-in"])
-                .arg(&config.private_out)
+                .arg(&private_out)
                 .arg("-pubout")
                 .output()
                 .unwrap();
@@ -331,7 +322,7 @@ mod tests {
             std::fs::write(&message, b"public interoperability test message").unwrap();
             let signed = std::process::Command::new("openssl")
                 .args(["dgst", "-sha256", "-sign"])
-                .arg(&config.private_out)
+                .arg(&private_out)
                 .arg(&message)
                 .output()
                 .unwrap();
@@ -339,7 +330,7 @@ mod tests {
             std::fs::write(&signature, signed.stdout).unwrap();
             let verified = std::process::Command::new("openssl")
                 .args(["dgst", "-sha256", "-verify"])
-                .arg(&config.public_out)
+                .arg(&public_out)
                 .arg("-signature")
                 .arg(&signature)
                 .arg(&message)
@@ -354,9 +345,10 @@ mod tests {
 /// Synchronized, ordered candidate evaluation for this mode. Implementations
 /// must clear secret device buffers before returning; this is not a CPU fallback.
 pub type EvaluateBatch<'a> = dyn FnMut(
-    &logic::p256_public_key_vanity::P256PublicRequest,
-    &logic::hex_pattern::HexPattern,
-    &[u8],
-    u64,
-    u32,
-) -> Result<logic::candidate_result::BatchResult, String> + 'a;
+        &logic::modes::p256_public_key_vanity::P256PublicRequest,
+        &logic::search::hex_pattern::HexPattern,
+        &[u8],
+        u64,
+        u32,
+    ) -> Result<logic::search::candidate_result::BatchResult, String>
+    + 'a;

@@ -5,7 +5,11 @@ pub fn validate_base58_string(base58_string: &str) -> Result<(), Box<dyn Error +
     let invalid_characters = ["l", "I", "0", "O"];
     for invalid_character in invalid_characters {
         if base58_string.contains(invalid_character) {
-            return Err(format!("base58 string contains invalid character: {}", invalid_character).into());
+            return Err(format!(
+                "base58 string contains invalid character: {}",
+                invalid_character
+            )
+            .into());
         }
     }
     Ok(())
@@ -34,8 +38,7 @@ pub fn validate_bech32_string(bech32_string: &str) -> Result<(), Box<dyn Error +
     let bech32_lower = bech32_string.to_ascii_lowercase();
 
     // Find separator
-    let separator_pos = bech32_lower.rfind('1')
-        .ok_or("Missing '1' separator")?;
+    let separator_pos = bech32_lower.rfind('1').ok_or("Missing '1' separator")?;
 
     let hrp = &bech32_lower[..separator_pos];
     let data = &bech32_lower[separator_pos + 1..];
@@ -58,4 +61,30 @@ pub fn validate_bech32_string(bech32_string: &str) -> Result<(), Box<dyn Error +
     }
 
     Ok(())
+}
+
+/// Suffixes contain only the Bech32 data alphabet, with no address HRP/separator.
+#[cfg(feature = "bitcoin")]
+pub fn validate_bech32_suffix(suffix: &str) -> Result<(), Box<dyn Error + Send + Sync>> {
+    for c in suffix.chars() {
+        if !BECH32_CHARSET.contains(c) {
+            return Err(format!("Invalid Bitcoin suffix character: '{c}'").into());
+        }
+    }
+    Ok(())
+}
+
+#[cfg(all(test, feature = "bitcoin"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bitcoin_suffix_is_data_without_address_prefix() {
+        for suffix in ["", "qq", "ff", "0239"] {
+            assert!(validate_bech32_suffix(suffix).is_ok());
+        }
+        for suffix in ["bc1q", "1", "b", "i", "o", "Q", " "] {
+            assert!(validate_bech32_suffix(suffix).is_err());
+        }
+    }
 }

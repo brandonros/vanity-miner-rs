@@ -36,7 +36,7 @@ requires a compatible NVIDIA GPU and driver. Add mode features as needed:
 ```sh
 # LLVM 21, compute_100 (Blackwell or later)
 nix develop .#v21 --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,llvm21,solana,self_test
-./target/llvm21/release/vanity-miner solana-vanity aaa ""
+./target/llvm21/release/vanity-miner solana-vanity --prefix aaa
 
 # LLVM 7, compute_89
 nix develop .#v7 --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,solana,self_test
@@ -73,28 +73,32 @@ not exposed by this backend.
 ## Search
 
 ```sh
-./target/release/vanity-miner solana-vanity aaa ""
-./target/release/vanity-miner bitcoin-vanity bc1qqqq ""
-./target/release/vanity-miner ethereum-vanity 5555 ""
-./target/release/vanity-miner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
+./target/release/vanity-miner solana-vanity --prefix aaa
+./target/release/vanity-miner bitcoin-vanity --prefix bc1qqqq
+./target/release/vanity-miner ethereum-vanity --prefix 5555
+./target/release/vanity-miner shallenge --username brandonros --target-hash 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
 ```
 
-Address modes take a prefix and suffix; `""` leaves either unconstrained. Ethereum
-requires even-length hex patterns without `0x`.
+Address modes use `--prefix` and `--suffix`; omit either option to leave it
+unconstrained. Ethereum requires even-length hex patterns without `0x`.
+Shallenge uses `--username` and `--target-hash`. Positional search arguments are
+no longer accepted.
 
 ### RSA and P-256
 
 ```sh
-./target/release/vanity-miner rsa-modulus-vanity --prefix a --suffix b --private-out rsa-private.pem --public-out rsa-public.pem
-./target/release/vanity-miner p256-public-key-vanity --prefix a --target xy --private-out p256-private.pem --public-out p256-public.pem --public-format spki-pem
+./target/release/vanity-miner rsa-modulus-vanity --prefix a --suffix b
+./target/release/vanity-miner p256-public-key-vanity --prefix a --target xy
 
+# Signature examples require existing rsa-private.pem / p256-private.pem inputs.
 printf 'example:00000000' > message.bin
-./target/release/vanity-miner rsa-pss-signature-vanity --key rsa-private.pem --message message.bin --prefix 0 --signature-out rsa-signature.bin --salt-out rsa-salt.bin
-./target/release/vanity-miner p256-signature-vanity --key p256-private.pem --message message.bin --nonce-offset 8 --nonce-length 8 --prefix a --signature-out p256-signature.bin --message-out winning-message.bin --der-out p256-signature.der
+./target/release/vanity-miner rsa-pss-signature-vanity --key rsa-private.pem --message message.bin --prefix 0
+./target/release/vanity-miner p256-signature-vanity --key p256-private.pem --message message.bin --nonce-offset 8 --nonce-length 8 --prefix a
 ```
 
 These four modes accept case-insensitive hex prefixes and suffixes, including odd
-lengths, without `0x`. They stop at the first independently verified winner.
+lengths, without `0x`. Matches are verified, printed to the console, and the search
+continues until Ctrl-C or exhaustion of a finite message/salt space.
 `--threads N` selects CPU workers; Ctrl-C cancels between work batches.
 
 | Mode | Pattern applies to |
@@ -114,10 +118,14 @@ lengths, without `0x`. They stop at the first independently verified winner.
   `--search-source ephemeral` keeps the message fixed and searches secret nonces.
   Nonces are never exported: reusing an ECDSA nonce across messages can expose the key.
 
-Private keys are PKCS#8 PEM. RSA public keys are SPKI PEM; P-256 public keys default
-to uncompressed SEC1, with SPKI PEM available through `--public-format spki-pem`.
-Private files use Unix mode 0600. Existing outputs require `--force`; publication
-is atomic per file, not across companion files.
+Every match is printed as a block of hex fields. `public_key` is the matched
+P-256 point representation or RSA modulus, so the pattern is visible directly.
+P-256 key matches include the private scalar; RSA key matches include the private
+key as PKCS#8 DER hex. Signature matches include the signature and exact message
+bytes; RSA-PSS also includes the salt. The miner writes no output files.
+
+Signature searches take an existing PKCS#8 PEM key and message file through
+`--key` and `--message`. Search counters keep advancing after each printed match.
 
 CUDA signing puts private keys in device memory. RSA device operations are
 unblinded and checked with the public exponent; host verification uses blinded
@@ -134,8 +142,9 @@ cargo build -p vanity-miner --release --locked --no-default-features --features 
 `self_test` enables every mode's logic dependencies, but not its CLI search command.
 The same command runs on the backend selected at build time.
 
-All 157 numbered checks and fixtures live in `logic/src/self_test.rs`, with one
-kernel per slot in `kernels/src/self_test.rs`. CPU runs report 157 passes and skip
+The `logic/src/self_test/` folder groups checks and fixtures by subject. Its
+`mod.rs` owns all 157 slot labels and the CPU dispatcher; `kernels/src/self_test.rs`
+keeps one kernel per slot. CPU runs report 157 passes and skip
 the additional GPU launch probe.
 
 | Slots | Coverage |
@@ -150,3 +159,17 @@ the additional GPU launch probe.
 These kernels test candidate logic, not production CUDA argument passing or batch
 buffer layouts. CPU passes and successful CUDA compilation do not establish GPU
 numerical correctness.
+
+## Source layout
+
+`logic/src` contains shared CPU/GPU code:
+
+- `modes/`: one search implementation per mode, matching the kernel files.
+- `crypto/`: hashes, elliptic curves, and RSA arithmetic.
+- `encoding/`: base58 and bech32.
+- `search/`: patterns, candidate results, derivation, and RNG helpers.
+- `self_test/`: primitive, pipeline, compiler, P-256, and RSA checks, plus fixtures.
+
+Imports follow the folders, for example `logic::modes::p256_public_key_vanity`
+and `logic::search::hex_pattern::HexPattern`. Root compatibility exports are
+removed. Feature selection and self-test slot numbering are unchanged.

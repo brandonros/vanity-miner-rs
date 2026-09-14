@@ -31,7 +31,7 @@ pub unsafe extern "C" fn kernel_find_bitcoin_vanity_private_key(
     } else {
         unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) }
     };
-    let request = logic::BitcoinVanityKeyRequest {
+    let request = logic::modes::bitcoin_vanity::BitcoinVanityKeyRequest {
         prefix: vanity_prefix,
         suffix: vanity_suffix,
         thread_idx,
@@ -39,7 +39,7 @@ pub unsafe extern "C" fn kernel_find_bitcoin_vanity_private_key(
     };
     
     // Call pure business logic
-    let result = logic::generate_and_check_bitcoin_vanity_key(&request);
+    let result = logic::modes::bitcoin_vanity::generate_and_check_bitcoin_vanity_key(&request);
     
     // Handle result (adapter layer)
     if result.matches {

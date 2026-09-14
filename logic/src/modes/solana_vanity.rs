@@ -1,8 +1,8 @@
-use crate::base58;
-use crate::ed25519;
-use crate::sha512;
-use crate::vanity;
-use crate::xoroshiro;
+use crate::crypto::ed25519;
+use crate::crypto::sha512;
+use crate::encoding::base58;
+use crate::search::vanity;
+use crate::search::xoroshiro;
 
 pub struct SolanaVanityKeyRequest<'a> {
     pub prefix: &'a [u8],
@@ -22,26 +22,29 @@ pub struct SolanaVanityKeyResult {
 }
 
 /// Pure function - no side effects, easily testable
-pub fn generate_and_check_solana_vanity_key(request: &SolanaVanityKeyRequest) -> SolanaVanityKeyResult {
+pub fn generate_and_check_solana_vanity_key(
+    request: &SolanaVanityKeyRequest,
+) -> SolanaVanityKeyResult {
     // Generate private key
-    let private_key = xoroshiro::generate_random_private_key(
-        request.thread_idx, 
-        request.rng_seed
-    );
-    
+    let private_key = xoroshiro::generate_random_private_key(request.thread_idx, request.rng_seed);
+
     // Hash private key
     let hashed_private_key = sha512::sha512_32bytes_from_bytes(&private_key);
-    
+
     // Derive public key
     let public_key = ed25519::ed25519_derive_public_key(&hashed_private_key);
-    
+
     // Encode public key
     let mut encoded_public_key = [0u8; 64];
     let encoded_len = base58::base58_encode_32(&public_key, &mut encoded_public_key);
-    
+
     // Check if matches vanity criteria
-    let matches = vanity::check_vanity_match(&encoded_public_key[..encoded_len], request.prefix, request.suffix);
-    
+    let matches = vanity::check_vanity_match(
+        &encoded_public_key[..encoded_len],
+        request.prefix,
+        request.suffix,
+    );
+
     SolanaVanityKeyResult {
         private_key,
         hashed_private_key,
@@ -59,7 +62,7 @@ mod test {
     #[test]
     fn should_generate_and_check_solana_vanity_key_correctly() {
         // Arrange
-        let prefix = b"aa";  // Example prefix
+        let prefix = b"aa"; // Example prefix
         let suffix = b""; // Example suffix
         let request = SolanaVanityKeyRequest {
             prefix,
@@ -79,7 +82,8 @@ mod test {
                 hex::decode("d32ef33913a75aada4fc64d153de08338e169234f3432cc0294510df9fd0ccf8")
                     .unwrap()
                     .as_slice()
-            ).unwrap()
+            )
+            .unwrap()
         );
         assert_eq!(
             result.hashed_private_key,
@@ -95,8 +99,12 @@ mod test {
                 hex::decode("0899ddfc8862a73570657c47c4ec289233a5c0543b2f83aa4e6dcbb196547ee3")
                     .unwrap()
                     .as_slice()
-            ).unwrap()
+            )
+            .unwrap()
         );
-        assert_eq!(result.encoded_public_key[0..result.encoded_len], *b"aaLs2GEHDEajV3kgXsr7FPDRc4mcKVJLQDXnWWcyJCr");
+        assert_eq!(
+            result.encoded_public_key[0..result.encoded_len],
+            *b"aaLs2GEHDEajV3kgXsr7FPDRc4mcKVJLQDXnWWcyJCr"
+        );
     }
 }

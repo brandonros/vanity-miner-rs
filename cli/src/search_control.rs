@@ -3,12 +3,13 @@
 use crate::stats::GlobalStats;
 use std::ops::Range;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::time::Duration;
 
 pub struct SearchControl {
     // 0 = running, 1 = cancelled, 2 = verified winner reserved.
     state: AtomicU8,
+    interrupted: AtomicBool,
     next: AtomicU64,
     stats: Arc<GlobalStats>,
 }
@@ -27,6 +28,7 @@ impl SearchControl {
     pub fn with_stats(stats: Arc<GlobalStats>) -> Self {
         Self {
             state: AtomicU8::new(0),
+            interrupted: AtomicBool::new(false),
             next: AtomicU64::new(0),
             stats,
         }
@@ -37,7 +39,23 @@ impl SearchControl {
     }
 
     pub fn stopped(&self) -> bool {
-        self.state.load(Ordering::Acquire) != 0
+        self.interrupted.load(Ordering::Acquire) || self.state.load(Ordering::Acquire) != 0
+    }
+
+    /// Process/user cancellation persists across match boundaries.
+    pub fn interrupt(&self) {
+        self.interrupted.store(true, Ordering::Release);
+        self.cancel();
+    }
+
+    /// Called after every worker has joined and the winning record was printed.
+    /// Keep the counter advancing so message searches never repeat candidates.
+    pub fn resume_after_match(&self) -> bool {
+        !self.interrupted.load(Ordering::Acquire)
+            && self
+                .state
+                .compare_exchange(2, 0, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
     }
 
     pub fn cancel(&self) {
@@ -66,7 +84,7 @@ impl SearchControl {
     }
 
     /// Call only after complete winner verification. Claiming stops all workers,
-    /// even if subsequent file output fails; another winner must not be written.
+    /// until the host has printed the match and joined the workers.
     pub fn claim_verified_winner(&self) -> bool {
         self.state
             .compare_exchange(0, 2, Ordering::AcqRel, Ordering::Acquire)
@@ -196,5 +214,32 @@ mod tests {
         cancelled.cancel();
         assert!(!cancelled.claim_verified_winner());
         assert!(cancelled.reserve_batch(1).is_none());
+    }
+}
+
+#[cfg(test)]
+mod continuous_tests {
+    use super::*;
+
+    #[test]
+    fn resuming_after_match_keeps_candidate_counters() {
+        let control = SearchControl::new();
+        assert_eq!(control.reserve_bounded_batch(64, 256), Some(0..64));
+        assert!(control.claim_verified_winner());
+        assert!(control.resume_after_match());
+        assert_eq!(control.reserve_bounded_batch(64, 256), Some(64..128));
+        assert!(control.claim_verified_winner());
+        assert!(control.resume_after_match());
+        assert_eq!(control.reserve_bounded_batch(64, 256), Some(128..192));
+    }
+
+    #[test]
+    fn ctrl_c_during_winner_output_prevents_restart() {
+        let control = SearchControl::new();
+        assert!(control.claim_verified_winner());
+        control.interrupt();
+        assert!(!control.resume_after_match());
+        assert!(control.stopped());
+        assert!(control.reserve_batch(64).is_none());
     }
 }

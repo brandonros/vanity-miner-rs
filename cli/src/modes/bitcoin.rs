@@ -26,14 +26,15 @@ pub mod cpu {
         while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             let rng_seed: u64 = rng.r#gen();
 
-            let request = logic::BitcoinVanityKeyRequest {
+            let request = logic::modes::bitcoin_vanity::BitcoinVanityKeyRequest {
                 prefix: &data.prefix_bytes,
                 suffix: &data.suffix_bytes,
                 thread_idx: thread_id,
                 rng_seed,
             };
 
-            let result = logic::generate_and_check_bitcoin_vanity_key(&request);
+            let result =
+                logic::modes::bitcoin_vanity::generate_and_check_bitcoin_vanity_key(&request);
 
             data.global_stats.add_launch(1);
 
@@ -42,7 +43,7 @@ pub mod cpu {
                     std::str::from_utf8(&result.encoded_public_key[0..result.encoded_len])
                         .unwrap_or("invalid_utf8");
                 let mut encoded_private_key = [0u8; 64];
-                let encoded_len = logic::private_key_to_wif(
+                let encoded_len = logic::modes::bitcoin_vanity::private_key_to_wif(
                     &result.private_key,
                     true,
                     false,
@@ -192,7 +193,7 @@ pub mod gpu {
 
                 // Generate WIF private key format
                 let mut encoded_private_key = [0u8; 64];
-                let encoded_private_key_len = logic::private_key_to_wif(
+                let encoded_private_key_len = logic::modes::bitcoin_vanity::private_key_to_wif(
                     &found_private_key,
                     true,
                     false,

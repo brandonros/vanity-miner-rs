@@ -11,12 +11,12 @@ pub(crate) type RunResult = Result<(), Box<dyn Error + Send + Sync>>;
 pub(crate) fn run_controlled(
     stats: Arc<crate::common::GlobalStats>,
     unit: &'static str,
-    work: impl FnOnce(Arc<SearchControl>) -> Result<bool, String>,
+    mut work: impl FnMut(Arc<SearchControl>) -> Result<bool, String>,
 ) -> RunResult {
     stats.set_unit(unit);
     let control = Arc::new(SearchControl::with_stats(stats.clone()));
     let cancellation = control.clone();
-    ctrlc::set_handler(move || cancellation.cancel())
+    ctrlc::set_handler(move || cancellation.interrupt())
         .map_err(|_| "could not install Ctrl-C handler")?;
     let observed = stats.clone();
     let (done, finished) = mpsc::channel();
@@ -28,16 +28,22 @@ pub(crate) fn run_controlled(
             observed.print_progress();
         }
     });
-    let result = work(control.clone());
+    let result = (|| -> Result<(), String> {
+        while !control.stopped() {
+            if !work(control.clone())? {
+                break;
+            }
+            stats.add_matches(1);
+            if !control.resume_after_match() {
+                break;
+            }
+        }
+        Ok(())
+    })();
     let _ = done.send(());
     monitor.join().map_err(|_| "statistics worker failed")?;
     stats.print_progress();
-    if result? {
-        stats.add_matches(1);
-        println!("Verified match written.");
-    } else {
-        println!("Search cancelled.");
-    }
+    result?;
     Ok(())
 }
 

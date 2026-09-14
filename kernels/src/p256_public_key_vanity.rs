@@ -1,9 +1,9 @@
 //! CUDA entry point for p256-public-key: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
-    candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
-    p256_public_key_vanity::{P256PublicRequest, p256_public},
+    search::candidate_result::{BatchResult, CandidateResult},
+    search::hex_pattern::HexPattern,
+    modes::p256_public_key_vanity::{P256PublicRequest, p256_public},
 };
 
 /// # Safety

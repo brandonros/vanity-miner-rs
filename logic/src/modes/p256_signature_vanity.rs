@@ -1,6 +1,6 @@
 //! Candidate evaluation and CUDA request layout for p256-signature.
 //! Owners must clear secret records after synchronized device use.
-use crate::{candidate_result::CandidateResult, hex_pattern::HexPattern};
+use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -28,8 +28,8 @@ pub fn p256_signature(
     pattern: &HexPattern,
 ) -> CandidateResult {
     use crate::{
-        crypto_search::{CandidateDeriver, CandidateDomain, hash_message_counter},
-        p256_vanity::{candidate_scalar, signatures::*},
+        crypto::p256_vanity::{candidate_scalar, signatures::*},
+        search::crypto_search::{CandidateDeriver, CandidateDomain, hash_message_counter},
     };
     let target = match request.target {
         0 => SignatureTarget::Raw,

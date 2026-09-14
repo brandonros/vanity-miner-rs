@@ -43,7 +43,10 @@ mod abi_tests {
     fn records_have_no_implicit_padding() {
         assert_eq!(core::mem::size_of::<super::CandidateResult>(), 260);
         assert_eq!(core::mem::size_of::<super::BatchResult>(), 272);
-        assert_eq!(core::mem::size_of::<crate::hex_pattern::HexPattern>(), 516);
+        assert_eq!(
+            core::mem::size_of::<crate::search::hex_pattern::HexPattern>(),
+            516
+        );
     }
 }
 

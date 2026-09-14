@@ -1,9 +1,9 @@
 //! CUDA entry point for p256-signature: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
-    candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
-    p256_signature_vanity::{P256SignatureRequest, p256_signature},
+    search::candidate_result::{BatchResult, CandidateResult},
+    search::hex_pattern::HexPattern,
+    modes::p256_signature_vanity::{P256SignatureRequest, p256_signature},
 };
 
 /// # Safety

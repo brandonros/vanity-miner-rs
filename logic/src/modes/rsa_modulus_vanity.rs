@@ -1,6 +1,6 @@
 //! Candidate evaluation and CUDA request layout for rsa-modulus.
 //! Owners must clear secret records after synchronized device use.
-use crate::{candidate_result::CandidateResult, hex_pattern::HexPattern};
+use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -47,7 +47,7 @@ pub fn rsa_modulus(
     if modulus.bits() != 2048 || !pattern.matches(&modulus.to_be_bytes()) {
         return CandidateResult::MISS;
     }
-    if !crate::rsa_prime::probable_prime(&q) {
+    if !crate::crypto::rsa_prime::probable_prime(&q) {
         return CandidateResult::MISS;
     }
     CandidateResult::matched(&q.to_be_bytes())

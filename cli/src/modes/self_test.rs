@@ -5,8 +5,8 @@ use vanity_miner::self_test_suite::{self, Outcome};
 pub mod cpu {
     use super::*;
     pub fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
-        let mut results = [0; logic::SELF_TEST_NUM_CHECKS];
-        logic::run_self_test(&mut results);
+        let mut results = [0; logic::self_test::SELF_TEST_NUM_CHECKS];
+        logic::self_test::run_self_test(&mut results);
         self_test_suite::run("CPU", |case| {
             let Some(slot) = case.slot else {
                 return Ok(Outcome::Skipped("requires GPU launch"));
@@ -31,7 +31,7 @@ pub mod gpu {
     pub fn run(ordinal: usize, gpu: &GpuContext) -> Result<(), Box<dyn Error + Send + Sync>> {
         self_test_suite::run(&format!("CUDA {ordinal}"), |case| {
             let stream = &gpu.stream;
-            let mut results = [0xa5a5a5a5u32; logic::SELF_TEST_NUM_CHECKS];
+            let mut results = [0xa5a5a5a5u32; logic::self_test::SELF_TEST_NUM_CHECKS];
             let device = DeviceBuffer::from_slice(&results).map_err(|e| e.to_string())?;
             let kernel = gpu
                 .module
@@ -52,5 +52,4 @@ pub mod gpu {
         })
         .map_err(Into::into)
     }
-
 }

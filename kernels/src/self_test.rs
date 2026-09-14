@@ -7,7 +7,7 @@ use cuda_std::prelude::*;
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_stub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
     results[0] = 1;
 }
 
@@ -18,35 +18,35 @@ pub unsafe extern "C" fn kernel_self_test_stub(results_ptr: *mut u32) {
 // (and slots that ran before the fault still produce reliable values
 // before the context goes sticky-errored).
 //
-// Slot ordering matches `logic::SELF_TEST_LABELS`. See `logic::self_test`
+// Slot ordering matches `logic::self_test::SELF_TEST_LABELS`. See `logic::self_test`
 // for the underlying `check_*` bodies (CPU mode calls them too via
-// `logic::run_self_test`).
+// `logic::self_test::run_self_test`).
 // Slots 0-3: solana per-primitive bisect. If a fault localizes here,
 // we know which of xoroshiro / sha512 / ed25519 / base58 is the
 // culprit before the composed `solana priv` kernel inlines all four.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_xoroshiro(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[0] = logic::check_primitive_xoroshiro();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[0] = logic::self_test::check_primitive_xoroshiro();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_sha512(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[1] = logic::check_primitive_sha512();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[1] = logic::self_test::check_primitive_sha512();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_ed25519(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[2] = logic::check_primitive_ed25519();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[2] = logic::self_test::check_primitive_ed25519();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_base58(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[3] = logic::check_primitive_base58();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[3] = logic::self_test::check_primitive_base58();
 }
 
 // Slots 4-9: non-solana primitive bisect — secp256k1 (compressed +
@@ -58,166 +58,166 @@ pub unsafe extern "C" fn kernel_self_test_primitive_base58(results_ptr: *mut u32
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_secp256k1_compressed(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[4] = logic::check_primitive_secp256k1_compressed();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[4] = logic::self_test::check_primitive_secp256k1_compressed();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_secp256k1_uncompressed(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[5] = logic::check_primitive_secp256k1_uncompressed();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[5] = logic::self_test::check_primitive_secp256k1_uncompressed();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_keccak256(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[6] = logic::check_primitive_keccak256();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[6] = logic::self_test::check_primitive_keccak256();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_ripemd160(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[7] = logic::check_primitive_ripemd160();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[7] = logic::self_test::check_primitive_ripemd160();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_sha256_32(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[8] = logic::check_primitive_sha256_32();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[8] = logic::self_test::check_primitive_sha256_32();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_primitive_sha256_variable(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[9] = logic::check_primitive_sha256_variable();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[9] = logic::self_test::check_primitive_sha256_variable();
 }
 
 // Slots 10-30: composed-subsystem KAT checks.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_solana_priv(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[10] = logic::check_solana_priv();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[10] = logic::self_test::check_solana_priv();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_solana_pub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[11] = logic::check_solana_pub();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[11] = logic::self_test::check_solana_pub();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_solana_encoded(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[12] = logic::check_solana_encoded();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[12] = logic::self_test::check_solana_encoded();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_ethereum_priv(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[13] = logic::check_ethereum_priv();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[13] = logic::self_test::check_ethereum_priv();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_ethereum_pub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[14] = logic::check_ethereum_pub();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[14] = logic::self_test::check_ethereum_pub();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_ethereum_address(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[15] = logic::check_ethereum_address();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[15] = logic::self_test::check_ethereum_address();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bitcoin_priv(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[16] = logic::check_bitcoin_priv();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[16] = logic::self_test::check_bitcoin_priv();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bitcoin_pub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[17] = logic::check_bitcoin_pub();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[17] = logic::self_test::check_bitcoin_pub();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bitcoin_pkh(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[18] = logic::check_bitcoin_pkh();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[18] = logic::self_test::check_bitcoin_pkh();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bitcoin_encoded(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[19] = logic::check_bitcoin_encoded();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[19] = logic::self_test::check_bitcoin_encoded();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bitcoin_matches(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[20] = logic::check_bitcoin_matches();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[20] = logic::self_test::check_bitcoin_matches();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_wif_compressed_mainnet(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[21] = logic::check_wif_compressed_mainnet();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[21] = logic::self_test::check_wif_compressed_mainnet();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_wif_uncompressed_mainnet(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[22] = logic::check_wif_uncompressed_mainnet();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[22] = logic::self_test::check_wif_uncompressed_mainnet();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_wif_compressed_testnet(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[23] = logic::check_wif_compressed_testnet();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[23] = logic::self_test::check_wif_compressed_testnet();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_wif_uncompressed_testnet(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[24] = logic::check_wif_uncompressed_testnet();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[24] = logic::self_test::check_wif_uncompressed_testnet();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_shallenge_hash(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[25] = logic::check_shallenge_hash();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[25] = logic::self_test::check_shallenge_hash();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_shallenge_nonce_len(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[26] = logic::check_shallenge_nonce_len();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[26] = logic::self_test::check_shallenge_nonce_len();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_shallenge_is_better(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[27] = logic::check_shallenge_is_better();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[27] = logic::self_test::check_shallenge_is_better();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_compare_hashes_lt(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[28] = logic::check_compare_hashes_lt();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[28] = logic::self_test::check_compare_hashes_lt();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_compare_hashes_gt(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[29] = logic::check_compare_hashes_gt();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[29] = logic::self_test::check_compare_hashes_gt();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_compare_hashes_eq(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[30] = logic::check_compare_hashes_eq();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[30] = logic::self_test::check_compare_hashes_eq();
 }
 
 // Slots 31-40: raw-arithmetic bisect — one PTX op per kernel. Each
@@ -226,176 +226,176 @@ pub unsafe extern "C" fn kernel_self_test_compare_hashes_eq(results_ptr: *mut u3
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u32_div_var(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[31] = logic::check_arith_u32_div_var();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[31] = logic::self_test::check_arith_u32_div_var();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u32_div_const(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[32] = logic::check_arith_u32_div_const();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[32] = logic::self_test::check_arith_u32_div_const();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u64_div_var(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[33] = logic::check_arith_u64_div_var();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[33] = logic::self_test::check_arith_u64_div_var();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u64_div_const(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[34] = logic::check_arith_u64_div_const();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[34] = logic::self_test::check_arith_u64_div_const();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u32_rem_var(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[35] = logic::check_arith_u32_rem_var();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[35] = logic::self_test::check_arith_u32_rem_var();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u64_rem_var(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[36] = logic::check_arith_u64_rem_var();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[36] = logic::self_test::check_arith_u64_rem_var();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u32_mul_lo(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[37] = logic::check_arith_u32_mul_lo();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[37] = logic::self_test::check_arith_u32_mul_lo();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u64_mul_lo(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[38] = logic::check_arith_u64_mul_lo();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[38] = logic::self_test::check_arith_u64_mul_lo();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u64_mul_hi(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[39] = logic::check_arith_u64_mul_hi();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[39] = logic::self_test::check_arith_u64_mul_hi();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u128_mul(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[40] = logic::check_arith_u128_mul();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[40] = logic::self_test::check_arith_u128_mul();
 }
 
 // Slots 41-45: composed-primitive sub-bisects.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_var_len(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[41] = logic::check_base58_var_len();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[41] = logic::self_test::check_base58_var_len();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_var_len_leading_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[42] = logic::check_base58_var_len_leading_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[42] = logic::self_test::check_base58_var_len_leading_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_all_zeros(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[43] = logic::check_base58_all_zeros();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[43] = logic::self_test::check_base58_all_zeros();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_xoroshiro_base64_nonce(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[44] = logic::check_xoroshiro_base64_nonce();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[44] = logic::self_test::check_xoroshiro_base64_nonce();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_bech32_p2wpkh(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[45] = logic::check_bech32_p2wpkh();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[45] = logic::self_test::check_bech32_p2wpkh();
 }
 
 // Slots 46-56: tier-2 arithmetic bisect.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_overflowing_add(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[46] = logic::check_arith_overflowing_add();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[46] = logic::self_test::check_arith_overflowing_add();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_overflowing_sub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[47] = logic::check_arith_overflowing_sub();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[47] = logic::self_test::check_arith_overflowing_sub();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_carry_chain_3limb(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[48] = logic::check_arith_carry_chain_3limb();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[48] = logic::self_test::check_arith_carry_chain_3limb();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_widening_mul_pair(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[49] = logic::check_arith_widening_mul_pair();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[49] = logic::self_test::check_arith_widening_mul_pair();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_mad_lo_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[50] = logic::check_arith_mad_lo_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[50] = logic::self_test::check_arith_mad_lo_u64();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_mad_hi_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[51] = logic::check_arith_mad_hi_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[51] = logic::self_test::check_arith_mad_hi_u64();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_mul_wide_u32(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[52] = logic::check_arith_mul_wide_u32();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[52] = logic::self_test::check_arith_mul_wide_u32();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_mask_blend_true(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[53] = logic::check_arith_mask_blend_true();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[53] = logic::self_test::check_arith_mask_blend_true();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_mask_blend_false(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[54] = logic::check_arith_mask_blend_false();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[54] = logic::self_test::check_arith_mask_blend_false();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_var_shr_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[55] = logic::check_arith_var_shr_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[55] = logic::self_test::check_arith_var_shr_u64();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_var_shl_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[56] = logic::check_arith_var_shl_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[56] = logic::self_test::check_arith_var_shl_u64();
 }
 
 // Slots 57-58: black_box identity smoking-gun probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_blackbox_identity_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[57] = logic::check_arith_blackbox_identity_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[57] = logic::self_test::check_arith_blackbox_identity_u64();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_blackbox_identity_u32(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[58] = logic::check_arith_blackbox_identity_u32();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[58] = logic::self_test::check_arith_blackbox_identity_u32();
 }
 
 // Slot 59: isolated divmod-by-58 — confirms slot 41's crash is
@@ -403,8 +403,8 @@ pub unsafe extern "C" fn kernel_self_test_arith_blackbox_identity_u32(results_pt
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_div_by_58(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[59] = logic::check_base58_div_by_58();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[59] = logic::self_test::check_base58_div_by_58();
 }
 
 // Slots 60-62: triangulating bisects for the slot 41/43 crash class.
@@ -414,20 +414,20 @@ pub unsafe extern "C" fn kernel_self_test_base58_div_by_58(results_ptr: *mut u32
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_iter_static_table_lookup(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[60] = logic::check_iter_static_table_lookup();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[60] = logic::self_test::check_iter_static_table_lookup();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_iter_mut_slice_partial(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[61] = logic::check_iter_mut_slice_partial();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[61] = logic::self_test::check_iter_mut_slice_partial();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_iter_mut_alphabet_lookup(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[62] = logic::check_iter_mut_alphabet_lookup();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[62] = logic::self_test::check_iter_mut_alphabet_lookup();
 }
 
 // Slot 63: `&[u8]` slice counterpart to slot 60's `&[u8; N]` array
@@ -436,8 +436,8 @@ pub unsafe extern "C" fn kernel_self_test_iter_mut_alphabet_lookup(results_ptr: 
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_iter_static_slice_lookup(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[63] = logic::check_iter_static_slice_lookup();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[63] = logic::self_test::check_iter_static_slice_lookup();
 }
 
 // Slots 64-65: in-suite versions of the cuda-oxide standalone repros
@@ -447,14 +447,14 @@ pub unsafe extern "C" fn kernel_self_test_iter_static_slice_lookup(results_ptr: 
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_divrem_by_58_pow_5(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[64] = logic::check_arith_divrem_by_58_pow_5();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[64] = logic::self_test::check_arith_divrem_by_58_pow_5();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_i128_chain_add(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[65] = logic::check_arith_i128_chain_add();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[65] = logic::self_test::check_arith_i128_chain_add();
 }
 
 // Slots 66-68: ports of three cuda-oxide standalone-repro hypotheses
@@ -462,20 +462,20 @@ pub unsafe extern "C" fn kernel_self_test_arith_i128_chain_add(results_ptr: *mut
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_limb_divrem(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[66] = logic::check_base58_limb_divrem();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[66] = logic::self_test::check_base58_limb_divrem();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dynamic_index_write(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[67] = logic::check_dynamic_index_write();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[67] = logic::self_test::check_dynamic_index_write();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_widening_mul_chain_3term(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[68] = logic::check_arith_widening_mul_chain_3term();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[68] = logic::self_test::check_arith_widening_mul_chain_3term();
 }
 
 // Slot 69: base58 Phase A inner-mutate (the only outer-loop phase
@@ -484,48 +484,48 @@ pub unsafe extern "C" fn kernel_self_test_arith_widening_mul_chain_3term(results
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_inner_mutate_phase(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[69] = logic::check_base58_inner_mutate_phase();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[69] = logic::self_test::check_base58_inner_mutate_phase();
 }
 
 // Slots 70-72: curve25519-dalek per-stage bisect for slot 2.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_clamp_integer(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[70] = logic::check_dalek_clamp_integer();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[70] = logic::self_test::check_dalek_clamp_integer();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar_round_trip_one(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[71] = logic::check_dalek_scalar_round_trip_one();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[71] = logic::self_test::check_dalek_scalar_round_trip_one();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_mul_base_scalar_one(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[72] = logic::check_dalek_mul_base_scalar_one();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[72] = logic::self_test::check_dalek_mul_base_scalar_one();
 }
 
 // Slots 73-75: k256 per-stage bisect for slot 4.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_secret_from_bytes_one(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[73] = logic::check_k256_secret_from_bytes_one();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[73] = logic::self_test::check_k256_secret_from_bytes_one();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_derive_scalar_one(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[74] = logic::check_k256_derive_scalar_one();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[74] = logic::self_test::check_k256_derive_scalar_one();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_derive_scalar_two(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[75] = logic::check_k256_derive_scalar_two();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[75] = logic::self_test::check_k256_derive_scalar_two();
 }
 
 // Slots 76-77: unifying-hypothesis probes for the &'static multi-byte
@@ -533,82 +533,82 @@ pub unsafe extern "C" fn kernel_self_test_k256_derive_scalar_two(results_ptr: *m
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_static_u64_array_lookup(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[76] = logic::check_static_u64_array_lookup();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[76] = logic::self_test::check_static_u64_array_lookup();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_static_struct_wrapped_u64_lookup(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[77] = logic::check_static_struct_wrapped_u64_lookup();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[77] = logic::self_test::check_static_struct_wrapped_u64_lookup();
 }
 
 // Slots 78-80: k256 bug-triangulation probes (Bug B in KNOWN_FAILURES).
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_encode_generator(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[78] = logic::check_k256_encode_generator();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[78] = logic::self_test::check_k256_encode_generator();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_double_generator(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[79] = logic::check_k256_double_generator();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[79] = logic::self_test::check_k256_double_generator();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_scalar_one_round_trip(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[80] = logic::check_k256_scalar_one_round_trip();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[80] = logic::self_test::check_k256_scalar_one_round_trip();
 }
 
 // Slots 81-83: post-v1.46 re-bisect probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_arith_u128_imm_shr_52(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[81] = logic::check_arith_u128_imm_shr_52();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[81] = logic::self_test::check_arith_u128_imm_shr_52();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_static_depth4_newtype_nesting(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[82] = logic::check_static_depth4_newtype_nesting();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[82] = logic::self_test::check_static_depth4_newtype_nesting();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_reverse_range_write(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[83] = logic::check_reverse_range_write();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[83] = logic::self_test::check_reverse_range_write();
 }
 
 // Slots 84-87: dalek Scalar52 ladder bisect of slot 71's chain
-// (using a verbatim port in logic::bisect_scalar52 since dalek's
+// (using a verbatim port in logic/src/self_test/codegen.rs since dalek's
 // backend module is pub(crate)).
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_from_bytes(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[84] = logic::check_dalek_scalar52_from_bytes();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[84] = logic::self_test::check_dalek_scalar52_from_bytes();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_montgomery_reduce_r(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[85] = logic::check_dalek_scalar52_montgomery_reduce_r();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[85] = logic::self_test::check_dalek_scalar52_montgomery_reduce_r();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[86] = logic::check_dalek_scalar52_mul_internal_then_reduce_one_r();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[86] = logic::self_test::check_dalek_scalar52_mul_internal_then_reduce_one_r();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_as_bytes_one(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[87] = logic::check_dalek_scalar52_as_bytes_one();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[87] = logic::self_test::check_dalek_scalar52_as_bytes_one();
 }
 
 // Slots 88-90: Scalar52::sub probes added after slot 86 PASSed
@@ -616,20 +616,20 @@ pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_as_bytes_one(results_pt
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_sub_no_underflow(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[88] = logic::check_dalek_scalar52_sub_no_underflow();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[88] = logic::self_test::check_dalek_scalar52_sub_no_underflow();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_sub_with_underflow(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[89] = logic::check_dalek_scalar52_sub_with_underflow();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[89] = logic::self_test::check_dalek_scalar52_sub_with_underflow();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[90] = logic::check_dalek_scalar52_montgomery_reduce_with_sub();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[90] = logic::self_test::check_dalek_scalar52_montgomery_reduce_with_sub();
 }
 
 // Slots 91-93: post-round-2 probes (Index trait dispatch + cross-crate
@@ -637,20 +637,20 @@ pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_montgomery_reduce_with_
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_index_trait_dispatch(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[91] = logic::check_index_trait_dispatch();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[91] = logic::self_test::check_index_trait_dispatch();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar_one_to_bytes_direct(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[92] = logic::check_dalek_scalar_one_to_bytes_direct();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[92] = logic::self_test::check_dalek_scalar_one_to_bytes_direct();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_affine_generator_encode(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[93] = logic::check_k256_affine_generator_encode();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[93] = logic::self_test::check_k256_affine_generator_encode();
 }
 
 // Slots 94-96: Bug F bisect (subtle::Choice + ConditionallySelectable +
@@ -658,162 +658,162 @@ pub unsafe extern "C" fn kernel_self_test_k256_affine_generator_encode(results_p
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_subtle_choice_u8_into_bool(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[94] = logic::check_subtle_choice_u8_into_bool();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[94] = logic::self_test::check_subtle_choice_u8_into_bool();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_subtle_conditional_select_u64(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[95] = logic::check_subtle_conditional_select_u64();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[95] = logic::self_test::check_subtle_conditional_select_u64();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_k256_encoded_point_from_affine_coords(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[96] = logic::check_k256_encoded_point_from_affine_coords();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[96] = logic::self_test::check_k256_encoded_point_from_affine_coords();
 }
 
 // Slots 97-99: post-round-4 probes (const-idx Index trait + GenericArray).
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_index_trait_const_indices(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[97] = logic::check_index_trait_const_indices();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[97] = logic::self_test::check_index_trait_const_indices();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_generic_array_basic_index(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[98] = logic::check_generic_array_basic_index();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[98] = logic::self_test::check_generic_array_basic_index();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_generic_array_copy_from_slice(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[99] = logic::check_generic_array_copy_from_slice();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[99] = logic::self_test::check_generic_array_copy_from_slice();
 }
 
 // Slots 100-102: post-round-5 probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_from_affine_coords_replica(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[100] = logic::check_from_affine_coords_replica();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[100] = logic::self_test::check_from_affine_coords_replica();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_generic_array_as_slice_last(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[101] = logic::check_generic_array_as_slice_last();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[101] = logic::self_test::check_generic_array_as_slice_last();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar_round_trip_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[102] = logic::check_dalek_scalar_round_trip_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[102] = logic::self_test::check_dalek_scalar_round_trip_zero();
 }
 
 // Slots 103-105: one fresh probe per open bug (Bug-71, Bug-96, Bug-41).
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar_from_bytes_wide_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[103] = logic::check_dalek_scalar_from_bytes_wide_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[103] = logic::self_test::check_dalek_scalar_from_bytes_wide_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_field_bytes_into_conversion(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[104] = logic::check_field_bytes_into_conversion();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[104] = logic::self_test::check_field_bytes_into_conversion();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_min_nonzero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[105] = logic::check_base58_min_nonzero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[105] = logic::self_test::check_base58_min_nonzero();
 }
 
 // Slots 106-107: breakthrough probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_named_field_struct_return(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[106] = logic::check_named_field_struct_return();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[106] = logic::self_test::check_named_field_struct_return();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_base58_handrolled_no_seq(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[107] = logic::check_base58_handrolled_no_seq();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[107] = logic::self_test::check_base58_handrolled_no_seq();
 }
 
 // Slots 108-109: post-round-7 probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_slice_reverse_partial(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[108] = logic::check_slice_reverse_partial();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[108] = logic::self_test::check_slice_reverse_partial();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar_eq_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[109] = logic::check_dalek_scalar_eq_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[109] = logic::self_test::check_dalek_scalar_eq_zero();
 }
 
 // Slots 110-112: post-round-8 probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_generic_array_copy_from_ga_source(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[110] = logic::check_generic_array_copy_from_ga_source();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[110] = logic::self_test::check_generic_array_copy_from_ga_source();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_zero_eq_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[111] = logic::check_dalek_zero_eq_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[111] = logic::self_test::check_dalek_zero_eq_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_from_canonical_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[112] = logic::check_dalek_from_canonical_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[112] = logic::self_test::check_dalek_from_canonical_zero();
 }
 
 // Slots 113-115: post-round-9 zero-input verbatim-port ladder.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_from_bytes_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[113] = logic::check_dalek_scalar52_from_bytes_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[113] = logic::self_test::check_dalek_scalar52_from_bytes_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_mul_internal_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[114] = logic::check_dalek_scalar52_mul_internal_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[114] = logic::self_test::check_dalek_scalar52_mul_internal_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_montgomery_reduce_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[115] = logic::check_dalek_scalar52_montgomery_reduce_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[115] = logic::self_test::check_dalek_scalar52_montgomery_reduce_zero();
 }
 
 // Slots 116-117: post-round-10 probes.
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_scalar52_as_bytes_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[116] = logic::check_dalek_scalar52_as_bytes_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[116] = logic::self_test::check_dalek_scalar52_as_bytes_zero();
 }
 #[kernel]
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_self_test_dalek_reduce_pipeline_zero(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[117] = logic::check_dalek_reduce_pipeline_zero();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[117] = logic::self_test::check_dalek_reduce_pipeline_zero();
 }
 
 /// p256 public key: hmac derivation.
@@ -822,8 +822,8 @@ pub unsafe extern "C" fn kernel_self_test_dalek_reduce_pipeline_zero(results_ptr
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_hmac_derivation(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[118] = logic::check_p256_public_key_hmac_derivation();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[118] = logic::self_test::check_p256_public_key_hmac_derivation();
 }
 
 /// p256 public key: scalar derivation.
@@ -832,8 +832,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_hmac_derivation(result
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_scalar_derivation(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[119] = logic::check_p256_public_key_scalar_derivation();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[119] = logic::self_test::check_p256_public_key_scalar_derivation();
 }
 
 /// p256 public key: generator.
@@ -842,8 +842,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_scalar_derivation(resu
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_generator(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[120] = logic::check_p256_public_key_generator();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[120] = logic::self_test::check_p256_public_key_generator();
 }
 
 /// p256 public key: point double.
@@ -852,8 +852,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_generator(results_ptr:
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_point_double(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[121] = logic::check_p256_public_key_point_double();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[121] = logic::self_test::check_p256_public_key_point_double();
 }
 
 /// p256 public key: zero scalar rejected.
@@ -864,8 +864,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_zero_scalar_rejected(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[122] = logic::check_p256_public_key_zero_scalar_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[122] = logic::self_test::check_p256_public_key_zero_scalar_rejected();
 }
 
 /// p256 public key: order scalar rejected.
@@ -876,8 +876,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_order_scalar_rejected(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[123] = logic::check_p256_public_key_order_scalar_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[123] = logic::self_test::check_p256_public_key_order_scalar_rejected();
 }
 
 /// p256 public key: x encoding.
@@ -886,8 +886,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_order_scalar_rejected(
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_x_encoding(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[124] = logic::check_p256_public_key_x_encoding();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[124] = logic::self_test::check_p256_public_key_x_encoding();
 }
 
 /// p256 public key: y encoding.
@@ -896,8 +896,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_x_encoding(results_ptr
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_key_y_encoding(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[125] = logic::check_p256_public_key_y_encoding();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[125] = logic::self_test::check_p256_public_key_y_encoding();
 }
 
 /// p256 signature: rfc6979 sample.
@@ -906,8 +906,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key_y_encoding(results_ptr
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_sample(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[126] = logic::check_p256_signature_rfc6979_sample();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[126] = logic::self_test::check_p256_signature_rfc6979_sample();
 }
 
 /// p256 signature: rfc6979 test.
@@ -916,8 +916,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_sample(results_
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_test(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[127] = logic::check_p256_signature_rfc6979_test();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[127] = logic::self_test::check_p256_signature_rfc6979_test();
 }
 
 /// p256 signature: ephemeral r.
@@ -926,8 +926,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_test(results_pt
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_r(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[128] = logic::check_p256_signature_ephemeral_r();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[128] = logic::self_test::check_p256_signature_ephemeral_r();
 }
 
 /// p256 signature: ephemeral signature.
@@ -938,8 +938,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_signature(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[129] = logic::check_p256_signature_ephemeral_signature();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[129] = logic::self_test::check_p256_signature_ephemeral_signature();
 }
 
 /// p256 signature: zero nonce rejected.
@@ -950,8 +950,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_zero_nonce_rejected(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[130] = logic::check_p256_signature_zero_nonce_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[130] = logic::self_test::check_p256_signature_zero_nonce_rejected();
 }
 
 /// p256 signature: low s.
@@ -960,8 +960,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_zero_nonce_rejected(
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_low_s(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[131] = logic::check_p256_signature_low_s();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[131] = logic::self_test::check_p256_signature_low_s();
 }
 
 /// p256 signature: high s.
@@ -970,8 +970,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_low_s(results_ptr: *mut
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_high_s(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[132] = logic::check_p256_signature_high_s();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[132] = logic::self_test::check_p256_signature_high_s();
 }
 
 /// p256 signature: message window carry.
@@ -982,8 +982,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_message_window_carry(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[133] = logic::check_p256_signature_message_window_carry();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[133] = logic::self_test::check_p256_signature_message_window_carry();
 }
 
 /// p256 signature: ephemeral hmac.
@@ -992,8 +992,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_message_window_carry(
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_hmac(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[134] = logic::check_p256_signature_ephemeral_hmac();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[134] = logic::self_test::check_p256_signature_ephemeral_hmac();
 }
 
 /// rsa pss: sha256.
@@ -1002,8 +1002,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_hmac(results_
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_sha256(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[135] = logic::check_rsa_pss_sha256();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[135] = logic::self_test::check_rsa_pss_sha256();
 }
 
 /// rsa pss: mgf1 partial block.
@@ -1012,8 +1012,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_sha256(results_ptr: *mut u32) 
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_mgf1_partial_block(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[136] = logic::check_rsa_pss_mgf1_partial_block();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[136] = logic::self_test::check_rsa_pss_mgf1_partial_block();
 }
 
 /// rsa pss: salt32 encoding.
@@ -1022,8 +1022,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_mgf1_partial_block(results_ptr
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt32_encoding(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[137] = logic::check_rsa_pss_salt32_encoding();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[137] = logic::self_test::check_rsa_pss_salt32_encoding();
 }
 
 /// rsa pss: empty salt encoding.
@@ -1032,8 +1032,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt32_encoding(results_ptr: *
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_empty_salt_encoding(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[138] = logic::check_rsa_pss_empty_salt_encoding();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[138] = logic::self_test::check_rsa_pss_empty_salt_encoding();
 }
 
 /// rsa pss: maximum salt encoding.
@@ -1042,8 +1042,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_empty_salt_encoding(results_pt
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_maximum_salt_encoding(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[139] = logic::check_rsa_pss_maximum_salt_encoding();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[139] = logic::self_test::check_rsa_pss_maximum_salt_encoding();
 }
 
 /// rsa pss: oversized salt rejected.
@@ -1052,8 +1052,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_maximum_salt_encoding(results_
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_oversized_salt_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[140] = logic::check_rsa_pss_oversized_salt_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[140] = logic::self_test::check_rsa_pss_oversized_salt_rejected();
 }
 
 /// rsa pss: salt carry.
@@ -1062,8 +1062,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_oversized_salt_rejected(result
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt_carry(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[141] = logic::check_rsa_pss_salt_carry();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[141] = logic::self_test::check_rsa_pss_salt_carry();
 }
 
 /// rsa pss: crt known answer.
@@ -1072,8 +1072,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt_carry(results_ptr: *mut u
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_known_answer(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[142] = logic::check_rsa_pss_crt_known_answer();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[142] = logic::self_test::check_rsa_pss_crt_known_answer();
 }
 
 /// rsa pss: crt fault rejected.
@@ -1082,8 +1082,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_known_answer(results_ptr: 
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_fault_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[143] = logic::check_rsa_pss_crt_fault_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[143] = logic::self_test::check_rsa_pss_crt_fault_rejected();
 }
 
 /// rsa pss: crt modulus rejected.
@@ -1092,8 +1092,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_fault_rejected(results_ptr
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_modulus_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[144] = logic::check_rsa_pss_crt_modulus_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[144] = logic::self_test::check_rsa_pss_crt_modulus_rejected();
 }
 
 /// rsa modulus: multiplication carry.
@@ -1102,8 +1102,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_modulus_rejected(results_p
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_multiplication_carry(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[145] = logic::check_rsa_modulus_multiplication_carry();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[145] = logic::self_test::check_rsa_modulus_multiplication_carry();
 }
 
 /// rsa modulus: progression carry.
@@ -1112,8 +1112,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_multiplication_carry(resul
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_progression_carry(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[146] = logic::check_rsa_modulus_progression_carry();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[146] = logic::self_test::check_rsa_modulus_progression_carry();
 }
 
 /// rsa modulus: prime filter.
@@ -1122,8 +1122,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_progression_carry(results_
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_prime_filter(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[147] = logic::check_rsa_modulus_prime_filter();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[147] = logic::self_test::check_rsa_modulus_prime_filter();
 }
 
 /// rsa modulus: pseudoprime rejected.
@@ -1132,8 +1132,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_prime_filter(results_ptr: 
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_pseudoprime_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[148] = logic::check_rsa_modulus_pseudoprime_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[148] = logic::self_test::check_rsa_modulus_pseudoprime_rejected();
 }
 
 /// rsa modulus: zero stride rejected.
@@ -1142,8 +1142,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_pseudoprime_rejected(resul
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_zero_stride_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[149] = logic::check_rsa_modulus_zero_stride_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[149] = logic::self_test::check_rsa_modulus_zero_stride_rejected();
 }
 
 /// rsa modulus: upper bound rejected.
@@ -1152,8 +1152,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_zero_stride_rejected(resul
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_upper_bound_rejected(results_ptr: *mut u32) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[150] = logic::check_rsa_modulus_upper_bound_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[150] = logic::self_test::check_rsa_modulus_upper_bound_rejected();
 }
 
 /// rsa modulus: equal factors rejected.
@@ -1164,8 +1164,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_equal_factors_rejected(
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[151] = logic::check_rsa_modulus_equal_factors_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[151] = logic::self_test::check_rsa_modulus_equal_factors_rejected();
 }
 
 /// rsa modulus: undersized factor rejected.
@@ -1176,8 +1176,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_undersized_factor_rejected
     results_ptr: *mut u32,
 ) {
     let results =
-        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[152] = logic::check_rsa_modulus_undersized_factor_rejected();
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[152] = logic::self_test::check_rsa_modulus_undersized_factor_rejected();
 }
 
 /// Full p256 public candidate pipeline regression, slot 153.
@@ -1185,8 +1185,8 @@ pub unsafe extern "C" fn kernel_self_test_rsa_modulus_undersized_factor_rejected
 /// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_public_end_to_end(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[153] = logic::check_p256_public_end_to_end();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[153] = logic::self_test::check_p256_public_end_to_end();
 }
 
 /// Full p256 signature candidate pipeline regression, slot 154.
@@ -1194,8 +1194,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_end_to_end(results_ptr: *m
 /// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_p256_signature_end_to_end(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[154] = logic::check_p256_signature_end_to_end();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[154] = logic::self_test::check_p256_signature_end_to_end();
 }
 
 /// Full rsa pss candidate pipeline regression, slot 155.
@@ -1203,8 +1203,8 @@ pub unsafe extern "C" fn kernel_self_test_p256_signature_end_to_end(results_ptr:
 /// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_pss_end_to_end(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[155] = logic::check_rsa_pss_end_to_end();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[155] = logic::self_test::check_rsa_pss_end_to_end();
 }
 
 /// Full rsa modulus candidate pipeline regression, slot 156.
@@ -1212,6 +1212,6 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss_end_to_end(results_ptr: *mut u
 /// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
 #[kernel]
 pub unsafe extern "C" fn kernel_self_test_rsa_modulus_end_to_end(results_ptr: *mut u32) {
-    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
-    results[156] = logic::check_rsa_modulus_end_to_end();
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS) };
+    results[156] = logic::self_test::check_rsa_modulus_end_to_end();
 }

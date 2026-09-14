@@ -26,14 +26,15 @@ pub mod cpu {
         while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             let rng_seed: u64 = rng.r#gen();
 
-            let request = logic::EthereumVanityKeyRequest {
+            let request = logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
                 prefix: &data.prefix_bytes,
                 suffix: &data.suffix_bytes,
                 thread_idx: thread_id,
                 rng_seed,
             };
 
-            let result = logic::generate_and_check_ethereum_vanity_key(&request);
+            let result =
+                logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(&request);
 
             data.global_stats.add_launch(1);
 

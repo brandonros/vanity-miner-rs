@@ -1,7 +1,7 @@
 use seq_macro::seq;
 
-use crate::sha256;
-use crate::xoroshiro;
+use crate::crypto::sha256;
+use crate::search::xoroshiro;
 
 /// Total preimage size fed to sha256: `username || '/' || nonce`.
 pub const PREIMAGE_LEN: usize = 32;
@@ -43,18 +43,18 @@ pub fn compare_hashes(a: &[u8; 32], b: &[u8; 32]) -> i32 {
 pub fn shallenge(username: &[u8], username_len: usize, nonce: &[u8], nonce_len: usize) -> [u8; 32] {
     let mut input = [0u8; 32];
     let mut pos = 0;
-    
+
     // Copy username
     input[pos..pos + username_len].copy_from_slice(&username[..username_len]);
     pos += username_len;
-    
+
     // Add separator '/'
     input[pos] = b'/';
     pos += 1;
-    
+
     // Copy nonce
     input[pos..pos + nonce_len].copy_from_slice(&nonce[..nonce_len]);
-    
+
     // Hash only the used portion
     sha256::sha256_32_from_bytes(&input)
 }
@@ -64,7 +64,7 @@ pub fn test_nonce(
     rng_seed: u64,
     username: &[u8],
     username_len: usize,
-    target_hash: &[u8; 32]
+    target_hash: &[u8; 32],
 ) -> i32 {
     let nonce_len = shallenge_nonce_len(username_len);
     let mut nonce = [0u8; MAX_NONCE_LEN];
@@ -76,7 +76,11 @@ pub fn test_nonce(
 pub fn generate_and_check_shallenge(request: &ShallengeRequest) -> ShallengeResult {
     let nonce_len = shallenge_nonce_len(request.username_len);
     let mut nonce = [0u8; MAX_NONCE_LEN];
-    xoroshiro::generate_base64_nonce(request.thread_idx, request.rng_seed, &mut nonce[..nonce_len]);
+    xoroshiro::generate_base64_nonce(
+        request.thread_idx,
+        request.rng_seed,
+        &mut nonce[..nonce_len],
+    );
 
     let hash = shallenge(request.username, request.username_len, &nonce, nonce_len);
     let is_better = compare_hashes(&hash, request.target_hash) < 0;
@@ -101,14 +105,26 @@ mod tests {
         let username: [u8; 10] = "brandonros".as_bytes().try_into().unwrap();
         let nonce: [u8; 21] = "000000000000000000000".as_bytes().try_into().unwrap();
         let result = shallenge(&username, 10, &nonce, 21);
-        let expected: [u8; 32] = hex::decode("f7a41dae1196282f0a544a8c7f1bbf61bda79307dc424c0d9febd27b08e1bf78").unwrap().try_into().unwrap();
+        let expected: [u8; 32] =
+            hex::decode("f7a41dae1196282f0a544a8c7f1bbf61bda79307dc424c0d9febd27b08e1bf78")
+                .unwrap()
+                .try_into()
+                .unwrap();
         assert_eq!(result, expected);
     }
 
     #[test]
     fn test_compare_hashes() {
-        let better: [u8; 32] = hex::decode("0000000000000004340F267BA07B90AED63F69DA590F155C140E7CD9786D65DE").unwrap().try_into().unwrap();
-        let worse: [u8; 32] = hex::decode("0000000000000038D5CDE5593531FD567B5F15562811C50FC2A45E5F2A458A65").unwrap().try_into().unwrap();
+        let better: [u8; 32] =
+            hex::decode("0000000000000004340F267BA07B90AED63F69DA590F155C140E7CD9786D65DE")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let worse: [u8; 32] =
+            hex::decode("0000000000000038D5CDE5593531FD567B5F15562811C50FC2A45E5F2A458A65")
+                .unwrap()
+                .try_into()
+                .unwrap();
         assert_eq!(compare_hashes(&better, &worse), -1);
         assert_eq!(compare_hashes(&worse, &better), 1);
         assert_eq!(compare_hashes(&better, &better), 0);
@@ -124,10 +140,17 @@ mod tests {
     #[test]
     fn test_test_nonce_returns_comparison_against_target() {
         let (thread_idx, rng_seed, username) = shallenge_kat_inputs();
-        let expected_hash: [u8; 32] = hex::decode("c3750f8711bf809f46de1f01eceb6f4e6fde670ad8a3e2a600a0e0b7357654c9").unwrap().try_into().unwrap();
+        let expected_hash: [u8; 32] =
+            hex::decode("c3750f8711bf809f46de1f01eceb6f4e6fde670ad8a3e2a600a0e0b7357654c9")
+                .unwrap()
+                .try_into()
+                .unwrap();
 
         // Equal target → 0
-        assert_eq!(test_nonce(thread_idx, rng_seed, &username, 10, &expected_hash), 0);
+        assert_eq!(
+            test_nonce(thread_idx, rng_seed, &username, 10, &expected_hash),
+            0
+        );
         // Target all-1s (max) → derived hash is smaller → -1
         let max = [0xffu8; 32];
         assert_eq!(test_nonce(thread_idx, rng_seed, &username, 10, &max), -1);
@@ -139,7 +162,11 @@ mod tests {
     #[test]
     fn test_generate_and_check_shallenge_end_to_end() {
         let (thread_idx, rng_seed, username) = shallenge_kat_inputs();
-        let expected_hash: [u8; 32] = hex::decode("c3750f8711bf809f46de1f01eceb6f4e6fde670ad8a3e2a600a0e0b7357654c9").unwrap().try_into().unwrap();
+        let expected_hash: [u8; 32] =
+            hex::decode("c3750f8711bf809f46de1f01eceb6f4e6fde670ad8a3e2a600a0e0b7357654c9")
+                .unwrap()
+                .try_into()
+                .unwrap();
         let max = [0xffu8; 32];
 
         let request = ShallengeRequest {
@@ -193,12 +220,18 @@ mod tests {
             preimage.extend_from_slice(&result.nonce[..result.nonce_len]);
             assert_eq!(preimage.len(), 32);
             // Cross-check the fixed-size pipeline with the variable-length hash path.
-            assert_eq!(result.hash, crate::sha256_from_bytes(&preimage));
-            assert_eq!(test_nonce(0, 12345, username, username.len(), &result.hash), 0);
+            assert_eq!(
+                result.hash,
+                crate::crypto::sha256::sha256_from_bytes(&preimage)
+            );
+            assert_eq!(
+                test_nonce(0, 12345, username, username.len(), &result.hash),
+                0
+            );
             assert!(result.is_better);
-            assert!(result.nonce[..result.nonce_len].iter().all(|b|
-                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".contains(b)));
+            assert!(result.nonce[..result.nonce_len].iter().all(|b| {
+                b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".contains(b)
+            }));
         }
     }
-
 }

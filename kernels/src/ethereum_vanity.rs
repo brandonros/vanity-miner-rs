@@ -29,7 +29,7 @@ pub unsafe extern "C" fn kernel_find_ethereum_vanity_private_key(
     } else {
         unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) }
     };
-    let request = logic::EthereumVanityKeyRequest {
+    let request = logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
         prefix: vanity_prefix,
         suffix: vanity_suffix,
         thread_idx,
@@ -37,7 +37,7 @@ pub unsafe extern "C" fn kernel_find_ethereum_vanity_private_key(
     };
     
     // Call pure business logic
-    let result = logic::generate_and_check_ethereum_vanity_key(&request);
+    let result = logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(&request);
     
     // Handle result (adapter layer)
     if result.matches {

@@ -1,9 +1,9 @@
 //! CUDA entry point for rsa-modulus: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
-    candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
-    rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus},
+    search::candidate_result::{BatchResult, CandidateResult},
+    search::hex_pattern::HexPattern,
+    modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus},
 };
 
 /// # Safety

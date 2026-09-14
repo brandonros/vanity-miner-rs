@@ -1,6 +1,6 @@
 //! Candidate evaluation and CUDA request layout for p256-public-key.
 //! Owners must clear secret records after synchronized device use.
-use crate::{candidate_result::CandidateResult, hex_pattern::HexPattern};
+use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -18,8 +18,8 @@ pub fn p256_public(
     pattern: &HexPattern,
 ) -> CandidateResult {
     use crate::{
-        crypto_search::{CandidateDeriver, CandidateDomain},
-        p256_vanity::{PublicTarget, candidate_scalar, public_point},
+        crypto::p256_vanity::{PublicTarget, candidate_scalar, public_point},
+        search::crypto_search::{CandidateDeriver, CandidateDomain},
     };
     let target = match request.target {
         0 => PublicTarget::X,

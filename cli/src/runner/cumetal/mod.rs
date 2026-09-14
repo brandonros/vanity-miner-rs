@@ -41,7 +41,7 @@ pub struct CumetalOptions {
     #[arg(long, global = true)]
     pub verify: bool,
     /// Run only selected self-test slots (repeatable); omitted runs all slots.
-    #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..logic::SELF_TEST_NUM_CHECKS as i64))]
+    #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..logic::self_test::SELF_TEST_NUM_CHECKS as i64))]
     pub self_test_slot: Vec<u32>,
 }
 
@@ -233,13 +233,14 @@ mod input_tests {
             suffix: "279A".into(),
         };
         let (prefix, suffix) = inputs(&command).unwrap();
-        let candidate =
-            logic::generate_and_check_ethereum_vanity_key(&logic::EthereumVanityKeyRequest {
+        let candidate = logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(
+            &logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
                 prefix: &prefix,
                 suffix: &suffix,
                 thread_idx: 0,
                 rng_seed: 1,
-            });
+            },
+        );
         assert_eq!(
             hex::encode(candidate.address),
             "539571f1569bfcb63397630dd2e7765555ae279a"
@@ -265,13 +266,15 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
             let target: [u8; 32] = second
                 .try_into()
                 .map_err(|_| "target must contain 32 bytes")?;
-            let r = logic::generate_and_check_shallenge(&logic::ShallengeRequest {
-                username: &first,
-                username_len: first.len(),
-                target_hash: &target,
-                thread_idx: index,
-                rng_seed: seed,
-            });
+            let r = logic::modes::shallenge::generate_and_check_shallenge(
+                &logic::modes::shallenge::ShallengeRequest {
+                    username: &first,
+                    username_len: first.len(),
+                    target_hash: &target,
+                    thread_idx: index,
+                    rng_seed: seed,
+                },
+            );
             Expected {
                 matched: r.is_better,
                 payloads: vec![
@@ -283,12 +286,14 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
         }
         #[cfg(feature = "solana")]
         Command::SolanaVanity { .. } => {
-            let r = logic::generate_and_check_solana_vanity_key(&logic::SolanaVanityKeyRequest {
-                prefix: &first,
-                suffix: &second,
-                thread_idx: index,
-                rng_seed: seed,
-            });
+            let r = logic::modes::solana_vanity::generate_and_check_solana_vanity_key(
+                &logic::modes::solana_vanity::SolanaVanityKeyRequest {
+                    prefix: &first,
+                    suffix: &second,
+                    thread_idx: index,
+                    rng_seed: seed,
+                },
+            );
             Expected {
                 matched: r.matches,
                 payloads: vec![
@@ -300,13 +305,14 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
         }
         #[cfg(feature = "ethereum")]
         Command::EthereumVanity { .. } => {
-            let r =
-                logic::generate_and_check_ethereum_vanity_key(&logic::EthereumVanityKeyRequest {
+            let r = logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(
+                &logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
                     prefix: &first,
                     suffix: &second,
                     thread_idx: index,
                     rng_seed: seed,
-                });
+                },
+            );
             Expected {
                 matched: r.matches,
                 payloads: vec![
@@ -318,12 +324,14 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
         }
         #[cfg(feature = "bitcoin")]
         Command::BitcoinVanity { .. } => {
-            let r = logic::generate_and_check_bitcoin_vanity_key(&logic::BitcoinVanityKeyRequest {
-                prefix: &first,
-                suffix: &second,
-                thread_idx: index,
-                rng_seed: seed,
-            });
+            let r = logic::modes::bitcoin_vanity::generate_and_check_bitcoin_vanity_key(
+                &logic::modes::bitcoin_vanity::BitcoinVanityKeyRequest {
+                    prefix: &first,
+                    suffix: &second,
+                    thread_idx: index,
+                    rng_seed: seed,
+                },
+            );
             let mut encoded = vec![0xa5; 64];
             encoded[..r.encoded_len].copy_from_slice(&r.encoded_public_key[..r.encoded_len]);
             Expected {
@@ -488,7 +496,9 @@ impl CumetalRunner {
         use vanity_miner::self_test_suite::{self, Outcome};
         self_test_suite::run("CuMetal", |case| {
             if let Some(slot) = case.slot {
-                if !self.options.self_test_slot.is_empty() && !self.options.self_test_slot.contains(&(slot as u32)) {
+                if !self.options.self_test_slot.is_empty()
+                    && !self.options.self_test_slot.contains(&(slot as u32))
+                {
                     return Ok(Outcome::Skipped("not selected"));
                 }
             }
@@ -496,19 +506,26 @@ impl CumetalRunner {
             let name = case.kernel;
             let operation = (|| -> Result<(), Error> {
                 let module = self.module(driver, name)?;
-                let result = driver.buffer(&vec![0xa5; logic::SELF_TEST_NUM_CHECKS * 4])?;
+                let result =
+                    driver.buffer(&vec![0xa5; logic::self_test::SELF_TEST_NUM_CHECKS * 4])?;
                 module.launch(&mut [result.pointer()], 1, 1)?;
                 let bytes = result.read()?;
                 for (index, word) in bytes.chunks_exact(4).enumerate() {
                     let value = u32::from_le_bytes(word.try_into().unwrap());
                     let expected = if index == slot { 1 } else { 0xa5a5a5a5 };
-                    if value != expected { return Err(format!("{name}: slot {index}: got {value}, expected {expected}").into()); }
+                    if value != expected {
+                        return Err(format!(
+                            "{name}: slot {index}: got {value}, expected {expected}"
+                        )
+                        .into());
+                    }
                 }
                 println!("NUMERICAL_PASS kernel={name} slot={slot}; other slots and guards intact");
                 Ok(())
             })();
             operation.map_err(|e| e.to_string())?;
             Ok(Outcome::Passed)
-        }).map_err(Into::into)
+        })
+        .map_err(Into::into)
     }
 }

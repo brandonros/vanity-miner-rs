@@ -2,7 +2,7 @@ use cuda_std::prelude::*;
 
 /// Handle the infrastructure concerns when a better hash is found
 unsafe fn handle_shallenge_match_found(
-    result: logic::ShallengeResult,
+    result: logic::modes::shallenge::ShallengeResult,
     thread_idx: usize,
     found_matches_slice_ptr: *mut u32,
     found_hash_ptr: *mut u8,
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
     let target_hash_slice = unsafe { core::slice::from_raw_parts(target_hash_ptr, 32) };
     let target_hash: &[u8; 32] = unsafe { &*(target_hash_slice.as_ptr() as *const [u8; 32]) };
     
-    let request = logic::ShallengeRequest {
+    let request = logic::modes::shallenge::ShallengeRequest {
         username,
         username_len,
         target_hash,
@@ -55,7 +55,7 @@ pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
     };
     
     // Call pure business logic
-    let result = logic::generate_and_check_shallenge(&request);
+    let result = logic::modes::shallenge::generate_and_check_shallenge(&request);
     
     // Handle result (adapter layer)
     if result.is_better {

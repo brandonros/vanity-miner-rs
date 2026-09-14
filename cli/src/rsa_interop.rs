@@ -1,6 +1,6 @@
 //! Independent host tests for shared fixed-width RSA arithmetic.
 
-use logic::{rsa_crt::Rsa2048Crt, rsa_pss::encode_sha256};
+use logic::{crypto::rsa_crt::Rsa2048Crt, crypto::rsa_pss::encode_sha256};
 use rand::{RngCore, rngs::OsRng};
 use rsa::{
     BigUint, Pss, RsaPrivateKey, RsaPublicKey,

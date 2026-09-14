@@ -155,7 +155,7 @@ impl Runner for GpuRunner {
                     stats.clone(),
                     "candidates",
                     |control| {
-                        self.run_devices(command, stats, control.clone())
+                        self.run_devices(command, stats.clone(), control.clone())
                             .map_err(|e| e.to_string())?;
                         Ok(control.has_winner())
                     },
