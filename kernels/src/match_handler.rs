@@ -18,8 +18,10 @@ macro_rules! handle_match {
     ) => {{
         // Claim the slot before writing so only one matching thread copies results.
         // The host must synchronize the kernel before reading the counter or payload.
-        if unsafe { $crate::atomic::atomic_add_u32($found_matches_ptr, 1) } == 0 {
-            handle_match!(@copies $($copy)*);
+        if unsafe { cuda_std::atomic::mid::atomic_fetch_add_u32_device(
+            $found_matches_ptr, core::sync::atomic::Ordering::Relaxed, 1,
+        ) } == 0 {
+            $crate::handle_match!(@copies $($copy)*);
 
             let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut($found_thread_idx_ptr, 1) };
             found_thread_idx_slice[0] = $thread_idx as u32;
@@ -30,21 +32,21 @@ macro_rules! handle_match {
     (@copies $src:expr => $dst_ptr:expr, $len:expr ; $($rest:tt)*) => {
         let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, $len) };
         dst.copy_from_slice(&$src);
-        handle_match!(@copies $($rest)*);
+        $crate::handle_match!(@copies $($rest)*);
     };
 
     // Partial slice copy: partial: src, dyn_len => ptr, max_len;
     (@copies partial: $src:expr, $dyn_len:expr => $dst_ptr:expr, $max_len:expr ; $($rest:tt)*) => {
         let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, $max_len) };
         dst[..$dyn_len].copy_from_slice(&$src[..$dyn_len]);
-        handle_match!(@copies $($rest)*);
+        $crate::handle_match!(@copies $($rest)*);
     };
 
     // Scalar assignment: scalar: value => ptr;
     (@copies scalar: $value:expr => $dst_ptr:expr ; $($rest:tt)*) => {
         let dst = unsafe { core::slice::from_raw_parts_mut($dst_ptr, 1) };
         dst[0] = $value;
-        handle_match!(@copies $($rest)*);
+        $crate::handle_match!(@copies $($rest)*);
     };
 
     // Base case - no more copies

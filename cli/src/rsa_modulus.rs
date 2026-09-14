@@ -243,19 +243,11 @@ fn construct_device(
                 start,
                 64,
             )?);
-            if results.len() != 64 {
-                return Err("device returned incorrect RSA lane count".into());
-            }
+            let winner = results.winner(64)?;
             control.add_tested(64);
-            for (lane, result) in results.iter().enumerate() {
+            if let Some((lane, result)) = winner {
                 if control.stopped() {
                     return Ok(None);
-                }
-                if result.status == 0 {
-                    continue;
-                }
-                if result.status != 1 {
-                    return Err("device RSA modulus evaluation failed".into());
                 }
                 let q = Zeroizing::new(
                     &*first + BigUint::from(start + lane as u64) * &progression.stride,
@@ -491,4 +483,4 @@ pub type EvaluateBatch<'a> = dyn FnMut(
     &[u8],
     u64,
     u32,
-) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;
+) -> Result<logic::candidate_result::BatchResult, String> + 'a;

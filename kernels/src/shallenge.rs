@@ -1,4 +1,3 @@
-use crate::utilities;
 use cuda_std::prelude::*;
 
 /// Handle the infrastructure concerns when a better hash is found
@@ -42,7 +41,7 @@ pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // Prepare request
-    let thread_idx = utilities::get_thread_idx();
+    let thread_idx = cuda_std::thread::index() as usize;
     let username = unsafe { core::slice::from_raw_parts(username_ptr, username_len) };
     let target_hash_slice = unsafe { core::slice::from_raw_parts(target_hash_ptr, 32) };
     let target_hash: &[u8; 32] = unsafe { &*(target_hash_slice.as_ptr() as *const [u8; 32]) };

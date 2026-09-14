@@ -1,4 +1,3 @@
-use crate::utilities;
 use cuda_std::prelude::*;
 
 #[kernel]
@@ -18,7 +17,7 @@ pub unsafe extern "C" fn kernel_find_ethereum_vanity_private_key(
     found_thread_idx_slice_ptr: *mut u32,
 ) {
     // Prepare request
-    let thread_idx = utilities::get_thread_idx();
+    let thread_idx = cuda_std::thread::index() as usize;
     // Empty device buffers may have null pointers, which cannot back Rust slices.
     let vanity_prefix = if vanity_prefix_len == 0 {
         &[]

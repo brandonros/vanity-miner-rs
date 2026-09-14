@@ -1,12 +1,13 @@
 //! Bounded batching, cancellation, and verified winner selection.
 use crate::search_control::SearchControl;
-use logic::candidate_result::CandidateResult;
+use logic::candidate_result::{BatchResult, CandidateResult};
 use zeroize::Zeroizing;
 
-/// Every candidate is reconstructed and verified before reserving the one output
-/// slot. Fixed batches make cancellation observable between launches.
+/// Verify the GPU-selected winner before claiming the output. Rejected winners
+/// discard the rest of that batch, matching the original shared-winner protocol.
+/// Fixed batches make cancellation observable between launches.
 pub fn find(
-    mut evaluate: impl FnMut(u64, u32) -> Result<Vec<CandidateResult>, String>,
+    mut evaluate: impl FnMut(u64, u32) -> Result<BatchResult, String>,
     limit: u64,
     control: &SearchControl,
     mut verify: impl FnMut(u64, &[u8; 256]) -> Result<bool, String>,
@@ -15,23 +16,15 @@ pub fn find(
     while let Some(batch) = control.reserve_bounded_batch(64, limit) {
         let count = (batch.end - batch.start) as u32;
         let results = Zeroizing::new(evaluate(batch.start, count)?);
-        if results.len() != count as usize {
-            return Err("device returned an incorrect lane count".into());
-        }
+        let winner = results.winner(count)?;
         control.add_tested(count as u64);
-        for (lane, result) in results.iter().enumerate() {
-            if control.stopped() {
-                return Ok(None);
-            }
-            match result.status {
-                0 => {}
-                1 => {
-                    let counter = batch.start + lane as u64;
-                    if verify(counter, &result.bytes)? && control.claim_verified_winner() {
-                        return Ok(Some((counter, *result)));
-                    }
-                }
-                _ => return Err("device candidate evaluation failed".into()),
+        if control.stopped() {
+            return Ok(None);
+        }
+        if let Some((lane, result)) = winner {
+            let counter = batch.start + lane as u64;
+            if verify(counter, &result.bytes)? && control.claim_verified_winner() {
+                return Ok(Some((counter, result)));
             }
         }
     }
@@ -44,14 +37,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn finite_tail_and_rejected_matches_keep_candidate_order() {
+    fn rejected_winner_advances_to_next_batch_without_replay() {
         let control = SearchControl::new();
         let mut batches = Vec::new();
         let mut verified = Vec::new();
         let found = find(
             |start, count| {
                 batches.push((start, count));
-                Ok(vec![CandidateResult::matched(&[1]); count as usize])
+                Ok(BatchResult {
+                    matches: count,
+                    errors: 0,
+                    lane: 0,
+                    candidate: CandidateResult::matched(&[1]),
+                })
             },
             65,
             &control,
@@ -63,7 +61,7 @@ mod tests {
         .unwrap();
         assert_eq!(found.unwrap().0, 64);
         assert_eq!(batches, [(0, 64), (64, 1)]);
-        assert_eq!(verified, (0..65).collect::<Vec<_>>());
+        assert_eq!(verified, [0, 64]);
         assert_eq!(control.statistics().0, 65);
         assert!(control.stopped());
     }
@@ -72,12 +70,17 @@ mod tests {
     fn malformed_batch_cancels_without_verifying() {
         let control = SearchControl::new();
         let result = find(
-            |_, _| Ok(Vec::new()),
+            |_, _| {
+                Ok(BatchResult {
+                    matches: 2,
+                    ..BatchResult::EMPTY
+                })
+            },
             1,
             &control,
             |_, _| panic!("must not verify a malformed batch"),
         );
-        assert!(matches!(result, Err(error) if error.contains("lane count")));
+        assert!(matches!(result, Err(error) if error.contains("batch counts")));
         assert!(control.stopped());
         assert_eq!(control.statistics().0, 0);
     }

@@ -283,9 +283,11 @@ mod tests {
         };
         if device {
             let mut corrupt = |_: &logic::p256_public_key_vanity::P256PublicRequest,
-                               _: &HexPattern, _: &[u8], _: u64, count: u32| {
-                let mut results = vec![logic::candidate_result::CandidateResult::MISS; count as usize];
-                results[0].status = 1; // Invalid all-zero SEC1 point, claimed as a winner.
+                               _: &HexPattern, _: &[u8], _: u64, _: u32| {
+                let mut results = logic::candidate_result::BatchResult::EMPTY;
+                results.matches = 1;
+                results.lane = 0;
+                results.candidate.status = 1; // Invalid all-zero SEC1 point, claimed as a winner.
                 Ok(results)
             };
             let rejected = run_device(&config, Arc::new(SearchControl::new()), &mut corrupt);
@@ -357,4 +359,4 @@ pub type EvaluateBatch<'a> = dyn FnMut(
     &[u8],
     u64,
     u32,
-) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;
+) -> Result<logic::candidate_result::BatchResult, String> + 'a;

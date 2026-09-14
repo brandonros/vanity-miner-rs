@@ -562,4 +562,4 @@ pub type EvaluateBatch<'a> = dyn FnMut(
     &[u8],
     u64,
     u32,
-) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;
+) -> Result<logic::candidate_result::BatchResult, String> + 'a;

@@ -25,16 +25,8 @@
 
 extern crate alloc;
 
-#[cfg(any(
-    feature = "solana",
-    feature = "bitcoin",
-    feature = "ethereum",
-    feature = "shallenge"
-))]
-mod atomic;
 #[macro_use]
 mod match_handler;
-mod utilities;
 
 #[cfg(feature = "bitcoin")]
 mod bitcoin_vanity;

@@ -12,7 +12,7 @@ use logic::p256_signature_vanity::P256SignatureRequest;
 use logic::rsa_modulus_vanity::RsaModulusRequest;
 #[cfg(feature = "rsa-pss")]
 use logic::rsa_pss_signature_vanity::RsaPssRequest;
-use logic::{candidate_result::CandidateResult, hex_pattern::HexPattern};
+use logic::{candidate_result::BatchResult, hex_pattern::HexPattern};
 use zeroize::{Zeroize, Zeroizing};
 
 #[repr(transparent)]
@@ -22,7 +22,7 @@ struct Record<T>(T);
 // pointers, references, enum discriminants, or uninitialized padding are copied.
 trait Abi: Copy {}
 impl Abi for HexPattern {}
-impl Abi for CandidateResult {}
+impl Abi for BatchResult {}
 #[cfg(feature = "p256-public-key")]
 impl Abi for P256PublicRequest {}
 #[cfg(feature = "p256-signature")]
@@ -86,7 +86,7 @@ impl<'a> Engine<'a> {
         message: &[u8],
         start: u64,
         count: u32,
-    ) -> Result<Vec<CandidateResult>, String> {
+    ) -> Result<BatchResult, String> {
         let stream = &state.stream;
         let kernel = state.module.get_function(name).map_err(|e| e.to_string())?;
         let host_request = Zeroizing::new([Record(*request)]);
@@ -97,8 +97,8 @@ impl<'a> Engine<'a> {
         let message_device =
             DeviceBuffer::from_slice(if message.is_empty() { &[0] } else { message })
                 .map_err(|e| e.to_string())?;
-        let mut host_results = Zeroizing::new(vec![Record(CandidateResult::MISS); count as usize]);
-        let mut result_device = SecretBuffer::new(&host_results, stream)?;
+        let mut host_results = Zeroizing::new([Record(BatchResult::EMPTY)]);
+        let mut result_device = SecretBuffer::new(&host_results[..], stream)?;
         let operation = (|| {
             unsafe {
                 launch!(kernel<<<count.div_ceil(32), 32, 0, stream>>>(
@@ -120,7 +120,7 @@ impl<'a> Engine<'a> {
         operation?;
         cleared_request?;
         cleared_result?;
-        Ok(host_results.iter().map(|record| record.0).collect())
+        Ok(host_results[0].0)
     }
 }
 impl Engine<'_> {
@@ -132,7 +132,7 @@ impl Engine<'_> {
         message: &[u8],
         start: u64,
         count: u32,
-    ) -> Result<Vec<CandidateResult>, String> {
+    ) -> Result<BatchResult, String> {
         if count == 0 || count > 64 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
@@ -155,7 +155,7 @@ impl Engine<'_> {
         message: &[u8],
         start: u64,
         count: u32,
-    ) -> Result<Vec<CandidateResult>, String> {
+    ) -> Result<BatchResult, String> {
         if count == 0 || count > 64 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
@@ -178,7 +178,7 @@ impl Engine<'_> {
         message: &[u8],
         start: u64,
         count: u32,
-    ) -> Result<Vec<CandidateResult>, String> {
+    ) -> Result<BatchResult, String> {
         if count == 0 || count > 64 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
@@ -201,7 +201,7 @@ impl Engine<'_> {
         message: &[u8],
         start: u64,
         count: u32,
-    ) -> Result<Vec<CandidateResult>, String> {
+    ) -> Result<BatchResult, String> {
         if count == 0 || count > 64 {
             return Err("invalid CUDA cryptographic batch size".into());
         }

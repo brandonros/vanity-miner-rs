@@ -1,15 +1,15 @@
-//! CUDA entry point for p256-public-key: one candidate per lane.
+//! CUDA entry point for p256-public-key: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
-    candidate_result::CandidateResult,
+    candidate_result::{BatchResult, CandidateResult},
     hex_pattern::HexPattern,
     p256_public_key_vanity::{P256PublicRequest, p256_public},
 };
 
 /// # Safety
-/// Request and pattern pointers must be valid and aligned. `results` must hold
-/// `count` writable records; `message` must hold `message_len` readable bytes
-/// when nonzero. Inputs must remain immutable until stream synchronization.
+/// Request and pattern pointers must be valid and aligned. `output` must point
+/// to one BatchResult initialized to EMPTY before each launch. `message` must
+/// hold `message_len` readable bytes when nonzero. Inputs must remain immutable until stream synchronization.
 #[kernel]
 pub unsafe extern "C" fn kernel_p256_public_key_vanity(
     request: *const P256PublicRequest,
@@ -18,9 +18,9 @@ pub unsafe extern "C" fn kernel_p256_public_key_vanity(
     message_len: usize,
     start: u64,
     count: u32,
-    results: *mut CandidateResult,
+    output: *mut BatchResult,
 ) {
-    let lane = crate::utilities::get_thread_idx();
+    let lane = cuda_std::thread::index() as usize;
     if lane >= count as usize {
         return;
     }
@@ -34,7 +34,22 @@ pub unsafe extern "C" fn kernel_p256_public_key_vanity(
     } else {
         CandidateResult::ERROR
     };
-    unsafe {
-        results.add(lane as usize).write(result);
+    match result.status {
+        0 => {}
+        1 => {
+            handle_match! {
+                thread_idx: lane,
+                found_matches_ptr: core::ptr::addr_of_mut!((*output).matches),
+                copies: [scalar: result => core::ptr::addr_of_mut!((*output).candidate);],
+                found_thread_idx_ptr: core::ptr::addr_of_mut!((*output).lane),
+            }
+        }
+        _ => unsafe {
+            cuda_std::atomic::mid::atomic_fetch_add_u32_device(
+                core::ptr::addr_of_mut!((*output).errors),
+                core::sync::atomic::Ordering::Relaxed,
+                1,
+            );
+        },
     }
 }

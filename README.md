@@ -1,15 +1,90 @@
 # vanity-miner-rs
-GPU-accelerated vanity address generator for multiple blockchains.
 
-## Cryptographic vanity modes
+Vanity address, key, and signature search in Rust, with CPU, NVIDIA CUDA, and
+Apple Silicon CuMetal backends.
 
-Four new commands have CPU runners and CUDA kernels/host dispatch. Shared logic
-and CPU integration are tested. CI compiles all four new CUDA modes on both
-LLVM backends; hardware validation and GPU performance measurements remain pending.
+## Build
+
+Run from the repository root using the pinned Rust toolchain.
 
 ```sh
-cargo build -p vanity-miner --no-default-features --features rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
+# CPU: all search modes and self-tests
+cargo build -p vanity-miner --release --locked --features solana,bitcoin,ethereum,shallenge,rsa-modulus,rsa-pss,p256-public-key,p256-signature,self_test
+./target/release/vanity-miner --help
+```
 
+The default feature is `shallenge`. To build a single mode, use
+`--no-default-features --features bitcoin`, for example. Builds share the same
+output path unless you set `CARGO_TARGET_DIR`.
+
+| Feature | Command | Search target |
+| --- | --- | --- |
+| `solana` | `solana-vanity` | Base58 address |
+| `bitcoin` | `bitcoin-vanity` | Mainnet `bc1q` address |
+| `ethereum` | `ethereum-vanity` | Hex address |
+| `shallenge` | `shallenge` | Challenge hash |
+| `rsa-modulus` | `rsa-modulus-vanity` | RSA-2048 modulus |
+| `rsa-pss` | `rsa-pss-signature-vanity` | RSA-PSS signature bytes |
+| `p256-public-key` | `p256-public-key-vanity` | P-256 public point |
+| `p256-signature` | `p256-signature-vanity` | ECDSA signature bytes |
+
+### NVIDIA CUDA
+
+The Nix shells provide the Linux build toolchain for x86_64 and aarch64. Running
+requires a compatible NVIDIA GPU and driver. Add mode features as needed:
+
+```sh
+# LLVM 21, compute_100 (Blackwell or later)
+nix develop .#v21 --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,llvm21,solana,self_test
+./target/llvm21/release/vanity-miner solana-vanity aaa ""
+
+# LLVM 7, compute_89
+nix develop .#v7 --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,solana,self_test
+./target/llvm7/release/vanity-miner self-test
+```
+
+The default Nix shell is `v21`. PTX is compiled and embedded during the build.
+Runtime overrides are checked in order: `CUBIN_PATH`, `PTX_PATH`, embedded PTX.
+An invalid override fails rather than falling back; use artifacts matching the
+binary's kernel interfaces and your GPU.
+
+`gpu` selects CUDA without enabling search modes or a CPU fallback. All eight
+modes support CUDA. RSA/P-256 searches use 64-candidate batches per device and a
+64-KiB default stack; `STACK_SIZE` overrides the stack size. Their GPU performance
+and numerical correctness remain unverified. CI builds LLVM 7 and 21 for both
+Linux host architectures.
+
+All eight modes count matches atomically and return one winner per launch.
+The winning lane depends on GPU scheduling. RSA/P-256 winners are independently
+verified on the host; an RSA candidate rejected by stronger primality checks is
+discarded with the rest of its batch, and the search advances to the next batch.
+Rebuild PTX/CUBIN overrides after kernel interface changes.
+
+### Apple Silicon
+
+Build with `cumetal` instead of `gpu`. CuMetal supports the four original search
+modes and the numbered self-tests. Supply `--ptx FILE` with `cumetalc` available,
+or `--module-dir DIR` containing compiled Metal modules and ABI sidecars. Use
+`--help` for runtime library and launch options. RSA/P-256 search commands are
+not exposed by this backend.
+
+`gpu` and `cumetal` are mutually exclusive; do not use `--all-features`.
+
+## Search
+
+```sh
+./target/release/vanity-miner solana-vanity aaa ""
+./target/release/vanity-miner bitcoin-vanity bc1qqqq ""
+./target/release/vanity-miner ethereum-vanity 5555 ""
+./target/release/vanity-miner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
+```
+
+Address modes take a prefix and suffix; `""` leaves either unconstrained. Ethereum
+requires even-length hex patterns without `0x`.
+
+### RSA and P-256
+
+```sh
 ./target/release/vanity-miner rsa-modulus-vanity --prefix a --suffix b --private-out rsa-private.pem --public-out rsa-public.pem
 ./target/release/vanity-miner p256-public-key-vanity --prefix a --target xy --private-out p256-private.pem --public-out p256-public.pem --public-format spki-pem
 
@@ -18,205 +93,60 @@ printf 'example:00000000' > message.bin
 ./target/release/vanity-miner p256-signature-vanity --key p256-private.pem --message message.bin --nonce-offset 8 --nonce-length 8 --prefix a --signature-out p256-signature.bin --message-out winning-message.bin --der-out p256-signature.der
 ```
 
-Each mode has its own feature: `rsa-modulus`, `rsa-pss`, `p256-public-key`, or
-`p256-signature`. New searches stop after the first independently verified winner.
-`--threads N` selects CPU workers; Ctrl-C cancels the search and joins workers.
-Statistics name keys, q candidates, salts, messages, or ephemeral nonces tested.
-Elapsed rates include setup and winner verification, so short searches are not
-steady-state benchmarks.
+These four modes accept case-insensitive hex prefixes and suffixes, including odd
+lengths, without `0x`. They stop at the first independently verified winner.
+`--threads N` selects CPU workers; Ctrl-C cancels between work batches.
 
-Patterns use case-insensitive hexadecimal without `0x`. `--prefix` and `--suffix`
-both accept odd digit counts. Contradictory overlaps and excessive lengths are
-rejected. Matching applies to these exact byte strings:
-
-| Command | Matched bytes |
+| Mode | Pattern applies to |
 | --- | --- |
-| `rsa-modulus-vanity` | Unsigned 256-byte big-endian modulus n; exactly 2048 bits, odd, e=65537 |
-| `rsa-pss-signature-vanity` | Raw 256-byte big-endian RSA signature, not its hash or salt |
-| `p256-public-key-vanity` | `xy` (default): X followed by Y, 64 bytes; `x`/`y`: 32 bytes; `uncompressed`: 04 followed by X and Y, 65 bytes |
-| `p256-signature-vanity` | `raw` (default): 32-byte r followed by 32-byte s; `r`/`s`: the selected 32-byte component |
+| RSA modulus | 256-byte big-endian modulus, exactly 2048 bits, exponent 65537 |
+| RSA-PSS | 256-byte signature, not its hash or salt |
+| P-256 public key | `xy` (default), `x`, `y`, or `uncompressed` SEC1 bytes |
+| P-256 signature | `raw` (default: 32-byte r then 32-byte s), `r`, or `s` |
 
-Generic brute-force work is approximately `16^d` for d independent matched hex
-digits: four digits mean roughly 65,536 candidates; eight mean roughly 4.3 billion.
-Overlapping bits count once; fixed format bits do not add work. RSA modulus
-construction is different: it chooses a random feasible p and restricts q to the
-prefix interval and suffix residue class, so its q candidates already satisfy
-the pattern. It does not repeatedly generate and reject complete random keys.
-Constraints leaving insufficient room for 256 bits of q candidate entropy are
-rejected. Every winning key receives additional OS-random primality checks,
-factor-distance checks, component validation, and a blinded sign/verify check.
+- **RSA modulus:** constructs a constrained q progression instead of rejecting
+  complete random keys. Winners receive primality, factor-distance, and key checks.
+- **RSA-PSS:** uses SHA-256/MGF1-SHA-256 and searches salts by default.
+  `--salt-length` defaults to 32, with a maximum of 222. Message-window search
+  uses `--search-source message`; see command help for window and fixed-salt options.
+- **P-256 signatures:** message-window search uses RFC 6979. `--s-form` selects
+  `low` (default), `high`, or `either`; some consumers reject high-S signatures.
+  `--search-source ephemeral` keeps the message fixed and searches secret nonces.
+  Nonces are never exported: reusing an ECDSA nonce across messages can expose the key.
 
-RSA-PSS supports SHA-256 and MGF1-SHA-256. `--salt-length` defaults to 32 (maximum
-222 for RSA-2048). The salt search enumerates distinct salts from a random starting
-value; a zero-byte salt has one candidate. For a message-window search, select
-`--search-source message --nonce-offset N --nonce-length N --message-out FILE`.
-Supply `--fixed-salt-hex HEX` of the requested salt length, or let the search
-generate one fixed salt. `--salt-out` saves the exact winning salt in both cases.
-The CPU private operation is blinded; the explicit salt remains fully controlled. GPU
-signing places private-key material in device memory. The device CRT operation is
-unblinded and checks each result with the public exponent; host reconstruction
-uses blinded RSA and independent PSS verification. Secret transport buffers are
-cleared after synchronization, but device faults and compiler-generated copies
-prevent a guarantee of complete erasure.
+Private keys are PKCS#8 PEM. RSA public keys are SPKI PEM; P-256 public keys default
+to uncompressed SEC1, with SPKI PEM available through `--public-format spki-pem`.
+Private files use Unix mode 0600. Existing outputs require `--force`; publication
+is atomic per file, not across companion files.
 
-P-256 signature message-window search uses deterministic RFC 6979 signing and is
-the recommended interface. `--search-source ephemeral` keeps the message fixed
-and derives secret nonces from fresh OS entropy, bound to the key, message,
-worker, and counter. **Reusing an ECDSA ephemeral nonce across different messages
-can reveal the private key.** An ephemeral nonce is different from the public
-message window: it is never printed or exported. Search seeds are never saved.
-Both private scalars and ephemeral nonces use rejection sampling without modulo
-bias. `--s-form low` is the default; `high` selects n-s when necessary, and `either`
-tests both representations and emits the one that matched. Some consumers reject
-high-S signatures. Optional DER output encodes the emitted signature; pattern
-semantics always apply to the raw fixed-width bytes.
+CUDA signing puts private keys in device memory. RSA device operations are
+unblinded and checked with the public exponent; host verification uses blinded
+RSA. Secret buffers are cleared after synchronization, but complete device-memory
+erasure is not guaranteed.
 
-Private keys use PKCS#8 PEM; RSA public keys use SPKI PEM. P-256 public output is
-SEC1 uncompressed bytes by default, or SPKI PEM with `--public-format spki-pem`.
-Private files are staged with Unix mode 0600 and published atomically; existing
-outputs require `--force`. Inputs cannot be replaced by output paths. Each file
-is atomic individually; companion output can remain if a later publication fails.
-All files are staged before publication, and private keys or raw signatures are
-published last. No private key, factor, scalar, search seed, or ephemeral nonce is
-printed in statistics or normal error messages.
-
-For CUDA, add `gpu` to the same mode features using the pinned Linux/CUDA
-toolchain. New searches use 64-candidate batches, run one worker per available device,
-and observe Ctrl-C between synchronized batches. GPU performance has not been
-measured; the default 64-KiB stack limit can be overridden with `STACK_SIZE`.
-Add `self_test` and run `self-test` to exercise crypto differential fixtures
-through the selected backend before searches.
-
-Independent verification examples:
+## Self-tests
 
 ```sh
-openssl rsa -in rsa-private.pem -check -noout
-openssl dgst -sha256 -verify rsa-public.pem -signature rsa-signature.bin -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:32 message.bin
-openssl dgst -sha256 -verify p256-public.pem -signature p256-signature.der winning-message.bin
-```
-
-Run commands from the repository root. Modes are selected at build time:
-the default build includes only `shallenge`. The `gpu` feature selects the NVIDIA
-CUDA runner; it does not enable additional modes and has no CPU fallback.
-The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon.
-Select only one GPU backend.
-
-## CPU mode (no CUDA required)
-
-Use the Rust toolchain specified in `rust-toolchain.toml`. These commands assume
-`CARGO_TARGET_DIR` is unset; otherwise use the binary in that target directory.
-
-```sh
-# Build all search modes and the self-test command.
-cargo build -p vanity-miner --features solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
-
-./target/release/vanity-miner solana-vanity aaa ""
-./target/release/vanity-miner ethereum-vanity 5555 ""
-./target/release/vanity-miner bitcoin-vanity bc1qqqq ""
-./target/release/vanity-miner shallenge brandonros 000000000000cbaec87e070a04c2eb90644e16f37aab655ccdf683fdda5a6f96
+cargo build -p vanity-miner --release --locked --no-default-features --features self_test
 ./target/release/vanity-miner self-test
-./target/release/vanity-miner --help
 ```
 
-For a single mode, use `--no-default-features --features solana`, `bitcoin`,
-`ethereum`, or `shallenge`. For example:
+`self_test` enables every mode's logic dependencies, but not its CLI search command.
+The same command runs on the backend selected at build time.
 
-```sh
-cargo build -p vanity-miner --no-default-features --features bitcoin --release --locked
-./target/release/vanity-miner bitcoin-vanity bc1qqqq ""
-```
-
-Each build replaces the binary at the same target path. `--features self_test`
-adds the self-test command; it does not expose the other search commands unless
-their CLI features are enabled too. Ethereum patterns currently require an even
-number of hex digits, without `0x`. Bitcoin examples use the supported lowercase
-mainnet `bc1q` prefix and an empty suffix.
-
-## GPU mode (Linux with CUDA)
-
-The Nix development shells support `x86_64-linux` and `aarch64-linux` and provide
-the build toolchain. Running requires a compatible NVIDIA GPU and host driver.
-
-```sh
-# LLVM 7, compute_89; select the legacy shell explicitly.
-nix develop .#v7 --command cargo build -p vanity-miner --features gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
-nix develop .#v7 --command ./target/llvm7/release/vanity-miner self-test
-nix develop .#v7 --command ./target/llvm7/release/vanity-miner solana-vanity aaa ""
-
-# LLVM 21, compute_100.
-nix develop .#v21 --command cargo build -p vanity-miner --features gpu,llvm21,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
-nix develop .#v21 --command ./target/llvm21/release/vanity-miner self-test
-```
-
-Shell builds use `target/llvm7/` and `target/llvm21/` respectively. `--all-features`
-enables mutually exclusive CUDA and CuMetal backends; select features explicitly. To build only Bitcoin
-with LLVM 7, use `--no-default-features --features gpu,bitcoin` in the v7 shell;
-for LLVM 21, use `--no-default-features --features gpu,llvm21,bitcoin` in v21.
-
-PTX is compiled and embedded automatically. An override is optional:
-
-```sh
-nix develop .#v7 --command env PTX_PATH=./output.ptx ./target/llvm7/release/vanity-miner solana-vanity aaa ""
-nix develop .#v7 --command env CUBIN_PATH=./output.cubin ./target/llvm7/release/vanity-miner solana-vanity aaa ""
-```
-
-Module selection is **CUBIN_PATH, then PTX_PATH, then embedded PTX**. A selected
-file that cannot be loaded produces an error; it does not fall back. Override
-files must match the host binary's kernel signatures and enabled modes, and the
-GPU/driver must support the selected module. Rebuild overrides after changing
-kernel interfaces.
-
-CI builds both LLVM backends for both Linux host architectures. Release assets
-use explicit `-llvm7` or `-llvm21` suffixes: two host binaries and one standalone
-PTX file per LLVM version. The host architecture suffix does not identify the GPU.
-
-This branch pins Rust-CUDA to `d2104a0a49252068292985e5e63328f522415c4b` from
-`poc/portable-ptx-export`, based on the LLVM 21.1.8 / CUDA 13.3 upgrade.
-The default Nix shell is `v21`; LLVM 19 has been replaced by the `llvm21` feature.
-Modern merged-module DCE is enabled by the backend by default. Optional cleanup
-and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.
-
-The RSA and P-256 commands support CPU and NVIDIA CUDA builds. CuMetal
-currently exposes only Solana, Bitcoin, Ethereum, Shallenge, and its existing
-self-tests; enabling RSA/P-256 features does not add those commands to CuMetal.
-
-## Focused Rust GPU reproductions
-
-The `self_test` build also exports a small runtime-input kernel for the observed
-nonce-generation failure. It preserves the existing 118
-known-answer slots and can be run independently with raw mismatch reporting.
-
-LLVM 7 kernel builds that enable RSA/P-256 use optimization level 1 to avoid
-legacy libnvvm rejecting vectorized HMAC byte swaps. Host builds and LLVM 21
-retain release optimization; GPU throughput for the new modes is unmeasured.
-
-### Numbered self-test coverage
-
-`self_test` enables the logic dependencies for all eight modes. The common
-`logic/src/self_test.rs` and `kernels/src/self_test.rs` inventory has 157 named
-numerical checks, each with a dedicated kernel and stable result slot:
+All 157 numbered checks and fixtures live in `logic/src/self_test.rs`, with one
+kernel per slot in `kernels/src/self_test.rs`. CPU runs report 157 passes and skip
+the additional GPU launch probe.
 
 | Slots | Coverage |
 | --- | --- |
-| 0–117 | Existing primitive, pipeline, and compiler regression checks (unchanged) |
-| 118–125 | P-256 public key derivation, points, encoding, invalid scalars |
-| 126–134 | P-256 signatures, RFC6979, nonce validity, S forms, message carry |
-| 135–144 | SHA-256, MGF1, PSS salt boundaries, carry, CRT and rejection |
-| 145–152 | RSA multiplication, progression, primality and candidate boundaries |
-| 153–156 | Full P-256 public/signature and RSA-PSS/modulus candidate pipelines |
+| 0–117 | Original primitives, pipelines, and compiler regressions |
+| 118–125 | P-256 key derivation, points, encoding, invalid scalars |
+| 126–134 | P-256 signing, RFC 6979, nonce validity, S forms, message carry |
+| 135–144 | SHA-256, MGF1, PSS salt boundaries, CRT and rejection |
+| 145–152 | RSA multiplication, progression, primality, boundaries |
+| 153–156 | Full RSA/P-256 candidate pipelines against fixed CPU references |
 
-The launch probe is additional: 158 reported cases total (157 CPU passes plus
-one GPU-only probe skip), including in a build enabling only `self_test`.
-The four full-pipeline slots hash every lane's status and all output bytes against
-fixed CPU reference digests, using public, fixed fixtures. These are regression
-references, distinct from the independently computed primitive vectors below.
-They exercise production candidate logic through single-slot wrapper kernels.
-
-The numbered self-tests do not verify production CUDA argument passing, buffer
-layouts, or batch lane ordering. The optional transport test layer is removed.
-
-Expected crypto constants live beside the checks in `logic/src/self_test.rs`.
-Primitive fixtures were computed independently with SHA/HMAC and elementary
-curve/integer reference arithmetic. No fixture generator is required to build
-or run self-tests.
-This inventory extension does not establish GPU numerical correctness.
+These kernels test candidate logic, not production CUDA argument passing or batch
+buffer layouts. CPU passes and successful CUDA compilation do not establish GPU
+numerical correctness.
