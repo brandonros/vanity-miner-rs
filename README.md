@@ -44,6 +44,12 @@ nix develop .#v7 --command cargo build -p vanity-miner --release --locked --no-d
 ```
 
 The default Nix shell is `v21`. PTX is compiled and embedded during the build.
+For build profiling, set `NVVM_TIMING_DIR` to an absolute log directory and add
+`--timings -vv` to the Cargo command. Rust-CUDA writes live phase logs and rustc
+self-profiles there; Cargo saves HTML timing reports under each target directory's
+`cargo-timings/`. Redirect the entire Nix command's output to capture setup and
+dependency-build messages too. Profiling is off when the variable is unset.
+
 Runtime overrides are checked in order: `CUBIN_PATH`, `PTX_PATH`, embedded PTX.
 An invalid override fails rather than falling back; use artifacts matching the
 binary's kernel interfaces and your GPU.

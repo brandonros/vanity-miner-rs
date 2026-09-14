@@ -20,7 +20,7 @@ p256-signature = ["logic/p256-signature"]
 
 [dependencies]
 logic = { path = "../logic", default-features = false }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "d2104a0a49252068292985e5e63328f522415c4b" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "5f27c96d0555b7552813f55270917a2c8ea469c4" }
 
 [workspace]
 
