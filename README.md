@@ -49,15 +49,15 @@ nix develop .#v7 --command cargo build -p vanity-miner --features gpu,solana,bit
 nix develop .#v7 --command ./target/llvm7/release/vanity-miner self-test
 nix develop .#v7 --command ./target/llvm7/release/vanity-miner solana-vanity aaa ""
 
-# LLVM 19, compute_100.
-nix develop .#v19 --command cargo build -p vanity-miner --features gpu,llvm19,solana,bitcoin,ethereum,shallenge,self_test --release --locked
-nix develop .#v19 --command ./target/llvm19/release/vanity-miner self-test
+# LLVM 21, compute_100.
+nix develop .#v21 --command cargo build -p vanity-miner --features gpu,llvm21,solana,bitcoin,ethereum,shallenge,self_test --release --locked
+nix develop .#v21 --command ./target/llvm21/release/vanity-miner self-test
 ```
 
-Shell builds use `target/llvm7/` and `target/llvm19/` respectively. `--all-features`
-also enables LLVM 19 and therefore requires the v19 shell. To build only Bitcoin
+Shell builds use `target/llvm7/` and `target/llvm21/` respectively. `--all-features`
+also enables LLVM 21 and therefore requires the v21 shell. To build only Bitcoin
 with LLVM 7, use `--no-default-features --features gpu,bitcoin` in the v7 shell;
-for LLVM 19, use `--no-default-features --features gpu,llvm19,bitcoin` in v19.
+for LLVM 21, use `--no-default-features --features gpu,llvm21,bitcoin` in v21.
 
 PTX is compiled and embedded automatically. An override is optional:
 
@@ -73,5 +73,11 @@ GPU/driver must support the selected module. Rebuild overrides after changing
 kernel interfaces.
 
 CI builds both LLVM backends for both Linux host architectures. Release assets
-use explicit `-llvm7` or `-llvm19` suffixes: two host binaries and one standalone
+use explicit `-llvm7` or `-llvm21` suffixes: two host binaries and one standalone
 PTX file per LLVM version. The host architecture suffix does not identify the GPU.
+
+This branch pins Rust-CUDA to `94b808a096cac28c24e5535901e7016bc9b36fbb` from
+`poc/portable-ptx-export`, based on the LLVM 21.1.8 / CUDA 13.3 upgrade.
+The default Nix shell is `v21`; LLVM 19 has been replaced by the `llvm21` feature.
+Modern merged-module DCE is enabled by the backend by default. Optional cleanup
+and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.

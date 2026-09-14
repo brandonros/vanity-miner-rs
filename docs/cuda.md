@@ -13,8 +13,8 @@ the toolkit's driver stubs are not a working runtime driver.
 
 | Shell | CLI features for all modes | PTX target | Binary |
 | --- | --- | --- | --- |
-| `.#v7` (also default) | `gpu,solana,bitcoin,ethereum,shallenge,self_test` | `compute_89` | `target/llvm7/release/vanity-miner` |
-| `.#v19` | `gpu,llvm19,solana,bitcoin,ethereum,shallenge,self_test` | `compute_100` | `target/llvm19/release/vanity-miner` |
+| `.#v7` | `gpu,solana,bitcoin,ethereum,shallenge,self_test` | `compute_89` | `target/llvm7/release/vanity-miner` |
+| `.#v21` (also default) | `gpu,llvm21,solana,bitcoin,ethereum,shallenge,self_test` | `compute_100` | `target/llvm21/release/vanity-miner` |
 
 ```sh
 nix develop .#v7 --command cargo build -p vanity-miner --features gpu,solana,bitcoin,ethereum,shallenge,self_test --release --locked
@@ -22,8 +22,8 @@ nix develop .#v7 --command ./target/llvm7/release/vanity-miner --help
 nix develop .#v7 --command ./target/llvm7/release/vanity-miner self-test
 ```
 
-For LLVM 19, use `.#v19`, add `llvm19` to the features, and run the binary under
-`target/llvm19/`. Use a GPU and driver that support the emitted module. A
+For LLVM 21, use `.#v21`, add `llvm21` to the features, and run the binary under
+`target/llvm21/`. Use a GPU and driver that support the emitted module. A
 successful build or help command does not validate kernel execution. The
 self-test checks isolated computations; it does not establish correctness of
 concurrent production result collection.

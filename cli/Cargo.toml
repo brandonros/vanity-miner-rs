@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
-llvm19 = ["gpu", "cuda_builder/llvm19"]
+llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
@@ -22,12 +22,12 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "94b808a096cac28c24e5535901e7016bc9b36fbb"
 optional = true
 
 [dependencies.cust_raw]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "94b808a096cac28c24e5535901e7016bc9b36fbb"
 optional = true
 
 [dependencies.backtrace]
@@ -36,7 +36,7 @@ optional = true
 
 [build-dependencies.cuda_builder]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "94b808a096cac28c24e5535901e7016bc9b36fbb"
 default-features = false
 features = ["rustc_codegen_nvvm"]
 optional = true

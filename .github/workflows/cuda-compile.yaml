@@ -20,12 +20,12 @@ jobs:
             extra-features: ""
           - runs-on: ubuntu-24.04
             arch: x86_64
-            llvm: 19
-            extra-features: ",llvm19"
+            llvm: 21
+            extra-features: ",llvm21"
           - runs-on: ubuntu-24.04-arm
             arch: aarch64
-            llvm: 19
-            extra-features: ",llvm19"
+            llvm: 21
+            extra-features: ",llvm21"
     name: Build ${{ matrix.arch }} LLVM ${{ matrix.llvm }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -154,7 +154,7 @@ jobs:
 
             ### GPU builds
             - Assets ending in `-llvm7` use LLVM 7 and target `compute_89`.
-            - Assets ending in `-llvm19` use LLVM 19 and target `compute_100` (Blackwell or later).
+            - Assets ending in `-llvm21` use LLVM 21 and target `compute_100` (Blackwell or later).
             - `x86_64` and `aarch64` identify the Linux host CPU, not the GPU.
             - Each LLVM version includes both host binaries and a standalone PTX file.
 
@@ -196,32 +196,32 @@ jobs:
           asset_name: output-llvm7.ptx
           asset_content_type: application/octet-stream
 
-      - name: Upload x86_64 LLVM 19 binary
+      - name: Upload x86_64 LLVM 21 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64-llvm19/vanity-miner-x86_64-llvm19
-          asset_name: vanity-miner-x86_64-llvm19
+          asset_path: dist/vanity-miner-x86_64-llvm21/vanity-miner-x86_64-llvm21
+          asset_name: vanity-miner-x86_64-llvm21
           asset_content_type: application/octet-stream
 
-      - name: Upload aarch64 LLVM 19 binary
+      - name: Upload aarch64 LLVM 21 binary
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-aarch64-llvm19/vanity-miner-aarch64-llvm19
-          asset_name: vanity-miner-aarch64-llvm19
+          asset_path: dist/vanity-miner-aarch64-llvm21/vanity-miner-aarch64-llvm21
+          asset_name: vanity-miner-aarch64-llvm21
           asset_content_type: application/octet-stream
 
-      - name: Upload LLVM 19 PTX
+      - name: Upload LLVM 21 PTX
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64-llvm19/output-llvm19.ptx
-          asset_name: output-llvm19.ptx
+          asset_path: dist/vanity-miner-x86_64-llvm21/output-llvm21.ptx
+          asset_name: output-llvm21.ptx
           asset_content_type: application/octet-stream

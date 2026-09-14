@@ -60,7 +60,7 @@ fn build_gpu() {
     }
 
     // The modern NVVM dialect requires a Blackwell-or-later target.
-    let arch = if cfg!(feature = "llvm19") {
+    let arch = if cfg!(feature = "llvm21") {
         NvvmArch::Compute100
     } else {
         NvvmArch::Compute89
