@@ -189,3 +189,7 @@ The `self_test` build also exports a small runtime-input kernel for the observed
 nonce-generation failure. It preserves the existing 118
 known-answer slots and can be run independently with raw mismatch reporting.
 See the [coverage audit and reproduction guide](docs/codegen-repros.md).
+
+LLVM 7 kernel builds that enable RSA/P-256 use optimization level 1 to avoid
+legacy libnvvm rejecting vectorized HMAC byte swaps. Host builds and LLVM 21
+retain release optimization; GPU throughput for the new modes is unmeasured.

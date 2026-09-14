@@ -62,6 +62,15 @@ fn build_gpu() {
     .collect::<Vec<_>>()
     .join(",");
     let mut kernel_args = vec!["--no-default-features".to_owned(), "--locked".to_owned()];
+    // Legacy libnvvm rejects vector bswap emitted while optimizing HMAC at O3.
+    // Keep the workaround in the nested kernel build, preserving host and
+    // LLVM 21 optimization. O1 avoids the legacy vectorization pipeline.
+    if !cfg!(feature = "llvm21") && cfg!(feature = "crypto-cli") {
+        kernel_args.extend([
+            "--config".to_owned(),
+            "profile.release.opt-level=1".to_owned(),
+        ]);
+    }
     if !kernel_features.is_empty() {
         kernel_args.extend(["--features".to_owned(), kernel_features]);
     }
