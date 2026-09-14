@@ -65,3 +65,9 @@ pub use solana_vanity::*;
     feature = "p256-signature"
 ))]
 mod crypto_vanity;
+
+
+#[cfg(feature = "self_test")]
+mod codegen_repros;
+#[cfg(feature = "self_test")]
+pub use codegen_repros::*;

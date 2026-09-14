@@ -15,7 +15,7 @@ def entry_names(ptx):
 
 def expected_names(root):
     names = set()
-    for module in ('solana_vanity', 'bitcoin_vanity', 'ethereum_vanity', 'shallenge', 'self_test'):
+    for module in ('solana_vanity', 'bitcoin_vanity', 'ethereum_vanity', 'shallenge', 'self_test', 'codegen_repros'):
         source = (root / 'kernels/src' / (module + '.rs')).read_text()
         names.update(re.findall(r'pub\s+unsafe\s+extern\s+"C"\s+fn\s+(kernel_\w+)\s*\(', source))
     if not names:
