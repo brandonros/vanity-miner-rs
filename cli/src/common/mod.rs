@@ -53,3 +53,9 @@ pub use stats::*;
     feature = "shallenge"
 ))]
 pub use validation::*;
+
+#[cfg(all(feature = "crypto-cli", not(feature = "cumetal")))]
+pub(crate) mod search_session;
+
+#[cfg(feature = "gpu")]
+mod cuda_module;

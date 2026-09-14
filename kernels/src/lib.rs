@@ -58,13 +58,22 @@ pub use shallenge::*;
 #[cfg(feature = "solana")]
 pub use solana_vanity::*;
 
-#[cfg(any(
-    feature = "rsa-modulus",
-    feature = "rsa-pss",
-    feature = "p256-public-key",
-    feature = "p256-signature"
-))]
-mod crypto_vanity;
+#[cfg(feature = "p256-public-key")]
+mod p256_public_key_vanity;
+#[cfg(feature = "p256-public-key")]
+pub use p256_public_key_vanity::*;
+#[cfg(feature = "p256-signature")]
+mod p256_signature_vanity;
+#[cfg(feature = "p256-signature")]
+pub use p256_signature_vanity::*;
+#[cfg(feature = "rsa-pss")]
+mod rsa_pss_signature_vanity;
+#[cfg(feature = "rsa-pss")]
+pub use rsa_pss_signature_vanity::*;
+#[cfg(feature = "rsa-modulus")]
+mod rsa_modulus_vanity;
+#[cfg(feature = "rsa-modulus")]
+pub use rsa_modulus_vanity::*;
 
 
 #[cfg(feature = "self_test")]

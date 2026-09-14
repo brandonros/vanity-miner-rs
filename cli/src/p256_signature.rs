@@ -97,7 +97,7 @@ pub fn run_cpu(
 pub fn run_device(
     config: &SignatureSearch,
     control: Arc<SearchControl>,
-    device: &mut dyn crate::device_search::DeviceSearch,
+    device: &mut EvaluateBatch<'_>,
 ) -> Result<SignatureReport, String> {
     run(config, control, Some(device))
 }
@@ -105,7 +105,7 @@ pub fn run_device(
 fn run(
     config: &SignatureSearch,
     control: Arc<SearchControl>,
-    device: Option<&mut dyn crate::device_search::DeviceSearch>,
+    device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<SignatureReport, String> {
     config.validate()?;
     let pattern = config.pattern()?;
@@ -150,7 +150,7 @@ fn run(
         _ => u64::MAX,
     };
     let outcome = if let Some(device) = device {
-        use logic::device_search::P256SignatureRequest;
+        use logic::p256_signature_vanity::P256SignatureRequest;
         let (source, offset, length) = match config.source {
             SearchSource::Message { offset, length } => (0, offset as u64, length as u64),
             SearchSource::Ephemeral => (1, 0, 0),
@@ -176,11 +176,8 @@ fn run(
             },
             reserved: 0,
         });
-        let found = crate::device_search::find(
-            device,
-            &crate::device_search::Request::P256Signature(&request),
-            &pattern,
-            &original,
+        let found = crate::search_batches::find(
+            |start, count| device(&request, &pattern, &original, start, count),
             candidate_limit,
             &control,
             |counter, bytes| {
@@ -480,7 +477,7 @@ mod tests {
             };
             let control = Arc::new(SearchControl::new());
             let report = if device {
-                run_device(&config, control, &mut crate::device_search::HostDevice)
+                run_device(&config, control, &mut crate::test_support::p256_signature)
             } else {
                 run_cpu(&config, control)
             }
@@ -545,7 +542,7 @@ mod tests {
             run_device(
                 &exhausted,
                 control.clone(),
-                &mut crate::device_search::HostDevice,
+                &mut crate::test_support::p256_signature,
             )
         } else {
             run_cpu(&exhausted, control.clone())
@@ -556,3 +553,13 @@ mod tests {
         assert!(!exhausted.message_out.unwrap().exists());
     }
 }
+
+/// Synchronized, ordered candidate evaluation for this mode. Implementations
+/// must clear secret device buffers before returning; this is not a CPU fallback.
+pub type EvaluateBatch<'a> = dyn FnMut(
+    &logic::p256_signature_vanity::P256SignatureRequest,
+    &logic::hex_pattern::HexPattern,
+    &[u8],
+    u64,
+    u32,
+) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;

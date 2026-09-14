@@ -129,7 +129,7 @@ pub fn run_cpu(config: &PssSearch, control: Arc<SearchControl>) -> Result<PssRep
 pub fn run_device(
     config: &PssSearch,
     control: Arc<SearchControl>,
-    device: &mut dyn crate::device_search::DeviceSearch,
+    device: &mut EvaluateBatch<'_>,
 ) -> Result<PssReport, String> {
     run(config, control, Some(device))
 }
@@ -137,7 +137,7 @@ pub fn run_device(
 fn run(
     config: &PssSearch,
     control: Arc<SearchControl>,
-    device: Option<&mut dyn crate::device_search::DeviceSearch>,
+    device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<PssReport, String> {
     let pattern = config.validate()?;
     let pem = Zeroizing::new(
@@ -194,7 +194,7 @@ fn run(
         u64::MAX
     };
     let outcome = if let Some(device) = device {
-        use logic::device_search::RsaPssRequest;
+        use logic::rsa_pss_signature_vanity::RsaPssRequest;
         use rsa::traits::PrivateKeyParts;
         let (source, offset, length) = match config.source {
             PssSource::Salt { .. } => (0, 0, 0),
@@ -217,11 +217,8 @@ fn run(
             salt_length: base_salt.len() as u32,
         });
         request.salt[..base_salt.len()].copy_from_slice(&base_salt);
-        let found = crate::device_search::find(
-            device,
-            &crate::device_search::Request::RsaPss(&request),
-            &pattern,
-            &original,
+        let found = crate::search_batches::find(
+            |start, count| device(&request, &pattern, &original, start, count),
             limit,
             &control,
             |counter, signature| {
@@ -447,7 +444,7 @@ mod tests {
             };
             let control = Arc::new(SearchControl::new());
             let report = if device {
-                run_device(&config, control, &mut crate::device_search::HostDevice)
+                run_device(&config, control, &mut crate::test_support::rsa_pss)
             } else {
                 run_cpu(&config, control)
             }
@@ -499,3 +496,13 @@ mod tests {
         }
     }
 }
+
+/// Synchronized, ordered candidate evaluation for this mode. Implementations
+/// must clear secret device buffers before returning; this is not a CPU fallback.
+pub type EvaluateBatch<'a> = dyn FnMut(
+    &logic::rsa_pss_signature_vanity::RsaPssRequest,
+    &logic::hex_pattern::HexPattern,
+    &[u8],
+    u64,
+    u32,
+) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;

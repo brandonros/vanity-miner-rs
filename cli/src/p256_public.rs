@@ -96,7 +96,7 @@ pub fn run_cpu(
 pub fn run_device(
     config: &PublicKeySearch,
     control: Arc<SearchControl>,
-    device: &mut dyn crate::device_search::DeviceSearch,
+    device: &mut EvaluateBatch<'_>,
 ) -> Result<SearchReport, String> {
     run(config, control, Some(device))
 }
@@ -104,7 +104,7 @@ pub fn run_device(
 fn run(
     config: &PublicKeySearch,
     control: Arc<SearchControl>,
-    device: Option<&mut dyn crate::device_search::DeviceSearch>,
+    device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<SearchReport, String> {
     config.validate()?;
     let pattern = config.pattern()?;
@@ -115,7 +115,7 @@ fn run(
     let deriver = CandidateDeriver::new(*seed, CandidateDomain::P256PrivateKey, [0; 32], [0; 32]);
 
     let outcome = if let Some(device) = device {
-        use logic::device_search::P256PublicRequest;
+        use logic::p256_public_key_vanity::P256PublicRequest;
         let request = Zeroizing::new(P256PublicRequest {
             seed: *seed,
             worker: 0,
@@ -128,11 +128,8 @@ fn run(
             reserved: 0,
         });
         let mut winner = None;
-        let found = crate::device_search::find(
-            device,
-            &crate::device_search::Request::P256Public(&request),
-            &pattern,
-            &[],
+        let found = crate::search_batches::find(
+            |start, count| device(&request, &pattern, &[], start, count),
             u64::MAX,
             &control,
             |counter, bytes| {
@@ -285,30 +282,20 @@ mod tests {
             workers: 4,
         };
         if device {
-            struct CorruptDevice;
-            impl crate::device_search::DeviceSearch for CorruptDevice {
-                fn evaluate(
-                    &mut self,
-                    _: &crate::device_search::Request<'_>,
-                    _: &HexPattern,
-                    _: &[u8],
-                    _: u64,
-                    count: u32,
-                ) -> Result<Vec<logic::device_search::CandidateResult>, String> {
-                    let mut results =
-                        vec![logic::device_search::CandidateResult::MISS; count as usize];
-                    results[0].status = 1; // Invalid all-zero SEC1 point, claimed as a winner.
-                    Ok(results)
-                }
-            }
-            let rejected = run_device(&config, Arc::new(SearchControl::new()), &mut CorruptDevice);
+            let mut corrupt = |_: &logic::p256_public_key_vanity::P256PublicRequest,
+                               _: &HexPattern, _: &[u8], _: u64, count: u32| {
+                let mut results = vec![logic::candidate_result::CandidateResult::MISS; count as usize];
+                results[0].status = 1; // Invalid all-zero SEC1 point, claimed as a winner.
+                Ok(results)
+            };
+            let rejected = run_device(&config, Arc::new(SearchControl::new()), &mut corrupt);
             assert!(matches!(rejected, Err(error) if error.contains("failed verification")));
             assert!(!config.private_out.exists());
             assert!(!config.public_out.exists());
         }
         let control = Arc::new(SearchControl::new());
         let report = if device {
-            run_device(&config, control, &mut crate::device_search::HostDevice)
+            run_device(&config, control, &mut crate::test_support::p256_public)
         } else {
             run_cpu(&config, control)
         }
@@ -361,3 +348,13 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
+
+/// Synchronized, ordered candidate evaluation for this mode. Implementations
+/// must clear secret device buffers before returning; this is not a CPU fallback.
+pub type EvaluateBatch<'a> = dyn FnMut(
+    &logic::p256_public_key_vanity::P256PublicRequest,
+    &logic::hex_pattern::HexPattern,
+    &[u8],
+    u64,
+    u32,
+) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;

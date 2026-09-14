@@ -4,7 +4,7 @@ fn main() {
     #[cfg(feature = "gpu")]
     build_gpu();
 
-    #[cfg(all(feature = "cumetal", feature = "self_test"))]
+    #[cfg(feature = "self_test")]
     export_self_test_names();
 }
 
@@ -95,7 +95,7 @@ fn build_gpu() {
     println!("cargo:rustc-env=KERNELS_PTX_PATH={}", ptx_path.display());
 }
 
-#[cfg(all(feature = "cumetal", feature = "self_test"))]
+#[cfg(feature = "self_test")]
 fn export_self_test_names() {
     use std::{env, fs, path::PathBuf};
     let source = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src/self_test.rs");

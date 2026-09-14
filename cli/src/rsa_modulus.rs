@@ -206,9 +206,9 @@ fn construct_worker(
 fn construct_device(
     constraints: &ModulusConstraints,
     control: &SearchControl,
-    device: &mut dyn crate::device_search::DeviceSearch,
+    device: &mut EvaluateBatch<'_>,
 ) -> Result<Option<RsaPrivateKey>, String> {
-    use logic::device_search::RsaModulusRequest;
+    use logic::rsa_modulus_vanity::RsaModulusRequest;
     let _stop = control.cancel_on_exit();
     let one = BigUint::from(1u8);
     let e = BigUint::from(65537u32);
@@ -236,8 +236,8 @@ fn construct_device(
             if control.stopped() {
                 return Ok(None);
             }
-            let results = Zeroizing::new(device.evaluate(
-                &crate::device_search::Request::RsaModulus(&request),
+            let results = Zeroizing::new(device(
+                &request,
                 &constraints.pattern,
                 &[],
                 start,
@@ -299,7 +299,7 @@ pub fn run_cpu(
 pub fn run_device(
     config: &ModulusSearch,
     control: Arc<SearchControl>,
-    device: &mut dyn crate::device_search::DeviceSearch,
+    device: &mut EvaluateBatch<'_>,
 ) -> Result<ModulusReport, String> {
     run(config, control, Some(device))
 }
@@ -307,7 +307,7 @@ pub fn run_device(
 fn run(
     config: &ModulusSearch,
     control: Arc<SearchControl>,
-    device: Option<&mut dyn crate::device_search::DeviceSearch>,
+    device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<ModulusReport, String> {
     let constraints = config.validate()?;
     let outcome = if let Some(device) = device {
@@ -411,7 +411,7 @@ mod tests {
             };
             let control = Arc::new(SearchControl::new());
             let report = if device {
-                run_device(&config, control, &mut crate::device_search::HostDevice)
+                run_device(&config, control, &mut crate::test_support::rsa_modulus)
             } else {
                 run_cpu(&config, control)
             }
@@ -482,3 +482,13 @@ mod tests {
         }
     }
 }
+
+/// Synchronized, ordered candidate evaluation for this mode. Implementations
+/// must clear secret device buffers before returning; this is not a CPU fallback.
+pub type EvaluateBatch<'a> = dyn FnMut(
+    &logic::rsa_modulus_vanity::RsaModulusRequest,
+    &logic::hex_pattern::HexPattern,
+    &[u8],
+    u64,
+    u32,
+) -> Result<Vec<logic::candidate_result::CandidateResult>, String> + 'a;

@@ -5,7 +5,8 @@ use crate::common::GlobalStats;
     feature = "bitcoin",
     feature = "ethereum",
     feature = "shallenge",
-    feature = "self_test"
+    feature = "self_test",
+    feature = "crypto-cli"
 ))]
 use crate::modes;
 use crate::runner::Runner;
@@ -45,19 +46,19 @@ impl Runner for CpuRunner {
         match command {
             #[cfg(feature = "rsa-modulus")]
             Command::RsaModulusVanity(args) => {
-                crate::crypto_runner::modulus(args, self.num_threads)
+                modes::rsa_modulus::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "rsa-pss")]
             Command::RsaPssSignatureVanity(args) => {
-                crate::crypto_runner::pss(args, self.num_threads)
+                modes::rsa_pss_search::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "p256-public-key")]
             Command::P256PublicKeyVanity(args) => {
-                crate::crypto_runner::public_key(args, self.num_threads)
+                modes::p256_public::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "p256-signature")]
             Command::P256SignatureVanity(args) => {
-                crate::crypto_runner::signature(args, self.num_threads)
+                modes::p256_signature::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "solana")]
             Command::SolanaVanity { prefix, suffix } => {

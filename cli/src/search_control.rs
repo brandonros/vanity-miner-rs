@@ -1,15 +1,16 @@
 //! Coordination shared by host CPU workers and GPU device workers.
 
+use crate::stats::GlobalStats;
 use std::ops::Range;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 pub struct SearchControl {
     // 0 = running, 1 = cancelled, 2 = verified winner reserved.
     state: AtomicU8,
     next: AtomicU64,
-    tested: AtomicU64,
-    start: Instant,
+    stats: Arc<GlobalStats>,
 }
 
 impl Default for SearchControl {
@@ -20,12 +21,19 @@ impl Default for SearchControl {
 
 impl SearchControl {
     pub fn new() -> Self {
+        Self::with_stats(Arc::new(GlobalStats::new(1, 0, 0)))
+    }
+
+    pub fn with_stats(stats: Arc<GlobalStats>) -> Self {
         Self {
             state: AtomicU8::new(0),
             next: AtomicU64::new(0),
-            tested: AtomicU64::new(0),
-            start: Instant::now(),
+            stats,
         }
+    }
+
+    pub fn has_winner(&self) -> bool {
+        self.state.load(Ordering::Acquire) == 2
     }
 
     pub fn stopped(&self) -> bool {
@@ -86,16 +94,11 @@ impl SearchControl {
     }
 
     pub fn add_tested(&self, count: u64) {
-        // Saturate rather than wrapping statistics on an extremely long search.
-        let _ = self
-            .tested
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                Some(old.saturating_add(count))
-            });
+        self.stats.add_operations(count);
     }
 
     pub fn statistics(&self) -> (u64, Duration) {
-        (self.tested.load(Ordering::Relaxed), self.start.elapsed())
+        self.stats.statistics()
     }
 }
 

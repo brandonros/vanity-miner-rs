@@ -81,7 +81,7 @@ published last. No private key, factor, scalar, search seed, or ephemeral nonce 
 printed in statistics or normal error messages.
 
 For CUDA, add `gpu` to the same mode features using the pinned Linux/CUDA
-toolchain. New searches use 64-candidate batches, rotate across available devices,
+toolchain. New searches use 64-candidate batches, run one worker per available device,
 and observe Ctrl-C between synchronized batches. GPU performance has not been
 measured; the default 64-KiB stack limit can be overridden with `STACK_SIZE`.
 Add `self_test` and run `self-test` to exercise crypto differential fixtures
