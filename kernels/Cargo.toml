@@ -16,7 +16,7 @@ self_test = ["logic/self_test"]
 
 [dependencies]
 logic = { path = "../logic", default-features = false }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "059beda8781e681834e971b4af86d71c661b1f66" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "d2104a0a49252068292985e5e63328f522415c4b" }
 
 [workspace]
 

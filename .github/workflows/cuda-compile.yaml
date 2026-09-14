@@ -64,6 +64,9 @@ jobs:
 
           echo "Copied build artifacts for ${{ matrix.arch }}"
 
+      - name: Verify all kernel entries survived compilation
+        run: python3 scripts/check-ptx-entries.py artifacts/output-llvm${{ matrix.llvm }}.ptx
+
       - name: Patch ELF interpreter for portability
         run: |
           # Nix bakes a /nix/store/... interpreter path into the binary, which

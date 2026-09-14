@@ -76,7 +76,7 @@ CI builds both LLVM backends for both Linux host architectures. Release assets
 use explicit `-llvm7` or `-llvm21` suffixes: two host binaries and one standalone
 PTX file per LLVM version. The host architecture suffix does not identify the GPU.
 
-This branch pins Rust-CUDA to `059beda8781e681834e971b4af86d71c661b1f66` from
+This branch pins Rust-CUDA to `d2104a0a49252068292985e5e63328f522415c4b` from
 `poc/portable-ptx-export`, based on the LLVM 21.1.8 / CUDA 13.3 upgrade.
 The default Nix shell is `v21`; LLVM 19 has been replaced by the `llvm21` feature.
 Modern merged-module DCE is enabled by the backend by default. Optional cleanup
