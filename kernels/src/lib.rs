@@ -51,3 +51,8 @@ pub use ethereum_vanity::*;
 pub use shallenge::*;
 #[cfg(feature = "self_test")]
 pub use self_test::*;
+
+#[cfg(feature = "self_test")]
+mod codegen_repros;
+#[cfg(feature = "self_test")]
+pub use codegen_repros::*;

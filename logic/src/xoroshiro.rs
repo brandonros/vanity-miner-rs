@@ -53,3 +53,19 @@ mod test {
         }
     }
 }
+
+// Same alphabet as the production nonce generator. Keep the two pointer origins
+// in a shared helper so generated PTX can expose helper address-space mistakes.
+#[cfg(feature = "self_test")]
+#[inline(never)]
+fn repro_read_byte(bytes: &[u8], index: usize) -> u8 {
+    bytes[index]
+}
+
+#[cfg(feature = "self_test")]
+pub fn repro_alphabet_helper(index: usize, bytes: &[u8]) -> (u64, u64) {
+    (
+        repro_read_byte(BASE64_CHARS, index & 63) as u64,
+        repro_read_byte(bytes, index & 7) as u64,
+    )
+}
