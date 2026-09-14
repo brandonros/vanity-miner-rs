@@ -1,5 +1,11 @@
 # Running prebuilt Rust-CUDA PTX through CuMetal
 
+Start with the [reproduction runbook](cumetal-reproduction.md) for repository
+roles, a clean CuMetal build, the exact CI artifact, durable paths, per-entry
+translation commands, and the correctness/benchmark sequence. No `/tmp` clone
+is required. The [benchmark guide](cumetal-benchmark.md) records measured M5
+settings and results.
+
 The optional `cumetal` CLI backend consumes an existing PTX artifact on Apple
 Silicon. It does not invoke Rust-CUDA or require the NVIDIA SDK on the Mac.
 The CuMetal compiler and runtime must already be built. This flow asks
@@ -113,11 +119,17 @@ The Ethereum request regression checks hex decoding against a fixed expected
 address, because CPU/GPU agreement alone can miss identical host-input errors.
 
 The same pinned compiler passed all 118 Rust-generated numerical entries and
-the separate launch probe through the standalone GPU runner. Seven recovered
-slots plus the probe also passed through the CLI. The full CLI self-test wrapper
-above has host tests for incomplete/duplicate evidence; its entire 119-entry GPU
-run has not yet been validated. These results do not claim a complete run on
-newer compiler binaries.
+the separate launch probe through both the standalone GPU runner and one
+complete CLI invocation. The CLI wrapper verified the exact 119-entry inventory,
+GPU launch provenance, neighboring result slots, and both buffer guards. Its
+host tests reject incomplete or duplicate evidence. These results do not claim
+a complete run on newer compiler binaries or exhaustive coverage of every input.
+
+The complete CLI self-test run took 2056.5 seconds (about 34 minutes), including
+Metal compilation. Larger cryptographic entries can take minutes to compile;
+that elapsed time is not GPU execution time. Reports and logs are archived in
+the companion CuMetal worktree under
+`docs/experiments/llvm21-cli-validation/final-v10/`.
 
 Validation inputs:
 

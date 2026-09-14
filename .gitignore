@@ -4,3 +4,4 @@ build
 .direnv
 
 .cumetal-cache/
+.cumetal-artifacts/

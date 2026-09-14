@@ -5,7 +5,9 @@ Run commands from the repository root. Modes are selected at build time:
 the default build includes only `shallenge`. The `gpu` feature selects the NVIDIA
 CUDA runner; it does not enable additional modes and has no CPU fallback.
 The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon;
-see [the CuMetal guide](docs/cumetal.md). Select only one GPU backend.
+see [the CuMetal guide](docs/cumetal.md). For the complete build, artifact download,
+translation, validation, and benchmark workflow, use the
+[CuMetal reproduction runbook](docs/cumetal-reproduction.md). Select only one GPU backend.
 
 ## CPU mode (no CUDA required)
 
