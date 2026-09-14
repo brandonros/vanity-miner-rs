@@ -815,3 +815,403 @@ pub unsafe extern "C" fn kernel_self_test_dalek_reduce_pipeline_zero(results_ptr
     let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
     results[117] = logic::check_dalek_reduce_pipeline_zero();
 }
+
+/// p256 public key: hmac derivation.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_hmac_derivation(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[118] = logic::check_p256_public_key_hmac_derivation();
+}
+
+/// p256 public key: scalar derivation.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_scalar_derivation(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[119] = logic::check_p256_public_key_scalar_derivation();
+}
+
+/// p256 public key: generator.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_generator(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[120] = logic::check_p256_public_key_generator();
+}
+
+/// p256 public key: point double.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_point_double(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[121] = logic::check_p256_public_key_point_double();
+}
+
+/// p256 public key: zero scalar rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_zero_scalar_rejected(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[122] = logic::check_p256_public_key_zero_scalar_rejected();
+}
+
+/// p256 public key: order scalar rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_order_scalar_rejected(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[123] = logic::check_p256_public_key_order_scalar_rejected();
+}
+
+/// p256 public key: x encoding.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_x_encoding(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[124] = logic::check_p256_public_key_x_encoding();
+}
+
+/// p256 public key: y encoding.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_key_y_encoding(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[125] = logic::check_p256_public_key_y_encoding();
+}
+
+/// p256 signature: rfc6979 sample.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_sample(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[126] = logic::check_p256_signature_rfc6979_sample();
+}
+
+/// p256 signature: rfc6979 test.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_rfc6979_test(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[127] = logic::check_p256_signature_rfc6979_test();
+}
+
+/// p256 signature: ephemeral r.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_r(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[128] = logic::check_p256_signature_ephemeral_r();
+}
+
+/// p256 signature: ephemeral signature.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_signature(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[129] = logic::check_p256_signature_ephemeral_signature();
+}
+
+/// p256 signature: zero nonce rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_zero_nonce_rejected(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[130] = logic::check_p256_signature_zero_nonce_rejected();
+}
+
+/// p256 signature: low s.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_low_s(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[131] = logic::check_p256_signature_low_s();
+}
+
+/// p256 signature: high s.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_high_s(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[132] = logic::check_p256_signature_high_s();
+}
+
+/// p256 signature: message window carry.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_message_window_carry(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[133] = logic::check_p256_signature_message_window_carry();
+}
+
+/// p256 signature: ephemeral hmac.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_ephemeral_hmac(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[134] = logic::check_p256_signature_ephemeral_hmac();
+}
+
+/// rsa pss: sha256.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_sha256(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[135] = logic::check_rsa_pss_sha256();
+}
+
+/// rsa pss: mgf1 partial block.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_mgf1_partial_block(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[136] = logic::check_rsa_pss_mgf1_partial_block();
+}
+
+/// rsa pss: salt32 encoding.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt32_encoding(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[137] = logic::check_rsa_pss_salt32_encoding();
+}
+
+/// rsa pss: empty salt encoding.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_empty_salt_encoding(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[138] = logic::check_rsa_pss_empty_salt_encoding();
+}
+
+/// rsa pss: maximum salt encoding.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_maximum_salt_encoding(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[139] = logic::check_rsa_pss_maximum_salt_encoding();
+}
+
+/// rsa pss: oversized salt rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_oversized_salt_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[140] = logic::check_rsa_pss_oversized_salt_rejected();
+}
+
+/// rsa pss: salt carry.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_salt_carry(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[141] = logic::check_rsa_pss_salt_carry();
+}
+
+/// rsa pss: crt known answer.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_known_answer(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[142] = logic::check_rsa_pss_crt_known_answer();
+}
+
+/// rsa pss: crt fault rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_fault_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[143] = logic::check_rsa_pss_crt_fault_rejected();
+}
+
+/// rsa pss: crt modulus rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_crt_modulus_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[144] = logic::check_rsa_pss_crt_modulus_rejected();
+}
+
+/// rsa modulus: multiplication carry.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_multiplication_carry(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[145] = logic::check_rsa_modulus_multiplication_carry();
+}
+
+/// rsa modulus: progression carry.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_progression_carry(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[146] = logic::check_rsa_modulus_progression_carry();
+}
+
+/// rsa modulus: prime filter.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_prime_filter(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[147] = logic::check_rsa_modulus_prime_filter();
+}
+
+/// rsa modulus: pseudoprime rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_pseudoprime_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[148] = logic::check_rsa_modulus_pseudoprime_rejected();
+}
+
+/// rsa modulus: zero stride rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_zero_stride_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[149] = logic::check_rsa_modulus_zero_stride_rejected();
+}
+
+/// rsa modulus: upper bound rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_upper_bound_rejected(results_ptr: *mut u32) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[150] = logic::check_rsa_modulus_upper_bound_rejected();
+}
+
+/// rsa modulus: equal factors rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_equal_factors_rejected(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[151] = logic::check_rsa_modulus_equal_factors_rejected();
+}
+
+/// rsa modulus: undersized factor rejected.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_undersized_factor_rejected(
+    results_ptr: *mut u32,
+) {
+    let results =
+        unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[152] = logic::check_rsa_modulus_undersized_factor_rejected();
+}
+
+/// Full p256 public candidate pipeline regression, slot 153.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_public_end_to_end(results_ptr: *mut u32) {
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[153] = logic::check_p256_public_end_to_end();
+}
+
+/// Full p256 signature candidate pipeline regression, slot 154.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_p256_signature_end_to_end(results_ptr: *mut u32) {
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[154] = logic::check_p256_signature_end_to_end();
+}
+
+/// Full rsa pss candidate pipeline regression, slot 155.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_pss_end_to_end(results_ptr: *mut u32) {
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[155] = logic::check_rsa_pss_end_to_end();
+}
+
+/// Full rsa modulus candidate pipeline regression, slot 156.
+/// # Safety
+/// results_ptr must point to SELF_TEST_NUM_CHECKS writable u32 values.
+#[kernel]
+pub unsafe extern "C" fn kernel_self_test_rsa_modulus_end_to_end(results_ptr: *mut u32) {
+    let results = unsafe { core::slice::from_raw_parts_mut(results_ptr, logic::SELF_TEST_NUM_CHECKS) };
+    results[156] = logic::check_rsa_modulus_end_to_end();
+}

@@ -14,7 +14,7 @@
 //! Empirically (RTX 4090, compute 8.9, CUDA 13.2): k256-derive kernels with
 //! runtime priv need > 8 KiB and work at 16 KiB. Pipelines that don't compose
 //! k256 (e.g. solana = xoroshiro + ed25519/dalek + base58) fit in the 1 KiB
-//! default. The full 118-slot self-test runs clean at 16 KiB.
+//! default. The original 118-slot self-test ran clean at 16 KiB; RSA/P-256 checks use the larger host-configured stack.
 //!
 //! The CLI sets `cudaLimitStackSize = 16 KiB` by default in
 //! `cli/src/common/gpu_context.rs`; override with `STACK_SIZE=N`. If you add

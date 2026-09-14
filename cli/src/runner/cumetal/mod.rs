@@ -41,7 +41,7 @@ pub struct CumetalOptions {
     #[arg(long, global = true)]
     pub verify: bool,
     /// Run only selected self-test slots (repeatable); omitted runs all slots.
-    #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..118))]
+    #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..logic::SELF_TEST_NUM_CHECKS as i64))]
     pub self_test_slot: Vec<u32>,
 }
 
@@ -485,18 +485,14 @@ impl Runner for CumetalRunner {
 #[cfg(feature = "self_test")]
 impl CumetalRunner {
     fn self_tests(&self, driver: &Rc<Driver>) -> Result<(), Error> {
-        use vanity_miner::self_test_suite::{self, Kind, Outcome};
+        use vanity_miner::self_test_suite::{self, Outcome};
         self_test_suite::run("CuMetal", |case| {
-            let slot = match case.kind {
-                Kind::Probe => 0,
-                Kind::Legacy(slot) => {
-                    if !self.options.self_test_slot.is_empty() && !self.options.self_test_slot.contains(&(slot as u32)) {
-                        return Ok(Outcome::Skipped("not selected"));
-                    }
-                    slot
+            if let Some(slot) = case.slot {
+                if !self.options.self_test_slot.is_empty() && !self.options.self_test_slot.contains(&(slot as u32)) {
+                    return Ok(Outcome::Skipped("not selected"));
                 }
-                _ => return Ok(Outcome::Skipped("crypto candidate transport is not supported by CuMetal")),
-            };
+            }
+            let slot = case.slot.unwrap_or(0);
             let name = case.kernel;
             let operation = (|| -> Result<(), Error> {
                 let module = self.module(driver, name)?;

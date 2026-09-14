@@ -15,12 +15,16 @@ pub mod cpu {
         global_stats: Arc<GlobalStats>,
     }
 
-    fn worker(thread_id: usize, data: Arc<WorkerData>) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn worker(
+        thread_id: usize,
+        data: Arc<WorkerData>,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
         println!("[CPU-{}] Starting CPU shallenge worker thread", thread_id);
 
-        loop {
+        while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             let rng_seed: u64 = rng.r#gen();
 
             // Get the current best hash (with minimal lock time)
@@ -83,6 +87,7 @@ pub mod cpu {
                 }
             }
         }
+        Ok(())
     }
 
     pub fn run(

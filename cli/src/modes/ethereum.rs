@@ -14,12 +14,16 @@ pub mod cpu {
         global_stats: Arc<GlobalStats>,
     }
 
-    fn worker(thread_id: usize, data: Arc<WorkerData>) -> Result<(), Box<dyn Error + Send + Sync>> {
+    fn worker(
+        thread_id: usize,
+        data: Arc<WorkerData>,
+        cancelled: Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let mut rng = rand::thread_rng();
 
         println!("[CPU-{thread_id}] Starting CPU ethereum vanity worker thread");
 
-        loop {
+        while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
             let rng_seed: u64 = rng.r#gen();
 
             let request = logic::EthereumVanityKeyRequest {
@@ -56,6 +60,7 @@ pub mod cpu {
                 data.global_stats.print_stats(thread_id, 1);
             }
         }
+        Ok(())
     }
 
     pub fn run(

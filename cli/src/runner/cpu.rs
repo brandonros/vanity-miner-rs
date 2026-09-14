@@ -40,7 +40,6 @@ impl Runner for CpuRunner {
             "Starting CPU mode with {} threads",
             command.cpu_threads(self.num_threads)
         );
-        // New modes have bounded-search statistics separate from legacy runners.
         let _ = &stats;
 
         match command {

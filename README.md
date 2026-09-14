@@ -5,7 +5,7 @@ GPU-accelerated vanity address generator for multiple blockchains.
 
 Four new commands have CPU runners and CUDA kernels/host dispatch. Shared logic
 and CPU integration are tested. CI compiles all four new CUDA modes on both
-LLVM backends; hardware validation and GPU performance measurements remain pending. See [implementation status](docs/new-modes-plan.md).
+LLVM backends; hardware validation and GPU performance measurements remain pending.
 
 ```sh
 cargo build -p vanity-miner --no-default-features --features rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
@@ -98,10 +98,8 @@ openssl dgst -sha256 -verify p256-public.pem -signature p256-signature.der winni
 Run commands from the repository root. Modes are selected at build time:
 the default build includes only `shallenge`. The `gpu` feature selects the NVIDIA
 CUDA runner; it does not enable additional modes and has no CPU fallback.
-The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon;
-see [the CuMetal guide](docs/cumetal.md). For the complete build, artifact download,
-translation, validation, and benchmark workflow, use the
-[CuMetal reproduction runbook](docs/cumetal-reproduction.md). Select only one GPU backend.
+The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon.
+Select only one GPU backend.
 
 ## CPU mode (no CUDA required)
 
@@ -138,7 +136,6 @@ mainnet `bc1q` prefix and an empty suffix.
 
 The Nix development shells support `x86_64-linux` and `aarch64-linux` and provide
 the build toolchain. Running requires a compatible NVIDIA GPU and host driver.
-See [the CUDA guide](docs/cuda.md) for runtime settings and validation.
 
 ```sh
 # LLVM 7, compute_89; select the legacy shell explicitly.
@@ -188,8 +185,38 @@ self-tests; enabling RSA/P-256 features does not add those commands to CuMetal.
 The `self_test` build also exports a small runtime-input kernel for the observed
 nonce-generation failure. It preserves the existing 118
 known-answer slots and can be run independently with raw mismatch reporting.
-See the [coverage audit and reproduction guide](docs/codegen-repros.md).
 
 LLVM 7 kernel builds that enable RSA/P-256 use optimization level 1 to avoid
 legacy libnvvm rejecting vectorized HMAC byte swaps. Host builds and LLVM 21
 retain release optimization; GPU throughput for the new modes is unmeasured.
+
+### Numbered self-test coverage
+
+`self_test` enables the logic dependencies for all eight modes. The common
+`logic/src/self_test.rs` and `kernels/src/self_test.rs` inventory has 157 named
+numerical checks, each with a dedicated kernel and stable result slot:
+
+| Slots | Coverage |
+| --- | --- |
+| 0–117 | Existing primitive, pipeline, and compiler regression checks (unchanged) |
+| 118–125 | P-256 public key derivation, points, encoding, invalid scalars |
+| 126–134 | P-256 signatures, RFC6979, nonce validity, S forms, message carry |
+| 135–144 | SHA-256, MGF1, PSS salt boundaries, carry, CRT and rejection |
+| 145–152 | RSA multiplication, progression, primality and candidate boundaries |
+| 153–156 | Full P-256 public/signature and RSA-PSS/modulus candidate pipelines |
+
+The launch probe is additional: 158 reported cases total (157 CPU passes plus
+one GPU-only probe skip), including in a build enabling only `self_test`.
+The four full-pipeline slots hash every lane's status and all output bytes against
+fixed CPU reference digests, using public, fixed fixtures. These are regression
+references, distinct from the independently computed primitive vectors below.
+They exercise production candidate logic through single-slot wrapper kernels.
+
+The numbered self-tests do not verify production CUDA argument passing, buffer
+layouts, or batch lane ordering. The optional transport test layer is removed.
+
+Expected crypto constants live beside the checks in `logic/src/self_test.rs`.
+Primitive fixtures were computed independently with SHA/HMAC and elementary
+curve/integer reference arithmetic. No fixture generator is required to build
+or run self-tests.
+This inventory extension does not establish GPU numerical correctness.
