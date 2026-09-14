@@ -19,10 +19,27 @@ fn build_gpu() {
     println!("cargo:rustc-link-lib=advapi32");
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let kernels_dir = manifest_dir.parent().unwrap().join("kernels");
+    let workspace_dir = manifest_dir.parent().unwrap();
+    let kernels_dir = workspace_dir.join("kernels");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     println!("cargo::rerun-if-changed={}", kernels_dir.display());
+    // The nested kernel workspace also compiles shared logic outside kernels/.
+    // Track its sources and the manifests, lockfiles, and toolchain that affect
+    // the build so CPU changes cannot leave the embedded PTX stale.
+    // kernels/ above includes its own Cargo.toml and Cargo.lock.
+    for input in [
+        "logic",
+        "Cargo.toml",
+        "Cargo.lock",
+        "cli/Cargo.toml",
+        "rust-toolchain.toml",
+    ] {
+        println!(
+            "cargo::rerun-if-changed={}",
+            workspace_dir.join(input).display()
+        );
+    }
 
     // `kernels` is a separate workspace; Cargo does not forward CLI features
     // into CudaBuilder's nested build automatically.
