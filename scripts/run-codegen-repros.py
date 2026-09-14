@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--vectors', type=Path, required=True)
     parser.add_argument('--library', type=Path, required=True)
     parser.add_argument('--cumetalc', type=Path, help='Omit for NVIDIA CUDA execution of PTX')
-    parser.add_argument('--entry', choices=['kernel_repro_nonce_sequence', 'kernel_repro_alphabet_helper'])
+    parser.add_argument('--entry', choices=['kernel_repro_nonce_sequence'])
     parser.add_argument('--out', type=Path, required=True, help='New evidence directory')
     args = parser.parse_args()
     rows = json.loads(args.vectors.read_text())

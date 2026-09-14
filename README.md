@@ -84,7 +84,7 @@ and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.
 
 ## Focused Rust GPU reproductions
 
-The `self_test` build also exports two small runtime-input kernels for observed
-nonce-generation and helper/table failures. They preserve the existing 118
+The `self_test` build also exports a small runtime-input kernel for the observed
+nonce-generation failure. It preserves the existing 118
 known-answer slots and can be run independently with raw mismatch reporting.
 See the [coverage audit and reproduction guide](docs/codegen-repros.md).

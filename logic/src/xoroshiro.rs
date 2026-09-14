@@ -53,25 +53,3 @@ mod test {
         }
     }
 }
-
-// Same alphabet as the production nonce generator. Keep the two pointer origins
-// in a shared helper so generated PTX can expose helper address-space mistakes.
-#[cfg(feature = "self_test")]
-#[inline(never)]
-unsafe fn repro_read_byte(base: *const u8, index: usize) -> u8 {
-    unsafe { *base.add(index) }
-}
-
-#[cfg(feature = "self_test")]
-pub fn repro_alphabet_helper(index: usize, bytes: &[u8; 8]) -> (u64, u64) {
-    // Both offsets are in bounds by construction. Isolate the pointer read,
-    // not an additional bounds-check/trap control-flow path in the helper.
-    // Keep the dynamic index inside the helper: a plain dereference can be
-    // promoted to a byte argument even when the function is not inlined.
-    unsafe {
-        (
-            repro_read_byte(BASE64_CHARS.as_ptr(), index & 63) as u64,
-            repro_read_byte(bytes.as_ptr(), index & 7) as u64,
-        )
-    }
-}

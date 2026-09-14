@@ -25,8 +25,8 @@ The 36 tracked CuMetal fixes are not 36 missing Rust tests. The table distinguis
 | [#36](https://github.com/Lulzx/cuda-metal/issues/36) / [#55](https://github.com/Lulzx/cuda-metal/pull/55) | Base58/nonce length handling | PTX overload typing; existing integration plus upstream unit test. |
 | [#38](https://github.com/Lulzx/cuda-metal/issues/38) / [#55](https://github.com/Lulzx/cuda-metal/pull/55) | Slot 39: u64 high multiply; 49, 51, 59, 64 | Already dedicated arithmetic coverage; no duplicate kernel. |
 | [#37](https://github.com/Lulzx/cuda-metal/issues/37) / [#56](https://github.com/Lulzx/cuda-metal/pull/56) | Curve/local-pointer internals | Dead conversion elimination; a standalone Rust expression may disappear. |
-| [#39](https://github.com/Lulzx/cuda-metal/issues/39) / [#56](https://github.com/Lulzx/cuda-metal/pull/56) | Slots 60–63, 99–103: indexing/slices/helper paths | Probe shared table/device helper in the new focused case. |
-| [#45](https://github.com/Lulzx/cuda-metal/issues/45) / [#56](https://github.com/Lulzx/cuda-metal/pull/56) | Slots 61–63, 97–101, 108: slice/index arithmetic | Existing Rust cases plus runtime-pointer paths in new kernels. |
+| [#39](https://github.com/Lulzx/cuda-metal/issues/39) / [#56](https://github.com/Lulzx/cuda-metal/pull/56) | Slots 60–63, 99–103: indexing/slices/helper paths | Existing direct tests retained; helper attempt tracked separately in CuMetal #80. |
+| [#45](https://github.com/Lulzx/cuda-metal/issues/45) / [#56](https://github.com/Lulzx/cuda-metal/pull/56) | Slots 61–63, 97–101, 108: slice/index arithmetic | Existing Rust cases plus runtime-pointer paths in new kernel. |
 | [#35](https://github.com/Lulzx/cuda-metal/issues/35) / [#57](https://github.com/Lulzx/cuda-metal/pull/57) | Slots 41–43, 105, 107–108: guarded base58/slices | Existing Rust bisects; no general CFG feature expansion. |
 | [#40](https://github.com/Lulzx/cuda-metal/issues/40) / [#58](https://github.com/Lulzx/cuda-metal/pull/58) | Slots 0, 44: RNG seeding/nonce generation | New runtime nonce extraction exercises actual library path; no invented recursion. |
 | [#41](https://github.com/Lulzx/cuda-metal/issues/41) / [#58](https://github.com/Lulzx/cuda-metal/pull/58) | Slots 96, 99–101, 106, 110: aggregate/copy/return | Existing small Rust cases; exact PTX parameter lanes stay upstream. |
@@ -34,7 +34,7 @@ The 36 tracked CuMetal fixes are not 36 missing Rust tests. The table distinguis
 | [#43](https://github.com/Lulzx/cuda-metal/issues/43) / [#62](https://github.com/Lulzx/cuda-metal/pull/62) | Bounds/assertion paths in generated module | Trap reporting is a runtime contract; do not add deliberate panics to successful miner tests. |
 | [#46](https://github.com/Lulzx/cuda-metal/issues/46) / [#62](https://github.com/Lulzx/cuda-metal/pull/62) | Assertions in reachable helper calls | Trap propagation stays in upstream runtime/compiler tests. |
 | [#24](https://github.com/Lulzx/cuda-metal/issues/24) / [#63](https://github.com/Lulzx/cuda-metal/pull/63) | All kernel launches | Runtime provenance; retain upstream test. |
-| [#59](https://github.com/Lulzx/cuda-metal/issues/59) / [#68](https://github.com/Lulzx/cuda-metal/pull/68) | Production input/output buffers | New runtime two-buffer kernels exercise provenance; store-specific mutation remains upstream. |
+| [#59](https://github.com/Lulzx/cuda-metal/issues/59) / [#68](https://github.com/Lulzx/cuda-metal/pull/68) | Production input/output buffers | New runtime two-buffer nonce kernel exercise provenance; store-specific mutation remains upstream. |
 | [#64](https://github.com/Lulzx/cuda-metal/issues/64) / [#69](https://github.com/Lulzx/cuda-metal/pull/69) | Production Shallenge; fixed nonce slot 44 did not catch runtime mismatch | High-value gap: new nonce vectors span seeds, indices, and zero/multiple iterations. |
 | [#51](https://github.com/Lulzx/cuda-metal/issues/51) / [#70](https://github.com/Lulzx/cuda-metal/pull/70) | Slots 84, 102–103, 109, 112–117: scalar reductions/zero paths | Already dedicated recovered Rust slots; do not introduce undefined Rust halves. |
 | [#66](https://github.com/Lulzx/cuda-metal/issues/66) / [#70](https://github.com/Lulzx/cuda-metal/pull/70) | Same recovered scalar-zero slots as #51 | Keep existing Rust cases; named discarded PTX registers are allocator-dependent. |
@@ -42,21 +42,22 @@ The 36 tracked CuMetal fixes are not 36 missing Rust tests. The table distinguis
 | [#65](https://github.com/Lulzx/cuda-metal/issues/65) / [#71](https://github.com/Lulzx/cuda-metal/pull/71) | Every typed kernel launch | ABI sidecar policy; upstream tests, not extra Rust arithmetic. |
 | [#61](https://github.com/Lulzx/cuda-metal/issues/61) / [#72](https://github.com/Lulzx/cuda-metal/pull/72) | Production Shallenge pointer/length handling | Runtime nonce extraction; commuted PTX register order is not guaranteed by Rust source. |
 | [#78](https://github.com/Lulzx/cuda-metal/issues/78) / [#79](https://github.com/Lulzx/cuda-metal/pull/79) | Upstream alias-write mutation audit | Not an observed miner computation; no new mutable-global Rust feature. |
-| [#67](https://github.com/Lulzx/cuda-metal/issues/67) / [#74](https://github.com/Lulzx/cuda-metal/pull/74) | Recovered scalar-wide slot 103; existing table slots 60–63 | Add shared-helper table/device path; verify emitted address conversions before claiming exact repro. |
+| [#67](https://github.com/Lulzx/cuda-metal/issues/67) / [#74](https://github.com/Lulzx/cuda-metal/pull/74) | Recovered scalar-wide slot 103; existing table slots 60–63 | Helper attempt still fails current compiler (#80); retain existing slots and defer the additional kernel. |
 | [#73](https://github.com/Lulzx/cuda-metal/issues/73) / [#75](https://github.com/Lulzx/cuda-metal/pull/75) | Upstream ReLU fixture, not an observed miner Rust kernel | Do not add ReLU or require specific register reuse merely to match upstream bug. |
 
 ## Bounded additions
 
-Two separate Rust-generated entries return raw values so the runner reports the exact input and mismatch. They do not renumber or enlarge the existing 118-slot known-answer protocol. Both use the existing `self_test` feature.
+One Rust-generated entry returns raw values so the runner reports the exact input and mismatch. It does not renumber or enlarge the existing 118-slot known-answer protocol and uses the existing `self_test` feature.
 
-- `kernel_repro_nonce_sequence`: calls the real `generate_base64_nonce`, removing Shallenge hashing and match/output coordination. 240 cases span six seeds (including nonzero high halves and wrap), five thread indices, and eight lengths including zero. The CPU oracle calls the same production logic; existing fixed known-answer tests remain its independent checks.
-- `kernel_repro_alphabet_helper`: the production nonce alphabet and a runtime device buffer pass through the same non-inlined byte-reading helper. 129 cases check all alphabet indices, masked large indices, and input byte values against an independent literal alphabet. This extends the existing direct table slots with the helper/storage interaction.
+`kernel_repro_nonce_sequence` calls the real `generate_base64_nonce`, removing Shallenge hashing and match/output coordination. Its 240 cases span six seeds (including nonzero high halves and wrap), five thread indices, and eight lengths including zero. The CPU oracle calls the same production logic and asserts the fixed two-byte result `pe` for the smallest historical mismatch. Existing known-answer checks are retained.
 
-The generated PTX must be inspected before treating either as an exact reproduction of #64 or #67. A passing related path is useful coverage but does not prove that the historical failing instruction shape survived reduction. No handwritten PTX or inline assembly is substituted.
+Generated PTX retains runtime loads, loop paths, 64-bit tuple packs, and RNG seeding. No handwritten PTX or inline assembly is substituted.
+
+A table/device helper was also investigated, because the existing direct table slots do not isolate that interaction. A faithful pointer/index helper still fails current typed import, so it is **not added to the accepted suite**. Its small Rust source, generated PTX and diagnostics are preserved in [CuMetal #80](https://github.com/Lulzx/cuda-metal/issues/80). The investigation also showed that `#[inline(never)]` alone does not stop argument promotion from replacing a plain pointer-reading helper with a byte identity function; that optimized-away case was not counted as coverage.
 
 ## Build and run
 
-Build the ordinary full-feature PTX using the existing Rust-CUDA workflow or the documented Linux `nix develop .#v21` command. The PTX entry inventory now also requires these two kernels. The PR build supplies LLVM 7/21 artifacts without running the release job.
+Build the ordinary full-feature PTX using the existing Rust-CUDA workflow or the documented Linux `nix develop .#v21` command. The PTX entry inventory now also requires this additional kernel. The PR build supplies LLVM 7/21 artifacts without running the release job.
 
 ```sh
 cargo run -p logic --example codegen_repro_vectors --features self_test --locked > vectors.json
@@ -68,4 +69,10 @@ For NVIDIA CUDA, omit `--cumetalc` and supply the CUDA driver library. Select a 
 
 ## Validation status
 
-Host vector generation and logic tests are available locally. Rust-CUDA CI compilation, emitted-code inspection, current CuMetal execution, and historical comparison are pending; none is inferred from CPU success.
+The initial Rust commit `36209df` passed all four Rust-CUDA compile cells (LLVM 7/21, x86_64/aarch64) in [run 34874682601](https://github.com/brandonros/vanity-miner-rs/actions/runs/34874682601). All 40 host logic tests and all 118 existing CPU self-tests pass.
+
+The LLVM 21 nonce entry is 187 PTX lines, versus 2,731 for the production Shallenge entry (entry bodies, excluding reachable helpers). On the archived CuMetal `1e3c01e`, seed 0 / thread 0 / length 2 produces `p9` instead of `pe`. Current CuMetal `ddf496c` passes all 240 nonce cases, with untouched input and output guards. Generated old MSL uses 32-bit variables for packed loop state where the corrected output uses 64 bits, matching the #64 failure class. This comparison is against the combined historical/current compilers, not an isolated single-commit revert.
+
+The helper investigation reproduced the address-space verification failure both with and without a bounds-check branch. The no-branch pointer/index source is preserved at `e18d297`; its LLVM 21 artifact has SHA-256 `4e08de091993f2475cd12ee8ecb13620ead3683ec96a3e2f52c2f231416b4b12`. All 240 nonce cases also pass using that artifact. The production nonce Rust function and its kernel body are unchanged when the unrelated helper is removed. Final nonce-only CI/export verification is pending.
+
+No NVIDIA numerical execution or full 118-entry GPU rerun is claimed for this change; the CI matrix validates compilation/export and the local CPU run preserves the existing known-answer inventory.

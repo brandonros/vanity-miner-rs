@@ -13,17 +13,3 @@ pub unsafe extern "C" fn kernel_repro_nonce_sequence(input: *const u64, output: 
     let bytes = unsafe { core::slice::from_raw_parts_mut(output.cast::<u8>(), length) };
     logic::generate_base64_nonce(index, seed, bytes);
 }
-
-/// Isolate the alphabet/device-buffer helper address paths from nonce generation.
-/// input: [index, eight bytes packed in a u64]; output: two u64 values.
-#[kernel]
-#[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe extern "C" fn kernel_repro_alphabet_helper(input: *const u64, output: *mut u64) {
-    let index = unsafe { *input } as usize;
-    let bytes = unsafe { &*input.add(1).cast::<[u8; 8]>() };
-    let pair = logic::repro_alphabet_helper(index, bytes);
-    unsafe {
-        *output = pair.0;
-        *output.add(1) = pair.1;
-    }
-}
