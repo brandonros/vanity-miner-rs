@@ -54,7 +54,7 @@ jobs:
 
       - name: Build with nix devshell
         run: |
-          nix develop .#v${{ matrix.llvm }} --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test${{ matrix.extra-features }}" --release --locked
+          nix develop .#v${{ matrix.llvm }} --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature${{ matrix.extra-features }}" --release --locked
 
           mkdir -p artifacts
           cp target/llvm${{ matrix.llvm }}/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}-llvm${{ matrix.llvm }}
