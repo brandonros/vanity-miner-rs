@@ -20,7 +20,7 @@ pub unsafe extern "C" fn kernel_repro_nonce_sequence(input: *const u64, output: 
 #[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
 pub unsafe extern "C" fn kernel_repro_alphabet_helper(input: *const u64, output: *mut u64) {
     let index = unsafe { *input } as usize;
-    let bytes = unsafe { core::slice::from_raw_parts(input.add(1).cast::<u8>(), 8) };
+    let bytes = unsafe { &*input.add(1).cast::<[u8; 8]>() };
     let pair = logic::repro_alphabet_helper(index, bytes);
     unsafe {
         *output = pair.0;

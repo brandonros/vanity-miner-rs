@@ -51,7 +51,11 @@ def main():
     lib = c.CDLL(str(library))
     ptr, u32, u64 = c.c_void_p, c.c_uint32, c.c_uint64
     def api(name, types, *values):
-        fn = getattr(lib, name)
+        # NVIDIA's unversioned allocation/copy entry points use the old ABI.
+        versioned = {'cuCtxCreate', 'cuCtxDestroy', 'cuMemAlloc', 'cuMemFree',
+                     'cuMemcpyHtoD', 'cuMemcpyDtoH'}
+        symbol = name + '_v2' if name in versioned and hasattr(lib, name + '_v2') else name
+        fn = getattr(lib, symbol)
         fn.argtypes, fn.restype = types, c.c_int
         status = fn(*values)
         if status:

@@ -81,3 +81,10 @@ This branch pins Rust-CUDA to `d2104a0a49252068292985e5e63328f522415c4b` from
 The default Nix shell is `v21`; LLVM 19 has been replaced by the `llvm21` feature.
 Modern merged-module DCE is enabled by the backend by default. Optional cleanup
 and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.
+
+## Focused Rust GPU reproductions
+
+The `self_test` build also exports two small runtime-input kernels for observed
+nonce-generation and helper/table failures. They preserve the existing 118
+known-answer slots and can be run independently with raw mismatch reporting.
+See the [coverage audit and reproduction guide](docs/codegen-repros.md).
