@@ -151,6 +151,10 @@ pub mod gpu {
                 found_encoded_public_key_dev.copy_to(&mut found_encoded_public_key)?;
                 found_thread_idx_dev.copy_to(&mut found_thread_idx_slice)?;
 
+                // TODO: CPU-verify GPU results before formatting or printing:
+                // validate candidate metadata, derive the public key and Base58
+                // address from the private seed, compare returned fields using
+                // the actual encoded length, and confirm the prefix/suffix match.
                 let found_thread_idx = found_thread_idx_slice[0];
                 let found_encoded_public_key_string =
                     String::from_utf8(found_encoded_public_key.to_vec())

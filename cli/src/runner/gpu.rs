@@ -1,5 +1,7 @@
 use crate::args::Command;
-use crate::common::{GlobalStats, SharedBestHash};
+use crate::common::GlobalStats;
+#[cfg(feature = "shallenge")]
+use crate::common::SharedBestHash;
 use crate::modes;
 use crate::runner::Runner;
 use backtrace::Backtrace;
@@ -12,7 +14,9 @@ use std::error::Error;
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+#[cfg(feature = "shallenge")]
+use std::sync::RwLock;
 
 pub struct GpuRunner {
     num_devices: usize,
@@ -32,6 +36,15 @@ impl GpuRunner {
         cust::context::CurrentContext::set_current(&ctx)?;
 
         println!("[{ordinal}] Loading module...");
+        // An explicit CUBIN takes precedence over PTX_PATH and embedded PTX.
+        // Surface loading failures instead of silently falling back.
+        if let Some(cubin_path) = std::env::var_os("CUBIN_PATH") {
+            let cubin_path = std::path::PathBuf::from(cubin_path);
+            let module = Module::from_file(&cubin_path)
+                .map_err(|e| format!("Failed to load CUBIN file {}: {}", cubin_path.display(), e))?;
+            println!("[{ordinal}] Module loaded from CUBIN: {}", cubin_path.display());
+            return Ok((ctx, module));
+        }
         let ptx_owned;
         let ptx: &str = if let Ok(ptx_path) = std::env::var("PTX_PATH") {
             ptx_owned = std::fs::read_to_string(ptx_path)

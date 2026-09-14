@@ -1,4 +1,4 @@
-use crate::{atomic, utilities};
+use crate::utilities;
 use cuda_std::prelude::*;
 
 /// Handle the infrastructure concerns when a better hash is found
@@ -11,24 +11,19 @@ unsafe fn handle_shallenge_match_found(
     found_nonce_len_ptr: *mut usize,
     found_thread_idx_slice_ptr: *mut u32,
 ) {
-    let found_matches_slice = unsafe { core::slice::from_raw_parts_mut(found_matches_slice_ptr, 1) };
-    let found_matches = &mut found_matches_slice[0];
-
-    // Always copy the better result (race condition is acceptable here)
-    let found_hash = unsafe { core::slice::from_raw_parts_mut(found_hash_ptr, 32) };
-    let found_nonce = unsafe { core::slice::from_raw_parts_mut(found_nonce_ptr, 64) };
-    let found_nonce_len = unsafe { core::slice::from_raw_parts_mut(found_nonce_len_ptr, 1) };
-    let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut(found_thread_idx_slice_ptr, 1) };
-
-    found_hash.copy_from_slice(&result.hash);
-    found_nonce.copy_from_slice(&result.nonce);
-    found_nonce_len[0] = result.nonce_len;
-    found_thread_idx_slice[0] = thread_idx as u32;
-
-    // Increment number of found matches
-    unsafe { atomic::atomic_add_u32(found_matches, 1) };
-    
-    // TODO: do we need device_fence here?
+    // Keep the first improvement to atomically claim the slot, not necessarily
+    // the best hash in this launch. Later improvements are counted but discarded.
+    // This preserves a consistent hash/nonce pair without a minimum reduction.
+    handle_match! {
+        thread_idx: thread_idx,
+        found_matches_ptr: found_matches_slice_ptr,
+        copies: [
+            result.hash => found_hash_ptr, 32;
+            result.nonce => found_nonce_ptr, 64;
+            scalar: result.nonce_len => found_nonce_len_ptr;
+        ],
+        found_thread_idx_ptr: found_thread_idx_slice_ptr,
+    }
 }
 
 #[kernel]

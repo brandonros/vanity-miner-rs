@@ -59,8 +59,8 @@ pub mod gpu {
                 )
             )?;
         }
-        stub_dev.copy_to(&mut stub)?;
         stream.synchronize()?;
+        stub_dev.copy_to(&mut stub)?;
         if stub[0] != 1 {
             return Err(format!(
                 "[{ordinal}] stub kernel wrote {} (expected 1) — PTX/launch plumbing is broken",
@@ -73,12 +73,9 @@ pub mod gpu {
         let results_dev = DeviceBuffer::<u32>::zeroed(logic::SELF_TEST_NUM_CHECKS)?;
         let mut results = [0u32; logic::SELF_TEST_NUM_CHECKS];
 
-        // Launch each slot's kernel sequentially with a copy+sync between
-        // launches. If a kernel hits an illegal address, the *next* host
-        // call (kernel launch or copy) is what surfaces the sticky error —
-        // so per-slot sync lets us pinpoint which slot's kernel faulted.
-        // Slots before the fault still produce reliable values; slots at
-        // and after are reported as FAIL since their writes never landed.
+        // Synchronize each slot's kernel before copying from its nonblocking
+        // stream. This makes results visible and attributes execution errors
+        // to the slot that faulted before attempting its host read.
         macro_rules! run_slot {
             ($slot:expr, $kname:expr) => {{
                 let slot: usize = $slot;
@@ -106,15 +103,15 @@ pub mod gpu {
                     )
                     .into());
                 }
-                if let Err(e) = results_dev.copy_to(&mut results) {
-                    return Err(format!(
-                        "[{ordinal}] slot {slot:2} [{label}] DtoH copy failed (kernel likely faulted): {e}"
-                    )
-                    .into());
-                }
                 if let Err(e) = stream.synchronize() {
                     return Err(format!(
                         "[{ordinal}] slot {slot:2} [{label}] sync failed (kernel likely faulted): {e}"
+                    )
+                    .into());
+                }
+                if let Err(e) = results_dev.copy_to(&mut results) {
+                    return Err(format!(
+                        "[{ordinal}] slot {slot:2} [{label}] DtoH copy failed: {e}"
                     )
                     .into());
                 }

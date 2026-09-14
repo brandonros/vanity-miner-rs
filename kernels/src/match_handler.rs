@@ -1,10 +1,8 @@
 /// Macro to handle the common pattern when a vanity match is found in a kernel.
 ///
 /// Handles:
-/// 1. Reconstructing found_matches slice from raw pointer
-/// 2. Atomic check for first-find (only first match copies data)
-/// 3. Copying result fields to device buffers
-/// 4. Incrementing match counter
+/// 1. Atomically counting the match and claiming the first result slot
+/// 2. Copying result fields to device buffers only for the first match
 ///
 /// Copy syntax:
 /// - `src => ptr, len;`                      - full slice copy
@@ -18,19 +16,14 @@ macro_rules! handle_match {
         copies: [ $( $copy:tt )* ],
         found_thread_idx_ptr: $found_thread_idx_ptr:expr $(,)?
     ) => {{
-        let found_matches_slice = unsafe { core::slice::from_raw_parts_mut($found_matches_ptr, 1) };
-        let found_matches = &mut found_matches_slice[0];
-
-        // If first find, copy results to device buffers
-        if unsafe { $crate::atomic::atomic_add_u32(found_matches, 0) } == 0 {
+        // Claim the slot before writing so only one matching thread copies results.
+        // The host must synchronize the kernel before reading the counter or payload.
+        if unsafe { $crate::atomic::atomic_add_u32($found_matches_ptr, 1) } == 0 {
             handle_match!(@copies $($copy)*);
 
             let found_thread_idx_slice = unsafe { core::slice::from_raw_parts_mut($found_thread_idx_ptr, 1) };
             found_thread_idx_slice[0] = $thread_idx as u32;
         }
-
-        // Increment number of found matches
-        unsafe { $crate::atomic::atomic_add_u32(found_matches, 1) };
     }};
 
     // Full slice copy: src => ptr, len;

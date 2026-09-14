@@ -19,10 +19,27 @@ fn build_gpu() {
     println!("cargo:rustc-link-lib=advapi32");
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let kernels_dir = manifest_dir.parent().unwrap().join("kernels");
+    let workspace_dir = manifest_dir.parent().unwrap();
+    let kernels_dir = workspace_dir.join("kernels");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
 
     println!("cargo::rerun-if-changed={}", kernels_dir.display());
+    // The nested kernel workspace also compiles shared logic outside kernels/.
+    // Track its sources and the manifests, lockfiles, and toolchain that affect
+    // the build so CPU changes cannot leave the embedded PTX stale.
+    // kernels/ above includes its own Cargo.toml and Cargo.lock.
+    for input in [
+        "logic",
+        "Cargo.toml",
+        "Cargo.lock",
+        "cli/Cargo.toml",
+        "rust-toolchain.toml",
+    ] {
+        println!(
+            "cargo::rerun-if-changed={}",
+            workspace_dir.join(input).display()
+        );
+    }
 
     // `kernels` is a separate workspace; Cargo does not forward CLI features
     // into CudaBuilder's nested build automatically.
@@ -42,9 +59,16 @@ fn build_gpu() {
         kernel_args.extend(["--features".to_owned(), kernel_features]);
     }
 
+    // The modern NVVM dialect requires a Blackwell-or-later target.
+    let arch = if cfg!(feature = "llvm19") {
+        NvvmArch::Compute100
+    } else {
+        NvvmArch::Compute89
+    };
+
     let ptx_path = out_path.join("kernels.ptx");
     CudaBuilder::new(&kernels_dir)
-        .arch(NvvmArch::Compute89)
+        .arch(arch)
         .build_args(&kernel_args)
         .copy_to(&ptx_path)
         .final_module_path(out_path.join("final-module.ll"))
