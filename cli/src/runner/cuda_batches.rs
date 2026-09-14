@@ -1,13 +1,18 @@
 //! CUDA transport for the shared cryptographic candidate evaluators.
 use cust::{
-    context::{Context, CurrentContext, ResourceLimit},
     launch,
     memory::{CopyDestination, DeviceBuffer, DeviceCopy},
-    module::Module,
-    stream::{Stream, StreamFlags},
+    stream::Stream,
 };
-use logic::{device_search::*, hex_pattern::HexPattern};
-use vanity_miner::device_search::{DeviceSearch, Request};
+#[cfg(feature = "p256-public-key")]
+use logic::p256_public_key_vanity::P256PublicRequest;
+#[cfg(feature = "p256-signature")]
+use logic::p256_signature_vanity::P256SignatureRequest;
+#[cfg(feature = "rsa-modulus")]
+use logic::rsa_modulus_vanity::RsaModulusRequest;
+#[cfg(feature = "rsa-pss")]
+use logic::rsa_pss_signature_vanity::RsaPssRequest;
+use logic::{candidate_result::CandidateResult, hex_pattern::HexPattern};
 use zeroize::{Zeroize, Zeroizing};
 
 #[repr(transparent)]
@@ -66,54 +71,15 @@ impl<T: Abi + Zeroize> Drop for SecretBuffer<'_, T> {
     }
 }
 
-struct DeviceState {
-    // Drop GPU resources before the context. The engine selects this context
-    // before each launch and before destroying the state.
-    stream: Stream,
-    module: Module,
-    context: Context,
+pub struct Engine<'a> {
+    gpu: &'a crate::common::GpuContext,
 }
-impl Drop for DeviceState {
-    fn drop(&mut self) {
-        let _ = CurrentContext::set_current(&self.context);
-        let _ = self.stream.synchronize();
+impl<'a> Engine<'a> {
+    pub fn new(gpu: &'a crate::common::GpuContext) -> Self {
+        Self { gpu }
     }
-}
-
-pub struct Engine {
-    devices: Vec<DeviceState>,
-    next: usize,
-}
-impl Engine {
-    pub fn new(modules: Vec<(Context, Module)>) -> Result<Self, String> {
-        if modules.is_empty() {
-            return Err("no CUDA devices available for cryptographic search".into());
-        }
-        let stack = std::env::var("STACK_SIZE")
-            .unwrap_or_else(|_| "65536".into())
-            .parse::<usize>()
-            .map_err(|_| "invalid STACK_SIZE")?;
-        let mut devices = Vec::new();
-        for (context, module) in modules {
-            CurrentContext::set_current(&context).map_err(|e| e.to_string())?;
-            CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack)
-                .map_err(|e| e.to_string())?;
-            let stream = Stream::new(StreamFlags::NON_BLOCKING, None).map_err(|e| e.to_string())?;
-            devices.push(DeviceState {
-                stream,
-                module,
-                context,
-            });
-        }
-        println!(
-            "Cryptographic CUDA search: 64 candidates per batch, rotating across {} devices; host verifies every match.",
-            devices.len()
-        );
-        Ok(Self { devices, next: 0 })
-    }
-
     fn launch<T: Abi + Zeroize>(
-        state: &DeviceState,
+        state: &crate::common::GpuContext,
         name: &str,
         request: &T,
         pattern: &HexPattern,
@@ -157,10 +123,11 @@ impl Engine {
         Ok(host_results.iter().map(|record| record.0).collect())
     }
 }
-impl DeviceSearch for Engine {
-    fn evaluate(
+impl Engine<'_> {
+    #[cfg(feature = "p256-public-key")]
+    pub fn p256_public(
         &mut self,
-        request: &Request<'_>,
+        request: &P256PublicRequest,
         pattern: &HexPattern,
         message: &[u8],
         start: u64,
@@ -169,50 +136,84 @@ impl DeviceSearch for Engine {
         if count == 0 || count > 64 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
-        let state = &self.devices[self.next];
-        self.next = (self.next + 1) % self.devices.len();
-        CurrentContext::set_current(&state.context).map_err(|e| e.to_string())?;
-        match request {
-            #[cfg(feature = "p256-public-key")]
-            Request::P256Public(request) => Self::launch(
-                state,
-                "kernel_p256_public_key_vanity",
-                *request,
-                pattern,
-                message,
-                start,
-                count,
-            ),
-            #[cfg(feature = "p256-signature")]
-            Request::P256Signature(request) => Self::launch(
-                state,
-                "kernel_p256_signature_vanity",
-                *request,
-                pattern,
-                message,
-                start,
-                count,
-            ),
-            #[cfg(feature = "rsa-pss")]
-            Request::RsaPss(request) => Self::launch(
-                state,
-                "kernel_rsa_pss_signature_vanity",
-                *request,
-                pattern,
-                message,
-                start,
-                count,
-            ),
-            #[cfg(feature = "rsa-modulus")]
-            Request::RsaModulus(request) => Self::launch(
-                state,
-                "kernel_rsa_modulus_vanity",
-                *request,
-                pattern,
-                message,
-                start,
-                count,
-            ),
+        let state = self.gpu;
+        Self::launch(
+            state,
+            "kernel_p256_public_key_vanity",
+            request,
+            pattern,
+            message,
+            start,
+            count,
+        )
+    }
+    #[cfg(feature = "p256-signature")]
+    pub fn p256_signature(
+        &mut self,
+        request: &P256SignatureRequest,
+        pattern: &HexPattern,
+        message: &[u8],
+        start: u64,
+        count: u32,
+    ) -> Result<Vec<CandidateResult>, String> {
+        if count == 0 || count > 64 {
+            return Err("invalid CUDA cryptographic batch size".into());
         }
+        let state = self.gpu;
+        Self::launch(
+            state,
+            "kernel_p256_signature_vanity",
+            request,
+            pattern,
+            message,
+            start,
+            count,
+        )
+    }
+    #[cfg(feature = "rsa-pss")]
+    pub fn rsa_pss(
+        &mut self,
+        request: &RsaPssRequest,
+        pattern: &HexPattern,
+        message: &[u8],
+        start: u64,
+        count: u32,
+    ) -> Result<Vec<CandidateResult>, String> {
+        if count == 0 || count > 64 {
+            return Err("invalid CUDA cryptographic batch size".into());
+        }
+        let state = self.gpu;
+        Self::launch(
+            state,
+            "kernel_rsa_pss_signature_vanity",
+            request,
+            pattern,
+            message,
+            start,
+            count,
+        )
+    }
+    #[cfg(feature = "rsa-modulus")]
+    pub fn rsa_modulus(
+        &mut self,
+        request: &RsaModulusRequest,
+        pattern: &HexPattern,
+        message: &[u8],
+        start: u64,
+        count: u32,
+    ) -> Result<Vec<CandidateResult>, String> {
+        if count == 0 || count > 64 {
+            return Err("invalid CUDA cryptographic batch size".into());
+        }
+        let state = self.gpu;
+        Self::launch(
+            state,
+            "kernel_rsa_modulus_vanity",
+            request,
+            pattern,
+            message,
+            start,
+            count,
+        )
     }
 }

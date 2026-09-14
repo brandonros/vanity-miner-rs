@@ -5,8 +5,6 @@ mod args;
 mod common;
 #[cfg(all(feature = "crypto-cli", not(feature = "cumetal")))]
 mod crypto_args;
-#[cfg(all(feature = "crypto-cli", not(feature = "cumetal")))]
-mod crypto_runner;
 #[cfg(not(feature = "cumetal"))]
 mod modes;
 mod runner;
@@ -53,6 +51,3 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Run
     runner.run(&cli.command, stats)
 }
-
-#[cfg(all(feature = "crypto-cli", feature = "gpu"))]
-mod crypto_gpu;

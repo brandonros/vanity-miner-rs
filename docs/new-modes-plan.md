@@ -16,18 +16,19 @@ protected output, cancellation, statistics, and documentation:
 | P-256 public key | HMAC candidate derivation, rejection sampling, scalar multiplication, point matching | Re-derive scalar/point and validate encoding before key export |
 | P-256 signature | RFC6979 message-window or domain-separated ephemeral search, scalar arithmetic, exact r/s/raw matching and S-form selection | Reconstruct candidate, compare exact signature bytes and verify |
 
-`logic/src/device_search.rs` defines fixed-layout request/result records and pure
-candidate evaluators. `kernels/src/crypto_vanity.rs` exports four thin CUDA entry
-points. `cli/src/crypto_gpu.rs` transports bounded batches, synchronizes results,
-and clears secret request/result buffers before release. A single host controller
-rotates batches across available devices, reserves only one verified winner, and
-shares the CPU runners' final reconstruction and output code. It does not call a
+Each mode has matching `logic/src/` and `kernels/src/` modules:
+`rsa_modulus_vanity.rs`, `rsa_pss_signature_vanity.rs`,
+`p256_public_key_vanity.rs`, and `p256_signature_vanity.rs`. Each logic module
+owns its request record and candidate evaluator; each kernel module exports one
+CUDA entry point. `logic/src/candidate_result.rs` holds the shared result record. `cli/src/runner/cuda_batches.rs` transports bounded batches, synchronizes results,
+and clears secret request/result buffers before release. The shared CUDA runner starts one worker per device, reserves only one verified
+winner across workers, and shares the CPU runners' final reconstruction and
+output code. Contexts, modules, and streams are owned by the common GPU context. It does not call a
 CPU search as a GPU fallback.
 
 The initial GPU transport uses conservative 64-candidate batches and a 64-KiB
 per-thread stack limit (`STACK_SIZE` overrides it). These are unmeasured starting
-settings, not performance claims. Concurrent multi-device scheduling, occupancy,
-CRT setup caching and batch tuning should follow hardware validation.
+settings, not performance claims. Occupancy, CRT setup caching and batch tuning should follow hardware validation.
 
 The user explicitly deferred Vast.ai execution and Rust-CUDA compiler bug fixing
 to a later session. No VM or GPU rental was provisioned. PTX compilation and
@@ -111,3 +112,14 @@ is published last. Each destination is atomic and refuses overwrite without
 arbitrary filesystem paths cannot form one atomic rename: companion output may
 remain if a later publication fails, and abrupt termination can leave protected
 staging files. This is a documented limitation, not a multi-file atomicity claim.
+
+The CLI uses direct per-mode CPU/GPU entry points under `cli/src/modes/`.
+Typed mode callbacks pass candidate batches to CUDA transport. Shared batching
+and winner selection live in `cli/src/search_batches.rs`; host evaluation
+adapters live in `cli/src/test_support.rs` and only compile for tests/self-test.
+There is no cross-mode request enum or device-search trait.
+
+All backends use `self_test_suite` for test inventory and reporting. CPU and CUDA
+execute the enabled crypto fixtures; CuMetal reports those entries as unsupported.
+Search statistics share `GlobalStats`; `SearchControl` only coordinates bounded
+work and winner/cancellation state, forwarding counts to the shared statistics.

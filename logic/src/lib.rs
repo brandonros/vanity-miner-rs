@@ -5,8 +5,17 @@ extern crate alloc;
 #[cfg(feature = "crypto-search")]
 pub mod crypto_search;
 #[cfg(feature = "crypto-search")]
-pub mod device_search;
+pub mod candidate_result;
 pub mod hex_pattern;
+#[cfg(feature = "p256-public-key")]
+pub mod p256_public_key_vanity;
+#[cfg(feature = "p256-signature")]
+pub mod p256_signature_vanity;
+#[cfg(feature = "rsa-pss")]
+pub mod rsa_pss_signature_vanity;
+#[cfg(feature = "rsa-modulus")]
+pub mod rsa_modulus_vanity;
+
 #[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
 pub mod p256_vanity;
 #[cfg(feature = "rsa-pss")]

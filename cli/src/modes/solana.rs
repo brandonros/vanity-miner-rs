@@ -66,7 +66,10 @@ pub mod cpu {
         suffix: String,
         global_stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        println!("Starting CPU solana vanity mode with {} threads", num_threads);
+        println!(
+            "Starting CPU solana vanity mode with {} threads",
+            num_threads
+        );
 
         let data = Arc::new(WorkerData {
             prefix_bytes: prefix.as_bytes().to_vec(),
@@ -84,7 +87,6 @@ pub mod gpu {
     use crate::common::GpuContext;
     use cust::launch;
     use cust::memory::CopyDestination;
-    use cust::module::Module;
     use cust::util::SliceExt;
     use rand::Rng;
 
@@ -92,13 +94,14 @@ pub mod gpu {
         ordinal: usize,
         prefix: String,
         suffix: String,
-        module: &Module,
+        gpu: &GpuContext,
         global_stats: Arc<GlobalStats>,
+        control: Arc<vanity_miner::search_control::SearchControl>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let prefix_bytes = prefix.as_bytes().to_vec();
         let suffix_bytes = suffix.as_bytes().to_vec();
 
-        let gpu = GpuContext::new(ordinal)?;
+        let module = &gpu.module;
         let kernel = module.get_function("kernel_find_solana_vanity_private_key")?;
         gpu.print_launch_info(ordinal, "solana vanity");
 
@@ -108,7 +111,7 @@ pub mod gpu {
         let prefix_dev = prefix_bytes.as_slice().as_dbuf()?;
         let suffix_dev = suffix_bytes.as_slice().as_dbuf()?;
 
-        loop {
+        while !control.stopped() {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
             let mut found_matches_slice = [0u32; 1];
@@ -160,8 +163,12 @@ pub mod gpu {
                     String::from_utf8(found_encoded_public_key.to_vec())
                         .unwrap_or_else(|_| "invalid_utf8".to_string());
 
-                println!("[{ordinal}] Vanity match: seed = {rng_seed} thread_idx = {found_thread_idx}");
-                println!("[{ordinal}] Vanity match: encoded_public_key = {found_encoded_public_key_string}");
+                println!(
+                    "[{ordinal}] Vanity match: seed = {rng_seed} thread_idx = {found_thread_idx}"
+                );
+                println!(
+                    "[{ordinal}] Vanity match: encoded_public_key = {found_encoded_public_key_string}"
+                );
                 println!(
                     "[{ordinal}] Vanity match: public_key = {}",
                     hex::encode(found_public_key)
@@ -179,5 +186,6 @@ pub mod gpu {
                 global_stats.print_stats(ordinal, found_matches_slice[0]);
             }
         }
+        Ok(())
     }
 }

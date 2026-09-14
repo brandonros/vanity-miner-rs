@@ -483,35 +483,36 @@ impl Runner for CumetalRunner {
     }
 }
 #[cfg(feature = "self_test")]
-include!(concat!(env!("OUT_DIR"), "/self_test_entries.rs"));
-#[cfg(feature = "self_test")]
 impl CumetalRunner {
     fn self_tests(&self, driver: &Rc<Driver>) -> Result<(), Error> {
-        for (slot, name) in std::iter::once((0, "kernel_self_test_stub")).chain(
-            SELF_TEST_ENTRIES
-                .iter()
-                .copied()
-                .enumerate()
-                .filter(|(slot, _)| {
-                    self.options.self_test_slot.is_empty()
-                        || self.options.self_test_slot.contains(&(*slot as u32))
-                }),
-        ) {
-            let module = self.module(driver, name)?;
-            let result = driver.buffer(&vec![0xa5; logic::SELF_TEST_NUM_CHECKS * 4])?;
-            module.launch(&mut [result.pointer()], 1, 1)?;
-            let bytes = result.read()?;
-            for (index, word) in bytes.chunks_exact(4).enumerate() {
-                let value = u32::from_le_bytes(word.try_into().unwrap());
-                let expected = if index == slot { 1 } else { 0xa5a5a5a5 };
-                if value != expected {
-                    return Err(
-                        format!("{name}: slot {index}: got {value}, expected {expected}").into(),
-                    );
+        use vanity_miner::self_test_suite::{self, Kind, Outcome};
+        self_test_suite::run("CuMetal", |case| {
+            let slot = match case.kind {
+                Kind::Probe => 0,
+                Kind::Legacy(slot) => {
+                    if !self.options.self_test_slot.is_empty() && !self.options.self_test_slot.contains(&(slot as u32)) {
+                        return Ok(Outcome::Skipped("not selected"));
+                    }
+                    slot
                 }
-            }
-            println!("NUMERICAL_PASS kernel={name} slot={slot}; other slots and guards intact");
-        }
-        Ok(())
+                _ => return Ok(Outcome::Skipped("crypto candidate transport is not supported by CuMetal")),
+            };
+            let name = case.kernel;
+            let operation = (|| -> Result<(), Error> {
+                let module = self.module(driver, name)?;
+                let result = driver.buffer(&vec![0xa5; logic::SELF_TEST_NUM_CHECKS * 4])?;
+                module.launch(&mut [result.pointer()], 1, 1)?;
+                let bytes = result.read()?;
+                for (index, word) in bytes.chunks_exact(4).enumerate() {
+                    let value = u32::from_le_bytes(word.try_into().unwrap());
+                    let expected = if index == slot { 1 } else { 0xa5a5a5a5 };
+                    if value != expected { return Err(format!("{name}: slot {index}: got {value}, expected {expected}").into()); }
+                }
+                println!("NUMERICAL_PASS kernel={name} slot={slot}; other slots and guards intact");
+                Ok(())
+            })();
+            operation.map_err(|e| e.to_string())?;
+            Ok(Outcome::Passed)
+        }).map_err(Into::into)
     }
 }

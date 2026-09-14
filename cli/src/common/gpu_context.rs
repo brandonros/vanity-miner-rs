@@ -5,6 +5,7 @@ use cust::stream::{Stream, StreamFlags};
 use std::error::Error;
 
 pub struct GpuContext {
+    pub module: cust::module::Module,
     pub stream: Stream,
     pub blocks_per_grid: usize,
     pub threads_per_block: usize,
@@ -23,7 +24,10 @@ impl GpuContext {
         // Optionally override stack size
         if let Ok(stack_size) = std::env::var("STACK_SIZE") {
             let stack_size = stack_size.parse::<usize>()?;
-            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, stack_size)?;
+            cust::context::CurrentContext::set_resource_limit(
+                ResourceLimit::StackSize,
+                stack_size,
+            )?;
         } else {
             // CUDA's default per-thread stack is 1024 bytes. Rust-CUDA's NVVM
             // backend aggressively inlines whole pipelines, so any kernel that
@@ -32,7 +36,14 @@ impl GpuContext {
             // composed kernel. The full self-test ladder has bigger kernels
             // (depot up to 1856 bytes + deeper k256/dalek call chains), so
             // give 2× headroom over the measured floor.
-            cust::context::CurrentContext::set_resource_limit(ResourceLimit::StackSize, 16384)?;
+            cust::context::CurrentContext::set_resource_limit(
+                ResourceLimit::StackSize,
+                if cfg!(feature = "crypto-cli") {
+                    65536
+                } else {
+                    16384
+                },
+            )?;
         }
 
         let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
@@ -48,7 +59,9 @@ impl GpuContext {
         let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
         let operations_per_launch = blocks_per_grid * threads_per_block;
 
+        let module = super::cuda_module::load_module(ordinal)?;
         Ok(Self {
+            module,
             stream,
             blocks_per_grid,
             threads_per_block,
@@ -62,5 +75,12 @@ impl GpuContext {
             "[{ordinal}] Starting {mode_name} search loop ({} blocks per grid, {} threads per block, {} operations per launch)",
             self.blocks_per_grid, self.threads_per_block, self.operations_per_launch
         );
+    }
+}
+
+impl Drop for GpuContext {
+    fn drop(&mut self) {
+        let _ = cust::context::CurrentContext::set_current(&self.ctx);
+        let _ = self.stream.synchronize();
     }
 }

@@ -26,7 +26,10 @@ pub mod cpu {
             // Get the current best hash (with minimal lock time)
             // Use unwrap_or_else to recover data even if lock is poisoned
             let current_target = {
-                let best_hash_guard = data.shared_best_hash.read().unwrap_or_else(|e| e.into_inner());
+                let best_hash_guard = data
+                    .shared_best_hash
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner());
                 best_hash_guard.get_current()
             };
 
@@ -44,20 +47,36 @@ pub mod cpu {
             data.global_stats.add_launch(1);
 
             if result.is_better {
-                let nonce_string =
-                    std::str::from_utf8(&result.nonce[0..result.nonce_len]).unwrap_or("invalid_utf8");
+                let nonce_string = std::str::from_utf8(&result.nonce[0..result.nonce_len])
+                    .unwrap_or("invalid_utf8");
 
                 // Try to update the global best hash
                 let was_global_best = {
-                    let mut best_hash_guard = data.shared_best_hash.write().unwrap_or_else(|e| e.into_inner());
+                    let mut best_hash_guard = data
+                        .shared_best_hash
+                        .write()
+                        .unwrap_or_else(|e| e.into_inner());
                     best_hash_guard.update_if_better(result.hash)
                 };
 
                 if was_global_best {
-                    println!("[CPU-{}] NEW GLOBAL BEST found: thread_idx = {}", thread_id, thread_id);
-                    println!("[CPU-{}] NEW GLOBAL BEST hash: {}", thread_id, hex::encode(result.hash));
-                    println!("[CPU-{}] NEW GLOBAL BEST nonce: {}", thread_id, nonce_string);
-                    println!("[CPU-{}] Challenge string: {}/{}", thread_id, data.username, nonce_string);
+                    println!(
+                        "[CPU-{}] NEW GLOBAL BEST found: thread_idx = {}",
+                        thread_id, thread_id
+                    );
+                    println!(
+                        "[CPU-{}] NEW GLOBAL BEST hash: {}",
+                        thread_id,
+                        hex::encode(result.hash)
+                    );
+                    println!(
+                        "[CPU-{}] NEW GLOBAL BEST nonce: {}",
+                        thread_id, nonce_string
+                    );
+                    println!(
+                        "[CPU-{}] Challenge string: {}/{}",
+                        thread_id, data.username, nonce_string
+                    );
 
                     data.global_stats.add_matches(1);
                     data.global_stats.print_stats(thread_id, 1);
@@ -97,7 +116,6 @@ pub mod gpu {
     use crate::common::GpuContext;
     use cust::launch;
     use cust::memory::CopyDestination;
-    use cust::module::Module;
     use cust::util::SliceExt;
     use rand::Rng;
 
@@ -105,13 +123,14 @@ pub mod gpu {
         ordinal: usize,
         username: String,
         shared_best_hash: Arc<RwLock<SharedBestHash>>,
-        module: &Module,
+        gpu: &GpuContext,
         global_stats: Arc<GlobalStats>,
+        control: Arc<vanity_miner::search_control::SearchControl>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         let username_bytes = username.as_bytes();
         let username_len: usize = username_bytes.len();
 
-        let gpu = GpuContext::new(ordinal)?;
+        let module = &gpu.module;
         let kernel = module.get_function("kernel_find_better_shallenge_nonce")?;
         gpu.print_launch_info(ordinal, "shallenge");
 
@@ -120,7 +139,7 @@ pub mod gpu {
         // Allocate static input buffer once (username doesn't change between iterations)
         let username_dev = username_bytes.as_dbuf()?;
 
-        loop {
+        while !control.stopped() {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
             // Get the current best hash (with minimal lock time)
@@ -183,20 +202,30 @@ pub mod gpu {
 
                 // Try to update the global best hash
                 let was_global_best = {
-                    let mut best_hash_guard = shared_best_hash.write().unwrap_or_else(|e| e.into_inner());
+                    let mut best_hash_guard =
+                        shared_best_hash.write().unwrap_or_else(|e| e.into_inner());
                     best_hash_guard.update_if_better(found_hash)
                 };
 
                 if was_global_best {
-                    println!("[{ordinal}] NEW GLOBAL BEST found: seed = {rng_seed} thread_idx = {found_thread_idx}");
-                    println!("[{ordinal}] NEW GLOBAL BEST hash: {}", hex::encode(found_hash));
+                    println!(
+                        "[{ordinal}] NEW GLOBAL BEST found: seed = {rng_seed} thread_idx = {found_thread_idx}"
+                    );
+                    println!(
+                        "[{ordinal}] NEW GLOBAL BEST hash: {}",
+                        hex::encode(found_hash)
+                    );
                     println!("[{ordinal}] NEW GLOBAL BEST nonce: {}", nonce_string);
-                    println!("[{ordinal}] Challenge string: {}/{}", username, nonce_string);
+                    println!(
+                        "[{ordinal}] Challenge string: {}/{}",
+                        username, nonce_string
+                    );
 
                     global_stats.add_matches(found_matches as usize);
                     global_stats.print_stats(ordinal, found_matches as u32);
                 }
             }
         }
+        Ok(())
     }
 }

@@ -89,7 +89,6 @@ pub mod gpu {
     use crate::common::GpuContext;
     use cust::launch;
     use cust::memory::CopyDestination;
-    use cust::module::Module;
     use cust::util::SliceExt;
     use rand::Rng;
 
@@ -97,14 +96,15 @@ pub mod gpu {
         ordinal: usize,
         prefix: String,
         suffix: String,
-        module: &Module,
+        gpu: &GpuContext,
         global_stats: Arc<GlobalStats>,
+        control: Arc<vanity_miner::search_control::SearchControl>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         // Ethereum uses hex-encoded prefix/suffix
         let prefix_bytes = hex::decode(&prefix)?;
         let suffix_bytes = hex::decode(&suffix)?;
 
-        let gpu = GpuContext::new(ordinal)?;
+        let module = &gpu.module;
         let kernel = module.get_function("kernel_find_ethereum_vanity_private_key")?;
         gpu.print_launch_info(ordinal, "ethereum vanity");
 
@@ -114,7 +114,7 @@ pub mod gpu {
         let prefix_dev = prefix_bytes.as_slice().as_dbuf()?;
         let suffix_dev = suffix_bytes.as_slice().as_dbuf()?;
 
-        loop {
+        while !control.stopped() {
             let rng_seed: u64 = rng.r#gen::<u64>();
 
             let mut found_matches_slice = [0u32; 1];
@@ -185,5 +185,6 @@ pub mod gpu {
                 global_stats.print_stats(ordinal, found_matches_slice[0]);
             }
         }
+        Ok(())
     }
 }
