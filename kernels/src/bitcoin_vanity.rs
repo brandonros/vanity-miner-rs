@@ -21,8 +21,17 @@ pub unsafe extern "C" fn kernel_find_bitcoin_vanity_private_key(
 ) {
     // Prepare request
     let thread_idx = utilities::get_thread_idx();
-    let vanity_prefix = unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len) };
-    let vanity_suffix = unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) };
+    // Empty device buffers may have null pointers, which cannot back Rust slices.
+    let vanity_prefix = if vanity_prefix_len == 0 {
+        &[]
+    } else {
+        unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len) }
+    };
+    let vanity_suffix = if vanity_suffix_len == 0 {
+        &[]
+    } else {
+        unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) }
+    };
     let request = logic::BitcoinVanityKeyRequest {
         prefix: vanity_prefix,
         suffix: vanity_suffix,
