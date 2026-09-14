@@ -182,3 +182,10 @@ and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.
 The RSA and P-256 commands support CPU and NVIDIA CUDA builds. CuMetal
 currently exposes only Solana, Bitcoin, Ethereum, Shallenge, and its existing
 self-tests; enabling RSA/P-256 features does not add those commands to CuMetal.
+
+## Focused Rust GPU reproductions
+
+The `self_test` build also exports a small runtime-input kernel for the observed
+nonce-generation failure. It preserves the existing 118
+known-answer slots and can be run independently with raw mismatch reporting.
+See the [coverage audit and reproduction guide](docs/codegen-repros.md).

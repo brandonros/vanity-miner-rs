@@ -15,9 +15,11 @@ def entry_names(ptx):
 
 def expected_names(root):
     names = set()
-    for module in ('solana_vanity', 'bitcoin_vanity', 'ethereum_vanity', 'shallenge', 'self_test'):
+    for module in ('solana_vanity', 'bitcoin_vanity', 'ethereum_vanity', 'shallenge', 'self_test', 'codegen_repros'):
         source = (root / 'kernels/src' / (module + '.rs')).read_text()
         names.update(re.findall(r'pub\s+unsafe\s+extern\s+"C"\s+fn\s+(kernel_\w+)\s*\(', source))
+    crypto = (root / 'kernels/src/crypto_vanity.rs').read_text()
+    names.update(re.findall(r'candidate_kernel!\(\s*(kernel_\w+)\s*,', crypto))
     if not names:
         raise RuntimeError('No source kernel names found')
     return names
