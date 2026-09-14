@@ -1,5 +1,5 @@
 #[cfg(all(
-    not(feature = "gpu"),
+    not(any(feature = "gpu", feature = "cumetal")),
     any(
         feature = "solana",
         feature = "bitcoin",
@@ -32,7 +32,7 @@ mod stats;
 mod validation;
 
 #[cfg(all(
-    not(feature = "gpu"),
+    not(any(feature = "gpu", feature = "cumetal")),
     any(
         feature = "solana",
         feature = "bitcoin",

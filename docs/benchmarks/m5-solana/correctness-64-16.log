@@ -1,0 +1,7 @@
+Searching for solana vanity key with prefix 'BMz' and suffix ''
+CUMETAL_PROVENANCE event=kernel_launch kernel="kernel_find_solana_vanity_private_key" source=generic_ptx provenance=generic_ptx_lowering semantic_quality=exact device=apple_gpu device_name="Apple M5" math_mode=safe compile_cache_hit=false launch_success=true duration_ns=34722875 grid=(16,1,1) block=(64,1,1) unsupported_reason=""
+MATCH thread=0 seed=1
+private_key=c326090b373e88c57083e6a1134aa8e2d150c3f85d0b88c7134d1f264ba59d07
+public_key=99f5781d6c768cf3f8755ca1ea4463160db1028f0378718815216b5f5c4168a7
+address=BMzUNgLUwUUGch3cujgAd2Bn7cNsAZo8rNK4uQ9iK2sG
+CUMETAL_BATCH batch=0 seed=1 candidates=1024 matches=1 verified=true guards=intact

@@ -3,6 +3,9 @@ fn main() {
 
     #[cfg(feature = "gpu")]
     build_gpu();
+
+    #[cfg(all(feature = "cumetal", feature = "self_test"))]
+    export_self_test_names();
 }
 
 #[cfg(feature = "gpu")]
@@ -81,4 +84,27 @@ fn build_gpu() {
         .unwrap();
 
     println!("cargo:rustc-env=KERNELS_PTX_PATH={}", ptx_path.display());
+}
+
+#[cfg(all(feature = "cumetal", feature = "self_test"))]
+fn export_self_test_names() {
+    use std::{env, fs, path::PathBuf};
+    let source = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src/self_test.rs");
+    println!("cargo::rerun-if-changed={}", source.display());
+    let mut names = std::collections::BTreeMap::new();
+    let mut entry = None;
+    for line in fs::read_to_string(source).unwrap().lines() {
+        if let Some(tail) = line.trim().strip_prefix(r#"pub unsafe extern "C" fn "#) {
+            entry = Some(tail.split('(').next().unwrap().to_owned());
+        }
+        if let Some(tail) = line.trim().strip_prefix("results[") {
+            let slot: usize = tail.split(']').next().unwrap().parse().unwrap();
+            if let Some(name) = entry.take() {
+                if name != "kernel_self_test_stub" { assert!(names.insert(slot, name).is_none()); }
+            }
+        }
+    }
+    assert_eq!(names.keys().copied().collect::<Vec<_>>(), (0..118).collect::<Vec<_>>());
+    let text = format!("const SELF_TEST_ENTRIES: [&str; 118] = {:?};", names.values().collect::<Vec<_>>());
+    fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"), text).unwrap();
 }

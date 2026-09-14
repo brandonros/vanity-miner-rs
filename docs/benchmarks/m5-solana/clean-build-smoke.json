@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-14",
+  "scope": "Clean runbook CMake configure/build, original CI artifact download and hash/inventory check, Solana translation and 1024-candidate CPU-verified M5 smoke; not a fresh full-suite or benchmark run.",
+  "compiler_base": "def27cb45d5a10f53fe4e473dc25dbb5f71c84b2",
+  "compiler_dirty_diff_sha256": "6071b60c2a672beb5757ab2af6c06ebc4ed8963d094d63f6380d13289cc5b989",
+  "inputs": {
+    "../cuda-metal-cli/build-macos-guide/cumetalc": "07b6748f22651b7ab39fc0686bc1b50e0940684316ec378191226957d1765ade",
+    "../cuda-metal-cli/build-macos-guide/libcumetal.dylib": "84d1cac4fbf7bcaeb94fb5be7c408375a33fe694f43c95a7230536858e8c5da0",
+    "target/release/vanity-miner": "8d3850e342fd6ebd4e7082bd84d55025300a236b505fb8ba1709a93541591d2c",
+    ".cumetal-artifacts/ptx-34803069395/output-llvm21.ptx": "2840485fe193d39cfdbb2e5babd25f6772a08a2550843c20b3beba5a26185f4b",
+    ".cumetal-artifacts/modules-llvm21/kernel_find_solana_vanity_private_key.metal": "20feaec3a7a621068387b4f031ce27d1f676570521dbedc4fbe9e72f2e7efe17",
+    ".cumetal-artifacts/modules-llvm21/kernel_find_solana_vanity_private_key.metal.cumetal-abi": "0990ebcd4179e27e50776618b1f146319b88c01df1a4a89ff4e0efbce186dbe5"
+  },
+  "result": "passed",
+  "log": "clean-build-smoke.log"
+}

@@ -1665,6 +1665,7 @@ dependencies = [
  "cust",
  "cust_raw",
  "hex",
+ "libloading",
  "logic",
  "num-bigint-dig",
  "p256",
