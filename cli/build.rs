@@ -3,6 +3,9 @@ fn main() {
 
     #[cfg(feature = "gpu")]
     build_gpu();
+
+    #[cfg(all(feature = "cumetal", feature = "self_test"))]
+    export_self_test_names();
 }
 
 #[cfg(feature = "gpu")]
@@ -49,18 +52,31 @@ fn build_gpu() {
         ("ethereum", cfg!(feature = "ethereum")),
         ("shallenge", cfg!(feature = "shallenge")),
         ("self_test", cfg!(feature = "self_test")),
+        ("rsa-modulus", cfg!(feature = "rsa-modulus")),
+        ("rsa-pss", cfg!(feature = "rsa-pss")),
+        ("p256-public-key", cfg!(feature = "p256-public-key")),
+        ("p256-signature", cfg!(feature = "p256-signature")),
     ]
     .into_iter()
     .filter_map(|(name, enabled)| enabled.then_some(name))
     .collect::<Vec<_>>()
     .join(",");
     let mut kernel_args = vec!["--no-default-features".to_owned(), "--locked".to_owned()];
+    // Legacy libnvvm rejects vector bswap emitted while optimizing HMAC at O3.
+    // Keep the workaround in the nested kernel build, preserving host and
+    // LLVM 21 optimization. O1 avoids the legacy vectorization pipeline.
+    if !cfg!(feature = "llvm21") && cfg!(feature = "crypto-cli") {
+        kernel_args.extend([
+            "--config".to_owned(),
+            "profile.release.opt-level=1".to_owned(),
+        ]);
+    }
     if !kernel_features.is_empty() {
         kernel_args.extend(["--features".to_owned(), kernel_features]);
     }
 
     // The modern NVVM dialect requires a Blackwell-or-later target.
-    let arch = if cfg!(feature = "llvm19") {
+    let arch = if cfg!(feature = "llvm21") {
         NvvmArch::Compute100
     } else {
         NvvmArch::Compute89
@@ -77,4 +93,27 @@ fn build_gpu() {
         .unwrap();
 
     println!("cargo:rustc-env=KERNELS_PTX_PATH={}", ptx_path.display());
+}
+
+#[cfg(all(feature = "cumetal", feature = "self_test"))]
+fn export_self_test_names() {
+    use std::{env, fs, path::PathBuf};
+    let source = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src/self_test.rs");
+    println!("cargo::rerun-if-changed={}", source.display());
+    let mut names = std::collections::BTreeMap::new();
+    let mut entry = None;
+    for line in fs::read_to_string(source).unwrap().lines() {
+        if let Some(tail) = line.trim().strip_prefix(r#"pub unsafe extern "C" fn "#) {
+            entry = Some(tail.split('(').next().unwrap().to_owned());
+        }
+        if let Some(tail) = line.trim().strip_prefix("results[") {
+            let slot: usize = tail.split(']').next().unwrap().parse().unwrap();
+            if let Some(name) = entry.take() {
+                if name != "kernel_self_test_stub" { assert!(names.insert(slot, name).is_none()); }
+            }
+        }
+    }
+    assert_eq!(names.keys().copied().collect::<Vec<_>>(), (0..118).collect::<Vec<_>>());
+    let text = format!("const SELF_TEST_ENTRIES: [&str; 118] = {:?};", names.values().collect::<Vec<_>>());
+    fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"), text).unwrap();
 }

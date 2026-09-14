@@ -6,14 +6,28 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
-llvm19 = ["gpu", "cuda_builder/llvm19"]
+cumetal = ["dep:libloading", "dep:sha2"]
+llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
+crypto-cli = ["dep:ctrlc"]
+p256-public-key = ["logic/p256-public-key", "dep:p256", "dep:zeroize", "crypto-cli"]
+p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "dep:sha2", "dep:zeroize", "crypto-cli"]
+rsa-common = ["dep:rsa", "dep:num-bigint-dig", "dep:sha2", "dep:zeroize", "crypto-cli"]
+rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
+rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
 self_test = ["logic/self_test"]
 
 [dependencies]
+libloading = { version = "0.8", optional = true }
+ctrlc = { version = "3.4", optional = true }
+num-bigint-dig = { version = "0.8.6", default-features = false, features = ["prime", "zeroize"], optional = true }
+rsa = { version = "0.9.10", default-features = false, features = ["pem", "sha2"], optional = true }
+sha2 = { version = "0.10.9", default-features = false, optional = true }
+p256 = { version = "0.13.2", default-features = false, features = ["arithmetic", "pkcs8", "pem"], optional = true }
+zeroize = { version = "1", default-features = false, features = ["alloc"], optional = true }
 logic = { path = "../logic", default-features = false }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"
@@ -22,12 +36,12 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "d2104a0a49252068292985e5e63328f522415c4b"
 optional = true
 
 [dependencies.cust_raw]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "d2104a0a49252068292985e5e63328f522415c4b"
 optional = true
 
 [dependencies.backtrace]
@@ -36,7 +50,7 @@ optional = true
 
 [build-dependencies.cuda_builder]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "2f4fd1d"
+rev = "d2104a0a49252068292985e5e63328f522415c4b"
 default-features = false
 features = ["rustc_codegen_nvvm"]
 optional = true

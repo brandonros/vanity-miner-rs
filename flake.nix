@@ -29,16 +29,17 @@
           lib = pkgs.lib;
           # Match the C toolchain and its runtime libraries to the selected LLVM.
           compatPkgs = if version == 7 then pkgsLlvm7 else pkgs;
-          llvm = if version == 7 then pkgsLlvm7.llvmPackages_7 else pkgs.llvmPackages_19;
+          llvm = if version == 7 then pkgsLlvm7.llvmPackages_7 else pkgs.llvmPackages_21;
 
           # ---- CUDA toolkit (Nix-managed) ----
-          # CUDA 13.2 → NVVM 22.0 → PTX 9.2 → needs driver 580.x+ (CUDA 13) at runtime.
+          # The modern backend uses CUDA 13.3; use CUDA 12.9 for LLVM 7.
           # `cudatoolkit` is the kitchen-sink symlinkJoin maintained by nixpkgs —
           # every header path and lib layout is already wired correctly. The host
           # NVIDIA driver (libcuda.so.1) is needed at runtime; it is *not* shimmed
           # in here — supply it via the system or extend LD_LIBRARY_PATH yourself
           # before running CUDA programs.
-          cudaRoot = pkgs.cudaPackages_13_2.cudatoolkit;
+          cudaRoot = if version == 7 then pkgs.cudaPackages_12_9.cudatoolkit
+            else pkgs.cudaPackages_13_3.cudatoolkit;
 
           # Single source of truth for channel + components lives in
           # rust-toolchain.toml. Update there, not here.
@@ -66,7 +67,7 @@
           # build.rs scripts that probe either layout resolve libcudart + stubs.
           CUDA_LIBRARY_PATH =
             "${cudaRoot}/lib:${cudaRoot}/lib64:${cudaRoot}/lib/stubs:${cudaRoot}/lib64/stubs";
-          ${if version == 7 then "LLVM_CONFIG" else "LLVM_CONFIG_19"} = "${llvmDev}/bin/llvm-config";
+          ${if version == 7 then "LLVM_CONFIG" else "LLVM_CONFIG_21"} = "${llvmDev}/bin/llvm-config";
           LIBCLANG_PATH = "${lib.getLib llvm.libclang}/lib";
 
           # nativeBuildInputs: tools invoked *during* the build — compilers,
@@ -89,7 +90,7 @@
             llvmDev
             llvmCompatTools
           ];
-          # LLVM 7 uses the old package set; LLVM 19 uses current libraries.
+          # LLVM 7 uses the old package set; LLVM 21 uses current libraries.
           buildInputs = [
             compatPkgs.openssl
             compatPkgs.libxml2
@@ -115,9 +116,9 @@
     in
     {
       devShells = forAllSystems (system: {
-        default = mkDevShell system 7;
+        default = mkDevShell system 21;
         v7 = mkDevShell system 7;
-        v19 = mkDevShell system 19;
+        v21 = mkDevShell system 21;
       });
     };
 }

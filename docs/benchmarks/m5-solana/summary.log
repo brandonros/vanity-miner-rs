@@ -1,0 +1,8 @@
+tune-32-32: 32 x 32: 29598 CLI keys/s, 30830 GPU keys/s (5.02s)
+tune-64-16: 64 x 16: 30165 CLI keys/s, 30654 GPU keys/s (5.02s)
+tune-128-8: 128 x 8: 27640 CLI keys/s, 29769 GPU keys/s (5.00s)
+tune-256-4: 256 x 4: 16956 CLI keys/s, 17592 GPU keys/s (5.01s)
+tune-64-4: 64 x 4: 12828 CLI keys/s, 13070 GPU keys/s (5.01s)
+tune-64-64: 64 x 64: 20185 CLI keys/s, 20290 GPU keys/s (5.07s)
+tune-64-256: 64 x 256: 18687 CLI keys/s, 18704 GPU keys/s (5.26s)
+sustained: 64 x 16: 25019 CLI keys/s, 29059 GPU keys/s (60.00s)

@@ -2,60 +2,74 @@
 
 extern crate alloc;
 
-mod xoroshiro;
+#[cfg(feature = "crypto-search")]
+pub mod crypto_search;
+#[cfg(feature = "crypto-search")]
+pub mod device_search;
+pub mod hex_pattern;
+#[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
+pub mod p256_vanity;
+#[cfg(feature = "rsa-pss")]
+pub mod rsa_crt;
+#[cfg(feature = "rsa-modulus")]
+pub mod rsa_prime;
+#[cfg(feature = "rsa-pss")]
+pub mod rsa_pss;
+
 #[cfg(any(feature = "solana", feature = "bitcoin"))]
 mod base58;
 #[cfg(feature = "bitcoin")]
 mod bech32;
+#[cfg(feature = "bitcoin")]
+mod bitcoin_vanity;
 #[cfg(feature = "solana")]
 mod ed25519;
+#[cfg(feature = "ethereum")]
+mod ethereum_vanity;
+#[cfg(feature = "ethereum")]
+mod keccak256;
+#[cfg(feature = "bitcoin")]
+mod ripemd160;
 #[cfg(any(feature = "bitcoin", feature = "ethereum"))]
 mod secp256k1;
+#[cfg(feature = "self_test")]
+mod self_test;
 #[cfg(any(feature = "bitcoin", feature = "shallenge"))]
 mod sha256;
 #[cfg(feature = "solana")]
 mod sha512;
-#[cfg(feature = "bitcoin")]
-mod ripemd160;
 #[cfg(feature = "shallenge")]
 mod shallenge;
-#[cfg(feature = "ethereum")]
-mod keccak256;
-#[cfg(any(feature = "solana", feature = "bitcoin", feature = "ethereum"))]
-mod vanity;
 #[cfg(feature = "solana")]
 mod solana_vanity;
-#[cfg(feature = "bitcoin")]
-mod bitcoin_vanity;
-#[cfg(feature = "ethereum")]
-mod ethereum_vanity;
-#[cfg(feature = "self_test")]
-mod self_test;
+#[cfg(any(feature = "solana", feature = "bitcoin", feature = "ethereum"))]
+mod vanity;
+mod xoroshiro;
 
-pub use xoroshiro::*;
 #[cfg(any(feature = "solana", feature = "bitcoin"))]
 pub use base58::*;
 #[cfg(feature = "bitcoin")]
 pub use bech32::*;
+#[cfg(feature = "bitcoin")]
+pub use bitcoin_vanity::*;
 #[cfg(feature = "solana")]
 pub use ed25519::*;
+#[cfg(feature = "ethereum")]
+pub use ethereum_vanity::*;
+#[cfg(feature = "ethereum")]
+pub use keccak256::*;
+#[cfg(feature = "bitcoin")]
+pub use ripemd160::*;
 #[cfg(any(feature = "bitcoin", feature = "ethereum"))]
 pub use secp256k1::*;
+#[cfg(feature = "self_test")]
+pub use self_test::*;
 #[cfg(any(feature = "bitcoin", feature = "shallenge"))]
 pub use sha256::*;
 #[cfg(feature = "solana")]
 pub use sha512::*;
-#[cfg(feature = "bitcoin")]
-pub use ripemd160::*;
 #[cfg(feature = "shallenge")]
 pub use shallenge::*;
-#[cfg(feature = "ethereum")]
-pub use keccak256::*;
 #[cfg(feature = "solana")]
 pub use solana_vanity::*;
-#[cfg(feature = "bitcoin")]
-pub use bitcoin_vanity::*;
-#[cfg(feature = "ethereum")]
-pub use ethereum_vanity::*;
-#[cfg(feature = "self_test")]
-pub use self_test::*;
+pub use xoroshiro::*;

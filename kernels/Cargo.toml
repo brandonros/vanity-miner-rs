@@ -13,10 +13,14 @@ bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
 self_test = ["logic/self_test"]
+rsa-modulus = ["logic/rsa-modulus"]
+rsa-pss = ["logic/rsa-pss"]
+p256-public-key = ["logic/p256-public-key"]
+p256-signature = ["logic/p256-signature"]
 
 [dependencies]
 logic = { path = "../logic", default-features = false }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "2f4fd1d" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "d2104a0a49252068292985e5e63328f522415c4b" }
 
 [workspace]
 
