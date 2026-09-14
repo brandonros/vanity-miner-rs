@@ -34,7 +34,7 @@ The 36 tracked CuMetal fixes are not 36 missing Rust tests. The table distinguis
 | [#43](https://github.com/Lulzx/cuda-metal/issues/43) / [#62](https://github.com/Lulzx/cuda-metal/pull/62) | Bounds/assertion paths in generated module | Trap reporting is a runtime contract; do not add deliberate panics to successful miner tests. |
 | [#46](https://github.com/Lulzx/cuda-metal/issues/46) / [#62](https://github.com/Lulzx/cuda-metal/pull/62) | Assertions in reachable helper calls | Trap propagation stays in upstream runtime/compiler tests. |
 | [#24](https://github.com/Lulzx/cuda-metal/issues/24) / [#63](https://github.com/Lulzx/cuda-metal/pull/63) | All kernel launches | Runtime provenance; retain upstream test. |
-| [#59](https://github.com/Lulzx/cuda-metal/issues/59) / [#68](https://github.com/Lulzx/cuda-metal/pull/68) | Production input/output buffers | New runtime two-buffer nonce kernel exercise provenance; store-specific mutation remains upstream. |
+| [#59](https://github.com/Lulzx/cuda-metal/issues/59) / [#68](https://github.com/Lulzx/cuda-metal/pull/68) | Production input/output buffers | New runtime two-buffer nonce kernel exercises provenance; store-specific mutation remains upstream. |
 | [#64](https://github.com/Lulzx/cuda-metal/issues/64) / [#69](https://github.com/Lulzx/cuda-metal/pull/69) | Production Shallenge; fixed nonce slot 44 did not catch runtime mismatch | High-value gap: new nonce vectors span seeds, indices, and zero/multiple iterations. |
 | [#51](https://github.com/Lulzx/cuda-metal/issues/51) / [#70](https://github.com/Lulzx/cuda-metal/pull/70) | Slots 84, 102–103, 109, 112–117: scalar reductions/zero paths | Already dedicated recovered Rust slots; do not introduce undefined Rust halves. |
 | [#66](https://github.com/Lulzx/cuda-metal/issues/66) / [#70](https://github.com/Lulzx/cuda-metal/pull/70) | Same recovered scalar-zero slots as #51 | Keep existing Rust cases; named discarded PTX registers are allocator-dependent. |
@@ -65,14 +65,22 @@ python3 scripts/run-codegen-repros.py --ptx output-llvm21.ptx --vectors vectors.
   --library /path/to/libcumetal.dylib --cumetalc /path/to/cumetalc --out repro-results
 ```
 
-For NVIDIA CUDA, omit `--cumetalc` and supply the CUDA driver library. Select a single kernel with `--entry`. This is a one-thread diagnostic suite; it is not a launch-boundary or throughput test. The runner snapshots PTX/vectors/tools, records hashes, checks both buffer guards and unchanged inputs, and retains exact mismatches. No-match CLI semantics are outside this issue.
+For NVIDIA CUDA, omit `--cumetalc` and supply the CUDA driver library. Select a single kernel with `--entry`. This is a one-thread diagnostic suite; it is not a launch-boundary or throughput test. The runner snapshots PTX/vectors/tools, records hashes, checks both buffer guards and unchanged inputs, and retains exact mismatches.
 
 ## Validation status
 
-The initial Rust commit `36209df` passed all four Rust-CUDA compile cells (LLVM 7/21, x86_64/aarch64) in [run 34874682601](https://github.com/brandonros/vanity-miner-rs/actions/runs/34874682601). All 40 host logic tests and all 118 existing CPU self-tests pass.
+Rust source commit `62580f7` builds the nonce-only suite in [CI run 34877613237](https://github.com/brandonros/vanity-miner-rs/actions/runs/34877613237). All four compile cells pass (LLVM 7/21 on x86_64/aarch64). Its LLVM 21 artifact contains all 124 expected entries: four mining kernels, the original 118 numerical checks and probe, and the new nonce entry. All 40 host logic tests and all 118 existing CPU self-tests pass; their source bodies and slot assignments are unchanged.
 
-The LLVM 21 nonce entry is 187 PTX lines, versus 2,731 for the production Shallenge entry (entry bodies, excluding reachable helpers). On the archived CuMetal `1e3c01e`, seed 0 / thread 0 / length 2 produces `p9` instead of `pe`. Current CuMetal `ddf496c` passes all 240 nonce cases, with untouched input and output guards. Generated old MSL uses 32-bit variables for packed loop state where the corrected output uses 64 bits, matching the #64 failure class. This comparison is against the combined historical/current compilers, not an isolated single-commit revert.
+The LLVM 21 nonce entry is 187 PTX lines, versus 2,731 for the production Shallenge entry (entry bodies, excluding reachable helpers). On the archived CuMetal `1e3c01e`, seed 0 / thread 0 / length 2 produces `p9` instead of `pe`. Corrected CuMetal `ddf496c` passes all 240 cases on Apple M5, with unchanged inputs and intact output guards. Both runs use exactly the same final PTX, vectors and runtime. Generated old MSL uses 32-bit variables for packed loop state where the corrected output uses 64 bits, matching the #64 failure class. This is a combined historical/current compiler comparison, not an isolated single-commit revert.
 
-The helper investigation reproduced the address-space verification failure both with and without a bounds-check branch. The no-branch pointer/index source is preserved at `e18d297`; its LLVM 21 artifact has SHA-256 `4e08de091993f2475cd12ee8ecb13620ead3683ec96a3e2f52c2f231416b4b12`. All 240 nonce cases also pass using that artifact. The production nonce Rust function and its kernel body are unchanged when the unrelated helper is removed. Final nonce-only CI/export verification is pending.
+| Input | SHA-256 |
+| --- | --- |
+| Final LLVM 21 PTX | `a0de7749b4b146bc6e41a7628a9be7c336ea55239a3c41f97e126eeee455d1cb` |
+| 240 vectors | `c1153d23a17727e4799df2d095109b12bd3512be9b8b329c8b9b660598640a00` |
+| Corrected compiler | `b7cf0485d3dc7a392e42b81c47a54ad0275f11fc0e5caf45cf34eb735b2a6103` |
+| Archived compiler | `af873d479c822b598867fb5a7478b1acdd1891b5a93053e1a725671fd47abc91` |
+| Shared runtime | `31492c9be52ea10c000490f7a9435ffe899d5eabf40b91ceb233eec40b110d2e` |
 
-No NVIDIA numerical execution or full 118-entry GPU rerun is claimed for this change; the CI matrix validates compilation/export and the local CPU run preserves the existing known-answer inventory.
+The helper investigation reproduced its address-space verification failure both with and without a bounds-check branch. The no-branch pointer/index source is preserved at `e18d297`; its LLVM 21 artifact has SHA-256 `4e08de091993f2475cd12ee8ecb13620ead3683ec96a3e2f52c2f231416b4b12`. That unsupported helper is excluded from the final suite and tracked in CuMetal #80.
+
+No NVIDIA numerical execution or full 118-entry GPU rerun is claimed for this change. The CI matrix validates Rust-CUDA compilation/export; the Apple M5 runs validate this reproduction, and the local CPU run preserves the existing known-answer inventory.
