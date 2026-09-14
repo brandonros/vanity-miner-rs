@@ -122,7 +122,7 @@ dependencies = [
 [[package]]
 name = "cuda_std"
 version = "0.2.2"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=94b808a096cac28c24e5535901e7016bc9b36fbb#94b808a096cac28c24e5535901e7016bc9b36fbb"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=059beda8781e681834e971b4af86d71c661b1f66#059beda8781e681834e971b4af86d71c661b1f66"
 dependencies = [
  "bitflags",
  "cuda_std_macros",
@@ -135,7 +135,7 @@ dependencies = [
 [[package]]
 name = "cuda_std_macros"
 version = "0.2.0"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=94b808a096cac28c24e5535901e7016bc9b36fbb#94b808a096cac28c24e5535901e7016bc9b36fbb"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=059beda8781e681834e971b4af86d71c661b1f66#059beda8781e681834e971b4af86d71c661b1f66"
 dependencies = [
  "proc-macro2",
  "quote",
