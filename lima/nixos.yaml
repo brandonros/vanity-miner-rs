@@ -1,0 +1,40 @@
+# Apple Silicon host -> aarch64-linux build VM.
+# Image: https://github.com/nixos-lima/nixos-lima/releases/tag/v0.2.1
+# Run from the repository root:
+#   limactl start --name=vanity-nixos ./lima/nixos.yaml
+#   limactl shell vanity-nixos
+# Inside the VM, in this same checkout:
+#   nix develop .#v21
+#   export CARGO_TARGET_DIR="$HOME/.cache/vanity-miner/llvm21"
+#   cargo build -p vanity-miner --release --locked --features gpu,llvm21,self_test,solana,bitcoin,ethereum,shallenge,rsa-modulus,rsa-pss,p256-public-key,p256-signature
+# The guest can compile CUDA/PTX, but has no NVIDIA GPU to run CUDA kernels.
+
+arch: aarch64
+vmType: vz
+cpus: 8
+memory: 16GiB
+disk: 100GiB
+
+images:
+  - location: https://github.com/nixos-lima/nixos-lima/releases/download/v0.2.1/nixos-lima-v0.2.1-aarch64.qcow2
+    arch: aarch64
+    digest: sha512:748c723b69dbdec40a9acaf78cc9070ae784dcb64b0856ab906efdac822d9abcc65565b8f8dfa4cf8b49cc6c12c372072e83bb5ed9247330a7c22675d9e141ce
+
+mountType: virtiofs
+mounts:
+  # Same path in both systems; includes flake.nix, flake.lock and live edits.
+  # Change this location if you move the checkout.
+  - location: "{{.Home}}/Desktop/gpu/vanity-miner-rs"
+    writable: true
+
+# Nix and flakes are already enabled in the image; no container runtime needed.
+containerd:
+  system: false
+  user: false
+
+# Upstream NixOS workaround: do not forward the guest's DHCP client port.
+portForwards:
+  - proto: udp
+    guestPort: 68
+    guestIP: 0.0.0.0
+    ignore: true
