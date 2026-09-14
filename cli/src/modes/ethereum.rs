@@ -157,6 +157,10 @@ pub mod gpu {
                 found_address_dev.copy_to(&mut found_address)?;
                 found_thread_idx_dev.copy_to(&mut found_thread_idx_slice)?;
 
+                // TODO: CPU-verify GPU results before formatting or printing:
+                // validate candidate metadata, derive the public key and Ethereum
+                // address from the private key, compare returned fields, and
+                // confirm the requested prefix/suffix match.
                 let found_thread_idx = found_thread_idx_slice[0];
                 let encoded_address_str = hex::encode(found_address);
 

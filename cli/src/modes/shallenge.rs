@@ -173,6 +173,10 @@ pub mod gpu {
                 found_nonce_len_dev.copy_to(&mut found_nonce_len)?;
                 found_thread_idx_slice_dev.copy_to(&mut found_thread_idx_slice)?;
 
+                // TODO: CPU-verify GPU results before slicing, printing, or updating
+                // the global target: validate nonce_len and candidate metadata,
+                // recompute SHA256(username || '/' || nonce), compare found_hash,
+                // and confirm it beats the launch target.
                 let found_thread_idx = found_thread_idx_slice[0];
                 let nonce_len = found_nonce_len[0];
                 let nonce_string = String::from_utf8(found_nonce[..nonce_len].to_vec()).unwrap();

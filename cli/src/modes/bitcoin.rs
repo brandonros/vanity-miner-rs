@@ -173,6 +173,10 @@ pub mod gpu {
                 found_encoded_len_dev.copy_to(&mut found_encoded_len_slice)?;
                 found_thread_idx_dev.copy_to(&mut found_thread_idx_slice)?;
 
+                // TODO: CPU-verify GPU results before slicing, formatting, or printing:
+                // validate encoded_len and candidate metadata, derive the public key,
+                // HASH160, and Bech32 address from the private key, compare returned
+                // fields, and confirm the requested prefix/suffix match.
                 let found_thread_idx = found_thread_idx_slice[0];
                 let encoded_len = found_encoded_len_slice[0] as usize;
                 let encoded_public_key_str =
