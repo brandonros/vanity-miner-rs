@@ -25,29 +25,43 @@
 
 extern crate alloc;
 
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge"
+))]
 mod atomic;
 #[macro_use]
 mod match_handler;
 mod utilities;
 
-#[cfg(feature = "solana")]
-mod solana_vanity;
 #[cfg(feature = "bitcoin")]
 mod bitcoin_vanity;
 #[cfg(feature = "ethereum")]
 mod ethereum_vanity;
-#[cfg(feature = "shallenge")]
-mod shallenge;
 #[cfg(feature = "self_test")]
 mod self_test;
-
+#[cfg(feature = "shallenge")]
+mod shallenge;
 #[cfg(feature = "solana")]
-pub use solana_vanity::*;
+mod solana_vanity;
+
 #[cfg(feature = "bitcoin")]
 pub use bitcoin_vanity::*;
 #[cfg(feature = "ethereum")]
 pub use ethereum_vanity::*;
-#[cfg(feature = "shallenge")]
-pub use shallenge::*;
 #[cfg(feature = "self_test")]
 pub use self_test::*;
+#[cfg(feature = "shallenge")]
+pub use shallenge::*;
+#[cfg(feature = "solana")]
+pub use solana_vanity::*;
+
+#[cfg(any(
+    feature = "rsa-modulus",
+    feature = "rsa-pss",
+    feature = "p256-public-key",
+    feature = "p256-signature"
+))]
+mod crypto_vanity;

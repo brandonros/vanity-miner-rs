@@ -1,6 +1,8 @@
 use std::error::Error;
 
-fn report(results: &[u32; logic::SELF_TEST_NUM_CHECKS]) -> Result<(), Box<dyn Error + Send + Sync>> {
+fn report(
+    results: &[u32; logic::SELF_TEST_NUM_CHECKS],
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut failed = 0usize;
     for (i, &r) in results.iter().enumerate() {
         let status = if r == 1 { "PASS" } else { "FAIL" };
@@ -25,7 +27,15 @@ pub mod cpu {
         println!("Running self-test on CPU");
         let mut results = [0u32; logic::SELF_TEST_NUM_CHECKS];
         logic::run_self_test(&mut results);
-        report(&results)
+        report(&results)?;
+        #[cfg(any(
+            feature = "rsa-modulus",
+            feature = "rsa-pss",
+            feature = "p256-public-key",
+            feature = "p256-signature"
+        ))]
+        vanity_miner::device_self_test::run(&mut vanity_miner::device_search::HostDevice)?;
+        Ok(())
     }
 }
 
@@ -37,10 +47,7 @@ pub mod gpu {
     use cust::memory::{CopyDestination, DeviceBuffer};
     use cust::module::Module;
 
-    pub fn run(
-        ordinal: usize,
-        module: &Module,
-    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    pub fn run(ordinal: usize, module: &Module) -> Result<(), Box<dyn Error + Send + Sync>> {
         let gpu = GpuContext::new(ordinal)?;
         println!("[{}] Running self-test on GPU", ordinal);
 
@@ -153,16 +160,16 @@ pub mod gpu {
         //   106-107 named-field struct return (Scalar shape) + hand-rolled no-seq base58
         //   108-109 <[u8]>::reverse() partial + dalek Scalar(0) == ZERO eq
         //   110-112 GA-source copy_from_slice + dalek ZERO==ZERO + from_canonical_bytes(0)
-        run_slot!(0,  "kernel_self_test_primitive_xoroshiro");
-        run_slot!(1,  "kernel_self_test_primitive_sha512");
-        run_slot!(2,  "kernel_self_test_primitive_ed25519");
-        run_slot!(3,  "kernel_self_test_primitive_base58");
-        run_slot!(4,  "kernel_self_test_primitive_secp256k1_compressed");
-        run_slot!(5,  "kernel_self_test_primitive_secp256k1_uncompressed");
-        run_slot!(6,  "kernel_self_test_primitive_keccak256");
-        run_slot!(7,  "kernel_self_test_primitive_ripemd160");
-        run_slot!(8,  "kernel_self_test_primitive_sha256_32");
-        run_slot!(9,  "kernel_self_test_primitive_sha256_variable");
+        run_slot!(0, "kernel_self_test_primitive_xoroshiro");
+        run_slot!(1, "kernel_self_test_primitive_sha512");
+        run_slot!(2, "kernel_self_test_primitive_ed25519");
+        run_slot!(3, "kernel_self_test_primitive_base58");
+        run_slot!(4, "kernel_self_test_primitive_secp256k1_compressed");
+        run_slot!(5, "kernel_self_test_primitive_secp256k1_uncompressed");
+        run_slot!(6, "kernel_self_test_primitive_keccak256");
+        run_slot!(7, "kernel_self_test_primitive_ripemd160");
+        run_slot!(8, "kernel_self_test_primitive_sha256_32");
+        run_slot!(9, "kernel_self_test_primitive_sha256_variable");
         run_slot!(10, "kernel_self_test_solana_priv");
         run_slot!(11, "kernel_self_test_solana_pub");
         run_slot!(12, "kernel_self_test_solana_encoded");
@@ -239,11 +246,17 @@ pub mod gpu {
         run_slot!(83, "kernel_self_test_reverse_range_write");
         run_slot!(84, "kernel_self_test_dalek_scalar52_from_bytes");
         run_slot!(85, "kernel_self_test_dalek_scalar52_montgomery_reduce_r");
-        run_slot!(86, "kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r");
+        run_slot!(
+            86,
+            "kernel_self_test_dalek_scalar52_mul_internal_then_reduce_one_r"
+        );
         run_slot!(87, "kernel_self_test_dalek_scalar52_as_bytes_one");
         run_slot!(88, "kernel_self_test_dalek_scalar52_sub_no_underflow");
         run_slot!(89, "kernel_self_test_dalek_scalar52_sub_with_underflow");
-        run_slot!(90, "kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub");
+        run_slot!(
+            90,
+            "kernel_self_test_dalek_scalar52_montgomery_reduce_with_sub"
+        );
         run_slot!(91, "kernel_self_test_index_trait_dispatch");
         run_slot!(92, "kernel_self_test_dalek_scalar_one_to_bytes_direct");
         run_slot!(93, "kernel_self_test_k256_affine_generator_encode");
@@ -268,7 +281,10 @@ pub mod gpu {
         run_slot!(112, "kernel_self_test_dalek_from_canonical_zero");
         run_slot!(113, "kernel_self_test_dalek_scalar52_from_bytes_zero");
         run_slot!(114, "kernel_self_test_dalek_scalar52_mul_internal_zero");
-        run_slot!(115, "kernel_self_test_dalek_scalar52_montgomery_reduce_zero");
+        run_slot!(
+            115,
+            "kernel_self_test_dalek_scalar52_montgomery_reduce_zero"
+        );
         run_slot!(116, "kernel_self_test_dalek_scalar52_as_bytes_zero");
         run_slot!(117, "kernel_self_test_dalek_reduce_pipeline_zero");
 

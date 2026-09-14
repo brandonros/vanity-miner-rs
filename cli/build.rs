@@ -49,6 +49,10 @@ fn build_gpu() {
         ("ethereum", cfg!(feature = "ethereum")),
         ("shallenge", cfg!(feature = "shallenge")),
         ("self_test", cfg!(feature = "self_test")),
+        ("rsa-modulus", cfg!(feature = "rsa-modulus")),
+        ("rsa-pss", cfg!(feature = "rsa-pss")),
+        ("p256-public-key", cfg!(feature = "p256-public-key")),
+        ("p256-signature", cfg!(feature = "p256-signature")),
     ]
     .into_iter()
     .filter_map(|(name, enabled)| enabled.then_some(name))
