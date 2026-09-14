@@ -2,13 +2,27 @@ use crate::args::Command;
 use crate::common::GlobalStats;
 #[cfg(feature = "shallenge")]
 use crate::common::SharedBestHash;
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge",
+    feature = "self_test"
+))]
 use crate::modes;
 use crate::runner::Runner;
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge",
+    feature = "self_test"
+))]
 use backtrace::Backtrace;
+use cust::CudaFlags;
 use cust::device::Device;
 use cust::module::{Module, ModuleJitOption};
 use cust::prelude::Context;
-use cust::CudaFlags;
 use cust_raw::driver_sys;
 use std::error::Error;
 use std::ffi::{CStr, CString, c_void};
@@ -40,9 +54,13 @@ impl GpuRunner {
         // Surface loading failures instead of silently falling back.
         if let Some(cubin_path) = std::env::var_os("CUBIN_PATH") {
             let cubin_path = std::path::PathBuf::from(cubin_path);
-            let module = Module::from_file(&cubin_path)
-                .map_err(|e| format!("Failed to load CUBIN file {}: {}", cubin_path.display(), e))?;
-            println!("[{ordinal}] Module loaded from CUBIN: {}", cubin_path.display());
+            let module = Module::from_file(&cubin_path).map_err(|e| {
+                format!("Failed to load CUBIN file {}: {}", cubin_path.display(), e)
+            })?;
+            println!(
+                "[{ordinal}] Module loaded from CUBIN: {}",
+                cubin_path.display()
+            );
             return Ok((ctx, module));
         }
         let ptx_owned;
@@ -60,7 +78,10 @@ impl GpuRunner {
         Ok((ctx, module))
     }
 
-    fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error + Send + Sync>> {
+    fn load_ptx_with_log(
+        ordinal: usize,
+        ptx: &str,
+    ) -> Result<Module, Box<dyn Error + Send + Sync>> {
         let cstr = CString::new(ptx).map_err(|e| format!("PTX contains nul bytes: {}", e))?;
 
         const LOG_CAP: usize = 16 * 1024;
@@ -138,98 +159,240 @@ impl Runner for GpuRunner {
         self.num_devices
     }
 
-    fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> Result<(), Box<dyn Error + Send + Sync>> {
-        // Set up panic hook for better error reporting
-        std::panic::set_hook(Box::new(|panic_info| {
-            let backtrace = Backtrace::new();
-            eprintln!("Thread panicked: {}", panic_info);
-            eprintln!("Backtrace:\n{:?}", backtrace);
-        }));
-
-        // Create shared state for shallenge mode
-        #[cfg(feature = "shallenge")]
-        let shared_best_hash: Option<Arc<RwLock<SharedBestHash>>> = match command {
-            Command::Shallenge { target_hash, .. } => {
-                let target_hash_bytes = hex::decode(target_hash)?;
-                let mut initial_target = [0u8; 32];
-                initial_target.copy_from_slice(&target_hash_bytes);
-                Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))
+    fn run(
+        &self,
+        command: &Command,
+        stats: Arc<GlobalStats>,
+    ) -> Result<(), Box<dyn Error + Send + Sync>> {
+        #[cfg(feature = "crypto-cli")]
+        {
+            let is_crypto = match command {
+                #[cfg(feature = "rsa-modulus")]
+                Command::RsaModulusVanity(_) => true,
+                #[cfg(feature = "rsa-pss")]
+                Command::RsaPssSignatureVanity(_) => true,
+                #[cfg(feature = "p256-public-key")]
+                Command::P256PublicKeyVanity(_) => true,
+                #[cfg(feature = "p256-signature")]
+                Command::P256SignatureVanity(_) => true,
+                #[allow(unreachable_patterns)]
+                _ => false,
+            };
+            if is_crypto {
+                let mut modules = Vec::new();
+                for ordinal in 0..self.num_devices {
+                    modules.push(Self::load_module(ordinal)?);
+                }
+                let mut engine = crate::crypto_gpu::Engine::new(modules)?;
+                return match command {
+                    #[cfg(feature = "rsa-modulus")]
+                    Command::RsaModulusVanity(args) => {
+                        let config = args.config(1)?;
+                        crate::crypto_runner::run_controlled("q candidates tested", |control| {
+                            vanity_miner::rsa_modulus::run_device(&config, control, &mut engine)
+                                .map(|report| report.found)
+                        })
+                    }
+                    #[cfg(feature = "rsa-pss")]
+                    Command::RsaPssSignatureVanity(args) => {
+                        let config = args.config(1)?;
+                        let unit = if matches!(
+                            config.source,
+                            vanity_miner::rsa_pss_search::PssSource::Salt { .. }
+                        ) {
+                            "salts tested"
+                        } else {
+                            "messages tested"
+                        };
+                        crate::crypto_runner::run_controlled(unit, |control| {
+                            vanity_miner::rsa_pss_search::run_device(&config, control, &mut engine)
+                                .map(|report| report.found)
+                        })
+                    }
+                    #[cfg(feature = "p256-public-key")]
+                    Command::P256PublicKeyVanity(args) => {
+                        let config = args.config(1);
+                        crate::crypto_runner::run_controlled("keys tested", |control| {
+                            vanity_miner::p256_public::run_device(&config, control, &mut engine)
+                                .map(|report| report.found)
+                        })
+                    }
+                    #[cfg(feature = "p256-signature")]
+                    Command::P256SignatureVanity(args) => {
+                        let config = args.config(1)?;
+                        let unit = if matches!(
+                            config.source,
+                            vanity_miner::p256_signature::SearchSource::Message { .. }
+                        ) {
+                            "messages tested"
+                        } else {
+                            "nonces tested"
+                        };
+                        crate::crypto_runner::run_controlled(unit, |control| {
+                            vanity_miner::p256_signature::run_device(&config, control, &mut engine)
+                                .map(|report| report.found)
+                        })
+                    }
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!("cryptographic command was selected above"),
+                };
             }
-            #[allow(unreachable_patterns)]
-            _ => None,
-        };
+        }
 
-        // Spawn device threads
-        let mut handles = Vec::new();
-        for i in 0..self.num_devices {
-            println!("Starting device {}", i);
-            let command_clone = command.clone();
-            #[cfg(feature = "shallenge")]
-            let shared_best_hash_clone = shared_best_hash.clone();
-            let stats_clone = Arc::clone(&stats);
+        #[cfg(all(
+            feature = "self_test",
+            any(
+                feature = "rsa-modulus",
+                feature = "rsa-pss",
+                feature = "p256-public-key",
+                feature = "p256-signature"
+            )
+        ))]
+        if matches!(command, Command::SelfTest) {
+            for ordinal in 0..self.num_devices {
+                let mut engine = crate::crypto_gpu::Engine::new(vec![Self::load_module(ordinal)?])?;
+                vanity_miner::device_self_test::run(&mut engine)?;
+            }
+        }
 
-            handles.push(std::thread::spawn(move || -> Result<(), Box<dyn Error + Send + Sync>> {
-                // Hold the context alive for the lifetime of the module — dropping the
-                // Context destroys every CUmodule inside it, which would make the
-                // Module's handle invalid before we ever launch a kernel.
-                let (_ctx, module) = Self::load_module(i)?;
-
-                match command_clone {
-                    #[cfg(feature = "solana")]
-                    Command::SolanaVanity { prefix, suffix } => {
-                        modes::solana::gpu::run(i, prefix, suffix, &module, stats_clone)
-                    }
-                    #[cfg(feature = "bitcoin")]
-                    Command::BitcoinVanity { prefix, suffix } => {
-                        modes::bitcoin::gpu::run(i, prefix, suffix, &module, stats_clone)
-                    }
-                    #[cfg(feature = "ethereum")]
-                    Command::EthereumVanity { prefix, suffix } => {
-                        modes::ethereum::gpu::run(i, prefix, suffix, &module, stats_clone)
-                    }
-                    #[cfg(feature = "shallenge")]
-                    Command::Shallenge { username, .. } => {
-                        let shared = shared_best_hash_clone.expect("SharedBestHash required for shallenge mode");
-                        modes::shallenge::gpu::run(i, username, shared, &module, stats_clone)
-                    }
-                    #[cfg(feature = "self_test")]
-                    Command::SelfTest => {
-                        let _ = stats_clone;
-                        modes::self_test::gpu::run(i, &module)
-                    }
-                }.map_err(|e| {
-                    let bt = Backtrace::new();
-                    eprintln!("Error in device {}: {}", i, e);
-                    eprintln!("Backtrace:\n{:?}", bt);
-                    e
-                })
+        #[cfg(any(
+            feature = "solana",
+            feature = "bitcoin",
+            feature = "ethereum",
+            feature = "shallenge",
+            feature = "self_test"
+        ))]
+        {
+            // Set up panic hook for better error reporting
+            std::panic::set_hook(Box::new(|panic_info| {
+                let backtrace = Backtrace::new();
+                eprintln!("Thread panicked: {}", panic_info);
+                eprintln!("Backtrace:\n{:?}", backtrace);
             }));
-        }
 
-        // Wait for threads
-        for (i, handle) in handles.into_iter().enumerate() {
-            match handle.join() {
-                Ok(result) => {
-                    if let Err(e) = result {
-                        eprintln!("Device {} returned error: {}", i, e);
-                        return Err(e);
+            // Create shared state for shallenge mode
+            #[cfg(feature = "shallenge")]
+            let shared_best_hash: Option<Arc<RwLock<SharedBestHash>>> = match command {
+                Command::Shallenge { target_hash, .. } => {
+                    let target_hash_bytes = hex::decode(target_hash)?;
+                    let mut initial_target = [0u8; 32];
+                    initial_target.copy_from_slice(&target_hash_bytes);
+                    Some(Arc::new(RwLock::new(SharedBestHash::new(initial_target))))
+                }
+                #[allow(unreachable_patterns)]
+                _ => None,
+            };
+
+            // Spawn device threads
+            let mut handles = Vec::new();
+            for i in 0..self.num_devices {
+                println!("Starting device {}", i);
+                let command_clone = command.clone();
+                #[cfg(feature = "shallenge")]
+                let shared_best_hash_clone = shared_best_hash.clone();
+                let stats_clone = Arc::clone(&stats);
+
+                handles.push(std::thread::spawn(
+                    move || -> Result<(), Box<dyn Error + Send + Sync>> {
+                        // Hold the context alive for the lifetime of the module — dropping the
+                        // Context destroys every CUmodule inside it, which would make the
+                        // Module's handle invalid before we ever launch a kernel.
+                        let (_ctx, module) = Self::load_module(i)?;
+
+                        match command_clone {
+                            #[cfg(feature = "rsa-modulus")]
+                            Command::RsaModulusVanity(_) => {
+                                unreachable!("handled by the shared cryptographic runner")
+                            }
+                            #[cfg(feature = "rsa-pss")]
+                            Command::RsaPssSignatureVanity(_) => {
+                                unreachable!("handled by the shared cryptographic runner")
+                            }
+                            #[cfg(feature = "p256-public-key")]
+                            Command::P256PublicKeyVanity(_) => {
+                                unreachable!("handled by the shared cryptographic runner")
+                            }
+                            #[cfg(feature = "p256-signature")]
+                            Command::P256SignatureVanity(_) => {
+                                unreachable!("handled by the shared cryptographic runner")
+                            }
+
+                            #[cfg(feature = "solana")]
+                            Command::SolanaVanity { prefix, suffix } => {
+                                modes::solana::gpu::run(i, prefix, suffix, &module, stats_clone)
+                            }
+                            #[cfg(feature = "bitcoin")]
+                            Command::BitcoinVanity { prefix, suffix } => {
+                                modes::bitcoin::gpu::run(i, prefix, suffix, &module, stats_clone)
+                            }
+                            #[cfg(feature = "ethereum")]
+                            Command::EthereumVanity { prefix, suffix } => {
+                                modes::ethereum::gpu::run(i, prefix, suffix, &module, stats_clone)
+                            }
+                            #[cfg(feature = "shallenge")]
+                            Command::Shallenge { username, .. } => {
+                                let shared = shared_best_hash_clone
+                                    .expect("SharedBestHash required for shallenge mode");
+                                modes::shallenge::gpu::run(
+                                    i,
+                                    username,
+                                    shared,
+                                    &module,
+                                    stats_clone,
+                                )
+                            }
+                            #[cfg(feature = "self_test")]
+                            Command::SelfTest => {
+                                let _ = stats_clone;
+                                modes::self_test::gpu::run(i, &module)
+                            }
+                        }
+                        .map_err(|e| {
+                            let bt = Backtrace::new();
+                            eprintln!("Error in device {}: {}", i, e);
+                            eprintln!("Backtrace:\n{:?}", bt);
+                            e
+                        })
+                    },
+                ));
+            }
+
+            // Wait for threads
+            for (i, handle) in handles.into_iter().enumerate() {
+                match handle.join() {
+                    Ok(result) => {
+                        if let Err(e) = result {
+                            eprintln!("Device {} returned error: {}", i, e);
+                            return Err(e);
+                        }
+                    }
+                    Err(panic_payload) => {
+                        eprintln!("Device {} thread panicked!", i);
+                        let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
+                            s.to_string()
+                        } else if let Some(s) = panic_payload.downcast_ref::<String>() {
+                            s.clone()
+                        } else {
+                            "Unknown panic".to_string()
+                        };
+                        eprintln!("Panic message: {}", panic_msg);
+                        return Err(format!("Device {} panicked: {}", i, panic_msg).into());
                     }
                 }
-                Err(panic_payload) => {
-                    eprintln!("Device {} thread panicked!", i);
-                    let panic_msg = if let Some(s) = panic_payload.downcast_ref::<&str>() {
-                        s.to_string()
-                    } else if let Some(s) = panic_payload.downcast_ref::<String>() {
-                        s.clone()
-                    } else {
-                        "Unknown panic".to_string()
-                    };
-                    eprintln!("Panic message: {}", panic_msg);
-                    return Err(format!("Device {} panicked: {}", i, panic_msg).into());
-                }
             }
-        }
 
-        Ok(())
+            Ok(())
+        }
+        #[cfg(not(any(
+            feature = "solana",
+            feature = "bitcoin",
+            feature = "ethereum",
+            feature = "shallenge",
+            feature = "self_test"
+        )))]
+        {
+            let _ = stats;
+            Err("no matching CUDA command enabled".into())
+        }
     }
 }

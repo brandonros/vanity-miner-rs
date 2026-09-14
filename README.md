@@ -1,6 +1,100 @@
 # vanity-miner-rs
 GPU-accelerated vanity address generator for multiple blockchains.
 
+## Cryptographic vanity modes (new-modes branch)
+
+Four new commands have CPU runners and CUDA kernels/host dispatch. Shared logic
+and CPU integration are tested; PTX compilation and hardware validation are
+deferred to the later GPU session. See [implementation status](docs/new-modes-plan.md).
+
+```sh
+cargo build -p vanity-miner --no-default-features --features rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
+
+./target/release/vanity-miner rsa-modulus-vanity --prefix a --suffix b --private-out rsa-private.pem --public-out rsa-public.pem
+./target/release/vanity-miner p256-public-key-vanity --prefix a --target xy --private-out p256-private.pem --public-out p256-public.pem --public-format spki-pem
+
+printf 'example:00000000' > message.bin
+./target/release/vanity-miner rsa-pss-signature-vanity --key rsa-private.pem --message message.bin --prefix 0 --signature-out rsa-signature.bin --salt-out rsa-salt.bin
+./target/release/vanity-miner p256-signature-vanity --key p256-private.pem --message message.bin --nonce-offset 8 --nonce-length 8 --prefix a --signature-out p256-signature.bin --message-out winning-message.bin --der-out p256-signature.der
+```
+
+Each mode has its own feature: `rsa-modulus`, `rsa-pss`, `p256-public-key`, or
+`p256-signature`. New searches stop after the first independently verified winner.
+`--threads N` selects CPU workers; Ctrl-C cancels the search and joins workers.
+Statistics name keys, q candidates, salts, messages, or ephemeral nonces tested.
+Elapsed rates include setup and winner verification, so short searches are not
+steady-state benchmarks.
+
+Patterns use case-insensitive hexadecimal without `0x`. `--prefix` and `--suffix`
+both accept odd digit counts. Contradictory overlaps and excessive lengths are
+rejected. Matching applies to these exact byte strings:
+
+| Command | Matched bytes |
+| --- | --- |
+| `rsa-modulus-vanity` | Unsigned 256-byte big-endian modulus n; exactly 2048 bits, odd, e=65537 |
+| `rsa-pss-signature-vanity` | Raw 256-byte big-endian RSA signature, not its hash or salt |
+| `p256-public-key-vanity` | `xy` (default): X followed by Y, 64 bytes; `x`/`y`: 32 bytes; `uncompressed`: 04 followed by X and Y, 65 bytes |
+| `p256-signature-vanity` | `raw` (default): 32-byte r followed by 32-byte s; `r`/`s`: the selected 32-byte component |
+
+Generic brute-force work is approximately `16^d` for d independent matched hex
+digits: four digits mean roughly 65,536 candidates; eight mean roughly 4.3 billion.
+Overlapping bits count once; fixed format bits do not add work. RSA modulus
+construction is different: it chooses a random feasible p and restricts q to the
+prefix interval and suffix residue class, so its q candidates already satisfy
+the pattern. It does not repeatedly generate and reject complete random keys.
+Constraints leaving insufficient room for 256 bits of q candidate entropy are
+rejected. Every winning key receives additional OS-random primality checks,
+factor-distance checks, component validation, and a blinded sign/verify check.
+
+RSA-PSS supports SHA-256 and MGF1-SHA-256. `--salt-length` defaults to 32 (maximum
+222 for RSA-2048). The salt search enumerates distinct salts from a random starting
+value; a zero-byte salt has one candidate. For a message-window search, select
+`--search-source message --nonce-offset N --nonce-length N --message-out FILE`.
+Supply `--fixed-salt-hex HEX` of the requested salt length, or let the search
+generate one fixed salt. `--salt-out` saves the exact winning salt in both cases.
+The CPU private operation is blinded; the explicit salt remains fully controlled. GPU
+signing places private-key material in device memory. The device CRT operation is
+unblinded and checks each result with the public exponent; host reconstruction
+uses blinded RSA and independent PSS verification. Secret transport buffers are
+cleared after synchronization, but device faults and compiler-generated copies
+prevent a guarantee of complete erasure.
+
+P-256 signature message-window search uses deterministic RFC 6979 signing and is
+the recommended interface. `--search-source ephemeral` keeps the message fixed
+and derives secret nonces from fresh OS entropy, bound to the key, message,
+worker, and counter. **Reusing an ECDSA ephemeral nonce across different messages
+can reveal the private key.** An ephemeral nonce is different from the public
+message window: it is never printed or exported. Search seeds are never saved.
+Both private scalars and ephemeral nonces use rejection sampling without modulo
+bias. `--s-form low` is the default; `high` selects n-s when necessary, and `either`
+tests both representations and emits the one that matched. Some consumers reject
+high-S signatures. Optional DER output encodes the emitted signature; pattern
+semantics always apply to the raw fixed-width bytes.
+
+Private keys use PKCS#8 PEM; RSA public keys use SPKI PEM. P-256 public output is
+SEC1 uncompressed bytes by default, or SPKI PEM with `--public-format spki-pem`.
+Private files are staged with Unix mode 0600 and published atomically; existing
+outputs require `--force`. Inputs cannot be replaced by output paths. Each file
+is atomic individually; companion output can remain if a later publication fails.
+All files are staged before publication, and private keys or raw signatures are
+published last. No private key, factor, scalar, search seed, or ephemeral nonce is
+printed in statistics or normal error messages.
+
+For CUDA, add `gpu` to the same mode features using the pinned Linux/CUDA
+toolchain. New searches use 64-candidate batches, rotate across available devices,
+and observe Ctrl-C between synchronized batches. GPU performance has not been
+measured; the default 64-KiB stack limit can be overridden with `STACK_SIZE`.
+Add `self_test` and run `self-test` to exercise crypto differential fixtures
+through the selected backend before searches.
+
+Independent verification examples:
+
+```sh
+openssl rsa -in rsa-private.pem -check -noout
+openssl dgst -sha256 -verify rsa-public.pem -signature rsa-signature.bin -sigopt rsa_padding_mode:pss -sigopt rsa_pss_saltlen:32 message.bin
+openssl dgst -sha256 -verify p256-public.pem -signature p256-signature.der winning-message.bin
+```
+
 Run commands from the repository root. Modes are selected at build time:
 the default build includes only `shallenge`. The `gpu` feature selects the GPU
 runner; it does not enable additional modes. A GPU-enabled binary requires CUDA

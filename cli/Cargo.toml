@@ -11,9 +11,21 @@ solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
+crypto-cli = ["dep:ctrlc"]
+p256-public-key = ["logic/p256-public-key", "dep:p256", "dep:zeroize", "crypto-cli"]
+p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "dep:sha2", "dep:zeroize", "crypto-cli"]
+rsa-common = ["dep:rsa", "dep:num-bigint-dig", "dep:sha2", "dep:zeroize", "crypto-cli"]
+rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
+rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
 self_test = ["logic/self_test"]
 
 [dependencies]
+ctrlc = { version = "3.4", optional = true }
+num-bigint-dig = { version = "0.8.6", default-features = false, features = ["prime", "zeroize"], optional = true }
+rsa = { version = "0.9.10", default-features = false, features = ["pem", "sha2"], optional = true }
+sha2 = { version = "0.10.9", default-features = false, optional = true }
+p256 = { version = "0.13.2", default-features = false, features = ["arithmetic", "pkcs8", "pem"], optional = true }
+zeroize = { version = "1", default-features = false, features = ["alloc"], optional = true }
 logic = { path = "../logic", default-features = false }
 clap = { version = "4", features = ["derive"] }
 hex = "0.4.3"

@@ -1,11 +1,15 @@
 mod args;
 mod common;
+#[cfg(feature = "crypto-cli")]
+mod crypto_args;
+#[cfg(feature = "crypto-cli")]
+mod crypto_runner;
 mod modes;
 mod runner;
 
+use crate::common::GlobalStats;
 use args::Cli;
 use clap::Parser;
-use crate::common::GlobalStats;
 use runner::Runner;
 use std::error::Error;
 use std::sync::Arc;
@@ -42,3 +46,6 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Run
     runner.run(&cli.command, stats)
 }
+
+#[cfg(all(feature = "crypto-cli", feature = "gpu"))]
+mod crypto_gpu;
