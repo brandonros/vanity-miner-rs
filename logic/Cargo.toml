@@ -14,7 +14,7 @@ p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "crypto-search"]
 crypto-search = ["dep:hmac", "dep:sha2", "dep:zeroize"]
 rsa-pss = ["crypto-search", "dep:crypto-bigint"]
 rsa-modulus = ["crypto-search", "dep:crypto-bigint"]
-self_test = ["solana", "bitcoin", "ethereum", "shallenge"]
+self_test = ["solana", "bitcoin", "ethereum", "shallenge", "p256-public-key", "p256-signature", "rsa-pss", "rsa-modulus"]
 
 [dependencies]
 crypto-bigint = { version = "0.5.5", default-features = false, features = ["zeroize"], optional = true }

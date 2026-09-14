@@ -65,7 +65,7 @@ fn build_gpu() {
     // Legacy libnvvm rejects vector bswap emitted while optimizing HMAC at O3.
     // Keep the workaround in the nested kernel build, preserving host and
     // LLVM 21 optimization. O1 avoids the legacy vectorization pipeline.
-    if !cfg!(feature = "llvm21") && cfg!(feature = "crypto-cli") {
+    if !cfg!(feature = "llvm21") && (cfg!(feature = "crypto-cli") || cfg!(feature = "self_test")) {
         kernel_args.extend([
             "--config".to_owned(),
             "profile.release.opt-level=1".to_owned(),
@@ -113,7 +113,9 @@ fn export_self_test_names() {
             }
         }
     }
-    assert_eq!(names.keys().copied().collect::<Vec<_>>(), (0..118).collect::<Vec<_>>());
-    let text = format!("const SELF_TEST_ENTRIES: [&str; 118] = {:?};", names.values().collect::<Vec<_>>());
+    let count = names.len();
+    assert!(count > 0);
+    assert_eq!(names.keys().copied().collect::<Vec<_>>(), (0..count).collect::<Vec<_>>());
+    let text = format!("const SELF_TEST_ENTRIES: [&str; {count}] = {:?};", names.values().collect::<Vec<_>>());
     fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"), text).unwrap();
 }

@@ -38,7 +38,7 @@ impl GpuContext {
             // give 2× headroom over the measured floor.
             cust::context::CurrentContext::set_resource_limit(
                 ResourceLimit::StackSize,
-                if cfg!(feature = "crypto-cli") {
+                if cfg!(feature = "crypto-cli") || cfg!(feature = "self_test") {
                     65536
                 } else {
                     16384
