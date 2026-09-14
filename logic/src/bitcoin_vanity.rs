@@ -53,7 +53,7 @@ pub fn generate_and_check_bitcoin_vanity_key(request: &BitcoinVanityKeyRequest) 
     address_with_checksum[0..21].copy_from_slice(&versioned_payload);
     address_with_checksum[21..25].copy_from_slice(&checksum_hash[0..4]);
     
-    // Base58 encode the final address
+    // Bech32 encode the final address
     let mut encoded_public_key = [0u8; 64];
     let encoded_len = bech32::encode_p2wpkh_address(&public_key_hash, true, &mut encoded_public_key);
     
