@@ -1,11 +1,11 @@
 # vanity-miner-rs
 GPU-accelerated vanity address generator for multiple blockchains.
 
-## Cryptographic vanity modes (new-modes branch)
+## Cryptographic vanity modes
 
 Four new commands have CPU runners and CUDA kernels/host dispatch. Shared logic
-and CPU integration are tested; PTX compilation and hardware validation are
-deferred to the later GPU session. See [implementation status](docs/new-modes-plan.md).
+and CPU integration are tested. CI compiles all four new CUDA modes on both
+LLVM backends; hardware validation and GPU performance measurements remain pending. See [implementation status](docs/new-modes-plan.md).
 
 ```sh
 cargo build -p vanity-miner --no-default-features --features rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
@@ -110,7 +110,7 @@ Use the Rust toolchain specified in `rust-toolchain.toml`. These commands assume
 
 ```sh
 # Build all search modes and the self-test command.
-cargo build -p vanity-miner --features solana,bitcoin,ethereum,shallenge,self_test --release --locked
+cargo build -p vanity-miner --features solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
 
 ./target/release/vanity-miner solana-vanity aaa ""
 ./target/release/vanity-miner ethereum-vanity 5555 ""
@@ -141,18 +141,18 @@ the build toolchain. Running requires a compatible NVIDIA GPU and host driver.
 See [the CUDA guide](docs/cuda.md) for runtime settings and validation.
 
 ```sh
-# LLVM 7, compute_89; default shell is also available as .#v7.
-nix develop .#v7 --command cargo build -p vanity-miner --features gpu,solana,bitcoin,ethereum,shallenge,self_test --release --locked
+# LLVM 7, compute_89; select the legacy shell explicitly.
+nix develop .#v7 --command cargo build -p vanity-miner --features gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
 nix develop .#v7 --command ./target/llvm7/release/vanity-miner self-test
 nix develop .#v7 --command ./target/llvm7/release/vanity-miner solana-vanity aaa ""
 
 # LLVM 21, compute_100.
-nix develop .#v21 --command cargo build -p vanity-miner --features gpu,llvm21,solana,bitcoin,ethereum,shallenge,self_test --release --locked
+nix develop .#v21 --command cargo build -p vanity-miner --features gpu,llvm21,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature --release --locked
 nix develop .#v21 --command ./target/llvm21/release/vanity-miner self-test
 ```
 
 Shell builds use `target/llvm7/` and `target/llvm21/` respectively. `--all-features`
-also enables LLVM 21 and therefore requires the v21 shell. To build only Bitcoin
+enables mutually exclusive CUDA and CuMetal backends; select features explicitly. To build only Bitcoin
 with LLVM 7, use `--no-default-features --features gpu,bitcoin` in the v7 shell;
 for LLVM 21, use `--no-default-features --features gpu,llvm21,bitcoin` in v21.
 
