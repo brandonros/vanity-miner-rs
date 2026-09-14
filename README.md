@@ -96,9 +96,12 @@ openssl dgst -sha256 -verify p256-public.pem -signature p256-signature.der winni
 ```
 
 Run commands from the repository root. Modes are selected at build time:
-the default build includes only `shallenge`. The `gpu` feature selects the GPU
-runner; it does not enable additional modes. A GPU-enabled binary requires CUDA
-and has no CPU fallback.
+the default build includes only `shallenge`. The `gpu` feature selects the NVIDIA
+CUDA runner; it does not enable additional modes and has no CPU fallback.
+The optional `cumetal` backend runs prebuilt Rust-CUDA PTX on Apple Silicon;
+see [the CuMetal guide](docs/cumetal.md). For the complete build, artifact download,
+translation, validation, and benchmark workflow, use the
+[CuMetal reproduction runbook](docs/cumetal-reproduction.md). Select only one GPU backend.
 
 ## CPU mode (no CUDA required)
 
@@ -175,3 +178,7 @@ This branch pins Rust-CUDA to `d2104a0a49252068292985e5e63328f522415c4b` from
 The default Nix shell is `v21`; LLVM 19 has been replaced by the `llvm21` feature.
 Modern merged-module DCE is enabled by the backend by default. Optional cleanup
 and inlining remain disabled. LLVM 7 builds remain available through `.#v7`.
+
+The RSA and P-256 commands support CPU and NVIDIA CUDA builds. CuMetal
+currently exposes only Solana, Bitcoin, Ethereum, Shallenge, and its existing
+self-tests; enabling RSA/P-256 features does not add those commands to CuMetal.
