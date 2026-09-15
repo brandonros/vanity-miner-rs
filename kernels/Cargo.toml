@@ -12,7 +12,25 @@ solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
-self_test = ["logic/self_test"]
+# Host-test aggregate; CUDA builds select one mode below.
+self_test = [
+    "self_test_solana",
+    "self_test_bitcoin",
+    "self_test_ethereum",
+    "self_test_shallenge",
+    "self_test_p256_public_key",
+    "self_test_p256_signature",
+    "self_test_rsa_pss",
+    "self_test_rsa_modulus",
+]
+self_test_solana = ["logic/self_test_solana"]
+self_test_bitcoin = ["logic/self_test_bitcoin"]
+self_test_ethereum = ["logic/self_test_ethereum"]
+self_test_shallenge = ["logic/self_test_shallenge"]
+self_test_p256_public_key = ["logic/self_test_p256_public_key"]
+self_test_p256_signature = ["logic/self_test_p256_signature"]
+self_test_rsa_pss = ["logic/self_test_rsa_pss"]
+self_test_rsa_modulus = ["logic/self_test_rsa_modulus"]
 rsa-modulus = ["logic/rsa-modulus"]
 rsa-pss = ["logic/rsa-pss"]
 p256-public-key = ["logic/p256-public-key"]

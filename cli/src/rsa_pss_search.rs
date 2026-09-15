@@ -4,6 +4,7 @@ use crate::{
     rsa_host::{fixed_bytes, validate_rsa2048},
     search_control::SearchControl,
 };
+use logic::crypto::sha256::Sha256;
 use logic::{
     crypto::rsa_pss::encode_sha256,
     search::crypto_search::{write_message_counter, write_salt_counter},
@@ -11,7 +12,6 @@ use logic::{
 };
 use rand::{RngCore, rngs::OsRng};
 use rsa::{BigUint, Pss, RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
-use sha2::{Digest, Sha256};
 use std::{path::PathBuf, sync::Arc, thread, time::Duration};
 use zeroize::Zeroizing;
 
@@ -145,7 +145,7 @@ fn run(
     {
         return Err("message window must be nonempty and within the message".into());
     }
-    let digest: [u8; 32] = Sha256::digest(&original).into();
+    let digest: [u8; 32] = Sha256::digest(&original);
     let mut base_salt = match &config.source {
         PssSource::Salt { length } => vec![0; *length],
         PssSource::Message {
@@ -210,7 +210,7 @@ fn run(
                 let mut message = original.clone();
                 let mut salt = base_salt.clone();
                 apply_candidate(&config.source, &base_salt, counter, &mut message, &mut salt)?;
-                let digest = Sha256::digest(&message).into();
+                let digest = Sha256::digest(&message);
                 let reproduced = sign_explicit_salt(&key, &digest, &salt)?;
                 if reproduced != *signature || !pattern.matches(signature) {
                     return Err("device RSA-PSS signature failed reconstruction".into());
@@ -251,7 +251,7 @@ fn run(
                                 if matches!(config.source, PssSource::Salt { .. }) {
                                     digest
                                 } else {
-                                    Sha256::digest(&message).into()
+                                    Sha256::digest(&message)
                                 };
                             let signature = sign_explicit_salt(key, &candidate_digest, &salt)?;
                             control.add_tested(1);
@@ -313,7 +313,7 @@ fn run(
             &mut message,
             &mut salt,
         )?;
-        let digest: [u8; 32] = Sha256::digest(&message).into();
+        let digest: [u8; 32] = Sha256::digest(&message);
         let reproduced = sign_explicit_salt(&key, &digest, &salt)?;
         if reproduced != winner.signature || !pattern.matches(&reproduced) {
             return Err("RSA-PSS winner failed reconstruction".into());
@@ -448,7 +448,7 @@ mod tests {
             if i == 1 {
                 assert_eq!(salt, vec![0x42; 32]);
             }
-            let digest: [u8; 32] = Sha256::digest(&winning_message).into();
+            let digest: [u8; 32] = Sha256::digest(&winning_message);
             key.to_public_key()
                 .verify(
                     Pss::new_with_salt::<Sha256>(salt.len()),

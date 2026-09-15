@@ -5,8 +5,8 @@
 //! retain the negligible collision probability of a 256-bit random function.
 //! Nothing in this module obtains entropy or prints secret material.
 
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
+use crate::crypto::sha256::Sha256;
+use hmac::{Mac, SimpleHmac};
 use zeroize::Zeroize;
 
 #[derive(Clone, Copy)]
@@ -61,8 +61,8 @@ impl CandidateDeriver {
     /// Consumers must reject counter overflow instead of restarting at zero.
     pub fn block(&self, worker: u64, counter: u128, attempt: u32) -> [u8; 32] {
         // HMAC-SHA256 accepts keys of every length, including this fixed 32 bytes.
-        let mut mac =
-            Hmac::<Sha256>::new_from_slice(&self.seed).expect("HMAC-SHA256 accepts 32-byte keys");
+        let mut mac = SimpleHmac::<Sha256>::new_from_slice(&self.seed)
+            .expect("HMAC-SHA256 accepts 32-byte keys");
         mac.update(b"vanity-miner/crypto-search/v1\0");
         mac.update(self.domain.label());
         mac.update(&[0]);
@@ -144,7 +144,6 @@ pub fn hash_message_counter(
     length: usize,
     counter: u128,
 ) -> Result<[u8; 32], WindowError> {
-    use sha2::Digest;
     let end = offset
         .checked_add(length)
         .ok_or(WindowError::InvalidBounds)?;
@@ -166,7 +165,7 @@ pub fn hash_message_counter(
     let bytes = counter.to_be_bytes();
     hash.update(&bytes[16 - length.min(16)..]);
     hash.update(&message[end..]);
-    Ok(hash.finalize().into())
+    Ok(hash.finalize())
 }
 
 #[cfg(test)]
@@ -175,13 +174,12 @@ mod tests {
 
     #[test]
     fn streaming_window_hash_equals_materialized_message() {
-        use sha2::Digest;
         for length in [1, 2, 8, 15, 16, 17, 63, 64, 65, 129] {
             for counter in [0, 1, 255] {
                 let original = [0xa5; 160];
                 let mut materialized = original;
                 write_message_counter(&mut materialized, 7, length, counter).unwrap();
-                let expected: [u8; 32] = Sha256::digest(materialized).into();
+                let expected: [u8; 32] = Sha256::digest(materialized);
                 assert_eq!(
                     hash_message_counter(&original, 7, length, counter).unwrap(),
                     expected

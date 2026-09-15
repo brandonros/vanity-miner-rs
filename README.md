@@ -145,13 +145,37 @@ cargo build -p vanity-miner --release --locked --no-default-features --features 
 ./target/release/vanity-miner self-test
 ```
 
-`self_test` enables every mode's logic dependencies, but not its CLI search command.
-The same command runs on the backend selected at build time.
+`self_test` enables all eight self-test groups. Select individual groups with
+`self_test_solana`, `self_test_bitcoin`, `self_test_ethereum`, `self_test_shallenge`,
+`self_test_p256_public_key`, `self_test_p256_signature`, `self_test_rsa_pss`, or
+`self_test_rsa_modulus`. These enable only their matching logic dependencies,
+not the search commands. Selected checks retain their original slot numbers.
+
+For example, compile and run only RSA-PSS tests on the CPU:
+
+```sh
+cargo run -p vanity-miner --release --locked --no-default-features --features self_test_rsa_pss -- self-test
+```
+
+Add `gpu,llvm21` in the v21 shell for CUDA. Multiple self-test features still
+produce separate PTX files. The same `self-test` command runs the selected groups
+on the backend chosen at build time.
 
 The `logic/src/self_test/` folder groups checks and fixtures by subject. Its
-`mod.rs` owns all 157 slot labels and the CPU dispatcher; `kernels/src/self_test.rs`
-keeps one kernel per slot. CPU runs report 157 passes and skip
-the additional GPU launch probe.
+`mod.rs` owns all 157 slot labels and the CPU dispatcher. Eight
+`kernels/src/self_test_<mode>.rs` kernels each run once and write their checks to
+the same numbered slots. Each mode is compiled separately into its own PTX file;
+the CLI embeds the selected modules and loads the appropriate one for each group.
+Each kernel feature enables only its matching logic self-tests and mode dependencies.
+The standalone nonce reproduction shares the Shallenge module.
+Shared primitives and compiler regressions have one
+owner; checks are not duplicated across modes. With all groups enabled, CPU runs report 157 passes with no skips.
+
+Standalone GPU artifacts are written to `target/llvm21/release/ptx/` (or
+`target/llvm7/release/ptx/`). The selected `self_test_<mode>.ptx` files hold the
+self-tests; `kernels.ptx` holds production kernels when search modes are enabled.
+To override the embedded self-tests, set `PTX_PATH` to this directory and leave
+`CUBIN_PATH` unset. CuMetal accepts the same directory through `--ptx`.
 
 | Slots | Coverage |
 | --- | --- |

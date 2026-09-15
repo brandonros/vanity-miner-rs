@@ -21,8 +21,14 @@ pub(crate) fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send
     }
     let ptx_owned;
     let ptx: &str = if let Ok(ptx_path) = std::env::var("PTX_PATH") {
-        ptx_owned = std::fs::read_to_string(ptx_path)
-            .map_err(|e| format!("Failed to read PTX file: {}", e))?;
+        let path = std::path::PathBuf::from(ptx_path);
+        let path = if path.is_dir() {
+            path.join("kernels.ptx")
+        } else {
+            path
+        };
+        ptx_owned =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
         &ptx_owned
     } else {
         const EMBEDDED_PTX: &[u8] = include_bytes!(env!("KERNELS_PTX_PATH"));
@@ -32,6 +38,38 @@ pub(crate) fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send
     let module = load_ptx_with_log(ordinal, ptx)?;
     println!("[{ordinal}] Module loaded");
     Ok(module)
+}
+
+#[cfg(feature = "self_test_support")]
+include!(concat!(env!("OUT_DIR"), "/self_test_ptx.rs"));
+
+#[cfg(feature = "self_test_support")]
+pub(crate) fn load_self_test_module(
+    ordinal: usize,
+    kernel: &str,
+) -> Result<Module, Box<dyn Error + Send + Sync>> {
+    let name = vanity_miner::self_test_suite::module_name(kernel);
+    if std::env::var_os("CUBIN_PATH").is_some() {
+        return Err(
+            "self-test modules require PTX; unset CUBIN_PATH and use PTX_PATH with a directory"
+                .into(),
+        );
+    }
+    let owned;
+    let ptx = if let Some(directory) = std::env::var_os("PTX_PATH") {
+        let directory = std::path::PathBuf::from(directory);
+        if !directory.is_dir() {
+            return Err(
+                "self-test PTX_PATH must be a directory containing self_test_<mode>.ptx files"
+                    .into(),
+            );
+        }
+        owned = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
+        &owned
+    } else {
+        embedded_self_test_ptx(name).ok_or("unknown self-test module")?
+    };
+    load_ptx_with_log(ordinal, ptx)
 }
 
 fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error + Send + Sync>> {

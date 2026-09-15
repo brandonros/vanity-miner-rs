@@ -253,16 +253,16 @@ mod tests {
     #[cfg(feature = "p256-signature")]
     #[test]
     fn ephemeral_signatures_verify_and_reject_invalid_nonces() {
+        use crate::crypto::sha256::Sha256;
         use crate::search::crypto_search::{CandidateDeriver, CandidateDomain};
-        use sha2::{Digest, Sha256};
         let private = test_scalar();
         let public = public_point(&private).unwrap();
         let message = b"ephemeral signing public test";
-        let digest: [u8; 32] = Sha256::digest(message).into();
+        let digest: [u8; 32] = Sha256::digest(message);
         let deriver = CandidateDeriver::new(
             [0x42; 32],
             CandidateDomain::P256Ephemeral,
-            Sha256::digest(public).into(),
+            Sha256::digest(public),
             digest,
         );
         for counter in 0..4 {

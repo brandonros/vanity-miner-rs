@@ -1,5 +1,6 @@
 //! Independent host tests for shared fixed-width RSA arithmetic.
 
+use logic::crypto::sha256::Sha256;
 use logic::{crypto::rsa_crt::Rsa2048Crt, crypto::rsa_pss::encode_sha256};
 use rand::{RngCore, rngs::OsRng};
 use rsa::{
@@ -7,7 +8,6 @@ use rsa::{
     pkcs8::{EncodePublicKey, LineEnding},
     traits::{PrivateKeyParts, PublicKeyParts},
 };
-use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
 
 fn fixed<const N: usize>(value: &BigUint) -> Zeroizing<[u8; N]> {
@@ -44,7 +44,7 @@ fn generated_rsa2048_crt_pss_matches_independent_verifiers() {
     assert_eq!(crt.modulus().as_slice(), key.n().to_bytes_be());
     let public = RsaPublicKey::from(&key);
     let message = b"independent RSA-2048 explicit-salt PSS test";
-    let digest: [u8; 32] = Sha256::digest(message).into();
+    let digest: [u8; 32] = Sha256::digest(message);
     for length in [0, 1, 32, 222] {
         let salt: Vec<u8> = (0..length).map(|i| i as u8).collect();
         let mut encoded = [0; 256];

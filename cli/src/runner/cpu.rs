@@ -5,7 +5,7 @@ use crate::common::GlobalStats;
     feature = "bitcoin",
     feature = "ethereum",
     feature = "shallenge",
-    feature = "self_test",
+    feature = "self_test_support",
     feature = "crypto-cli"
 ))]
 use crate::modes;
@@ -84,7 +84,7 @@ impl Runner for CpuRunner {
                     stats,
                 )
             }
-            #[cfg(feature = "self_test")]
+            #[cfg(feature = "self_test_support")]
             Command::SelfTest => modes::self_test::cpu::run(),
         }
     }

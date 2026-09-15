@@ -25,6 +25,9 @@
 
 extern crate alloc;
 
+#[cfg(all(target_arch = "nvptx64", feature = "self_test"))]
+compile_error!("GPU self-tests must be compiled separately with one self_test_<mode> feature; self_test is the host-test aggregate");
+
 #[macro_use]
 mod match_handler;
 
@@ -32,8 +35,6 @@ mod match_handler;
 mod bitcoin_vanity;
 #[cfg(feature = "ethereum")]
 mod ethereum_vanity;
-#[cfg(feature = "self_test")]
-mod self_test;
 #[cfg(feature = "shallenge")]
 mod shallenge;
 #[cfg(feature = "solana")]
@@ -43,8 +44,6 @@ mod solana_vanity;
 pub use bitcoin_vanity::*;
 #[cfg(feature = "ethereum")]
 pub use ethereum_vanity::*;
-#[cfg(feature = "self_test")]
-pub use self_test::*;
 #[cfg(feature = "shallenge")]
 pub use shallenge::*;
 #[cfg(feature = "solana")]
@@ -67,8 +66,47 @@ mod rsa_modulus_vanity;
 #[cfg(feature = "rsa-modulus")]
 pub use rsa_modulus_vanity::*;
 
-
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_shallenge")]
 mod codegen_repros;
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_shallenge")]
 pub use codegen_repros::*;
+
+#[cfg(feature = "self_test_solana")]
+mod self_test_solana;
+#[cfg(feature = "self_test_solana")]
+pub use self_test_solana::*;
+
+#[cfg(feature = "self_test_bitcoin")]
+mod self_test_bitcoin;
+#[cfg(feature = "self_test_bitcoin")]
+pub use self_test_bitcoin::*;
+
+#[cfg(feature = "self_test_ethereum")]
+mod self_test_ethereum;
+#[cfg(feature = "self_test_ethereum")]
+pub use self_test_ethereum::*;
+
+#[cfg(feature = "self_test_shallenge")]
+mod self_test_shallenge;
+#[cfg(feature = "self_test_shallenge")]
+pub use self_test_shallenge::*;
+
+#[cfg(feature = "self_test_p256_public_key")]
+mod self_test_p256_public_key;
+#[cfg(feature = "self_test_p256_public_key")]
+pub use self_test_p256_public_key::*;
+
+#[cfg(feature = "self_test_p256_signature")]
+mod self_test_p256_signature;
+#[cfg(feature = "self_test_p256_signature")]
+pub use self_test_p256_signature::*;
+
+#[cfg(feature = "self_test_rsa_pss")]
+mod self_test_rsa_pss;
+#[cfg(feature = "self_test_rsa_pss")]
+pub use self_test_rsa_pss::*;
+
+#[cfg(feature = "self_test_rsa_modulus")]
+mod self_test_rsa_modulus;
+#[cfg(feature = "self_test_rsa_modulus")]
+pub use self_test_rsa_modulus::*;

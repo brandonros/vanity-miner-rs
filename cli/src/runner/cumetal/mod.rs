@@ -4,7 +4,7 @@ mod driver;
 use crate::{args::Command, common::GlobalStats, runner::Runner};
 use clap::Args;
 use driver::{Driver, Module};
-use sha2::{Digest, Sha256};
+use logic::crypto::sha256::Sha256;
 use std::{
     path::{Path, PathBuf},
     rc::Rc,
@@ -17,7 +17,7 @@ pub struct CumetalOptions {
     /// CuMetal driver library (libcumetal.dylib).
     #[arg(long, global = true, default_value = "libcumetal.dylib")]
     pub cumetal_library: PathBuf,
-    /// Original Rust-CUDA PTX artifact to compile for the selected entry.
+    /// Rust-CUDA PTX file, or a directory of separately compiled PTX modules.
     #[arg(long, global = true)]
     pub ptx: Option<PathBuf>,
     /// Directory of precompiled ENTRY.metal files and their ABI sidecars.
@@ -40,7 +40,8 @@ pub struct CumetalOptions {
     /// Compare every candidate and the match count with the CPU reference.
     #[arg(long, global = true)]
     pub verify: bool,
-    /// Run only selected self-test slots (repeatable); omitted runs all slots.
+    #[cfg(feature = "self_test_support")]
+    /// Report selected self-test slots; each containing mode kernel still runs in full.
     #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..logic::self_test::SELF_TEST_NUM_CHECKS as i64))]
     pub self_test_slot: Vec<u32>,
 }
@@ -64,7 +65,23 @@ impl CumetalRunner {
             directory.join(format!("{entry}.metal"))
         } else {
             let input = self.options.ptx.as_ref().ok_or("--ptx is required")?;
+            let module_path;
+            let input = if input.is_dir() {
+                #[cfg(feature = "self_test_support")]
+                let name = if entry.starts_with("kernel_self_test_") {
+                    vanity_miner::self_test_suite::module_name(entry)
+                } else {
+                    "kernels"
+                };
+                #[cfg(not(feature = "self_test_support"))]
+                let name = "kernels";
+                module_path = input.join(format!("{name}.ptx"));
+                &module_path
+            } else {
+                input
+            };
             let compiler = resolve_program(&self.options.cumetalc)?;
+
             let mut hash = Sha256::new();
             let ptx_bytes = std::fs::read(input)?;
             let compiler_bytes = std::fs::read(&compiler)?;
@@ -140,7 +157,7 @@ fn entry(command: &Command) -> &'static str {
         Command::EthereumVanity { .. } => "kernel_find_ethereum_vanity_private_key",
         #[cfg(feature = "bitcoin")]
         Command::BitcoinVanity { .. } => "kernel_find_bitcoin_vanity_private_key",
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
     }
 }
@@ -154,7 +171,7 @@ fn payload_sizes(command: &Command) -> &'static [usize] {
         Command::EthereumVanity { .. } => &[32, 64, 20],
         #[cfg(feature = "bitcoin")]
         Command::BitcoinVanity { .. } => &[32, 33, 20, 64, 4],
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
     }
 }
@@ -194,7 +211,7 @@ fn print_payloads(command: &Command, output: &[Vec<u8>]) -> Result<(), Error> {
             println!("hash160={}", hex::encode(&output[2]));
             println!("address={}", std::str::from_utf8(address)?);
         }
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
     }
     Ok(())
@@ -217,7 +234,7 @@ fn inputs(command: &Command) -> Result<(Vec<u8>, Vec<u8>), Error> {
         Command::BitcoinVanity { prefix, suffix } => {
             (prefix.as_bytes().to_vec(), suffix.as_bytes().to_vec())
         }
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
     })
 }
@@ -345,7 +362,7 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
                 ],
             }
         }
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
     })
 }
@@ -355,7 +372,7 @@ impl Runner for CumetalRunner {
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> Result<(), Error> {
         let driver = Driver::open(&self.options.cumetal_library)?;
-        #[cfg(feature = "self_test")]
+        #[cfg(feature = "self_test_support")]
         if matches!(command, Command::SelfTest) {
             return self.self_tests(&driver);
         }
@@ -490,41 +507,31 @@ impl Runner for CumetalRunner {
         Ok(())
     }
 }
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_support")]
 impl CumetalRunner {
     fn self_tests(&self, driver: &Rc<Driver>) -> Result<(), Error> {
         use vanity_miner::self_test_suite::{self, Outcome};
+        let mut cache = self_test_suite::DeviceResults::default();
         self_test_suite::run("CuMetal", |case| {
-            if let Some(slot) = case.slot {
-                if !self.options.self_test_slot.is_empty()
-                    && !self.options.self_test_slot.contains(&(slot as u32))
-                {
-                    return Ok(Outcome::Skipped("not selected"));
-                }
+            if !self.options.self_test_slot.is_empty()
+                && !self.options.self_test_slot.contains(&(case.slot as u32))
+            {
+                return Ok(Outcome::Skipped("not selected"));
             }
-            let slot = case.slot.unwrap_or(0);
-            let name = case.kernel;
-            let operation = (|| -> Result<(), Error> {
-                let module = self.module(driver, name)?;
-                let result =
-                    driver.buffer(&vec![0xa5; logic::self_test::SELF_TEST_NUM_CHECKS * 4])?;
-                module.launch(&mut [result.pointer()], 1, 1)?;
-                let bytes = result.read()?;
-                for (index, word) in bytes.chunks_exact(4).enumerate() {
-                    let value = u32::from_le_bytes(word.try_into().unwrap());
-                    let expected = if index == slot { 1 } else { 0xa5a5a5a5 };
-                    if value != expected {
-                        return Err(format!(
-                            "{name}: slot {index}: got {value}, expected {expected}"
-                        )
-                        .into());
-                    }
-                }
-                println!("NUMERICAL_PASS kernel={name} slot={slot}; other slots and guards intact");
-                Ok(())
-            })();
-            operation.map_err(|e| e.to_string())?;
-            Ok(Outcome::Passed)
+            cache.check(case, || {
+                let operation = (|| -> Result<Vec<u32>, Error> {
+                    let module = self.module(driver, case.kernel)?;
+                    let result =
+                        driver.buffer(&vec![0xa5; logic::self_test::SELF_TEST_NUM_CHECKS * 4])?;
+                    module.launch(&mut [result.pointer()], 1, 1)?;
+                    let bytes = result.read()?;
+                    Ok(bytes
+                        .chunks_exact(4)
+                        .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
+                        .collect())
+                })();
+                operation.map_err(|e| e.to_string())
+            })
         })
         .map_err(Into::into)
     }

@@ -52,7 +52,13 @@ impl GpuRunner {
                 handles.push(scope.spawn(move || -> RunResult {
                     // Any error or panic cancels peers before scoped joins finish.
                     let stop = control.cancel_on_exit();
-                    let gpu = GpuContext::new(ordinal)?;
+                    let gpu = match command {
+                        #[cfg(feature = "self_test_support")]
+                        Command::SelfTest => GpuContext::for_self_test(ordinal)?,
+                        #[allow(unreachable_patterns)]
+                        _ => GpuContext::new(ordinal)?,
+                    };
+
                     let result = match command {
                         #[cfg(feature = "p256-public-key")]
                         Command::P256PublicKeyVanity(args) => {
@@ -106,7 +112,7 @@ impl GpuRunner {
                             stats,
                             control.clone(),
                         ),
-                        #[cfg(feature = "self_test")]
+                        #[cfg(feature = "self_test_support")]
                         Command::SelfTest => modes::self_test::gpu::run(ordinal, &gpu),
                     };
                     if result.is_ok() {

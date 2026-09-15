@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
-cumetal = ["dep:libloading", "dep:sha2"]
+cumetal = ["dep:libloading", "logic/sha256"]
 llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
@@ -14,18 +14,35 @@ ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
 crypto-cli = ["dep:ctrlc"]
 p256-public-key = ["logic/p256-public-key", "dep:p256", "dep:zeroize", "crypto-cli"]
-p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "dep:sha2", "dep:zeroize", "crypto-cli"]
-rsa-common = ["dep:rsa", "dep:num-bigint-dig", "dep:sha2", "dep:zeroize", "crypto-cli"]
+p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "dep:zeroize", "crypto-cli"]
+rsa-common = ["dep:rsa", "dep:num-bigint-dig", "dep:zeroize", "crypto-cli"]
 rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
 rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
-self_test = ["logic/self_test"]
+self_test = [
+    "self_test_solana",
+    "self_test_bitcoin",
+    "self_test_ethereum",
+    "self_test_shallenge",
+    "self_test_p256_public_key",
+    "self_test_p256_signature",
+    "self_test_rsa_pss",
+    "self_test_rsa_modulus",
+]
+self_test_support = ["logic/self_test_support"]
+self_test_solana = ["self_test_support", "logic/self_test_solana"]
+self_test_bitcoin = ["self_test_support", "logic/self_test_bitcoin"]
+self_test_ethereum = ["self_test_support", "logic/self_test_ethereum"]
+self_test_shallenge = ["self_test_support", "logic/self_test_shallenge"]
+self_test_p256_public_key = ["self_test_support", "logic/self_test_p256_public_key"]
+self_test_p256_signature = ["self_test_support", "logic/self_test_p256_signature"]
+self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss"]
+self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
 libloading = { version = "0.8", optional = true }
 ctrlc = { version = "3.4", optional = true }
 num-bigint-dig = { version = "0.8.6", default-features = false, features = ["prime", "zeroize"], optional = true }
-rsa = { version = "0.9.10", default-features = false, features = ["pem", "sha2"], optional = true }
-sha2 = { version = "0.10.9", default-features = false, optional = true }
+rsa = { version = "0.9.10", default-features = false, features = ["pem"], optional = true }
 p256 = { version = "0.13.2", default-features = false, features = ["arithmetic", "pkcs8", "pem"], optional = true }
 zeroize = { version = "1", default-features = false, features = ["alloc"], optional = true }
 logic = { path = "../logic", default-features = false }

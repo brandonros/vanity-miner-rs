@@ -69,7 +69,7 @@ pub enum Command {
         target_hash: String,
     },
     /// Run on-device self-test (validates PTX codegen against CPU expectations)
-    #[cfg(feature = "self_test")]
+    #[cfg(feature = "self_test_support")]
     SelfTest,
 }
 
@@ -149,7 +149,7 @@ impl Command {
                     ).into());
                 }
             }
-            #[cfg(feature = "self_test")]
+            #[cfg(feature = "self_test_support")]
             Command::SelfTest => {}
         }
         Ok(())
@@ -173,7 +173,7 @@ impl Command {
             Command::EthereumVanity { prefix, .. } => prefix.len(),
             #[cfg(feature = "shallenge")]
             Command::Shallenge { username, .. } => username.len(),
-            #[cfg(feature = "self_test")]
+            #[cfg(feature = "self_test_support")]
             Command::SelfTest => 0,
         }
     }
@@ -196,7 +196,7 @@ impl Command {
             Command::EthereumVanity { suffix, .. } => suffix.len(),
             #[cfg(feature = "shallenge")]
             Command::Shallenge { .. } => 0,
-            #[cfg(feature = "self_test")]
+            #[cfg(feature = "self_test_support")]
             Command::SelfTest => 0,
         }
     }
@@ -242,7 +242,7 @@ impl Command {
                     username, target_hash
                 )
             }
-            #[cfg(feature = "self_test")]
+            #[cfg(feature = "self_test_support")]
             Command::SelfTest => "Running on-device self-test".to_string(),
         }
     }

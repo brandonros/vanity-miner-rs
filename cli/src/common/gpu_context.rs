@@ -17,6 +17,23 @@ pub struct GpuContext {
 
 impl GpuContext {
     pub fn new(ordinal: usize) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        Self::with_module(ordinal, || super::cuda_module::load_module(ordinal))
+    }
+
+    #[cfg(feature = "self_test_support")]
+    pub fn for_self_test(ordinal: usize) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        Self::with_module(ordinal, || {
+            super::cuda_module::load_self_test_module(
+                ordinal,
+                vanity_miner::self_test_suite::inventory()[0].kernel,
+            )
+        })
+    }
+
+    fn with_module(
+        ordinal: usize,
+        load: impl FnOnce() -> Result<cust::module::Module, Box<dyn Error + Send + Sync>>,
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
         let device = Device::get_device(ordinal as u32)?;
         let ctx = Context::new(device)?;
         cust::context::CurrentContext::set_current(&ctx)?;
@@ -38,7 +55,7 @@ impl GpuContext {
             // give 2× headroom over the measured floor.
             cust::context::CurrentContext::set_resource_limit(
                 ResourceLimit::StackSize,
-                if cfg!(feature = "crypto-cli") || cfg!(feature = "self_test") {
+                if cfg!(feature = "crypto-cli") || cfg!(feature = "self_test_support") {
                     65536
                 } else {
                     16384
@@ -59,7 +76,7 @@ impl GpuContext {
         let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
         let operations_per_launch = blocks_per_grid * threads_per_block;
 
-        let module = super::cuda_module::load_module(ordinal)?;
+        let module = load()?;
         Ok(Self {
             module,
             stream,

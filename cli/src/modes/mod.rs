@@ -19,7 +19,7 @@
 pub mod bitcoin;
 #[cfg(feature = "ethereum")]
 pub mod ethereum;
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_support")]
 pub mod self_test;
 #[cfg(feature = "shallenge")]
 pub mod shallenge;

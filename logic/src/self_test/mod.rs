@@ -2,30 +2,102 @@
 //! primitive against externally-validated expected values, writing
 //! pass(1)/fail(0) per check into the results buffer.
 //!
-//! Each slot has a dedicated `check_*` function. GPU mode launches one
-//! kernel per slot so an illegal-address fault localizes to a single
-//! subsystem (and the kernels before it still produce reliable results
-//! before the context goes sticky-errored). CPU mode's `run_self_test`
-//! calls them all in sequence.
+//! Each slot has a dedicated `check_*` function. GPU mode runs eight mode-specific
+//! kernels, preserving individual result slots. CPU mode calls all checks in sequence.
 //!
 //! Keep known-answer inputs opaque before the operation under test. A barrier
 //! around the final boolean is too late: the operation can already be folded.
 //! `black_box` is best effort; inspect emitted PTX to verify the computation
 //! survives optimization.
 
+#[cfg(any(
+    feature = "self_test_p256_public_key",
+    feature = "self_test_p256_signature",
+    feature = "self_test_rsa_pss",
+    feature = "self_test_rsa_modulus"
+))]
 mod fixtures;
-mod primitives;
-pub use primitives::*;
-mod pipelines;
-pub use pipelines::*;
-mod codegen;
-pub use codegen::*;
-mod p256;
-pub use p256::*;
-mod rsa;
-pub use rsa::*;
-mod candidate_pipelines;
-pub use candidate_pipelines::*;
+#[cfg(feature = "self_test_solana")]
+mod solana;
+#[cfg(feature = "self_test_solana")]
+pub use solana::*;
+#[cfg(feature = "self_test_bitcoin")]
+mod bitcoin;
+#[cfg(feature = "self_test_bitcoin")]
+pub use bitcoin::*;
+#[cfg(feature = "self_test_ethereum")]
+mod ethereum;
+#[cfg(feature = "self_test_ethereum")]
+pub use ethereum::*;
+#[cfg(feature = "self_test_shallenge")]
+mod shallenge;
+#[cfg(feature = "self_test_shallenge")]
+pub use shallenge::*;
+#[cfg(feature = "self_test_p256_public_key")]
+mod p256_public_key;
+#[cfg(feature = "self_test_p256_public_key")]
+pub use p256_public_key::*;
+#[cfg(feature = "self_test_p256_signature")]
+mod p256_signature;
+#[cfg(feature = "self_test_p256_signature")]
+pub use p256_signature::*;
+#[cfg(feature = "self_test_rsa_pss")]
+mod rsa_pss;
+#[cfg(feature = "self_test_rsa_pss")]
+pub use rsa_pss::*;
+#[cfg(feature = "self_test_rsa_modulus")]
+mod rsa_modulus;
+#[cfg(feature = "self_test_rsa_modulus")]
+pub use rsa_modulus::*;
+
+#[cfg(any(
+    feature = "self_test_solana",
+    feature = "self_test_bitcoin",
+    feature = "self_test_ethereum"
+))]
+pub(super) fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
+    let n = expected.len();
+    let mut i = 0;
+    while i < n {
+        if actual[i] != expected[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+#[cfg(any(
+    feature = "self_test_p256_public_key",
+    feature = "self_test_p256_signature",
+    feature = "self_test_rsa_pss",
+    feature = "self_test_rsa_modulus"
+))]
+fn record_candidate(
+    h: &mut crate::crypto::sha256::Sha256,
+    result: crate::search::candidate_result::CandidateResult,
+) {
+    h.update(result.status.to_le_bytes());
+    h.update(result.bytes);
+}
+
+#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
+pub struct IdxProbe(pub [u64; 5]);
+
+#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
+impl core::ops::Index<usize> for IdxProbe {
+    type Output = u64;
+    fn index(&self, i: usize) -> &u64 {
+        &(self.0[i])
+    }
+}
+
+#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
+impl core::ops::IndexMut<usize> for IdxProbe {
+    fn index_mut(&mut self, i: usize) -> &mut u64 {
+        &mut (self.0[i])
+    }
+}
 
 pub const SELF_TEST_NUM_CHECKS: usize = 157;
 
@@ -524,166 +596,190 @@ pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = [
 ];
 
 pub fn run_self_test(results: &mut [u32]) {
-    results[0] = check_primitive_xoroshiro();
-    results[1] = check_primitive_sha512();
-    results[2] = check_primitive_ed25519();
-    results[3] = check_primitive_base58();
-    results[4] = check_primitive_secp256k1_compressed();
-    results[5] = check_primitive_secp256k1_uncompressed();
-    results[6] = check_primitive_keccak256();
-    results[7] = check_primitive_ripemd160();
-    results[8] = check_primitive_sha256_32();
-    results[9] = check_primitive_sha256_variable();
-    results[10] = check_solana_priv();
-    results[11] = check_solana_pub();
-    results[12] = check_solana_encoded();
-    results[13] = check_ethereum_priv();
-    results[14] = check_ethereum_pub();
-    results[15] = check_ethereum_address();
-    results[16] = check_bitcoin_priv();
-    results[17] = check_bitcoin_pub();
-    results[18] = check_bitcoin_pkh();
-    results[19] = check_bitcoin_encoded();
-    results[20] = check_bitcoin_matches();
-    results[21] = check_wif_compressed_mainnet();
-    results[22] = check_wif_uncompressed_mainnet();
-    results[23] = check_wif_compressed_testnet();
-    results[24] = check_wif_uncompressed_testnet();
-    results[25] = check_shallenge_hash();
-    results[26] = check_shallenge_nonce_len();
-    results[27] = check_shallenge_is_better();
-    results[28] = check_compare_hashes_lt();
-    results[29] = check_compare_hashes_gt();
-    results[30] = check_compare_hashes_eq();
-    results[31] = check_arith_u32_div_var();
-    results[32] = check_arith_u32_div_const();
-    results[33] = check_arith_u64_div_var();
-    results[34] = check_arith_u64_div_const();
-    results[35] = check_arith_u32_rem_var();
-    results[36] = check_arith_u64_rem_var();
-    results[37] = check_arith_u32_mul_lo();
-    results[38] = check_arith_u64_mul_lo();
-    results[39] = check_arith_u64_mul_hi();
-    results[40] = check_arith_u128_mul();
-    results[41] = check_base58_var_len();
-    results[42] = check_base58_var_len_leading_zero();
-    results[43] = check_base58_all_zeros();
-    results[44] = check_xoroshiro_base64_nonce();
-    results[45] = check_bech32_p2wpkh();
-    results[46] = check_arith_overflowing_add();
-    results[47] = check_arith_overflowing_sub();
-    results[48] = check_arith_carry_chain_3limb();
-    results[49] = check_arith_widening_mul_pair();
-    results[50] = check_arith_mad_lo_u64();
-    results[51] = check_arith_mad_hi_u64();
-    results[52] = check_arith_mul_wide_u32();
-    results[53] = check_arith_mask_blend_true();
-    results[54] = check_arith_mask_blend_false();
-    results[55] = check_arith_var_shr_u64();
-    results[56] = check_arith_var_shl_u64();
-    results[57] = check_arith_blackbox_identity_u64();
-    results[58] = check_arith_blackbox_identity_u32();
-    results[59] = check_base58_div_by_58();
-    results[60] = check_iter_static_table_lookup();
-    results[61] = check_iter_mut_slice_partial();
-    results[62] = check_iter_mut_alphabet_lookup();
-    results[63] = check_iter_static_slice_lookup();
-    results[64] = check_arith_divrem_by_58_pow_5();
-    results[65] = check_arith_i128_chain_add();
-    results[66] = check_base58_limb_divrem();
-    results[67] = check_dynamic_index_write();
-    results[68] = check_arith_widening_mul_chain_3term();
-    results[69] = check_base58_inner_mutate_phase();
-    results[70] = check_dalek_clamp_integer();
-    results[71] = check_dalek_scalar_round_trip_one();
-    results[72] = check_dalek_mul_base_scalar_one();
-    results[73] = check_k256_secret_from_bytes_one();
-    results[74] = check_k256_derive_scalar_one();
-    results[75] = check_k256_derive_scalar_two();
-    results[76] = check_static_u64_array_lookup();
-    results[77] = check_static_struct_wrapped_u64_lookup();
-    results[78] = check_k256_encode_generator();
-    results[79] = check_k256_double_generator();
-    results[80] = check_k256_scalar_one_round_trip();
-    results[81] = check_arith_u128_imm_shr_52();
-    results[82] = check_static_depth4_newtype_nesting();
-    results[83] = check_reverse_range_write();
-    results[84] = check_dalek_scalar52_from_bytes();
-    results[85] = check_dalek_scalar52_montgomery_reduce_r();
-    results[86] = check_dalek_scalar52_mul_internal_then_reduce_one_r();
-    results[87] = check_dalek_scalar52_as_bytes_one();
-    results[88] = check_dalek_scalar52_sub_no_underflow();
-    results[89] = check_dalek_scalar52_sub_with_underflow();
-    results[90] = check_dalek_scalar52_montgomery_reduce_with_sub();
-    results[91] = check_index_trait_dispatch();
-    results[92] = check_dalek_scalar_one_to_bytes_direct();
-    results[93] = check_k256_affine_generator_encode();
-    results[94] = check_subtle_choice_u8_into_bool();
-    results[95] = check_subtle_conditional_select_u64();
-    results[96] = check_k256_encoded_point_from_affine_coords();
-    results[97] = check_index_trait_const_indices();
-    results[98] = check_generic_array_basic_index();
-    results[99] = check_generic_array_copy_from_slice();
-    results[100] = check_from_affine_coords_replica();
-    results[101] = check_generic_array_as_slice_last();
-    results[102] = check_dalek_scalar_round_trip_zero();
-    results[103] = check_dalek_scalar_from_bytes_wide_zero();
-    results[104] = check_field_bytes_into_conversion();
-    results[105] = check_base58_min_nonzero();
-    results[106] = check_named_field_struct_return();
-    results[107] = check_base58_handrolled_no_seq();
-    results[108] = check_slice_reverse_partial();
-    results[109] = check_dalek_scalar_eq_zero();
-    results[110] = check_generic_array_copy_from_ga_source();
-    results[111] = check_dalek_zero_eq_zero();
-    results[112] = check_dalek_from_canonical_zero();
-    results[113] = check_dalek_scalar52_from_bytes_zero();
-    results[114] = check_dalek_scalar52_mul_internal_zero();
-    results[115] = check_dalek_scalar52_montgomery_reduce_zero();
-    results[116] = check_dalek_scalar52_as_bytes_zero();
-    results[117] = check_dalek_reduce_pipeline_zero();
-    results[118] = check_p256_public_key_hmac_derivation();
-    results[119] = check_p256_public_key_scalar_derivation();
-    results[120] = check_p256_public_key_generator();
-    results[121] = check_p256_public_key_point_double();
-    results[122] = check_p256_public_key_zero_scalar_rejected();
-    results[123] = check_p256_public_key_order_scalar_rejected();
-    results[124] = check_p256_public_key_x_encoding();
-    results[125] = check_p256_public_key_y_encoding();
-    results[126] = check_p256_signature_rfc6979_sample();
-    results[127] = check_p256_signature_rfc6979_test();
-    results[128] = check_p256_signature_ephemeral_r();
-    results[129] = check_p256_signature_ephemeral_signature();
-    results[130] = check_p256_signature_zero_nonce_rejected();
-    results[131] = check_p256_signature_low_s();
-    results[132] = check_p256_signature_high_s();
-    results[133] = check_p256_signature_message_window_carry();
-    results[134] = check_p256_signature_ephemeral_hmac();
-    results[135] = check_rsa_pss_sha256();
-    results[136] = check_rsa_pss_mgf1_partial_block();
-    results[137] = check_rsa_pss_salt32_encoding();
-    results[138] = check_rsa_pss_empty_salt_encoding();
-    results[139] = check_rsa_pss_maximum_salt_encoding();
-    results[140] = check_rsa_pss_oversized_salt_rejected();
-    results[141] = check_rsa_pss_salt_carry();
-    results[142] = check_rsa_pss_crt_known_answer();
-    results[143] = check_rsa_pss_crt_fault_rejected();
-    results[144] = check_rsa_pss_crt_modulus_rejected();
-    results[145] = check_rsa_modulus_multiplication_carry();
-    results[146] = check_rsa_modulus_progression_carry();
-    results[147] = check_rsa_modulus_prime_filter();
-    results[148] = check_rsa_modulus_pseudoprime_rejected();
-    results[149] = check_rsa_modulus_zero_stride_rejected();
-    results[150] = check_rsa_modulus_upper_bound_rejected();
-    results[151] = check_rsa_modulus_equal_factors_rejected();
-    results[152] = check_rsa_modulus_undersized_factor_rejected();
-    results[153] = check_p256_public_end_to_end();
-    results[154] = check_p256_signature_end_to_end();
-    results[155] = check_rsa_pss_end_to_end();
-    results[156] = check_rsa_modulus_end_to_end();
+    #[cfg(feature = "self_test_solana")]
+    {
+        results[0] = check_primitive_xoroshiro();
+        results[1] = check_primitive_sha512();
+        results[2] = check_primitive_ed25519();
+        results[3] = check_primitive_base58();
+        results[10] = check_solana_priv();
+        results[11] = check_solana_pub();
+        results[12] = check_solana_encoded();
+        results[31] = check_arith_u32_div_var();
+        results[32] = check_arith_u32_div_const();
+        results[33] = check_arith_u64_div_var();
+        results[34] = check_arith_u64_div_const();
+        results[35] = check_arith_u32_rem_var();
+        results[36] = check_arith_u64_rem_var();
+        results[37] = check_arith_u32_mul_lo();
+        results[38] = check_arith_u64_mul_lo();
+        results[39] = check_arith_u64_mul_hi();
+        results[40] = check_arith_u128_mul();
+        results[41] = check_base58_var_len();
+        results[43] = check_base58_all_zeros();
+        results[46] = check_arith_overflowing_add();
+        results[47] = check_arith_overflowing_sub();
+        results[48] = check_arith_carry_chain_3limb();
+        results[49] = check_arith_widening_mul_pair();
+        results[50] = check_arith_mad_lo_u64();
+        results[51] = check_arith_mad_hi_u64();
+        results[52] = check_arith_mul_wide_u32();
+        results[53] = check_arith_mask_blend_true();
+        results[54] = check_arith_mask_blend_false();
+        results[55] = check_arith_var_shr_u64();
+        results[56] = check_arith_var_shl_u64();
+        results[57] = check_arith_blackbox_identity_u64();
+        results[58] = check_arith_blackbox_identity_u32();
+        results[59] = check_base58_div_by_58();
+        results[60] = check_iter_static_table_lookup();
+        results[61] = check_iter_mut_slice_partial();
+        results[62] = check_iter_mut_alphabet_lookup();
+        results[63] = check_iter_static_slice_lookup();
+        results[64] = check_arith_divrem_by_58_pow_5();
+        results[65] = check_arith_i128_chain_add();
+        results[66] = check_base58_limb_divrem();
+        results[67] = check_dynamic_index_write();
+        results[68] = check_arith_widening_mul_chain_3term();
+        results[69] = check_base58_inner_mutate_phase();
+        results[70] = check_dalek_clamp_integer();
+        results[71] = check_dalek_scalar_round_trip_one();
+        results[72] = check_dalek_mul_base_scalar_one();
+        results[81] = check_arith_u128_imm_shr_52();
+        results[82] = check_static_depth4_newtype_nesting();
+        results[83] = check_reverse_range_write();
+        results[84] = check_dalek_scalar52_from_bytes();
+        results[85] = check_dalek_scalar52_montgomery_reduce_r();
+        results[86] = check_dalek_scalar52_mul_internal_then_reduce_one_r();
+        results[87] = check_dalek_scalar52_as_bytes_one();
+        results[88] = check_dalek_scalar52_sub_no_underflow();
+        results[89] = check_dalek_scalar52_sub_with_underflow();
+        results[90] = check_dalek_scalar52_montgomery_reduce_with_sub();
+        results[91] = check_index_trait_dispatch();
+        results[92] = check_dalek_scalar_one_to_bytes_direct();
+        results[102] = check_dalek_scalar_round_trip_zero();
+        results[103] = check_dalek_scalar_from_bytes_wide_zero();
+        results[105] = check_base58_min_nonzero();
+        results[106] = check_named_field_struct_return();
+        results[107] = check_base58_handrolled_no_seq();
+        results[108] = check_slice_reverse_partial();
+        results[109] = check_dalek_scalar_eq_zero();
+        results[111] = check_dalek_zero_eq_zero();
+        results[112] = check_dalek_from_canonical_zero();
+        results[113] = check_dalek_scalar52_from_bytes_zero();
+        results[114] = check_dalek_scalar52_mul_internal_zero();
+        results[115] = check_dalek_scalar52_montgomery_reduce_zero();
+        results[116] = check_dalek_scalar52_as_bytes_zero();
+        results[117] = check_dalek_reduce_pipeline_zero();
+    }
+    #[cfg(feature = "self_test_bitcoin")]
+    {
+        results[4] = check_primitive_secp256k1_compressed();
+        results[7] = check_primitive_ripemd160();
+        results[8] = check_primitive_sha256_32();
+        results[16] = check_bitcoin_priv();
+        results[17] = check_bitcoin_pub();
+        results[18] = check_bitcoin_pkh();
+        results[19] = check_bitcoin_encoded();
+        results[20] = check_bitcoin_matches();
+        results[21] = check_wif_compressed_mainnet();
+        results[22] = check_wif_uncompressed_mainnet();
+        results[23] = check_wif_compressed_testnet();
+        results[24] = check_wif_uncompressed_testnet();
+        results[42] = check_base58_var_len_leading_zero();
+        results[45] = check_bech32_p2wpkh();
+        results[73] = check_k256_secret_from_bytes_one();
+        results[74] = check_k256_derive_scalar_one();
+        results[75] = check_k256_derive_scalar_two();
+        results[76] = check_static_u64_array_lookup();
+        results[77] = check_static_struct_wrapped_u64_lookup();
+        results[78] = check_k256_encode_generator();
+        results[79] = check_k256_double_generator();
+        results[80] = check_k256_scalar_one_round_trip();
+        results[93] = check_k256_affine_generator_encode();
+        results[94] = check_subtle_choice_u8_into_bool();
+        results[95] = check_subtle_conditional_select_u64();
+        results[96] = check_k256_encoded_point_from_affine_coords();
+        results[97] = check_index_trait_const_indices();
+        results[98] = check_generic_array_basic_index();
+        results[99] = check_generic_array_copy_from_slice();
+        results[100] = check_from_affine_coords_replica();
+        results[101] = check_generic_array_as_slice_last();
+        results[104] = check_field_bytes_into_conversion();
+        results[110] = check_generic_array_copy_from_ga_source();
+    }
+    #[cfg(feature = "self_test_ethereum")]
+    {
+        results[5] = check_primitive_secp256k1_uncompressed();
+        results[6] = check_primitive_keccak256();
+        results[13] = check_ethereum_priv();
+        results[14] = check_ethereum_pub();
+        results[15] = check_ethereum_address();
+    }
+    #[cfg(feature = "self_test_shallenge")]
+    {
+        results[9] = check_primitive_sha256_variable();
+        results[25] = check_shallenge_hash();
+        results[26] = check_shallenge_nonce_len();
+        results[27] = check_shallenge_is_better();
+        results[28] = check_compare_hashes_lt();
+        results[29] = check_compare_hashes_gt();
+        results[30] = check_compare_hashes_eq();
+        results[44] = check_xoroshiro_base64_nonce();
+    }
+    #[cfg(feature = "self_test_p256_public_key")]
+    {
+        results[118] = check_p256_public_key_hmac_derivation();
+        results[119] = check_p256_public_key_scalar_derivation();
+        results[120] = check_p256_public_key_generator();
+        results[121] = check_p256_public_key_point_double();
+        results[122] = check_p256_public_key_zero_scalar_rejected();
+        results[123] = check_p256_public_key_order_scalar_rejected();
+        results[124] = check_p256_public_key_x_encoding();
+        results[125] = check_p256_public_key_y_encoding();
+        results[153] = check_p256_public_end_to_end();
+    }
+    #[cfg(feature = "self_test_p256_signature")]
+    {
+        results[126] = check_p256_signature_rfc6979_sample();
+        results[127] = check_p256_signature_rfc6979_test();
+        results[128] = check_p256_signature_ephemeral_r();
+        results[129] = check_p256_signature_ephemeral_signature();
+        results[130] = check_p256_signature_zero_nonce_rejected();
+        results[131] = check_p256_signature_low_s();
+        results[132] = check_p256_signature_high_s();
+        results[133] = check_p256_signature_message_window_carry();
+        results[134] = check_p256_signature_ephemeral_hmac();
+        results[154] = check_p256_signature_end_to_end();
+    }
+    #[cfg(feature = "self_test_rsa_pss")]
+    {
+        results[135] = check_rsa_pss_sha256();
+        results[136] = check_rsa_pss_mgf1_partial_block();
+        results[137] = check_rsa_pss_salt32_encoding();
+        results[138] = check_rsa_pss_empty_salt_encoding();
+        results[139] = check_rsa_pss_maximum_salt_encoding();
+        results[140] = check_rsa_pss_oversized_salt_rejected();
+        results[141] = check_rsa_pss_salt_carry();
+        results[142] = check_rsa_pss_crt_known_answer();
+        results[143] = check_rsa_pss_crt_fault_rejected();
+        results[144] = check_rsa_pss_crt_modulus_rejected();
+        results[155] = check_rsa_pss_end_to_end();
+    }
+    #[cfg(feature = "self_test_rsa_modulus")]
+    {
+        results[145] = check_rsa_modulus_multiplication_carry();
+        results[146] = check_rsa_modulus_progression_carry();
+        results[147] = check_rsa_modulus_prime_filter();
+        results[148] = check_rsa_modulus_pseudoprime_rejected();
+        results[149] = check_rsa_modulus_zero_stride_rejected();
+        results[150] = check_rsa_modulus_upper_bound_rejected();
+        results[151] = check_rsa_modulus_equal_factors_rejected();
+        results[152] = check_rsa_modulus_undersized_factor_rejected();
+        results[156] = check_rsa_modulus_end_to_end();
+    }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "self_test"))]
 mod test {
     use super::*;
 

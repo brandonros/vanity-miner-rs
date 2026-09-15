@@ -290,6 +290,119 @@ pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
     result
 }
 
+/// Incremental SHA-256 using the same compression function as the one-shot paths.
+/// Updates borrow their input; only the last partial block is buffered.
+#[derive(Clone)]
+pub struct Sha256 {
+    state: [u32; 8],
+    buffer: [u8; 64],
+    used: usize,
+    bytes: u64,
+}
+
+impl Sha256 {
+    pub const fn new() -> Self {
+        Self {
+            state: H0,
+            buffer: [0; 64],
+            used: 0,
+            bytes: 0,
+        }
+    }
+
+    pub fn digest(input: impl AsRef<[u8]>) -> [u8; 32] {
+        sha256_from_bytes(input.as_ref())
+    }
+
+    pub fn update(&mut self, input: impl AsRef<[u8]>) {
+        self.update_slice(input.as_ref());
+    }
+
+    fn update_slice(&mut self, mut input: &[u8]) {
+        self.bytes = self.bytes.wrapping_add(input.len() as u64);
+        if self.used != 0 {
+            let take = (64 - self.used).min(input.len());
+            self.buffer[self.used..self.used + take].copy_from_slice(&input[..take]);
+            self.used += take;
+            input = &input[take..];
+            if self.used != 64 {
+                return;
+            }
+            Self::compress(&mut self.state, &self.buffer);
+            self.used = 0;
+        }
+        while input.len() >= 64 {
+            Self::compress(&mut self.state, &input[..64]);
+            input = &input[64..];
+        }
+        self.buffer[..input.len()].copy_from_slice(input);
+        self.used = input.len();
+    }
+
+    fn compress(state: &mut [u32; 8], bytes: &[u8]) {
+        let mut block = [0u32; 16];
+        for (word, chunk) in block.iter_mut().zip(bytes.chunks_exact(4)) {
+            *word = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+        process_block(&block, state);
+    }
+
+    pub fn finalize(mut self) -> [u8; 32] {
+        self.buffer[self.used] = 0x80;
+        self.buffer[self.used + 1..].fill(0);
+        if self.used >= 56 {
+            Self::compress(&mut self.state, &self.buffer);
+            self.buffer = [0; 64];
+        }
+        self.buffer[56..].copy_from_slice(&self.bytes.wrapping_mul(8).to_be_bytes());
+        Self::compress(&mut self.state, &self.buffer);
+        hash_to_bytes(self.state)
+    }
+}
+
+impl Default for Sha256 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// The crypto-search callers use RustCrypto's HMAC and RSA digest interfaces.
+// Bitcoin/Shallenge's existing paths do not enable this dependency.
+#[cfg(feature = "crypto-search")]
+mod digest_traits {
+    use super::Sha256;
+    use digest::{
+        FixedOutput, FixedOutputReset, HashMarker, Output, OutputSizeUser, Reset, Update,
+    };
+    impl HashMarker for Sha256 {}
+    impl OutputSizeUser for Sha256 {
+        type OutputSize = digest::consts::U32;
+    }
+    impl digest::core_api::BlockSizeUser for Sha256 {
+        type BlockSize = digest::consts::U64;
+    }
+    impl Update for Sha256 {
+        fn update(&mut self, data: &[u8]) {
+            self.update_slice(data);
+        }
+    }
+    impl FixedOutput for Sha256 {
+        fn finalize_into(self, out: &mut Output<Self>) {
+            out.copy_from_slice(&self.finalize());
+        }
+    }
+    impl Reset for Sha256 {
+        fn reset(&mut self) {
+            *self = Self::new();
+        }
+    }
+    impl FixedOutputReset for Sha256 {
+        fn finalize_into_reset(&mut self, out: &mut Output<Self>) {
+            out.copy_from_slice(&core::mem::take(self).finalize());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459,5 +572,91 @@ mod tests {
                 "length {len}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod streaming_tests {
+    use super::*;
+
+    #[test]
+    fn every_split_around_block_and_padding_boundaries() {
+        let input: [u8; 257] = core::array::from_fn(|i| i as u8);
+        for len in 0..=input.len() {
+            let expected = sha256_from_bytes(&input[..len]);
+            for split in 0..=len {
+                let mut hash = Sha256::new();
+                hash.update([]);
+                hash.update(&input[..split]);
+                hash.update([]);
+                hash.update(&input[split..len]);
+                hash.update([]);
+                assert_eq!(hash.finalize(), expected, "length {len}, split {split}");
+            }
+        }
+    }
+
+    #[test]
+    fn large_message_in_different_chunk_sizes() {
+        let input: alloc::vec::Vec<u8> = (0..102400).map(|i| (i * 37) as u8).collect();
+        let expected = sha256_from_bytes(&input);
+        for chunk_size in [1, 7, 31, 55, 56, 63, 64, 65, 127, 1024, 65536] {
+            let mut hash = Sha256::new();
+            for chunk in input.chunks(chunk_size) {
+                hash.update(chunk);
+            }
+            assert_eq!(hash.finalize(), expected, "chunk size {chunk_size}");
+        }
+    }
+
+    #[test]
+    fn published_million_a_vector() {
+        let mut hash = Sha256::new();
+        for _ in 0..1000 {
+            hash.update([b'a'; 1000]);
+        }
+        assert_eq!(
+            hex::encode(hash.finalize()),
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+        );
+    }
+
+    #[cfg(feature = "crypto-search")]
+    #[test]
+    fn digest_reset_and_cloned_prefixes() {
+        let mut hash = Sha256::new();
+        hash.update(b"shared prefix:");
+        let mut other = hash.clone();
+        hash.update(b"a");
+        other.update(b"b");
+        assert_eq!(hash.finalize(), sha256_from_bytes(b"shared prefix:a"));
+        let result = digest::Digest::finalize_reset(&mut other);
+        assert_eq!(&result[..], &sha256_from_bytes(b"shared prefix:b"));
+        assert_eq!(other.clone().finalize(), sha256_from_bytes(b""));
+        other.update(b"discard this");
+        digest::Reset::reset(&mut other);
+        other.update(b"abc");
+        assert_eq!(
+            hex::encode(other.finalize()),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[cfg(feature = "crypto-search")]
+    #[test]
+    fn rfc4231_hmac_short_and_long_keys() {
+        use hmac::{Mac, SimpleHmac};
+        let mut mac = SimpleHmac::<Sha256>::new_from_slice(&[0x0b; 20]).unwrap();
+        mac.update(b"Hi There");
+        assert_eq!(
+            hex::encode(mac.finalize().into_bytes()),
+            "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+        );
+        let mut mac = SimpleHmac::<Sha256>::new_from_slice(&[0xaa; 131]).unwrap();
+        mac.update(b"Test Using Larger Than Block-Size Key - Hash Key First");
+        assert_eq!(
+            hex::encode(mac.finalize().into_bytes()),
+            "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
+        );
     }
 }

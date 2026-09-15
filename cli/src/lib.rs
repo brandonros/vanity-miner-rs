@@ -23,7 +23,7 @@ pub mod search_control;
 pub mod search_batches;
 
 #[cfg(all(
-    any(test, feature = "self_test"),
+    any(test, feature = "self_test_support"),
     any(
         feature = "p256-public-key",
         feature = "p256-signature",
@@ -35,5 +35,5 @@ pub mod test_support;
 
 pub mod stats;
 
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_support")]
 pub mod self_test_suite;

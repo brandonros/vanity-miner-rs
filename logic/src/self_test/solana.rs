@@ -1,9 +1,97 @@
-//! Arithmetic and compiler regression checks.
-use crate::{
-    crypto::secp256k1::secp256k1_derive_public_key, encoding::base58::base58_encode,
-    encoding::base58::base58_encode_32, encoding::bech32::encode_p2wpkh_address,
-    search::xoroshiro::generate_base64_nonce,
-};
+//! solana self-tests: primitives, pipeline stages, and regressions.
+use super::IdxProbe;
+use super::bytes_eq_prefix;
+use crate::crypto::ed25519::ed25519_derive_public_key;
+use crate::crypto::sha512::sha512_32bytes_from_bytes;
+use crate::encoding::base58::base58_encode;
+use crate::encoding::base58::base58_encode_32;
+use crate::modes::solana_vanity::SolanaVanityKeyRequest;
+use crate::modes::solana_vanity::SolanaVanityKeyResult;
+use crate::modes::solana_vanity::generate_and_check_solana_vanity_key;
+use crate::search::xoroshiro::generate_random_private_key;
+
+// === Solana per-primitive bisect (slots 0-3) ===
+// The `solana priv` slot ran the *whole* pipeline before checking the priv
+// bytes; if that kernel faulted we couldn't tell which primitive triggered
+// it. These four `check_primitive_*` functions exercise each stage in
+// isolation against externally-validated intermediates, so GPU mode can
+// localize a fault to xoroshiro / sha512 / ed25519 / base58.
+
+const SOLANA_PRIMITIVE_PRIV: [u8; 32] = [
+    0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48, 0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2, 0xc4,
+    0x43, 0xd5, 0x96, 0x56, 0x5f, 0xa0, 0x52, 0x14, 0xb0, 0xff, 0x7c, 0x5a, 0xb5, 0xe7, 0x95, 0x6b,
+];
+
+const SOLANA_PRIMITIVE_HASHED_PRIV: [u8; 64] = [
+    0xaa, 0xe4, 0x1d, 0x15, 0x43, 0x8a, 0x30, 0xa5, 0x0e, 0x27, 0x4b, 0x13, 0x6d, 0x5c, 0x2a, 0x7c,
+    0x36, 0x6e, 0x68, 0xbf, 0xf9, 0xa0, 0xbb, 0x05, 0x87, 0x2c, 0x35, 0x75, 0x2e, 0x9a, 0x45, 0xa4,
+    0x8c, 0x25, 0x5f, 0x21, 0xb8, 0x43, 0xfc, 0xa7, 0x21, 0x81, 0x3f, 0xc2, 0x40, 0x3e, 0x20, 0x13,
+    0xe0, 0xe8, 0x1d, 0xd6, 0xd7, 0xc9, 0xd8, 0x69, 0xac, 0xf6, 0x03, 0x1e, 0x33, 0xb6, 0x95, 0x6a,
+];
+
+const SOLANA_PRIMITIVE_PUB: [u8; 32] = [
+    0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d, 0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0, 0x28,
+    0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30, 0x16, 0xbb,
+];
+
+pub fn check_primitive_xoroshiro() -> u32 {
+    let priv_key = generate_random_private_key(3, 583437459223573146);
+    (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
+}
+
+pub fn check_primitive_sha512() -> u32 {
+    let hashed = sha512_32bytes_from_bytes(&SOLANA_PRIMITIVE_PRIV);
+    (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
+}
+
+pub fn check_primitive_ed25519() -> u32 {
+    let pub_key = ed25519_derive_public_key(&SOLANA_PRIMITIVE_HASHED_PRIV);
+    (pub_key == SOLANA_PRIMITIVE_PUB) as u32
+}
+
+pub fn check_primitive_base58() -> u32 {
+    let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
+    let mut out = [0u8; 64];
+    let n = base58_encode_32(&SOLANA_PRIMITIVE_PUB, &mut out);
+    (n == expected.len() && bytes_eq_prefix(&out, expected)) as u32
+}
+
+// === Solana (rng_seed=583437459223573146, thread_idx=3) ===
+
+fn solana_test() -> SolanaVanityKeyResult {
+    let req = SolanaVanityKeyRequest {
+        prefix: b"",
+        suffix: b"",
+        thread_idx: 3,
+        rng_seed: 583437459223573146,
+    };
+    generate_and_check_solana_vanity_key(&req)
+}
+
+pub fn check_solana_priv() -> u32 {
+    let expected: [u8; 32] = [
+        0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48, 0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2,
+        0xc4, 0x43, 0xd5, 0x96, 0x56, 0x5f, 0xa0, 0x52, 0x14, 0xb0, 0xff, 0x7c, 0x5a, 0xb5, 0xe7,
+        0x95, 0x6b,
+    ];
+    (solana_test().private_key == expected) as u32
+}
+
+pub fn check_solana_pub() -> u32 {
+    let expected: [u8; 32] = [
+        0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d, 0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0,
+        0x28, 0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30,
+        0x16, 0xbb,
+    ];
+    (solana_test().public_key == expected) as u32
+}
+
+pub fn check_solana_encoded() -> u32 {
+    let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
+    let sol = solana_test();
+    (sol.encoded_len == expected.len() && bytes_eq_prefix(&sol.encoded_public_key, expected)) as u32
+}
+
 // === Arithmetic primitive bisect (slots 31-40) ===
 // The composed primitives above all reduce to the same root cause: any
 // integer op that lowers to `mul.hi.u64` (multi-word multiply, divide-by-
@@ -18,10 +106,15 @@ use crate::{
 // codegen bug isolated to that op.
 
 const ARITH_U32_A: u32 = 0xDEADBEEF;
+
 const ARITH_U32_B: u32 = 0x12345678;
+
 const ARITH_U64_A: u64 = 0xDEADBEEFCAFEBABE;
+
 const ARITH_U64_B: u64 = 0x123456789ABCDEF0;
+
 const ARITH_U128_A: u128 = ((ARITH_U64_A as u128) << 64) | (ARITH_U64_B as u128);
+
 const ARITH_U128_B: u128 = ((ARITH_U64_B as u128) << 64) | (ARITH_U64_A as u128);
 
 pub fn check_arith_u32_div_var() -> u32 {
@@ -127,16 +220,8 @@ const BASE58_VAR_INPUT: [u8; 25] = [
     0x0A, 0xF7, 0x64, 0xC1, 0xB6, 0x13, 0x3A, 0x3A, 0x0A, 0xBD, 0x7E, 0xF9, 0xC8, 0x53, 0x79, 0x1B,
     0x68, 0x7C, 0xE1, 0xE2, 0x35, 0xF9, 0xDC, 0x84, 0x66,
 ];
-const BASE58_VAR_EXPECTED: &[u8] = b"5Qw8TAab98QrQmymczzxwkZzacMDL4MeEH";
 
-// Bitcoin Genesis P2PKH (mainnet) — one leading 0x00 forces the
-// `num_leading_zeros` pad branch to emit a single '1' before the encoded
-// numeric tail.
-const BASE58_LEADZERO_INPUT: [u8; 25] = [
-    0x00, 0x62, 0xE9, 0x07, 0xB1, 0x5C, 0xBF, 0x27, 0xD5, 0x42, 0x53, 0x99, 0xEB, 0xF6, 0xF0, 0xFB,
-    0x50, 0xEB, 0xB8, 0x8F, 0x18, 0xC2, 0x9B, 0x7D, 0x93,
-];
-const BASE58_LEADZERO_EXPECTED: &[u8] = b"1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa";
+const BASE58_VAR_EXPECTED: &[u8] = b"5Qw8TAab98QrQmymczzxwkZzacMDL4MeEH";
 
 // 32 all-zero bytes → all-leading-zero pad with no divide loop iterations.
 // If this PASSes but slot 3 FAILs, the divide-by-58 codegen is to blame;
@@ -159,22 +244,6 @@ pub fn check_base58_var_len() -> u32 {
     1
 }
 
-pub fn check_base58_var_len_leading_zero() -> u32 {
-    let mut out = [0u8; 64];
-    let n = base58_encode(&BASE58_LEADZERO_INPUT, &mut out);
-    if n != BASE58_LEADZERO_EXPECTED.len() {
-        return 0;
-    }
-    let mut i = 0;
-    while i < n {
-        if out[i] != BASE58_LEADZERO_EXPECTED[i] {
-            return 0;
-        }
-        i += 1;
-    }
-    1
-}
-
 pub fn check_base58_all_zeros() -> u32 {
     let input = core::hint::black_box([0u8; 32]);
     let mut out = [0u8; 64];
@@ -185,44 +254,6 @@ pub fn check_base58_all_zeros() -> u32 {
     let mut i = 0;
     while i < n {
         if out[i] != BASE58_ALLZERO_EXPECTED[i] {
-            return 0;
-        }
-        i += 1;
-    }
-    1
-}
-
-// Captured by running `generate_base64_nonce(0, 12345, &mut [0u8; 21])` on
-// the host (see /tmp/probe). Same (thread_idx, rng_seed) the shallenge
-// pipeline uses, so this slot directly answers "is the nonce wrong, and is
-// that why shallenge_hash fails?".
-const XOROSHIRO_NONCE_EXPECTED: [u8; 21] = [
-    0x61, 0x63, 0x65, 0x43, 0x48, 0x73, 0x71, 0x46, 0x36, 0x67, 0x31, 0x33, 0x5a, 0x65, 0x32, 0x6e,
-    0x47, 0x53, 0x4a, 0x67, 0x6d,
-];
-
-pub fn check_xoroshiro_base64_nonce() -> u32 {
-    let mut nonce = [0u8; 21];
-    generate_base64_nonce(0, 12345, &mut nonce);
-    (nonce == XOROSHIRO_NONCE_EXPECTED) as u32
-}
-
-// p2wpkh KAT lifted from bech32::test::should_encode_p2wpkh_correctly.
-const BECH32_P2WPKH_HASH: [u8; 20] = [
-    0x46, 0x04, 0x7c, 0x8a, 0x3d, 0x8e, 0xdb, 0x13, 0x4c, 0x3f, 0x1a, 0x3e, 0x7d, 0x65, 0xb0, 0xfd,
-    0x74, 0x21, 0xf1, 0x27,
-];
-const BECH32_P2WPKH_EXPECTED: &[u8] = b"bc1qgcz8ez3a3md3xnplrgl86edsl46zruf8mwx56m";
-
-pub fn check_bech32_p2wpkh() -> u32 {
-    let mut out = [0u8; 64];
-    let n = encode_p2wpkh_address(&BECH32_P2WPKH_HASH, true, &mut out);
-    if n != BECH32_P2WPKH_EXPECTED.len() {
-        return 0;
-    }
-    let mut i = 0;
-    while i < n {
-        if out[i] != BECH32_P2WPKH_EXPECTED[i] {
             return 0;
         }
         i += 1;
@@ -865,157 +896,6 @@ pub fn check_dalek_mul_base_scalar_one() -> u32 {
     (compressed == ED25519_BASEPOINT_COMPRESSED) as u32
 }
 
-// Slot 73: `SecretKey::from_bytes` for the smallest valid scalar (=1).
-// Tests just the validation/wrap step (range check + GenericArray copy).
-// k256 scalars are big-endian, so 1 = [0; 31] ++ [0x01].
-//
-// Wrapped in ManuallyDrop because SecretKey zeroizes on Drop and
-// cuda-oxide does not yet emit device-side drop_in_place (same pattern
-// as logic/src/secp256k1.rs).
-pub fn check_k256_secret_from_bytes_one() -> u32 {
-    use core::mem::ManuallyDrop;
-    use k256::SecretKey;
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 1;
-    let result = SecretKey::from_bytes((&priv_bytes).into());
-    match result {
-        Ok(sk) => {
-            let _sk = ManuallyDrop::new(sk);
-            1
-        }
-        Err(_) => 0,
-    }
-}
-
-// Slot 74: full k256 derive for scalar=1. Compressed public key must
-// equal the well-known secp256k1 generator G.
-const SECP256K1_GENERATOR_COMPRESSED: [u8; 33] = [
-    0x02, 0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B,
-    0x07, 0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17,
-    0x98,
-];
-
-pub fn check_k256_derive_scalar_one() -> u32 {
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 1;
-    let pub_key = secp256k1_derive_public_key(&priv_bytes);
-    (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 75: full k256 derive for scalar=2. Compressed public key must
-// equal 2G (one more doubling beyond slot 74). A 74-PASS / 75-FAIL split
-// pinpoints the doubling formula; a 74-FAIL / 75-FAIL means scalar mult
-// is broken even for the trivial-scalar case.
-const SECP256K1_TWO_G_COMPRESSED: [u8; 33] = [
-    0x02, 0xC6, 0x04, 0x7F, 0x94, 0x41, 0xED, 0x7D, 0x6D, 0x30, 0x45, 0x40, 0x6E, 0x95, 0xC0, 0x7C,
-    0xD8, 0x5C, 0x77, 0x8E, 0x4B, 0x8C, 0xEF, 0x3C, 0xA7, 0xAB, 0xAC, 0x09, 0xB9, 0x5C, 0x70, 0x9E,
-    0xE5,
-];
-
-pub fn check_k256_derive_scalar_two() -> u32 {
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 2;
-    let pub_key = secp256k1_derive_public_key(&priv_bytes);
-    (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
-}
-
-// Slot 76: bare `&'static [u64; 5]` runtime-indexed read. The simplest
-// possible test of the "element-width > 1 byte breaks &'static reads"
-// hypothesis. No struct wrapper, no arithmetic on the result.
-static STATIC_U64_TABLE: [u64; 5] = [
-    0x0123_4567_89AB_CDEF,
-    0xFEDC_BA98_7654_3210,
-    0x1111_2222_3333_4444,
-    0xAAAA_BBBB_CCCC_DDDD,
-    0xDEAD_BEEF_CAFE_BABE,
-];
-
-pub fn check_static_u64_array_lookup() -> u32 {
-    let idx = core::hint::black_box(3usize);
-    let val = STATIC_U64_TABLE[idx];
-    (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
-}
-
-// Slot 77: same but wrapped in a single-field tuple struct — matches
-// dalek's `Scalar52(pub(crate) [u64; 5])` newtype shape. If 76 PASSes
-// and 77 FAILs, the bug is specifically in field projection through a
-// newtype, not in the underlying array.
-#[repr(transparent)]
-pub struct U64Wrap5(pub [u64; 5]);
-
-static STATIC_U64_WRAPPED: U64Wrap5 = U64Wrap5([
-    0x0123_4567_89AB_CDEF,
-    0xFEDC_BA98_7654_3210,
-    0x1111_2222_3333_4444,
-    0xAAAA_BBBB_CCCC_DDDD,
-    0xDEAD_BEEF_CAFE_BABE,
-]);
-
-pub fn check_static_struct_wrapped_u64_lookup() -> u32 {
-    let idx = core::hint::black_box(3usize);
-    let val = STATIC_U64_WRAPPED.0[idx];
-    (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
-}
-
-// Slot 78: encode the secp256k1 generator point directly — no scalar mult,
-// no Lazy<> table touch. Tests the projective→affine + to_encoded_point
-// chain in isolation. ProjectivePoint::GENERATOR has z=1, so the affine
-// conversion's field inversion is trivial; this primarily exercises the
-// FieldElement→bytes serialization + parity-bit pack.
-pub fn check_k256_encode_generator() -> u32 {
-    use k256::ProjectivePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g = ProjectivePoint::GENERATOR;
-    let affine = g.to_affine();
-    let encoded = affine.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
-    }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 79: `ProjectivePoint::double()` on the generator + encode. One
-// doubling = one field-mul-heavy operation that produces a projective
-// point with z != 1, so the subsequent `to_affine()` requires a real
-// field inversion. 78 PASS + 79 FAIL = doubling formula or non-trivial
-// field inversion broken (5-wide variant of Bug C suspect).
-pub fn check_k256_double_generator() -> u32 {
-    use k256::ProjectivePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g2 = ProjectivePoint::GENERATOR.double();
-    let affine = g2.to_affine();
-    let encoded = affine.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
-    }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_TWO_G_COMPRESSED) as u32
-}
-
-// Slot 80: k256 `Scalar::ONE` round-trip via the PrimeField trait. Mirror
-// of slot 71 for k256's Scalar type. k256's Scalar wraps a `U256` from
-// crypto-bigint (different layout than dalek's `Scalar52([u64; 5])`),
-// so this distinguishes Bug A (dalek-specific newtype shape) from a
-// broader Bug A' (any static-resident scalar repr).
-pub fn check_k256_scalar_one_round_trip() -> u32 {
-    use k256::Scalar;
-    use k256::elliptic_curve::PrimeField;
-    let s = Scalar::ONE;
-    let repr = s.to_repr();
-    let s2_opt = Scalar::from_repr(repr);
-    let recovered: bool = s2_opt.is_some().into();
-    if !recovered {
-        return 0;
-    }
-    let s2 = s2_opt.unwrap();
-    (s2 == s) as u32
-}
-
 // Slot 81: `u128 >> 52` immediate right shift, matching the exact shape
 // inside dalek's `montgomery_reduce::part1`:
 //   ((sum + m(p, constants::L[0])) >> 52, p)
@@ -1425,20 +1305,6 @@ pub fn check_dalek_scalar52_montgomery_reduce_with_sub() -> u32 {
 // `&mut u64`. If this FAILs, trait dispatch on `[i]` syntax is broken
 // on the cuda-oxide alpha-NVPTX backend — explains why dalek (uses
 // `a[i]`) fails while our port (uses `a.0[i]`) passes.
-pub struct IdxProbe(pub [u64; 5]);
-
-impl core::ops::Index<usize> for IdxProbe {
-    type Output = u64;
-    fn index(&self, i: usize) -> &u64 {
-        &(self.0[i])
-    }
-}
-
-impl core::ops::IndexMut<usize> for IdxProbe {
-    fn index_mut(&mut self, i: usize) -> &mut u64 {
-        &mut (self.0[i])
-    }
-}
 
 pub fn check_index_trait_dispatch() -> u32 {
     let mut p = IdxProbe([0u64; 5]);
@@ -1459,192 +1325,6 @@ pub fn check_dalek_scalar_one_to_bytes_direct() -> u32 {
     let mut expected = [0u8; 32];
     expected[0] = 1;
     (bytes == expected) as u32
-}
-
-// Slot 93: k256 `AffinePoint::GENERATOR.to_encoded_point(true)`. Skips
-// the projective→affine conversion that slot 78 includes (no z-coord
-// inversion). Tests cross-crate const access for AffinePoint::GENERATOR
-// + the encoded_point serialization chain. If 93 PASSes and 78 FAILs,
-// the bug in 78 is specifically in `to_affine()` (the field inversion).
-pub fn check_k256_affine_generator_encode() -> u32 {
-    use k256::AffinePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g = AffinePoint::GENERATOR;
-    let encoded = g.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
-    }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 94: subtle::Choice u8 → bool. The most trivial subtle operation.
-// Choice is a tuple struct wrapping u8 with field private. From<u8> sets
-// it; Into<bool> reads it via debug_assert + comparison.
-pub fn check_subtle_choice_u8_into_bool() -> u32 {
-    use k256::elliptic_curve::subtle::Choice;
-    let c0 = Choice::from(core::hint::black_box(0u8));
-    let c1 = Choice::from(core::hint::black_box(1u8));
-    let b0: bool = c0.into();
-    let b1: bool = c1.into();
-    (!b0 && b1) as u32
-}
-
-// Slot 95: subtle::ConditionallySelectable on u64. The mechanism k256's
-// `AffinePoint::to_encoded_point` uses to pick between the identity
-// arm and the from_affine_coordinates arm.
-//   conditional_select(&a, &b, Choice(0)) should return a
-//   conditional_select(&a, &b, Choice(1)) should return b
-// Slot 53/54 tested a HAND-ROLLED mask blend with the same conceptual
-// math; this slot tests the actual subtle::ConditionallySelectable trait
-// impl which the real code path uses.
-pub fn check_subtle_conditional_select_u64() -> u32 {
-    use k256::elliptic_curve::subtle::{Choice, ConditionallySelectable};
-    let a = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
-    let b = core::hint::black_box(0x1234_5678_9ABC_DEF0_u64);
-    let c0 = Choice::from(core::hint::black_box(0u8));
-    let c1 = Choice::from(core::hint::black_box(1u8));
-    let r0 = u64::conditional_select(&a, &b, c0);
-    let r1 = u64::conditional_select(&a, &b, c1);
-    (r0 == a && r1 == b) as u32
-}
-
-// Slot 96: `EncodedPoint::from_affine_coordinates(&GX_bytes, &GY_bytes,
-// compress=true)` with hardcoded generator-x/y. Bypasses AffinePoint's
-// own `to_encoded_point` (which goes through `is_identity`+
-// `conditional_select`) and tests just the EncodedPoint construction.
-//
-// If 96 PASSes and 93 FAILs, the bug is in `is_identity`/`conditional_
-// select` (slot 95 should then also FAIL). If 96 FAILs, EncodedPoint
-// construction itself is broken.
-const SECP256K1_GX_BYTES: [u8; 32] = [
-    0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
-    0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
-];
-const SECP256K1_GY_BYTES: [u8; 32] = [
-    0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65, 0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
-    0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19, 0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8,
-];
-
-pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
-    use k256::EncodedPoint;
-    use k256::elliptic_curve::FieldBytes;
-    let x_bytes = core::hint::black_box(SECP256K1_GX_BYTES);
-    let y_bytes = core::hint::black_box(SECP256K1_GY_BYTES);
-    let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
-    let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
-    let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
-    }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 97: Index/IndexMut trait dispatch with LITERAL const indices.
-// Slot 91 used `black_box(idx)` → runtime index, and now PASSes. Dalek's
-// Scalar52::from_bytes uses `s[0] = …; s[1] = …; …; s[4] = …` with
-// const literal indices. Different IR shape — const indices typically
-// fold the trait call into a direct GEP at compile time.
-pub fn check_index_trait_const_indices() -> u32 {
-    let mut p = IdxProbe([0u64; 5]);
-    p[0] = core::hint::black_box(0x1111_1111_1111_1111_u64);
-    p[1] = core::hint::black_box(0x2222_2222_2222_2222_u64);
-    p[2] = core::hint::black_box(0x3333_3333_3333_3333_u64);
-    p[3] = core::hint::black_box(0x4444_4444_4444_4444_u64);
-    p[4] = core::hint::black_box(0x5555_5555_5555_5555_u64);
-    let r0 = p[0];
-    let r1 = p[1];
-    let r2 = p[2];
-    let r3 = p[3];
-    let r4 = p[4];
-    (r0 == 0x1111_1111_1111_1111
-        && r1 == 0x2222_2222_2222_2222
-        && r2 == 0x3333_3333_3333_3333
-        && r3 == 0x4444_4444_4444_4444
-        && r4 == 0x5555_5555_5555_5555) as u32
-}
-
-// Slot 98: `GenericArray<u8, U33>` basic index. GenericArray doesn't have
-// a custom Index impl; it Derefs to `[T]` via:
-//   `unsafe { slice::from_raw_parts(self as *const Self as *const T, N::USIZE) }`
-// If that raw-ptr-cast Deref miscompiles, every GenericArray op breaks.
-// k256::EncodedPoint stores its bytes in a `GenericArray<u8, EncodedSize>`.
-pub fn check_generic_array_basic_index() -> u32 {
-    use k256::elliptic_curve::generic_array::GenericArray;
-    use k256::elliptic_curve::generic_array::typenum::U33;
-    let mut ga: GenericArray<u8, U33> = GenericArray::default();
-    let i0 = core::hint::black_box(0usize);
-    let i32 = core::hint::black_box(32usize);
-    ga[i0] = 0xAA;
-    ga[i32] = 0xBB;
-    let v0 = ga[i0];
-    let v32 = ga[i32];
-    (v0 == 0xAA && v32 == 0xBB) as u32
-}
-
-// Slot 99: `GenericArray<u8, U33>` populated via `copy_from_slice` from a
-// regular byte array. This is exactly what EncodedPoint::from_affine_
-// coordinates does:
-//   bytes[1..33].copy_from_slice(x);
-// If this FAILs, the slice-copy-into-GenericArray-slice is the bug.
-pub fn check_generic_array_copy_from_slice() -> u32 {
-    use k256::elliptic_curve::generic_array::GenericArray;
-    use k256::elliptic_curve::generic_array::typenum::U33;
-    let src: [u8; 32] = core::hint::black_box(SECP256K1_GX_BYTES);
-    let mut ga: GenericArray<u8, U33> = GenericArray::default();
-    ga[0] = 0x02;
-    ga[1..33].copy_from_slice(&src);
-    // Compare against the known compressed-generator encoding.
-    let mut got = [0u8; 33];
-    got.copy_from_slice(&ga[..]);
-    (got == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 100: local re-impl of sec1's `from_affine_coordinates` body using
-// raw `[u8; 33]` instead of `GenericArray<u8, U33>`. Same algorithm:
-//   tag = 0x02/0x03 based on y[31]&1
-//   bytes[0] = tag
-//   bytes[1..33] = x
-// If 100 PASSes and 96 still FAILs, the bug is in sec1's
-// GenericArray-typed parameter handling, not the algorithm.
-pub fn check_from_affine_coords_replica() -> u32 {
-    let x_bytes = &SECP256K1_GX_BYTES;
-    let y_bytes = &SECP256K1_GY_BYTES;
-    // Compute tag: even y → 0x02, odd y → 0x03
-    let last_y = core::hint::black_box(y_bytes[31]);
-    let tag: u8 = if last_y & 1 == 1 { 0x03 } else { 0x02 };
-    let mut bytes = [0u8; 33];
-    bytes[0] = tag;
-    bytes[1..33].copy_from_slice(x_bytes);
-    (bytes == SECP256K1_GENERATOR_COMPRESSED) as u32
-}
-
-// Slot 101: probes the exact `y.as_slice().last()` shape inside
-// `Tag::compress_y`. Pass a `&GenericArray<u8, U32>` to a function, do
-// `as_slice().last()` inside. Slot 99 tested write-side copy; this
-// tests read-side slice access via Deref then `.last()`.
-#[inline(never)]
-fn last_via_as_slice(
-    ga: &k256::elliptic_curve::generic_array::GenericArray<
-        u8,
-        k256::elliptic_curve::generic_array::typenum::U32,
-    >,
-) -> u8 {
-    *ga.as_slice().last().expect("non-empty")
-}
-
-pub fn check_generic_array_as_slice_last() -> u32 {
-    use k256::elliptic_curve::generic_array::GenericArray;
-    use k256::elliptic_curve::generic_array::typenum::U32;
-    let input = core::hint::black_box(SECP256K1_GY_BYTES);
-    let ga: &GenericArray<u8, U32> = (&input).into();
-    let last = last_via_as_slice(ga);
-    (last == 0xB8) as u32 // SECP256K1_GY_BYTES[31]
 }
 
 // Slot 102: dalek `Scalar::from_bytes_mod_order([0; 32])` should
@@ -1669,20 +1349,6 @@ pub fn check_dalek_scalar_from_bytes_wide_zero() -> u32 {
     let scalar = curve25519_dalek::Scalar::from_bytes_mod_order_wide(&core::hint::black_box(input));
     let bytes = scalar.to_bytes();
     (bytes == [0u8; 32]) as u32
-}
-
-// Slot 104: `(&[u8; 32]).into() → &FieldBytes<Secp256k1>` then read first
-// and last bytes. Tests the `From<&[u8; N]> for &GenericArray<u8, N>`
-// conversion (the only GA-related path slot 98/99 didn't cover — they
-// constructed via `GenericArray::default()` instead).
-pub fn check_field_bytes_into_conversion() -> u32 {
-    use k256::elliptic_curve::FieldBytes;
-    let arr: [u8; 32] = SECP256K1_GX_BYTES;
-    let arr = core::hint::black_box(arr);
-    let ga: &FieldBytes<k256::Secp256k1> = (&arr).into();
-    let first = ga[0];
-    let last = ga[31];
-    (first == 0x79 && last == 0x98) as u32
 }
 
 // Slot 105: `base58_encode_32` with minimum non-zero input: 31 leading
@@ -1792,24 +1458,6 @@ pub fn check_dalek_scalar_eq_zero() -> u32 {
     let s = Scalar::from_bytes_mod_order(input);
     let zero = Scalar::ZERO;
     (s == zero) as u32
-}
-
-// Slot 110: `dst_ga.copy_from_slice(src_ga)` where source IS a
-// `&GenericArray<u8, U32>` (not `&[u8; 32]`). Slot 99 already covered
-// `&[u8; 32]` source. The function `EncodedPoint::from_affine_coordinates`
-// uses `bytes[1..33].copy_from_slice(x)` where `x: &GenericArray`, so
-// the source-side Deref→slice conversion happens implicitly.
-pub fn check_generic_array_copy_from_ga_source() -> u32 {
-    use k256::elliptic_curve::generic_array::GenericArray;
-    use k256::elliptic_curve::generic_array::typenum::{U32, U33};
-    let src_arr = core::hint::black_box(SECP256K1_GX_BYTES);
-    let src: &GenericArray<u8, U32> = (&src_arr).into();
-    let mut dst: GenericArray<u8, U33> = GenericArray::default();
-    dst[0] = 0x02;
-    dst[1..33].copy_from_slice(src);
-    let mut got = [0u8; 33];
-    got.copy_from_slice(&dst);
-    (got == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
 // Slot 111: `Scalar::ZERO == Scalar::ZERO`. Pure const-vs-const

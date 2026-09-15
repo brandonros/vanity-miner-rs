@@ -806,6 +806,7 @@ version = "0.1.0"
 dependencies = [
  "crypto-bigint",
  "curve25519-dalek",
+ "digest",
  "ecdsa",
  "hex",
  "hmac",
@@ -814,7 +815,6 @@ dependencies = [
  "rand_core 0.9.3",
  "rand_xoshiro",
  "seq-macro",
- "sha2",
  "tiny-keccak",
  "zeroize",
 ]
@@ -1228,7 +1228,6 @@ dependencies = [
  "pkcs1",
  "pkcs8",
  "rand_core 0.6.4",
- "sha2",
  "signature",
  "spki",
  "subtle",
@@ -1672,7 +1671,6 @@ dependencies = [
  "paste",
  "rand",
  "rsa",
- "sha2",
  "zeroize",
 ]
 

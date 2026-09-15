@@ -2,7 +2,7 @@
 //! The mode runners restrict keys to RSA-2048; this primitive accepts the
 //! RFC 8017 bit-width parameter to exercise unused-bit edge cases in tests.
 
-use sha2::{Digest, Sha256};
+use crate::crypto::sha256::Sha256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PssError {
@@ -103,7 +103,7 @@ mod tests {
     fn explicit_salt_known_answer() {
         // Independent Python hashlib encoding, for the public message "sample"
         // and salt bytes 00..1f; no RSA private material is involved.
-        let digest: [u8; 32] = Sha256::digest(b"sample").into();
+        let digest: [u8; 32] = Sha256::digest(b"sample");
         let salt = core::array::from_fn::<_, 32, _>(|i| i as u8);
         let mut output = [0; 256];
         encode_sha256(&digest, &salt, 2047, &mut output).unwrap();
@@ -124,7 +124,7 @@ mod tests {
 
     #[test]
     fn masking_salt_recovery_and_trailer() {
-        let digest: [u8; 32] = Sha256::digest(b"sample").into();
+        let digest: [u8; 32] = Sha256::digest(b"sample");
         for em_bits in [2041, 2047, 2048] {
             for salt_length in [0, 1, 32, 222] {
                 let salt = [0x42; 222];

@@ -4,11 +4,11 @@ use crate::{
     rsa_host::{fixed_bytes, sufficiently_separated, validate_rsa2048},
     search_control::SearchControl,
 };
+use logic::crypto::sha256::Sha256;
 use logic::search::hex_pattern::HexPattern;
 use num_bigint_dig::{BigUint, ModInverse, RandBigInt, prime::probably_prime};
 use rand::rngs::OsRng;
 use rsa::{Pss, RsaPrivateKey, pkcs8::EncodePrivateKey, traits::PublicKeyParts};
-use sha2::{Digest, Sha256};
 use std::{sync::Arc, thread, time::Duration};
 use zeroize::Zeroizing;
 

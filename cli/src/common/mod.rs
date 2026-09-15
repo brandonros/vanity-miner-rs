@@ -58,4 +58,4 @@ pub use validation::*;
 pub(crate) mod search_session;
 
 #[cfg(feature = "gpu")]
-mod cuda_module;
+pub(crate) mod cuda_module;

@@ -1,6 +1,7 @@
 //! Bounded P-256/SHA-256 signature searches with host winner verification.
 
 use crate::search_control::SearchControl;
+use logic::crypto::sha256::Sha256;
 use logic::{
     crypto::p256_vanity::{
         candidate_scalar,
@@ -16,7 +17,6 @@ use p256::{
     pkcs8::DecodePrivateKey,
 };
 use rand::{RngCore, rngs::OsRng};
-use sha2::{Digest, Sha256};
 use std::{path::PathBuf, sync::Arc, thread, time::Duration};
 use zeroize::Zeroizing;
 
@@ -116,7 +116,7 @@ fn run(
             return Err("message window must be nonempty and within the message".into());
         }
     }
-    let digest: [u8; 32] = Sha256::digest(&original).into();
+    let digest: [u8; 32] = Sha256::digest(&original);
     let mut seed = Zeroizing::new([0; 32]);
     OsRng
         .try_fill_bytes(seed.as_mut())
@@ -124,7 +124,7 @@ fn run(
     let deriver = CandidateDeriver::new(
         *seed,
         CandidateDomain::P256Ephemeral,
-        Sha256::digest(public).into(),
+        Sha256::digest(public),
         digest,
     );
 
@@ -141,7 +141,7 @@ fn run(
         let request = Zeroizing::new(P256SignatureRequest {
             private: *private,
             seed: *seed,
-            fingerprint: Sha256::digest(public).into(),
+            fingerprint: Sha256::digest(public),
             digest,
             worker: 0,
             offset,

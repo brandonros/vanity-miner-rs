@@ -7,5 +7,5 @@ pub mod encoding;
 pub mod modes;
 pub mod search;
 
-#[cfg(feature = "self_test")]
+#[cfg(feature = "self_test_support")]
 pub mod self_test;
