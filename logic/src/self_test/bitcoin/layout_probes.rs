@@ -1,12 +1,14 @@
 //! Concrete layout probes used by this mode's device self-test.
 use super::*;
 
+#[inline(never)]
 pub fn check_static_u64_array_lookup() -> u32 {
     let idx = core::hint::black_box(3usize);
     let val = STATIC_U64_TABLE[idx];
     (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
 }
 
+#[inline(never)]
 pub fn check_static_struct_wrapped_u64_lookup() -> u32 {
     let idx = core::hint::black_box(3usize);
     let val = STATIC_U64_WRAPPED.0[idx];
@@ -16,6 +18,7 @@ pub fn check_static_struct_wrapped_u64_lookup() -> u32 {
 // Slot 94: subtle::Choice u8 → bool. The most trivial subtle operation.
 // Choice is a tuple struct wrapping u8 with field private. From<u8> sets
 // it; Into<bool> reads it via debug_assert + comparison.
+#[inline(never)]
 pub fn check_subtle_choice_u8_into_bool() -> u32 {
     use k256::elliptic_curve::subtle::Choice;
     let c0 = Choice::from(core::hint::black_box(0u8));
@@ -33,6 +36,7 @@ pub fn check_subtle_choice_u8_into_bool() -> u32 {
 // Slot 53/54 tested a HAND-ROLLED mask blend with the same conceptual
 // math; this slot tests the actual subtle::ConditionallySelectable trait
 // impl which the real code path uses.
+#[inline(never)]
 pub fn check_subtle_conditional_select_u64() -> u32 {
     use k256::elliptic_curve::subtle::{Choice, ConditionallySelectable};
     let a = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
@@ -49,6 +53,7 @@ pub fn check_subtle_conditional_select_u64() -> u32 {
 // Scalar52::from_bytes uses `s[0] = …; s[1] = …; …; s[4] = …` with
 // const literal indices. Different IR shape — const indices typically
 // fold the trait call into a direct GEP at compile time.
+#[inline(never)]
 pub fn check_index_trait_const_indices() -> u32 {
     let mut p = IdxProbe([0u64; 5]);
     p[0] = core::hint::black_box(0x1111_1111_1111_1111_u64);
@@ -73,6 +78,7 @@ pub fn check_index_trait_const_indices() -> u32 {
 //   `unsafe { slice::from_raw_parts(self as *const Self as *const T, N::USIZE) }`
 // If that raw-ptr-cast Deref miscompiles, every GenericArray op breaks.
 // k256::EncodedPoint stores its bytes in a `GenericArray<u8, EncodedSize>`.
+#[inline(never)]
 pub fn check_generic_array_basic_index() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::U33;
@@ -91,6 +97,7 @@ pub fn check_generic_array_basic_index() -> u32 {
 // coordinates does:
 //   bytes[1..33].copy_from_slice(x);
 // If this FAILs, the slice-copy-into-GenericArray-slice is the bug.
+#[inline(never)]
 pub fn check_generic_array_copy_from_slice() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::U33;
@@ -111,6 +118,7 @@ pub fn check_generic_array_copy_from_slice() -> u32 {
 //   bytes[1..33] = x
 // If 100 PASSes and 96 still FAILs, the bug is in sec1's
 // GenericArray-typed parameter handling, not the algorithm.
+#[inline(never)]
 pub fn check_from_affine_coords_replica() -> u32 {
     let x_bytes = &SECP256K1_GX_BYTES;
     let y_bytes = &SECP256K1_GY_BYTES;
@@ -123,6 +131,7 @@ pub fn check_from_affine_coords_replica() -> u32 {
     (bytes == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+#[inline(never)]
 pub fn check_generic_array_as_slice_last() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::U32;
@@ -136,6 +145,7 @@ pub fn check_generic_array_as_slice_last() -> u32 {
 // and last bytes. Tests the `From<&[u8; N]> for &GenericArray<u8, N>`
 // conversion (the only GA-related path slot 98/99 didn't cover — they
 // constructed via `GenericArray::default()` instead).
+#[inline(never)]
 pub fn check_field_bytes_into_conversion() -> u32 {
     use k256::elliptic_curve::FieldBytes;
     let arr: [u8; 32] = SECP256K1_GX_BYTES;
@@ -151,6 +161,7 @@ pub fn check_field_bytes_into_conversion() -> u32 {
 // `&[u8; 32]` source. The function `EncodedPoint::from_affine_coordinates`
 // uses `bytes[1..33].copy_from_slice(x)` where `x: &GenericArray`, so
 // the source-side Deref→slice conversion happens implicitly.
+#[inline(never)]
 pub fn check_generic_array_copy_from_ga_source() -> u32 {
     use k256::elliptic_curve::generic_array::GenericArray;
     use k256::elliptic_curve::generic_array::typenum::{U32, U33};

@@ -1,6 +1,7 @@
 //! Concrete base58 probes used by this mode's device self-test.
 use super::*;
 
+#[inline(never)]
 pub fn check_base58_var_len() -> u32 {
     let mut out = [0u8; 64];
     let n = base58_encode(&BASE58_VAR_INPUT, &mut out);
@@ -17,6 +18,7 @@ pub fn check_base58_var_len() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_base58_all_zeros() -> u32 {
     let input = core::hint::black_box([0u8; 32]);
     let mut out = [0u8; 64];
@@ -34,6 +36,7 @@ pub fn check_base58_all_zeros() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_base58_div_by_58() -> u32 {
     // Exact divmod-by-58 pattern from base58_encode_32's digit-extraction
     // loop (logic/src/base58.rs:73-82), in isolation. The constant-divisor
@@ -68,6 +71,7 @@ pub fn check_base58_div_by_58() -> u32 {
     (got == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_base58_limb_divrem() -> u32 {
     // The exact base58_encode_32 inner-loop shape: a u32 limb loaded
     // from a stack array, shifted into the high half, added to a u64
@@ -110,6 +114,7 @@ pub fn check_base58_limb_divrem() -> u32 {
 // only path it touches that slot 43 doesn't is Phase A. This slot runs
 // Phase A standalone with limb_count=1 and a non-zero limb so the loop
 // executes exactly one iteration of read-shift-add-divrem-writeback.
+#[inline(never)]
 pub fn check_base58_inner_mutate_phase() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const LIMB0_IN: u32 = 0x1234_5678;
@@ -145,6 +150,7 @@ pub fn check_base58_inner_mutate_phase() -> u32 {
 // zero bytes + 1 byte of value 1. Forces `limb_count == 1` after the
 // outer loop (vs slot 41 which has higher limb_count). Expected output
 // is 31 '1's followed by '2' = 32 chars.
+#[inline(never)]
 pub fn check_base58_min_nonzero() -> u32 {
     let mut input = [0u8; 32];
     input[31] = 1;
@@ -164,6 +170,7 @@ pub fn check_base58_min_nonzero() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_base58_handrolled_no_seq() -> u32 {
     const D: u64 = 58_u64.pow(5);
     const DIVISORS: [u64; 5] = [1, 58, 3364, 195112, 11316496];

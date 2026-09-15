@@ -5,6 +5,7 @@ use super::record_candidate;
 use core::hint::black_box;
 use fixtures::*;
 
+#[inline(never)]
 pub fn check_p256_public_key_hmac_derivation() -> u32 {
     u32::from((|| {
         let d = crate::search::candidate_derivation::CandidateDeriver::new(
@@ -17,6 +18,7 @@ pub fn check_p256_public_key_hmac_derivation() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_scalar_derivation() -> u32 {
     u32::from((|| {
         let d = crate::search::candidate_derivation::CandidateDeriver::new(
@@ -30,6 +32,7 @@ pub fn check_p256_public_key_scalar_derivation() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_generator() -> u32 {
     u32::from((|| {
         let mut scalar = [0; 32];
@@ -38,6 +41,7 @@ pub fn check_p256_public_key_generator() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_point_double() -> u32 {
     u32::from((|| {
         let mut scalar = [0; 32];
@@ -46,18 +50,21 @@ pub fn check_p256_public_key_point_double() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_zero_scalar_rejected() -> u32 {
     u32::from((|| {
         crate::crypto::p256::public_point(&black_box([0; 32])).is_none()
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_order_scalar_rejected() -> u32 {
     u32::from((|| {
         crate::crypto::p256::public_point(&black_box(CRYPTO_FIXTURE_P256_ORDER)).is_none()
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_x_encoding() -> u32 {
     u32::from((|| {
         crate::crypto::p256::PublicTarget::X.bytes(&black_box(CRYPTO_FIXTURE_P256_GENERATOR))
@@ -65,6 +72,7 @@ pub fn check_p256_public_key_x_encoding() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_public_key_y_encoding() -> u32 {
     u32::from((|| {
         crate::crypto::p256::PublicTarget::Y.bytes(&black_box(CRYPTO_FIXTURE_P256_GENERATOR))
@@ -93,6 +101,7 @@ fn self_test_digest_p256_public() -> [u8; 32] {
     h.finalize()
 }
 
+#[inline(never)]
 pub fn check_p256_public_end_to_end() -> u32 {
     u32::from(
         self_test_digest_p256_public()

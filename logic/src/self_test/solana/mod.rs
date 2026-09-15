@@ -34,21 +34,25 @@ const SOLANA_PRIMITIVE_PUB: [u8; 32] = [
     0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30, 0x16, 0xbb,
 ];
 
+#[inline(never)]
 pub fn check_primitive_xoroshiro() -> u32 {
     let priv_key = generate_random_private_key(3, 583437459223573146);
     (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_sha512() -> u32 {
     let hashed = sha512_32bytes_from_bytes(&SOLANA_PRIMITIVE_PRIV);
     (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_ed25519() -> u32 {
     let pub_key = ed25519_derive_public_key(&SOLANA_PRIMITIVE_HASHED_PRIV);
     (pub_key == SOLANA_PRIMITIVE_PUB) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_base58() -> u32 {
     let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
     let mut out = [0u8; 64];
@@ -68,6 +72,7 @@ fn solana_test() -> SolanaVanityKeyResult {
     generate_and_check_solana_vanity_key(&req)
 }
 
+#[inline(never)]
 pub fn check_solana_priv() -> u32 {
     let expected: [u8; 32] = [
         0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48, 0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2,
@@ -77,6 +82,7 @@ pub fn check_solana_priv() -> u32 {
     (solana_test().private_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_solana_pub() -> u32 {
     let expected: [u8; 32] = [
         0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d, 0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0,
@@ -86,6 +92,7 @@ pub fn check_solana_pub() -> u32 {
     (solana_test().public_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_solana_encoded() -> u32 {
     let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
     let sol = solana_test();

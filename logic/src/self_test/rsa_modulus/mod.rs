@@ -4,6 +4,7 @@ use super::known_answers::*;
 use core::hint::black_box;
 use fixtures::*;
 
+#[inline(never)]
 pub fn check_rsa_modulus_multiplication_carry() -> u32 {
     u32::from((|| {
         use crypto_bigint::{Encoding, U1024, U2048};
@@ -13,6 +14,7 @@ pub fn check_rsa_modulus_multiplication_carry() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_progression_carry() -> u32 {
     u32::from((|| {
         use crypto_bigint::{Encoding, U1024, U2048};
@@ -23,6 +25,7 @@ pub fn check_rsa_modulus_progression_carry() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_prime_filter() -> u32 {
     use crate::modes::rsa_modulus::probable_p;
     let mut even = black_box(SELF_TEST_RSA_P);
@@ -30,6 +33,7 @@ pub fn check_rsa_modulus_prime_filter() -> u32 {
     u32::from(probable_p(&black_box(SELF_TEST_RSA_P)) && !probable_p(&even))
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_pseudoprime_rejected() -> u32 {
     u32::from((|| {
         !crate::crypto::rsa_prime::probable_prime(&black_box(crypto_bigint::U1024::from_u64(
@@ -38,11 +42,13 @@ pub fn check_rsa_modulus_pseudoprime_rejected() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_empty_task_rejected() -> u32 {
     use crate::modes::rsa_modulus::{self as pipeline, Task};
     u32::from(pipeline::q_at(&black_box(device_config()), &black_box(Task::EMPTY), 0).is_none())
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_upper_bound_rejected() -> u32 {
     use crate::modes::rsa_modulus::{self as pipeline, Task};
     let config = black_box(device_config());
@@ -57,6 +63,7 @@ pub fn check_rsa_modulus_upper_bound_rejected() -> u32 {
     )
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_equal_factors_rejected() -> u32 {
     use crate::modes::rsa_modulus as pipeline;
     let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
@@ -67,6 +74,7 @@ pub fn check_rsa_modulus_equal_factors_rejected() -> u32 {
     ))
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_undersized_factor_rejected() -> u32 {
     use crate::modes::rsa_modulus as pipeline;
     let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
@@ -77,6 +85,7 @@ pub fn check_rsa_modulus_undersized_factor_rejected() -> u32 {
     ))
 }
 
+#[inline(never)]
 pub fn check_rsa_modulus_end_to_end() -> u32 {
     use crate::modes::rsa_modulus::{self as pipeline, Task};
     let config = black_box(device_config());
@@ -140,6 +149,7 @@ fn device_config() -> crate::modes::rsa_modulus::SearchConfig {
     }
 }
 
+#[inline(never)]
 pub fn check_device_range() -> u32 {
     use crate::modes::rsa_modulus::{self as pipeline, Task};
     let config = black_box(device_config());
@@ -156,6 +166,7 @@ pub fn check_device_range() -> u32 {
     )
 }
 
+#[inline(never)]
 pub fn check_device_cursor() -> u32 {
     use crate::modes::rsa_modulus::{self as pipeline, Task};
     use crypto_bigint::{Encoding, U1024};
@@ -187,6 +198,7 @@ pub fn check_device_cursor() -> u32 {
     u32::from(task.state == 0 && task.p == [0; 128] && task.remaining == [0; 128])
 }
 
+#[inline(never)]
 pub fn check_device_derivation() -> u32 {
     use crate::modes::rsa_modulus as pipeline;
     use crypto_bigint::{Encoding, U1024};

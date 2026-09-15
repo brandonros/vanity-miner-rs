@@ -1,6 +1,7 @@
 //! Concrete arithmetic used by this mode's device self-test.
 use super::*;
 
+#[inline(never)]
 pub fn check_arith_u32_div_var() -> u32 {
     // Two black-boxed operands — forces `div.u32` PTX op (no magic-multiply
     // folding, since the divisor isn't a known constant).
@@ -10,6 +11,7 @@ pub fn check_arith_u32_div_var() -> u32 {
     (a / b == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u32_div_const() -> u32 {
     // Variable dividend, constant divisor — rustc lowers `x / 58` to
     // `mul.hi.u32` (or `mul.wide.u32` + shift) magic-multiply. Same path
@@ -19,6 +21,7 @@ pub fn check_arith_u32_div_const() -> u32 {
     (a / 58 == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u64_div_var() -> u32 {
     // Forces `div.u64` PTX op.
     const EXPECTED: u64 = ARITH_U64_A / 58;
@@ -27,6 +30,7 @@ pub fn check_arith_u64_div_var() -> u32 {
     (a / b == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u64_div_const() -> u32 {
     // Variable dividend, constant divisor — rustc lowers `x / 58` to
     // `mul.hi.u64` (the smoking-gun op). This is THE path base58_encode_32
@@ -36,6 +40,7 @@ pub fn check_arith_u64_div_const() -> u32 {
     (a / 58 == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u32_rem_var() -> u32 {
     // Forces `rem.u32`.
     const EXPECTED: u32 = ARITH_U32_A % 58;
@@ -44,6 +49,7 @@ pub fn check_arith_u32_rem_var() -> u32 {
     (a % b == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u64_rem_var() -> u32 {
     // Forces `rem.u64`.
     const EXPECTED: u64 = ARITH_U64_A % 58;
@@ -52,6 +58,7 @@ pub fn check_arith_u64_rem_var() -> u32 {
     (a % b == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u32_mul_lo() -> u32 {
     // Forces `mul.lo.s32` / `mul.lo.u32` (low 32 bits of u32 × u32).
     const EXPECTED: u32 = ARITH_U32_A.wrapping_mul(ARITH_U32_B);
@@ -60,6 +67,7 @@ pub fn check_arith_u32_mul_lo() -> u32 {
     (a.wrapping_mul(b) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u64_mul_lo() -> u32 {
     // Forces `mul.lo.s64` / `mul.lo.u64` (low 64 bits of u64 × u64). This
     // op is *heavily* used by the failing primitives but is also used by
@@ -71,6 +79,7 @@ pub fn check_arith_u64_mul_lo() -> u32 {
     (a.wrapping_mul(b) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u64_mul_hi() -> u32 {
     // The smoking gun: `(a as u128) * (b as u128) >> 64` lowers to a single
     // `mul.hi.u64` PTX op. Every failing primitive (ed25519 field math,
@@ -85,6 +94,7 @@ pub fn check_arith_u64_mul_hi() -> u32 {
     (hi == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_u128_mul() -> u32 {
     // Full u128 wrapping multiply. Lowers to a sequence of `mul.lo.s64` +
     // `mul.hi.u64` + `mad.lo.s64`. Exercises the carry chain rustc emits
@@ -95,6 +105,7 @@ pub fn check_arith_u128_mul() -> u32 {
     (a.wrapping_mul(b) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_overflowing_add() -> u32 {
     // Three regimes in one slot so any miscompile of `add.cc.u64` /
     // `addc.cc.u64` (the PTX primitives that carry the boolean out) FAILs
@@ -125,6 +136,7 @@ pub fn check_arith_overflowing_add() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_arith_overflowing_sub() -> u32 {
     // No borrow: 5 - 3
     let a = core::hint::black_box(5u64);
@@ -153,6 +165,7 @@ pub fn check_arith_overflowing_sub() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_arith_carry_chain_3limb() -> u32 {
     // Three-limb add chosen so the carry propagates through every limb.
     // [u64::MAX, u64::MAX, 0] + [1, 0, 0] = [0, 0, 1]
@@ -178,6 +191,7 @@ pub fn check_arith_carry_chain_3limb() -> u32 {
     (s0 == 0 && s1 == 0 && s2 == 1) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_widening_mul_pair() -> u32 {
     // Tier-1 slots 38 (lo) and 39 (hi) verify each lane in isolation. This
     // one verifies both lanes come from the *same* widening product, the
@@ -195,6 +209,7 @@ pub fn check_arith_widening_mul_pair() -> u32 {
     (lo == EXPECTED_LO && hi == EXPECTED_HI) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_mad_lo_u64() -> u32 {
     // `a.wrapping_mul(b).wrapping_add(c)` typically folds to a single
     // `mad.lo.u64` PTX op. This is dalek's `m!` macro shape — slot 38 only
@@ -208,6 +223,7 @@ pub fn check_arith_mad_lo_u64() -> u32 {
     (a.wrapping_mul(b).wrapping_add(c) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_mad_hi_u64() -> u32 {
     // High-half MAD: same shape as mad_lo but pulling the upper 64 bits
     // of the widening product before the add. May fold to `mad.hi.u64`.
@@ -221,6 +237,7 @@ pub fn check_arith_mad_hi_u64() -> u32 {
     (hi.wrapping_add(c) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_mul_wide_u32() -> u32 {
     // Both operands start as u32 then widen to u64 for the mul — rustc may
     // emit `mul.wide.u32` (one PTX op, distinct from `mul.lo.u64`). k256's
@@ -231,6 +248,7 @@ pub fn check_arith_mul_wide_u32() -> u32 {
     ((a as u64) * (b as u64) == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_mask_blend_true() -> u32 {
     // The subtle::Choice / CtOption idiom: bool → u64 → wrapping_neg gives
     // an all-1s or all-0s mask; (a & mask) | (b & !mask) selects a or b.
@@ -247,6 +265,7 @@ pub fn check_arith_mask_blend_true() -> u32 {
     (r == ARITH_U64_A) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_mask_blend_false() -> u32 {
     // Same as above but with cond=false — selects b. Splitting true/false
     // into two slots means a bug that breaks only one arm pinpoints
@@ -259,6 +278,7 @@ pub fn check_arith_mask_blend_false() -> u32 {
     (r == ARITH_U64_B) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_var_shr_u64() -> u32 {
     // Runtime shift amount — emits `shr.b64 %rd, %rd, %r` (variable form),
     // distinct from constant-amount shifts which can be folded. Montgomery
@@ -269,6 +289,7 @@ pub fn check_arith_var_shr_u64() -> u32 {
     (a >> n == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_var_shl_u64() -> u32 {
     // Same as var_shr but the other direction (`shl.b64`).
     const EXPECTED: u64 = ARITH_U64_A << 13;
@@ -277,6 +298,7 @@ pub fn check_arith_var_shl_u64() -> u32 {
     (a << n == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_blackbox_identity_u64() -> u32 {
     // The cheapest possible probe: does black_box preserve a u64?
     // No arithmetic of any kind — if this FAILs on GPU + PASSes on CPU,
@@ -288,6 +310,7 @@ pub fn check_arith_blackbox_identity_u64() -> u32 {
     (core::hint::black_box(v) == v) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_blackbox_identity_u32() -> u32 {
     // u32 variant — same probe at half the width in case the bug is
     // type-specific.
@@ -295,6 +318,7 @@ pub fn check_arith_blackbox_identity_u32() -> u32 {
     (core::hint::black_box(v) == v) as u32
 }
 
+#[inline(never)]
 pub fn check_arith_divrem_by_58_pow_5() -> u32 {
     // Slot 59 covers `x / 58` through `x / 58^4`. base58_encode_32's limb
     // update loop divides by `58^5 = 656_356_768` (NEXT_LIMB_DIVISOR),
@@ -350,6 +374,7 @@ pub fn check_arith_divrem_by_58_pow_5() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_arith_i128_chain_add() -> u32 {
     // Slot 40 (u128 wrapping_mul) and slot 49 (widening mul pair) both
     // PASS, but those only exercise a single u128 op. dalek's
@@ -406,6 +431,7 @@ pub fn check_arith_i128_chain_add() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_arith_widening_mul_chain_3term() -> u32 {
     // dalek's `Scalar52::mul_internal` and k256's
     // `FieldElement5x52::mul_inner` accumulate partial products as
@@ -451,6 +477,7 @@ pub fn check_arith_widening_mul_chain_3term() -> u32 {
 // LLVM lowers u128 immediate shifts to multi-step 64-bit shift sequences.
 // Slot 65 (i128 add chain) is fixed but doesn't cover this shape. Slot
 // 55/56 cover u64 var shifts, not u128 immediate shifts.
+#[inline(never)]
 pub fn check_arith_u128_imm_shr_52() -> u32 {
     const SUM: u128 = 0xFEDC_BA98_7654_3210_0123_4567_89AB_CDEF;
     const EXPECTED: u128 = SUM >> 52;

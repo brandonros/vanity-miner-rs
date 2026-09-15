@@ -37,11 +37,13 @@ const KECCAK256_PRIMITIVE_OUTPUT: [u8; 32] = [
     0x01, 0xc3, 0x43, 0x21, 0xa5, 0x3b, 0x29, 0x42, 0x2a, 0xac, 0xde, 0x31, 0x06, 0x43, 0xd3, 0x73,
 ];
 
+#[inline(never)]
 pub fn check_primitive_secp256k1_uncompressed() -> u32 {
     let pub_key = secp256k1_derive_public_key_uncompressed(&SECP256K1_PRIMITIVE_PRIV);
     (pub_key == SECP256K1_PRIMITIVE_UNCOMPRESSED_PUB) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_keccak256() -> u32 {
     let hash = keccak256_64bytes(&KECCAK256_PRIMITIVE_INPUT);
     (hash == KECCAK256_PRIMITIVE_OUTPUT) as u32
@@ -59,6 +61,7 @@ fn ethereum_test() -> EthereumVanityKeyResult {
     generate_and_check_ethereum_vanity_key(&req)
 }
 
+#[inline(never)]
 pub fn check_ethereum_priv() -> u32 {
     let expected: [u8; 32] = [
         0x1c, 0xcf, 0x23, 0x85, 0x14, 0x11, 0x73, 0x04, 0x8c, 0x0d, 0x06, 0xc1, 0x07, 0x08, 0x69,
@@ -68,6 +71,7 @@ pub fn check_ethereum_priv() -> u32 {
     (ethereum_test().private_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_ethereum_pub() -> u32 {
     let expected: [u8; 64] = [
         0x88, 0xf1, 0xff, 0xe7, 0x4d, 0x7c, 0x83, 0xb6, 0xae, 0xe0, 0xc7, 0x0f, 0x42, 0x38, 0xf5,
@@ -79,6 +83,7 @@ pub fn check_ethereum_pub() -> u32 {
     (ethereum_test().public_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_ethereum_address() -> u32 {
     let expected: [u8; 20] = [
         0x55, 0x55, 0x63, 0x59, 0x0c, 0x72, 0x4a, 0x58, 0xf7, 0xbb, 0x48, 0xb6, 0xc8, 0x47, 0xaa,

@@ -1,6 +1,7 @@
 //! Concrete layout probes used by this mode's device self-test.
 use super::*;
 
+#[inline(never)]
 pub fn check_iter_static_table_lookup() -> u32 {
     // Simplest possible probe for `TABLE[byte as usize]`: a single dynamic
     // index into a small static byte slice. No iterator, no &mut, no slice
@@ -11,6 +12,7 @@ pub fn check_iter_static_table_lookup() -> u32 {
     (TABLE[idx] == b'A') as u32
 }
 
+#[inline(never)]
 pub fn check_iter_mut_slice_partial() -> u32 {
     // `for val in &mut buf[..n]` over a partial slice of a stack-resident
     // fixed-size array, writing a constant. Isolates the IterMut codegen
@@ -24,6 +26,7 @@ pub fn check_iter_mut_slice_partial() -> u32 {
     (buf[0] == 0xAA && buf[3] == 0xAA && buf[4] == 0 && buf[7] == 0) as u32
 }
 
+#[inline(never)]
 pub fn check_iter_mut_alphabet_lookup() -> u32 {
     // Combined: `for val in &mut buf[..n] { *val = TABLE[*val as usize]; }`
     // — the exact final-stage pattern in base58_encode_32 that runs even
@@ -38,6 +41,7 @@ pub fn check_iter_mut_alphabet_lookup() -> u32 {
     (buf[0] == b'A' && buf[3] == b'A' && buf[4] == 0 && buf[7] == 0) as u32
 }
 
+#[inline(never)]
 pub fn check_iter_static_slice_lookup() -> u32 {
     // Counterpart to slot 60. Identical shape — single dynamic index into
     // a small static byte table — but typed as `&'static [u8]` (slice)
@@ -52,6 +56,7 @@ pub fn check_iter_static_slice_lookup() -> u32 {
     (TABLE[idx] == b'A') as u32
 }
 
+#[inline(never)]
 pub fn check_dynamic_index_write() -> u32 {
     // base58_encode_32's dynamic-growth pattern in isolation:
     //   while remaining_carry > 0 && limb_count < N {
@@ -119,6 +124,7 @@ pub fn check_dynamic_index_write() -> u32 {
     1
 }
 
+#[inline(never)]
 pub fn check_static_depth4_newtype_nesting() -> u32 {
     let idx = core::hint::black_box(2usize);
     let v = NESTED_ONE_PROBE.0.limbs[idx].0;
@@ -132,6 +138,7 @@ pub fn check_static_depth4_newtype_nesting() -> u32 {
 //       let output_offset = idx * DIGITS_PER_LIMB;
 //       output[output_offset + i] = ...;
 //   }
+#[inline(never)]
 pub fn check_reverse_range_write() -> u32 {
     let limb_count: usize = core::hint::black_box(3);
     let mut out = [0u32; 10];
@@ -151,6 +158,7 @@ pub fn check_reverse_range_write() -> u32 {
     (out == EXPECTED) as u32
 }
 
+#[inline(never)]
 pub fn check_index_trait_dispatch() -> u32 {
     let mut p = IdxProbe([0u64; 5]);
     let idx = core::hint::black_box(2usize);
@@ -160,6 +168,7 @@ pub fn check_index_trait_dispatch() -> u32 {
     (read == val) as u32
 }
 
+#[inline(never)]
 pub fn check_named_field_struct_return() -> u32 {
     let input = core::hint::black_box([0u8; 32]);
     let out = make_wrap_named(input);
@@ -185,6 +194,7 @@ pub fn check_named_field_struct_return() -> u32 {
 // rolls — slot 107 uses manual swap pairs, while the original calls
 // `output[..result_len].reverse()`. If 108 FAILs, that's the Bug-41
 // minimal repro.
+#[inline(never)]
 pub fn check_slice_reverse_partial() -> u32 {
     let mut arr = [0u8; 64];
     // Populate a non-trivial prefix with a recognizable pattern

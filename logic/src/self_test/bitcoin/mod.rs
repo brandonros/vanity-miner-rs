@@ -42,16 +42,19 @@ const SHA256_PRIMITIVE_OUTPUT_32: [u8; 32] = [
     0xbd, 0xa7, 0x93, 0x07, 0xdc, 0x42, 0x4c, 0x0d, 0x9f, 0xeb, 0xd2, 0x7b, 0x08, 0xe1, 0xbf, 0x78,
 ];
 
+#[inline(never)]
 pub fn check_primitive_secp256k1_compressed() -> u32 {
     let pub_key = secp256k1_derive_public_key(&SECP256K1_PRIMITIVE_PRIV);
     (pub_key == SECP256K1_PRIMITIVE_COMPRESSED_PUB) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_ripemd160() -> u32 {
     let hash = ripemd160_32bytes_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_32));
     (hash == RIPEMD160_PRIMITIVE_OUTPUT) as u32
 }
 
+#[inline(never)]
 pub fn check_primitive_sha256_32() -> u32 {
     let hash = sha256_32_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_32));
     (hash == SHA256_PRIMITIVE_OUTPUT_32) as u32
@@ -69,6 +72,7 @@ fn bitcoin_test() -> BitcoinVanityKeyResult {
     generate_and_check_bitcoin_vanity_key(&req)
 }
 
+#[inline(never)]
 pub fn check_bitcoin_priv() -> u32 {
     let expected: [u8; 32] = [
         0x36, 0x32, 0xf6, 0x6f, 0xed, 0x3b, 0x77, 0xf3, 0x30, 0x9c, 0x86, 0xd7, 0x08, 0xfc, 0xce,
@@ -78,6 +82,7 @@ pub fn check_bitcoin_priv() -> u32 {
     (bitcoin_test().private_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_bitcoin_pub() -> u32 {
     let expected: [u8; 33] = [
         0x02, 0x54, 0x38, 0x15, 0x68, 0x27, 0x6c, 0x32, 0xfe, 0x4a, 0x16, 0x77, 0xbb, 0x97, 0xb2,
@@ -87,6 +92,7 @@ pub fn check_bitcoin_pub() -> u32 {
     (bitcoin_test().public_key == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_bitcoin_pkh() -> u32 {
     let expected: [u8; 20] = [
         0x00, 0x01, 0xb5, 0x3d, 0x6d, 0x26, 0xf1, 0x8c, 0x85, 0xbf, 0xf2, 0xac, 0x3c, 0x57, 0x1e,
@@ -95,12 +101,14 @@ pub fn check_bitcoin_pkh() -> u32 {
     (bitcoin_test().public_key_hash == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_bitcoin_encoded() -> u32 {
     let expected: &[u8] = b"bc1qqqqm20tdymccepdl72krc4c7ulsv3pllzju9s4";
     let btc = bitcoin_test();
     (btc.encoded_len == expected.len() && bytes_eq_prefix(&btc.encoded_public_key, expected)) as u32
 }
 
+#[inline(never)]
 pub fn check_bitcoin_matches() -> u32 {
     bitcoin_test().matches as u32
 }
@@ -114,6 +122,7 @@ const BITCOIN_TEST_PRIV: [u8; 32] = [
     0x07, 0x1a, 0x61, 0xa1, 0xa9, 0x4a, 0xdd, 0x0c, 0xb4, 0x5f, 0x95, 0x7c, 0x34, 0x67, 0xd1, 0xdc,
 ];
 
+#[inline(never)]
 pub fn check_wif_compressed_mainnet() -> u32 {
     let mut wif_buf = [0u8; 64];
     let n = private_key_to_wif(&BITCOIN_TEST_PRIV, true, false, &mut wif_buf);
@@ -124,6 +133,7 @@ pub fn check_wif_compressed_mainnet() -> u32 {
         )) as u32
 }
 
+#[inline(never)]
 pub fn check_wif_uncompressed_mainnet() -> u32 {
     let mut wif_buf = [0u8; 64];
     let n = private_key_to_wif(&BITCOIN_TEST_PRIV, false, false, &mut wif_buf);
@@ -134,6 +144,7 @@ pub fn check_wif_uncompressed_mainnet() -> u32 {
         )) as u32
 }
 
+#[inline(never)]
 pub fn check_wif_compressed_testnet() -> u32 {
     let mut wif_buf = [0u8; 64];
     let n = private_key_to_wif(&BITCOIN_TEST_PRIV, true, true, &mut wif_buf);
@@ -144,6 +155,7 @@ pub fn check_wif_compressed_testnet() -> u32 {
         )) as u32
 }
 
+#[inline(never)]
 pub fn check_wif_uncompressed_testnet() -> u32 {
     let mut wif_buf = [0u8; 64];
     let n = private_key_to_wif(&BITCOIN_TEST_PRIV, false, true, &mut wif_buf);
@@ -172,6 +184,7 @@ const BECH32_P2WPKH_HASH: [u8; 20] = [
 
 const BECH32_P2WPKH_EXPECTED: &[u8] = b"bc1qgcz8ez3a3md3xnplrgl86edsl46zruf8mwx56m";
 
+#[inline(never)]
 pub fn check_bech32_p2wpkh() -> u32 {
     let mut out = [0u8; 64];
     let n = encode_p2wpkh_address(&BECH32_P2WPKH_HASH, true, &mut out);

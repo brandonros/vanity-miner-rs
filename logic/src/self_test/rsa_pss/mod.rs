@@ -5,6 +5,7 @@ use super::record_candidate;
 use core::hint::black_box;
 use fixtures::*;
 
+#[inline(never)]
 pub fn check_rsa_pss_sha256() -> u32 {
     u32::from((|| {
         use crate::crypto::sha256::Sha256;
@@ -13,6 +14,7 @@ pub fn check_rsa_pss_sha256() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_mgf1_partial_block() -> u32 {
     u32::from((|| {
         let mut out = [0; 50];
@@ -21,6 +23,7 @@ pub fn check_rsa_pss_mgf1_partial_block() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_salt32_encoding() -> u32 {
     u32::from((|| {
         let salt = black_box(core::array::from_fn::<_, 32, _>(|i| i as u8));
@@ -36,6 +39,7 @@ pub fn check_rsa_pss_salt32_encoding() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_empty_salt_encoding() -> u32 {
     u32::from((|| {
         let salt = black_box([0u8; 0]);
@@ -51,6 +55,7 @@ pub fn check_rsa_pss_empty_salt_encoding() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_maximum_salt_encoding() -> u32 {
     u32::from((|| {
         let salt = black_box([0x42; 222]);
@@ -66,6 +71,7 @@ pub fn check_rsa_pss_maximum_salt_encoding() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_oversized_salt_rejected() -> u32 {
     u32::from((|| {
         let mut out = [0xa5; 256];
@@ -79,6 +85,7 @@ pub fn check_rsa_pss_oversized_salt_rejected() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_salt_carry() -> u32 {
     u32::from((|| {
         let mut out = [0; 2];
@@ -92,6 +99,7 @@ pub fn check_rsa_pss_salt_carry() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_crt_known_answer() -> u32 {
     let key = self_test_crt_key();
     let mut input = [0; 256];
@@ -99,6 +107,7 @@ pub fn check_rsa_pss_crt_known_answer() -> u32 {
     u32::from(key.private_operation(&black_box(input)) == Some(SELF_TEST_RSA_SIGNATURE_65))
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_crt_fault_rejected() -> u32 {
     // Deliberately composite p simulates inconsistent CRT arithmetic while
     // leaving constructor congruence checks satisfied. The final public-operation
@@ -116,6 +125,7 @@ pub fn check_rsa_pss_crt_fault_rejected() -> u32 {
     u32::from(key.private_operation(&black_box(input)).is_none())
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_crt_modulus_rejected() -> u32 {
     let key = self_test_crt_key();
     u32::from(key.private_operation(&black_box(key.modulus())).is_none())
@@ -166,6 +176,7 @@ fn self_test_digest_rsa_pss() -> [u8; 32] {
     h.finalize()
 }
 
+#[inline(never)]
 pub fn check_rsa_pss_end_to_end() -> u32 {
     u32::from(
         self_test_digest_rsa_pss()

@@ -5,6 +5,7 @@ use super::record_candidate;
 use core::hint::black_box;
 use fixtures::*;
 
+#[inline(never)]
 pub fn check_p256_signature_rfc6979_sample() -> u32 {
     u32::from((|| {
         crate::crypto::p256::signatures::sign_message(
@@ -14,6 +15,7 @@ pub fn check_p256_signature_rfc6979_sample() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_rfc6979_test() -> u32 {
     u32::from((|| {
         crate::crypto::p256::signatures::sign_message(
@@ -23,6 +25,7 @@ pub fn check_p256_signature_rfc6979_test() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_ephemeral_r() -> u32 {
     u32::from((|| {
         let mut nonce = [0; 32];
@@ -32,6 +35,7 @@ pub fn check_p256_signature_ephemeral_r() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_ephemeral_signature() -> u32 {
     u32::from((|| {
         let mut one = [0; 32];
@@ -44,6 +48,7 @@ pub fn check_p256_signature_ephemeral_signature() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_zero_nonce_rejected() -> u32 {
     u32::from((|| {
         crate::crypto::p256::signatures::sign_digest_ephemeral(
@@ -55,6 +60,7 @@ pub fn check_p256_signature_zero_nonce_rejected() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_low_s() -> u32 {
     u32::from((|| {
         use crate::crypto::p256::signatures::{SForm, SignatureTarget, matching_representation};
@@ -68,6 +74,7 @@ pub fn check_p256_signature_low_s() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_high_s() -> u32 {
     u32::from((|| {
         use crate::crypto::p256::signatures::{SForm, SignatureTarget, matching_representation};
@@ -81,6 +88,7 @@ pub fn check_p256_signature_high_s() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_message_window_carry() -> u32 {
     u32::from((|| {
         crate::search::message_window::hash_message_counter(
@@ -92,6 +100,7 @@ pub fn check_p256_signature_message_window_carry() -> u32 {
     })())
 }
 
+#[inline(never)]
 pub fn check_p256_signature_ephemeral_hmac() -> u32 {
     u32::from((|| {
         let d = crate::search::candidate_derivation::CandidateDeriver::new(
@@ -142,6 +151,7 @@ fn self_test_digest_p256_signature() -> [u8; 32] {
     h.finalize()
 }
 
+#[inline(never)]
 pub fn check_p256_signature_end_to_end() -> u32 {
     u32::from(
         self_test_digest_p256_signature()

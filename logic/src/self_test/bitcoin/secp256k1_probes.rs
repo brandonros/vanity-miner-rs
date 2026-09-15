@@ -8,6 +8,7 @@ use super::*;
 // Wrapped in ManuallyDrop because SecretKey zeroizes on Drop and
 // cuda-oxide does not yet emit device-side drop_in_place (same pattern
 // as logic/src/secp256k1.rs).
+#[inline(never)]
 pub fn check_k256_secret_from_bytes_one() -> u32 {
     use core::mem::ManuallyDrop;
     use k256::SecretKey;
@@ -23,6 +24,7 @@ pub fn check_k256_secret_from_bytes_one() -> u32 {
     }
 }
 
+#[inline(never)]
 pub fn check_k256_derive_scalar_one() -> u32 {
     let mut priv_bytes = [0u8; 32];
     priv_bytes[31] = 1;
@@ -30,6 +32,7 @@ pub fn check_k256_derive_scalar_one() -> u32 {
     (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+#[inline(never)]
 pub fn check_k256_derive_scalar_two() -> u32 {
     let mut priv_bytes = [0u8; 32];
     priv_bytes[31] = 2;
@@ -42,6 +45,7 @@ pub fn check_k256_derive_scalar_two() -> u32 {
 // chain in isolation. ProjectivePoint::GENERATOR has z=1, so the affine
 // conversion's field inversion is trivial; this primarily exercises the
 // FieldElement→bytes serialization + parity-bit pack.
+#[inline(never)]
 pub fn check_k256_encode_generator() -> u32 {
     use k256::ProjectivePoint;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -62,6 +66,7 @@ pub fn check_k256_encode_generator() -> u32 {
 // point with z != 1, so the subsequent `to_affine()` requires a real
 // field inversion. 78 PASS + 79 FAIL = doubling formula or non-trivial
 // field inversion broken (5-wide variant of Bug C suspect).
+#[inline(never)]
 pub fn check_k256_double_generator() -> u32 {
     use k256::ProjectivePoint;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -82,6 +87,7 @@ pub fn check_k256_double_generator() -> u32 {
 // crypto-bigint (different layout than dalek's `Scalar52([u64; 5])`),
 // so this distinguishes Bug A (dalek-specific newtype shape) from a
 // broader Bug A' (any static-resident scalar repr).
+#[inline(never)]
 pub fn check_k256_scalar_one_round_trip() -> u32 {
     use k256::Scalar;
     use k256::elliptic_curve::PrimeField;
@@ -101,6 +107,7 @@ pub fn check_k256_scalar_one_round_trip() -> u32 {
 // inversion). Tests cross-crate const access for AffinePoint::GENERATOR
 // + the encoded_point serialization chain. If 93 PASSes and 78 FAILs,
 // the bug in 78 is specifically in `to_affine()` (the field inversion).
+#[inline(never)]
 pub fn check_k256_affine_generator_encode() -> u32 {
     use k256::AffinePoint;
     use k256::elliptic_curve::sec1::ToEncodedPoint;
@@ -115,6 +122,7 @@ pub fn check_k256_affine_generator_encode() -> u32 {
     (out == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
+#[inline(never)]
 pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
     use k256::EncodedPoint;
     use k256::elliptic_curve::FieldBytes;

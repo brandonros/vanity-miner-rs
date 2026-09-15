@@ -15,6 +15,7 @@ const SHA256_PRIMITIVE_OUTPUT_VARIABLE: [u8; 32] = [
     0xe1, 0xcf, 0x0a, 0x66, 0x03, 0xf8, 0xb6, 0x7c, 0x74, 0x8a, 0x5d, 0x21, 0x1e, 0x48, 0xb2, 0x9d,
 ];
 
+#[inline(never)]
 pub fn check_primitive_sha256_variable() -> u32 {
     let hash = sha256_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_33));
     (hash == SHA256_PRIMITIVE_OUTPUT_VARIABLE) as u32
@@ -35,6 +36,7 @@ fn shallenge_test() -> ShallengeResult {
     generate_and_check_shallenge(&req)
 }
 
+#[inline(never)]
 pub fn check_shallenge_hash() -> u32 {
     let expected: [u8; 32] = [
         0xc3, 0x75, 0x0f, 0x87, 0x11, 0xbf, 0x80, 0x9f, 0x46, 0xde, 0x1f, 0x01, 0xec, 0xeb, 0x6f,
@@ -44,30 +46,35 @@ pub fn check_shallenge_hash() -> u32 {
     (shallenge_test().hash == expected) as u32
 }
 
+#[inline(never)]
 pub fn check_shallenge_nonce_len() -> u32 {
     // This slot tests length arithmetic; hash and nonce generation have separate checks.
     let username_len = core::hint::black_box(10usize);
     (crate::modes::shallenge::shallenge_nonce_len(username_len) == 21) as u32
 }
 
+#[inline(never)]
 pub fn check_shallenge_is_better() -> u32 {
     shallenge_test().is_better as u32
 }
 
 // === compare_hashes (lt / gt / eq branches) ===
 
+#[inline(never)]
 pub fn check_compare_hashes_lt() -> u32 {
     let zero = core::hint::black_box([0u8; 32]);
     let max = core::hint::black_box([0xffu8; 32]);
     (compare_hashes(&zero, &max) == -1) as u32
 }
 
+#[inline(never)]
 pub fn check_compare_hashes_gt() -> u32 {
     let zero = core::hint::black_box([0u8; 32]);
     let max = core::hint::black_box([0xffu8; 32]);
     (compare_hashes(&max, &zero) == 1) as u32
 }
 
+#[inline(never)]
 pub fn check_compare_hashes_eq() -> u32 {
     let a = core::hint::black_box([0u8; 32]);
     let b = core::hint::black_box([0u8; 32]);
@@ -83,6 +90,7 @@ const XOROSHIRO_NONCE_EXPECTED: [u8; 21] = [
     0x47, 0x53, 0x4a, 0x67, 0x6d,
 ];
 
+#[inline(never)]
 pub fn check_xoroshiro_base64_nonce() -> u32 {
     let mut nonce = [0u8; 21];
     generate_base64_nonce(0, 12345, &mut nonce);

@@ -1,6 +1,7 @@
 //! Concrete base58 probes used by this mode's device self-test.
 use super::*;
 
+#[inline(never)]
 pub fn check_base58_var_len_leading_zero() -> u32 {
     let mut out = [0u8; 64];
     let n = base58_encode(&BASE58_LEADZERO_INPUT, &mut out);

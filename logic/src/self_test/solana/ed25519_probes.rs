@@ -10,6 +10,7 @@ use super::*;
 //   byte[0]  &= 0xF8        (clear bits 0,1,2)
 //   byte[31] &= 0x7F        (clear bit 7)
 //   byte[31] |= 0x40        (set bit 6)
+#[inline(never)]
 pub fn check_dalek_clamp_integer() -> u32 {
     let input = core::hint::black_box([0xFFu8; 32]);
     let clamped = curve25519_dalek::scalar::clamp_integer(input);
@@ -27,6 +28,7 @@ pub fn check_dalek_clamp_integer() -> u32 {
 // is a no-op and `to_bytes()` must return the input unchanged. Tests
 // Scalar52 deserialization + canonical encoding without exercising any
 // field multiplication or scalar mul.
+#[inline(never)]
 pub fn check_dalek_scalar_round_trip_one() -> u32 {
     let mut input = [0u8; 32];
     input[0] = 1;
@@ -35,6 +37,7 @@ pub fn check_dalek_scalar_round_trip_one() -> u32 {
     (bytes == input) as u32
 }
 
+#[inline(never)]
 pub fn check_dalek_mul_base_scalar_one() -> u32 {
     let mut scalar_bytes = [0u8; 32];
     scalar_bytes[0] = 1;
@@ -46,6 +49,7 @@ pub fn check_dalek_mul_base_scalar_one() -> u32 {
 
 // Slot 84 — Rung A: pure byte→limbs unpack. No arithmetic, no statics
 // other than the const masks.
+#[inline(never)]
 pub fn check_dalek_scalar52_from_bytes() -> u32 {
     let mut bytes = [0u8; 32];
     bytes[0] = 1;
@@ -58,6 +62,7 @@ pub fn check_dalek_scalar52_from_bytes() -> u32 {
 // `montgomery_reduce_no_sub` variant so this slot's result is directly
 // comparable to the v1.46 run where it PASSed. Slot 90 calls the same
 // pipeline WITH the sub — if 85 PASSes and 90 FAILs, the bug is in sub.
+#[inline(never)]
 pub fn check_dalek_scalar52_montgomery_reduce_r() -> u32 {
     let r = bisect_scalar52::R;
     let mut widened = [0u128; 9];
@@ -71,6 +76,7 @@ pub fn check_dalek_scalar52_montgomery_reduce_r() -> u32 {
 
 // Slot 86 — Rungs B+C: mul_internal + montgomery_reduce_no_sub.
 // Keeps "without sub" semantics for direct comparison to the v1.46 run.
+#[inline(never)]
 pub fn check_dalek_scalar52_mul_internal_then_reduce_one_r() -> u32 {
     use bisect_scalar52::Scalar52;
     const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
@@ -82,6 +88,7 @@ pub fn check_dalek_scalar52_mul_internal_then_reduce_one_r() -> u32 {
 }
 
 // Slot 87 — Rung D: limbs→bytes pack. Inverse of slot 84.
+#[inline(never)]
 pub fn check_dalek_scalar52_as_bytes_one() -> u32 {
     use bisect_scalar52::Scalar52;
     const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
@@ -96,6 +103,7 @@ pub fn check_dalek_scalar52_as_bytes_one() -> u32 {
 // limbs, no underflow, no conditional add-L. If this FAILs, the basic
 // borrow propagation is broken (Slot 47's overflowing_sub is a SINGLE
 // op; this is a 5-limb chain).
+#[inline(never)]
 pub fn check_dalek_scalar52_sub_no_underflow() -> u32 {
     let r = core::hint::black_box(bisect_scalar52::R);
     let result = bisect_scalar52::Scalar52::sub(&r, &r);
@@ -108,6 +116,7 @@ pub fn check_dalek_scalar52_sub_no_underflow() -> u32 {
 // L - 1 in 5x52-bit limbs:
 //   limb[0] = 0x0002631a5cf5d3ec  (L[0] - 1)
 //   limb[1..4] = L[1..4] unchanged
+#[inline(never)]
 pub fn check_dalek_scalar52_sub_with_underflow() -> u32 {
     use bisect_scalar52::Scalar52;
     let zero = core::hint::black_box(Scalar52::ZERO);
@@ -127,6 +136,7 @@ pub fn check_dalek_scalar52_sub_with_underflow() -> u32 {
 // included. Compare to slot 85 (same input, sub-less version): if 85
 // PASS and 90 FAIL, the bug is in `Scalar52::sub` specifically — that's
 // also what makes the real dalek path (slot 71) FAIL.
+#[inline(never)]
 pub fn check_dalek_scalar52_montgomery_reduce_with_sub() -> u32 {
     let r = bisect_scalar52::R;
     let mut widened = [0u128; 9];
@@ -142,6 +152,7 @@ pub fn check_dalek_scalar52_montgomery_reduce_with_sub() -> u32 {
 // a `pub const Scalar` followed by trivial byte copy (Scalar's internal
 // rep IS the bytes; to_bytes just copies them out). No reduce, no math.
 // If this FAILs, the bug is at the cross-crate const-access layer.
+#[inline(never)]
 pub fn check_dalek_scalar_one_to_bytes_direct() -> u32 {
     let s = core::hint::black_box(curve25519_dalek::Scalar::ONE);
     let bytes = s.to_bytes();
@@ -155,6 +166,7 @@ pub fn check_dalek_scalar_one_to_bytes_direct() -> u32 {
 // 71 with a different input value. If 102 PASS but 71 FAIL, the bug is
 // input-dependent (only non-zero scalars). If 102 FAIL too, the bug is
 // general to any Scalar::from_bytes_mod_order call.
+#[inline(never)]
 pub fn check_dalek_scalar_round_trip_zero() -> u32 {
     let input = [0u8; 32];
     let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(core::hint::black_box(input));
@@ -167,6 +179,7 @@ pub fn check_dalek_scalar_round_trip_zero() -> u32 {
 // `Scalar52::from_bytes_wide` + `montgomery_mul(R)` / `montgomery_mul(RR)`
 // composition, NOT `Scalar::reduce`. For all-zero input the result is
 // canonically 0.
+#[inline(never)]
 pub fn check_dalek_scalar_from_bytes_wide_zero() -> u32 {
     let input = [0u8; 64];
     let scalar = curve25519_dalek::Scalar::from_bytes_mod_order_wide(&core::hint::black_box(input));
@@ -180,6 +193,7 @@ pub fn check_dalek_scalar_from_bytes_wide_zero() -> u32 {
 // Disambiguates: is the Scalar VALUE correct, or is `to_bytes` broken?
 //   If 109 PASS but 102 FAIL → bug is specifically in `to_bytes`.
 //   If 109 FAIL → the Scalar value from `from_bytes_mod_order` is wrong.
+#[inline(never)]
 pub fn check_dalek_scalar_eq_zero() -> u32 {
     use curve25519_dalek::Scalar;
     let input = core::hint::black_box([0u8; 32]);
@@ -192,6 +206,7 @@ pub fn check_dalek_scalar_eq_zero() -> u32 {
 // PartialEq, no function call producing a Scalar. If FAIL, dalek's
 // PartialEq impl itself is broken; if PASS, slot 109's FAIL is
 // genuinely from from_bytes_mod_order returning a non-zero value.
+#[inline(never)]
 pub fn check_dalek_zero_eq_zero() -> u32 {
     use curve25519_dalek::Scalar;
     let a = core::hint::black_box(Scalar::ZERO);
@@ -205,6 +220,7 @@ pub fn check_dalek_zero_eq_zero() -> u32 {
 // `CtOption::Some(Scalar { bytes: [0; 32] })`. If 112 PASSes but slot
 // 109 FAILs, the bug is in `reduce()` specifically (not the wider
 // Scalar construction).
+#[inline(never)]
 pub fn check_dalek_from_canonical_zero() -> u32 {
     use curve25519_dalek::Scalar;
     let opt = Scalar::from_canonical_bytes(core::hint::black_box([0u8; 32]));
@@ -221,6 +237,7 @@ pub fn check_dalek_from_canonical_zero() -> u32 {
 // 84 covered value=1; this is the analogous zero variant. If FAIL,
 // limb-unpack of all-zero bytes is broken (likely a const-fold or zero-
 // special-case codegen). If PASS, the unpack step is not Bug-71's locus.
+#[inline(never)]
 pub fn check_dalek_scalar52_from_bytes_zero() -> u32 {
     let bytes = core::hint::black_box([0u8; 32]);
     let s = bisect_scalar52::Scalar52::from_bytes(&bytes);
@@ -230,6 +247,7 @@ pub fn check_dalek_scalar52_from_bytes_zero() -> u32 {
 // Slot 114: `Scalar52::mul_internal(ZERO, R)` via the verbatim port. The
 // 5x5 widening multiply matrix should produce all-zero u128 limbs when
 // one operand is zero. Slot 86 covered ONE * R; this is the zero case.
+#[inline(never)]
 pub fn check_dalek_scalar52_mul_internal_zero() -> u32 {
     use bisect_scalar52::Scalar52;
     let zero = core::hint::black_box(Scalar52::ZERO);
@@ -243,6 +261,7 @@ pub fn check_dalek_scalar52_mul_internal_zero() -> u32 {
 // covered widened R; slot 90 covered montgomery_reduce-with-sub on R.
 // This tests the zero-input variant, which exercises the underflow-mask
 // + conditional-add-L branch differently.
+#[inline(never)]
 pub fn check_dalek_scalar52_montgomery_reduce_zero() -> u32 {
     let widened = core::hint::black_box([0u128; 9]);
     let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
@@ -252,6 +271,7 @@ pub fn check_dalek_scalar52_montgomery_reduce_zero() -> u32 {
 // Slot 116: `Scalar52::ZERO.as_bytes() == [0; 32]` — pack of zero via
 // the verbatim port. Slot 87 covered pack of ONE. Completing this
 // confirms every individual reduce primitive works on zero in isolation.
+#[inline(never)]
 pub fn check_dalek_scalar52_as_bytes_zero() -> u32 {
     use bisect_scalar52::Scalar52;
     let zero = core::hint::black_box(Scalar52::ZERO);
@@ -266,6 +286,7 @@ pub fn check_dalek_scalar52_as_bytes_zero() -> u32 {
 // (which slots 113-115 individually doing so suggests), Bug-71 is
 // genuinely cross-crate-only: only the real-dalek monomorphization of
 // these same steps fires the miscompile.
+#[inline(never)]
 pub fn check_dalek_reduce_pipeline_zero() -> u32 {
     use bisect_scalar52::{R, Scalar52};
     let bytes = core::hint::black_box([0u8; 32]);
