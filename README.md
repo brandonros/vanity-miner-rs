@@ -68,11 +68,20 @@ Rebuild PTX/CUBIN overrides after kernel interface changes.
 
 ### Apple Silicon
 
-Build with `cumetal` instead of `gpu`. CuMetal supports the four original search
-modes and the numbered self-tests. Supply `--ptx FILE` with `cumetalc` available,
-or `--module-dir DIR` containing compiled Metal modules and ABI sidecars. Use
-`--help` for runtime library and launch options. RSA/P-256 search commands are
-not exposed by this backend.
+Build with `cumetal` instead of `gpu`, plus the desired mode features. All eight
+search commands and the numbered self-tests have CuMetal host dispatch. Supply
+`--ptx DIR` containing separately compiled PTX modules, with `cumetalc` available,
+or `--module-dir DIR` containing ENTRY.metal files and ABI sidecars. Translation
+uses the typed backend. `--ptx FILE` also accepts one selected mode's module.
+RSA/P-256 searches use 64-candidate shared-winner batches and the same host
+verification as CUDA. `--batches N` bounds launches; `--verify` additionally checks
+every candidate against CPU logic. Wiring and compilation alone do not establish
+GPU numerical correctness; validate the selected mode on your hardware.
+Current Apple M5 validation with CuMetal contribution commit `ddf496c` finds
+compiler blockers in all four RSA/P-256 production modules: pointer/integer
+mismatches in generated Metal for public-key/modulus searches, and undefined
+registers at control-flow joins for signature searches. These commands have real
+device dispatch but are not yet validated working searches on CuMetal.
 
 `gpu` and `cumetal` are mutually exclusive; do not use `--all-features`.
 
@@ -170,13 +179,25 @@ boundary, and regression checks. Shared RSA/P-256 constants live in `fixtures.rs
 the same numbered slots. Each mode is compiled separately into its own PTX file;
 the CLI embeds the selected modules and loads the appropriate one for each group.
 Each kernel feature enables only its matching logic self-tests and mode dependencies.
-The standalone nonce reproduction shares the Shallenge module.
+The standalone nonce reproduction uses the kernel-only `repro_nonce_sequence`
+feature; it is not included in mode self-tests.
 Shared primitives and compiler regressions have one
 owner; checks are not duplicated across modes. With all groups enabled, CPU runs report 157 passes with no skips.
 
+GPU slot 155 (RSA-PSS end-to-end candidate pipeline) is temporarily disabled and
+reported as SKIP. Its isolated LLVM 21 build took 429 seconds, peaked near 7.1 GiB,
+and produced about 30 MiB of PTX; the combined RSA-PSS self-test could run out of
+memory. These measurements predate the SHA-256 replacement. Slots 135–144 still
+exercise SHA-256, PSS and CRT on GPU; the full slot 155 fixture still runs on CPU.
+With all other checks passing, GPU runs report 156 passes and one skip. Restore
+its kernel call once the compile-time blow-up is resolved.
+
 Standalone GPU artifacts are written to `target/llvm21/release/ptx/` (or
 `target/llvm7/release/ptx/`). The selected `self_test_<mode>.ptx` files hold the
-self-tests; `kernels.ptx` holds production kernels when search modes are enabled.
+self-tests. Production files are `solana.ptx`, `bitcoin.ptx`, `ethereum.ptx`,
+`shallenge.ptx`, `p256_public_key.ptx`, `p256_signature.ptx`, `rsa_pss.ptx`, and
+`rsa_modulus.ptx`, for the selected features. Each file is built separately with
+one feature and contains one kernel entry. There is no combined production PTX.
 To override the embedded self-tests, set `PTX_PATH` to this directory and leave
 `CUBIN_PATH` unset. CuMetal accepts the same directory through `--ptx`.
 

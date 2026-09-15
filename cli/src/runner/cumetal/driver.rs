@@ -105,6 +105,7 @@ impl Driver {
             driver: self.clone(),
             handle: ptr::null_mut(),
             function: ptr::null_mut(),
+            temporary: None,
         };
         unsafe {
             check((self.load)(&mut m.handle, path.as_ptr()), "cuModuleLoad")?;
@@ -131,6 +132,18 @@ pub struct Buffer {
     size: usize,
 }
 impl Buffer {
+    #[cfg(feature = "crypto-cli")]
+    pub fn clear(&self) -> Result<(), Error> {
+        let zeros = vec![0u8; self.size + 32];
+        unsafe {
+            check((self.driver.sync)(), "cuCtxSynchronize")?;
+            check(
+                (self.driver.to_device)(self.base, zeros.as_ptr().cast(), zeros.len()),
+                "cuMemcpyHtoD",
+            )
+        }
+    }
+
     pub fn pointer(&self) -> u64 {
         self.base + 16
     }
@@ -162,6 +175,7 @@ impl Drop for Buffer {
     }
 }
 pub struct Module {
+    pub(super) temporary: Option<super::TemporaryDirectory>,
     driver: Rc<Driver>,
     handle: Handle,
     function: Handle,

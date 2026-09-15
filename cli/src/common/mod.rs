@@ -54,7 +54,7 @@ pub use stats::*;
 ))]
 pub use validation::*;
 
-#[cfg(all(feature = "crypto-cli", not(feature = "cumetal")))]
+#[cfg(feature = "crypto-cli")]
 pub(crate) mod search_session;
 
 #[cfg(feature = "gpu")]

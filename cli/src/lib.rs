@@ -37,3 +37,5 @@ pub mod stats;
 
 #[cfg(feature = "self_test_support")]
 pub mod self_test_suite;
+
+pub mod kernel_modules;

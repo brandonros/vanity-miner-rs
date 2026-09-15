@@ -16,8 +16,8 @@ pub struct GpuContext {
 }
 
 impl GpuContext {
-    pub fn new(ordinal: usize) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        Self::with_module(ordinal, || super::cuda_module::load_module(ordinal))
+    pub fn new(ordinal: usize, module: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        Self::with_module(ordinal, || super::cuda_module::load_module(ordinal, module))
     }
 
     #[cfg(feature = "self_test_support")]

@@ -79,7 +79,6 @@ fn build_gpu() {
     let (self_tests, production): (Vec<_>, Vec<_>) = kernel_features
         .into_iter()
         .partition(|name| name.starts_with("self_test_"));
-    let production_features = production.join(",");
     let mut kernel_args = vec!["--no-default-features".to_owned(), "--locked".to_owned()];
     // Legacy libnvvm rejects vector bswap emitted while optimizing HMAC at O3.
     // Keep the workaround in the nested kernel build, preserving host and
@@ -100,8 +99,7 @@ fn build_gpu() {
         NvvmArch::Compute89
     };
 
-    // Keep each libNVVM invocation bounded to one self-test mode. Production
-    // kernels retain their existing feature-selected build.
+    // Every selected feature gets its own libNVVM invocation and PTX module.
     let build = |name: &str, features: &str| {
         let mut args = kernel_args.clone();
         args.extend(["--features".to_owned(), features.to_owned()]);
@@ -110,7 +108,7 @@ fn build_gpu() {
             .arch(arch)
             .build_args(&args)
             .copy_to(&ptx)
-            .final_module_path(out_path.join("final-module.ll"))
+            .final_module_path(out_path.join(format!("{name}.ll")))
             .emit_llvm_ir(true)
             .build()
             .unwrap();
@@ -120,31 +118,24 @@ fn build_gpu() {
     // beside the host binary as well as embedding the build-specific copies.
     let artifacts = out_path.ancestors().nth(3).unwrap().join("ptx");
     std::fs::create_dir_all(&artifacts).unwrap();
-    if cfg!(feature = "self_test_support") {
-        let mut embedded = String::from(
-            "fn embedded_self_test_ptx(name: &str) -> Option<&'static str> { match name {\n",
-        );
-        for &name in &self_tests {
-            let ptx = build(name, name);
-            std::fs::copy(&ptx, artifacts.join(format!("{name}.ptx"))).unwrap();
-            embedded.push_str(&format!(
-                "{name:?} => Some(include_str!({:?})),\n",
-                ptx.to_str().unwrap()
-            ));
-        }
-        embedded.push_str("_ => None, } }\n");
-        std::fs::write(out_path.join("self_test_ptx.rs"), embedded).unwrap();
+    // Retire the former combined artifact so it cannot be mistaken for current output.
+    let combined = artifacts.join("kernels.ptx");
+    if combined.exists() {
+        std::fs::remove_file(combined).unwrap();
     }
-    let ptx_path = if production_features.is_empty() && !self_tests.is_empty() {
-        // Use a real test module for the default embedding in self-test-only builds.
-        out_path.join(format!("{}.ptx", self_tests[0]))
-    } else {
-        build("kernels", &production_features)
-    };
-    if !production_features.is_empty() {
-        std::fs::copy(&ptx_path, artifacts.join("kernels.ptx")).unwrap();
+    let mut embedded =
+        String::from("fn embedded_ptx(name: &str) -> Option<&'static str> { match name {\n");
+    for feature in production.iter().chain(self_tests.iter()) {
+        let name = feature.replace('-', "_");
+        let ptx = build(&name, feature);
+        std::fs::copy(&ptx, artifacts.join(format!("{name}.ptx"))).unwrap();
+        embedded.push_str(&format!(
+            "{name:?} => Some(include_str!({:?})),\n",
+            ptx.to_str().unwrap()
+        ));
     }
-    println!("cargo:rustc-env=KERNELS_PTX_PATH={}", ptx_path.display());
+    embedded.push_str("_ => None, } }\n");
+    std::fs::write(out_path.join("kernel_ptx.rs"), embedded).unwrap();
 }
 
 #[cfg(feature = "self_test_support")]

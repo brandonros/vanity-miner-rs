@@ -17,16 +17,16 @@ pub struct Cli {
 #[allow(clippy::enum_variant_names)]
 pub enum Command {
     /// Continuously print matching RSA-2048 moduli and key pairs
-    #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+    #[cfg(feature = "rsa-modulus")]
     RsaModulusVanity(crate::crypto_args::RsaModulusArgs),
     /// Search raw RSA-PSS signatures over salts or a message window
-    #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+    #[cfg(feature = "rsa-pss")]
     RsaPssSignatureVanity(crate::crypto_args::RsaPssArgs),
     /// Continuously print matching NIST P-256 public points and private keys
-    #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+    #[cfg(feature = "p256-public-key")]
     P256PublicKeyVanity(crate::crypto_args::P256PublicArgs),
     /// Search P-256 signatures over a message window or secret ephemeral nonces
-    #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+    #[cfg(feature = "p256-signature")]
     P256SignatureVanity(crate::crypto_args::P256SignatureArgs),
     /// Generate Solana vanity address (base58)
     #[cfg(feature = "solana")]
@@ -77,13 +77,13 @@ impl Command {
     #[cfg(not(feature = "gpu"))]
     pub fn cpu_threads(&self, default: usize) -> usize {
         match self {
-            #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-modulus")]
             Self::RsaModulusVanity(args) => args.pattern.threads.unwrap_or(default),
-            #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => args.pattern.threads.unwrap_or(default),
-            #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-public-key")]
             Self::P256PublicKeyVanity(args) => args.pattern.threads.unwrap_or(default),
-            #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-signature")]
             Self::P256SignatureVanity(args) => args.pattern.threads.unwrap_or(default),
             #[allow(unreachable_patterns)]
             _ => default,
@@ -92,17 +92,17 @@ impl Command {
 
     pub fn validate(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-modulus")]
             Self::RsaModulusVanity(args) => {
                 args.config(1)?.validate()?;
             }
-            #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => {
                 args.config(1)?.validate()?;
             }
-            #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-public-key")]
             Self::P256PublicKeyVanity(args) => args.config(1).validate()?,
-            #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-signature")]
             Self::P256SignatureVanity(args) => args.config(1)?.validate()?,
             #[cfg(feature = "solana")]
             Command::SolanaVanity { prefix, suffix } => {
@@ -157,13 +157,13 @@ impl Command {
 
     pub fn prefix_len(&self) -> usize {
         match self {
-            #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-modulus")]
             Self::RsaModulusVanity(args) => args.pattern.prefix.len(),
-            #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => args.pattern.prefix.len(),
-            #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-public-key")]
             Self::P256PublicKeyVanity(args) => args.pattern.prefix.len(),
-            #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-signature")]
             Self::P256SignatureVanity(args) => args.pattern.prefix.len(),
             #[cfg(feature = "solana")]
             Command::SolanaVanity { prefix, .. } => prefix.len(),
@@ -180,13 +180,13 @@ impl Command {
 
     pub fn suffix_len(&self) -> usize {
         match self {
-            #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-modulus")]
             Self::RsaModulusVanity(args) => args.pattern.suffix.len(),
-            #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => args.pattern.suffix.len(),
-            #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-public-key")]
             Self::P256PublicKeyVanity(args) => args.pattern.suffix.len(),
-            #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-signature")]
             Self::P256SignatureVanity(args) => args.pattern.suffix.len(),
             #[cfg(feature = "solana")]
             Command::SolanaVanity { suffix, .. } => suffix.len(),
@@ -203,13 +203,13 @@ impl Command {
 
     pub fn description(&self) -> String {
         match self {
-            #[cfg(all(feature = "rsa-modulus", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-modulus")]
             Self::RsaModulusVanity(_) => "Constructing an RSA-2048 vanity modulus".into(),
-            #[cfg(all(feature = "rsa-pss", not(feature = "cumetal")))]
+            #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(_) => "Searching raw RSA-PSS signatures".into(),
-            #[cfg(all(feature = "p256-public-key", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-public-key")]
             Self::P256PublicKeyVanity(_) => "Searching NIST P-256 public points".into(),
-            #[cfg(all(feature = "p256-signature", not(feature = "cumetal")))]
+            #[cfg(feature = "p256-signature")]
             Self::P256SignatureVanity(_) => "Searching NIST P-256 signatures".into(),
             #[cfg(feature = "solana")]
             Command::SolanaVanity { prefix, suffix } => {
@@ -330,5 +330,31 @@ mod tests {
         }
         assert!(Cli::try_parse_from(["vanity-miner", "shallenge", "alice", &hash]).is_err());
         assert!(Cli::try_parse_from(["vanity-miner", "shallenge", "--username", "alice"]).is_err());
+    }
+}
+
+impl Command {
+    #[cfg(feature = "gpu")]
+    pub(crate) fn ptx_module(&self) -> &'static str {
+        match self {
+            #[cfg(feature = "solana")]
+            Self::SolanaVanity { .. } => "solana",
+            #[cfg(feature = "bitcoin")]
+            Self::BitcoinVanity { .. } => "bitcoin",
+            #[cfg(feature = "ethereum")]
+            Self::EthereumVanity { .. } => "ethereum",
+            #[cfg(feature = "shallenge")]
+            Self::Shallenge { .. } => "shallenge",
+            #[cfg(feature = "p256-public-key")]
+            Self::P256PublicKeyVanity(_) => "p256_public_key",
+            #[cfg(feature = "p256-signature")]
+            Self::P256SignatureVanity(_) => "p256_signature",
+            #[cfg(feature = "rsa-pss")]
+            Self::RsaPssSignatureVanity(_) => "rsa_pss",
+            #[cfg(feature = "rsa-modulus")]
+            Self::RsaModulusVanity(_) => "rsa_modulus",
+            #[cfg(feature = "self_test_support")]
+            Self::SelfTest => unreachable!("self-tests select their own modules"),
+        }
     }
 }

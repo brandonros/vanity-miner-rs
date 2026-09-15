@@ -66,9 +66,9 @@ mod rsa_modulus_vanity;
 #[cfg(feature = "rsa-modulus")]
 pub use rsa_modulus_vanity::*;
 
-#[cfg(feature = "self_test_shallenge")]
+#[cfg(feature = "repro_nonce_sequence")]
 mod codegen_repros;
-#[cfg(feature = "self_test_shallenge")]
+#[cfg(feature = "repro_nonce_sequence")]
 pub use codegen_repros::*;
 
 #[cfg(feature = "self_test_solana")]

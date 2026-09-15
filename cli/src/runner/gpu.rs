@@ -56,7 +56,7 @@ impl GpuRunner {
                         #[cfg(feature = "self_test_support")]
                         Command::SelfTest => GpuContext::for_self_test(ordinal)?,
                         #[allow(unreachable_patterns)]
-                        _ => GpuContext::new(ordinal)?,
+                        _ => GpuContext::new(ordinal, command.ptx_module())?,
                     };
 
                     let result = match command {

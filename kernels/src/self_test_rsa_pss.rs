@@ -17,5 +17,10 @@ pub unsafe extern "C" fn kernel_self_test_rsa_pss(results_ptr: *mut u32) {
     results[142] = logic::self_test::check_rsa_pss_crt_known_answer();
     results[143] = logic::self_test::check_rsa_pss_crt_fault_rejected();
     results[144] = logic::self_test::check_rsa_pss_crt_modulus_rejected();
-    results[155] = logic::self_test::check_rsa_pss_end_to_end();
+    // Temporarily disabled on GPU: isolated LLVM 21 compilation took 429 s,
+    // peaked near 7.1 GiB, and emitted 30 MiB PTX; the combined test can OOM.
+    // Keep slot 155 reserved and explicitly skipped (2), never reported passed.
+    // Restore check_rsa_pss_end_to_end() after the compiler blow-up is resolved.
+    // CPU self-tests still execute the full candidate fixture.
+    results[155] = 2;
 }

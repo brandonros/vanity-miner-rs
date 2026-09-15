@@ -3,7 +3,7 @@ compile_error!("Select either gpu (NVIDIA CUDA) or cumetal, not both");
 
 mod args;
 mod common;
-#[cfg(all(feature = "crypto-cli", not(feature = "cumetal")))]
+#[cfg(feature = "crypto-cli")]
 mod crypto_args;
 #[cfg(not(feature = "cumetal"))]
 mod modes;

@@ -59,9 +59,6 @@ jobs:
           mkdir -p artifacts
           cp target/llvm${{ matrix.llvm }}/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}-llvm${{ matrix.llvm }}
 
-          # PTX targets the selected GPU architecture, independently of the host.
-          cp target/llvm${{ matrix.llvm }}/release/ptx/kernels.ptx ./artifacts/output-llvm${{ matrix.llvm }}.ptx
-
           tar -C target/llvm${{ matrix.llvm }}/release/ptx -czf ./artifacts/ptx-bundle-llvm${{ matrix.llvm }}.tar.gz .
 
           echo "Copied build artifacts for ${{ matrix.arch }}"
@@ -188,16 +185,6 @@ jobs:
           asset_name: vanity-miner-aarch64-llvm7
           asset_content_type: application/octet-stream
 
-      - name: Upload LLVM 7 PTX
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64-llvm7/output-llvm7.ptx
-          asset_name: output-llvm7.ptx
-          asset_content_type: application/octet-stream
-
       - name: Upload x86_64 LLVM 21 binary
         uses: actions/upload-release-asset@v1
         env:
@@ -216,16 +203,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: dist/vanity-miner-aarch64-llvm21/vanity-miner-aarch64-llvm21
           asset_name: vanity-miner-aarch64-llvm21
-          asset_content_type: application/octet-stream
-
-      - name: Upload LLVM 21 PTX
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/vanity-miner-x86_64-llvm21/output-llvm21.ptx
-          asset_name: output-llvm21.ptx
           asset_content_type: application/octet-stream
 
       - name: Upload LLVM 7 PTX bundle

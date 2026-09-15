@@ -1,10 +1,10 @@
 //! CuMetal host backend: consume prebuilt PTX without a local NVIDIA toolchain.
-mod cache;
+#[cfg(feature = "crypto-cli")]
+mod crypto_batches;
 mod driver;
 use crate::{args::Command, common::GlobalStats, runner::Runner};
 use clap::Args;
 use driver::{Driver, Module};
-use logic::crypto::sha256::Sha256;
 use std::{
     path::{Path, PathBuf},
     rc::Rc,
@@ -25,8 +25,6 @@ pub struct CumetalOptions {
     pub module_dir: Option<PathBuf>,
     #[arg(long, global = true, default_value = "cumetalc")]
     pub cumetalc: PathBuf,
-    #[arg(long, global = true, default_value = ".cumetal-cache")]
-    pub cumetal_cache: PathBuf,
     /// Stop after this many launches; omitted means keep searching.
     #[arg(long, global=true, value_parser=clap::value_parser!(u64).range(1..))]
     pub batches: Option<u64>,
@@ -61,6 +59,7 @@ impl CumetalRunner {
         Ok(Self { options })
     }
     fn module(&self, driver: &Rc<Driver>, entry: &str) -> Result<Module, Error> {
+        let mut temporary = None;
         let path = if let Some(directory) = &self.options.module_dir {
             directory.join(format!("{entry}.metal"))
         } else {
@@ -71,10 +70,10 @@ impl CumetalRunner {
                 let name = if entry.starts_with("kernel_self_test_") {
                     vanity_miner::self_test_suite::module_name(entry)
                 } else {
-                    "kernels"
+                    vanity_miner::kernel_modules::production_module(entry)
                 };
                 #[cfg(not(feature = "self_test_support"))]
-                let name = "kernels";
+                let name = vanity_miner::kernel_modules::production_module(entry);
                 module_path = input.join(format!("{name}.ptx"));
                 &module_path
             } else {
@@ -82,55 +81,54 @@ impl CumetalRunner {
             };
             let compiler = resolve_program(&self.options.cumetalc)?;
 
-            let mut hash = Sha256::new();
-            let ptx_bytes = std::fs::read(input)?;
-            let compiler_bytes = std::fs::read(&compiler)?;
-            hash.update(&ptx_bytes);
-            hash.update(&compiler_bytes);
-            hash.update(b"cumetal-ir/ptx-strict/msl/v2");
-            hash.update(entry.as_bytes());
-            let directory = self
-                .options
-                .cumetal_cache
-                .join(hex::encode(hash.finalize()));
-            cache::module(&directory, entry, |output| {
-                eprintln!("Compiling {entry} from {}", input.display());
-                // Compile the exact bytes used in the cache key even if the
-                // supplied artifact is replaced while the compiler is running.
-                let snapshot = output.with_extension("ptx");
-                std::fs::write(&snapshot, &ptx_bytes)?;
-                let status = std::process::Command::new(&compiler)
-                    .arg(&snapshot)
-                    .args([
-                        "--backend=cumetal-ir",
-                        "--ptx-strict",
-                        "--overwrite",
-                        "--entry",
-                        entry,
-                        "--emit=msl",
-                        "-o",
-                    ])
-                    .arg(output)
-                    .status()?;
-                if !status.success() {
-                    return Err(format!("CuMetal compilation failed for {entry}: {status}").into());
-                }
-                if std::fs::read(&compiler)? != compiler_bytes {
-                    return Err(
-                        "CuMetal compiler changed during compilation; retry with a stable compiler"
-                            .into(),
-                    );
-                }
-                std::fs::remove_file(snapshot)?;
-                Ok(())
-            })?
+            temporary = Some(TemporaryDirectory::new()?);
+            let output = temporary.as_ref().unwrap().0.join(format!("{entry}.metal"));
+            eprintln!("Compiling {entry} from {}", input.display());
+            let status = std::process::Command::new(&compiler)
+                .arg(input)
+                .args([
+                    "--backend=cumetal-ir",
+                    "--ptx-strict",
+                    "--overwrite",
+                    "--entry",
+                    entry,
+                    "--emit=msl",
+                    "-o",
+                ])
+                .arg(&output)
+                .status()?;
+            if !status.success() {
+                return Err(format!("CuMetal compilation failed for {entry}: {status}").into());
+            }
+            output
         };
         if !path.with_extension("metal.cumetal-abi").is_file() {
             return Err(format!("Missing ABI sidecar for {}", path.display()).into());
         }
-        driver.module(&path, entry)
+        let mut module = driver.module(&path, entry)?;
+        module.temporary = temporary;
+        Ok(module)
     }
 }
+// CuMetal loads/compiles Metal lazily at launch; retain files until module unload.
+struct TemporaryDirectory(PathBuf);
+impl TemporaryDirectory {
+    fn new() -> Result<Self, Error> {
+        let path = std::env::temp_dir().join(format!(
+            "vanity-cumetal-{}-{:016x}",
+            std::process::id(),
+            rand::random::<u64>()
+        ));
+        std::fs::create_dir(&path)?;
+        Ok(Self(path))
+    }
+}
+impl Drop for TemporaryDirectory {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 fn resolve_program(path: &Path) -> Result<PathBuf, Error> {
     if path.components().count() > 1 || path.is_file() {
         return Ok(path.canonicalize()?);
@@ -159,6 +157,8 @@ fn entry(command: &Command) -> &'static str {
         Command::BitcoinVanity { .. } => "kernel_find_bitcoin_vanity_private_key",
         #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
+        #[cfg(feature = "crypto-cli")]
+        _ => unreachable!("cryptographic commands use their own batch transport"),
     }
 }
 fn payload_sizes(command: &Command) -> &'static [usize] {
@@ -173,6 +173,8 @@ fn payload_sizes(command: &Command) -> &'static [usize] {
         Command::BitcoinVanity { .. } => &[32, 33, 20, 64, 4],
         #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
+        #[cfg(feature = "crypto-cli")]
+        _ => unreachable!("cryptographic commands use their own batch transport"),
     }
 }
 fn print_payloads(command: &Command, output: &[Vec<u8>]) -> Result<(), Error> {
@@ -213,6 +215,8 @@ fn print_payloads(command: &Command, output: &[Vec<u8>]) -> Result<(), Error> {
         }
         #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
+        #[cfg(feature = "crypto-cli")]
+        _ => unreachable!("cryptographic commands use their own batch transport"),
     }
     Ok(())
 }
@@ -236,6 +240,8 @@ fn inputs(command: &Command) -> Result<(Vec<u8>, Vec<u8>), Error> {
         }
         #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
+        #[cfg(feature = "crypto-cli")]
+        _ => unreachable!("cryptographic commands use their own batch transport"),
     })
 }
 
@@ -364,6 +370,8 @@ fn expected(command: &Command, seed: u64, index: usize) -> Result<Expected, Erro
         }
         #[cfg(feature = "self_test_support")]
         Command::SelfTest => unreachable!(),
+        #[cfg(feature = "crypto-cli")]
+        _ => unreachable!("cryptographic commands use their own batch transport"),
     })
 }
 impl Runner for CumetalRunner {
@@ -375,6 +383,10 @@ impl Runner for CumetalRunner {
         #[cfg(feature = "self_test_support")]
         if matches!(command, Command::SelfTest) {
             return self.self_tests(&driver);
+        }
+        #[cfg(feature = "crypto-cli")]
+        if let Some(result) = self.crypto_search(command, &driver, stats.clone()) {
+            return result;
         }
         let module = self.module(&driver, entry(command))?;
         let candidates = self.options.blocks * self.options.threads_per_block;

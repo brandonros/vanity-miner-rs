@@ -7,6 +7,8 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+# Standalone nonce reproduction, outside mode self-tests.
+repro_nonce_sequence = []
 default = ["shallenge"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]

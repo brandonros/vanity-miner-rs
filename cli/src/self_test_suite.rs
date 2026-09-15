@@ -53,6 +53,11 @@ impl DeviceResults {
         });
         let results = results.as_ref().map_err(Clone::clone)?;
         let slot = case.slot;
+        if slot == 155 && results[slot] == 2 {
+            return Ok(Outcome::Skipped(
+                "temporarily disabled: RSA-PSS end-to-end GPU compilation takes ~7 min / 7.1 GiB and can OOM",
+            ));
+        }
         if results[slot] != 1 {
             return Err(format!(
                 "result slot {slot}: got {}, expected 1",
@@ -98,6 +103,28 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "self_test_rsa_pss")]
+    #[test]
+    fn disabled_rsa_pipeline_is_skipped_but_failures_are_not_hidden() {
+        let case = inventory()
+            .into_iter()
+            .find(|case| case.slot == 155)
+            .unwrap();
+        for value in [0, 1, 2, SENTINEL] {
+            let mut cache = DeviceResults::default();
+            let outcome = cache.check(case, || {
+                let mut results = vec![SENTINEL; SELF_TEST_ENTRIES.len()];
+                results[155] = value;
+                Ok(results)
+            });
+            match value {
+                1 => assert!(matches!(outcome, Ok(Outcome::Passed))),
+                2 => assert!(matches!(outcome, Ok(Outcome::Skipped(_)))),
+                _ => assert!(outcome.is_err()),
+            }
+        }
+    }
+
     #[test]
     fn grouped_launches_preserve_individual_failures() {
         let mut cache = DeviceResults::default();

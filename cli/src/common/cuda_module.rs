@@ -5,12 +5,22 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
-pub(crate) fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send + Sync>> {
+include!(concat!(env!("OUT_DIR"), "/kernel_ptx.rs"));
+
+pub(crate) fn load_module(
+    ordinal: usize,
+    name: &str,
+) -> Result<Module, Box<dyn Error + Send + Sync>> {
     println!("[{ordinal}] Loading module...");
     // An explicit CUBIN takes precedence over PTX_PATH and embedded PTX.
     // Surface loading failures instead of silently falling back.
     if let Some(cubin_path) = std::env::var_os("CUBIN_PATH") {
         let cubin_path = std::path::PathBuf::from(cubin_path);
+        let cubin_path = if cubin_path.is_dir() {
+            cubin_path.join(format!("{name}.cubin"))
+        } else {
+            cubin_path
+        };
         let module = Module::from_file(&cubin_path)
             .map_err(|e| format!("Failed to load CUBIN file {}: {}", cubin_path.display(), e))?;
         println!(
@@ -23,7 +33,7 @@ pub(crate) fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send
     let ptx: &str = if let Ok(ptx_path) = std::env::var("PTX_PATH") {
         let path = std::path::PathBuf::from(ptx_path);
         let path = if path.is_dir() {
-            path.join("kernels.ptx")
+            path.join(format!("{name}.ptx"))
         } else {
             path
         };
@@ -31,17 +41,12 @@ pub(crate) fn load_module(ordinal: usize) -> Result<Module, Box<dyn Error + Send
             std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
         &ptx_owned
     } else {
-        const EMBEDDED_PTX: &[u8] = include_bytes!(env!("KERNELS_PTX_PATH"));
-        std::str::from_utf8(EMBEDDED_PTX)
-            .map_err(|e| format!("Embedded PTX is not valid UTF-8: {}", e))?
+        embedded_ptx(name).ok_or("production PTX module not enabled")?
     };
     let module = load_ptx_with_log(ordinal, ptx)?;
     println!("[{ordinal}] Module loaded");
     Ok(module)
 }
-
-#[cfg(feature = "self_test_support")]
-include!(concat!(env!("OUT_DIR"), "/self_test_ptx.rs"));
 
 #[cfg(feature = "self_test_support")]
 pub(crate) fn load_self_test_module(
@@ -67,7 +72,7 @@ pub(crate) fn load_self_test_module(
         owned = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
         &owned
     } else {
-        embedded_self_test_ptx(name).ok_or("unknown self-test module")?
+        embedded_ptx(name).ok_or("unknown self-test module")?
     };
     load_ptx_with_log(ordinal, ptx)
 }

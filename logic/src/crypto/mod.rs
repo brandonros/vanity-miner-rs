@@ -22,8 +22,7 @@ pub mod secp256k1;
     feature = "p256-public-key",
     feature = "p256-signature",
     feature = "rsa-pss",
-    feature = "rsa-modulus",
-    feature = "cumetal"
+    feature = "rsa-modulus"
 ))]
 pub mod sha256;
 #[cfg(any(
