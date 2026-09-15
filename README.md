@@ -127,16 +127,19 @@ its PTX with that compiler. To advance the contribution revision, update the
 CuMetal input ref if needed, run `nix flake update cumetal`, review the locked
 commit, and rebuild the host in the shell. See [validation provenance rules](AGENTS.md).
 
-The pinned `98cf505` compiler/runtime pair passed a 32-candidate Shallenge GPU
-batch with `--verify`. This validates the dependency selection and that mode's
-smoke test; it does not establish all-mode correctness. The exact artifact
-identities are recorded in [validation results](docs/module-consolidation.md#pinned-cumetal-validation).
-
-Historical Apple M5 validation with CuMetal contribution commit `ddf496c` found
-compiler blockers in all four RSA/P-256 production modules: pointer/integer
-mismatches in generated Metal for public-key/modulus searches, and undefined
-registers at control-flow joins for signature searches. These results describe
-that revision; the current contribution series needs validation from its own build.
+Validation on 2026-09-15 of CuMetal `e5acf8cc0c65` on Apple M5 passed two
+32-candidate batches each for Shallenge and P-256 public-key search with `--verify`.
+Four production modes failed translation; RSA modulus and both RSA-PSS search
+variants emitted Metal but timed out before completing a batch. All eight
+self-test groups were attempted: 8 checks passed and 152 were blocked by
+translation. The [16-row status](docs/cumetal-status.md) remains 3 true / 13 false,
+but RSA-PSS production now gets past its earlier translation failure. See the
+[complete report](docs/cumetal-validation.md) for fresh diagnostics, fix coverage,
+validation limits, and exact artifact identities.
+The [issue ownership matrix](docs/cumetal-issue-matrix.md) maps all 13 unresolved
+workloads to upstream defects and distinguishes partial fixes from completed
+validation. The full run above predates the later `92a9b8f4de23` and
+`7d12f120a6b8` locks.
 
 `gpu` and `cumetal` are mutually exclusive; do not use `--all-features`.
 

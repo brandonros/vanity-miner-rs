@@ -254,9 +254,12 @@ the old `BLOCKS_PER_SM` address-only launch setting is removed.
   [validation provenance rules](../AGENTS.md) before repeating the checks.
 - Root and kernel workspace formatting, shell syntax, and `git diff --check` passed.
 
-## Pinned CuMetal validation
+## Historical pinned CuMetal validation
 
-The CuMetal flake input pins the cumulative fork contribution revision
+The following records the earlier `98cf505` validation. See the
+[current validation report](cumetal-validation.md) for the later tested pin.
+
+At that time, the CuMetal flake input pinned the cumulative fork contribution revision
 `98cf50573d091162a507e83f1d9e07e45b477ed1`, including its VF64 submodule. The Nix
 package builds the compiler and runtime together. The CLI embeds the locked
 revision and verifies the package manifest and both hashes before loading it.
