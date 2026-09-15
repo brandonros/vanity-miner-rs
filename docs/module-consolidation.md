@@ -249,4 +249,38 @@ the old `BLOCKS_PER_SM` address-only launch setting is removed.
 - CuMetal runtime execution remains unverified. The installed Nix compiler rejects
   `shf.l.wrap.b32` in the generated Shallenge and RSA PTX. The installed Apple compiler
   rejects pointer subtraction in the Shallenge PTX. These attempts did not reach kernel execution.
+  Those existing binaries had unverified source revisions; these failures do not
+  establish the status of the current CuMetal contribution series. See the
+  [validation provenance rules](../AGENTS.md) before repeating the checks.
 - Root and kernel workspace formatting, shell syntax, and `git diff --check` passed.
+
+## Pinned CuMetal validation
+
+The CuMetal flake input pins the cumulative fork contribution revision
+`98cf50573d091162a507e83f1d9e07e45b477ed1`, including its VF64 submodule. The Nix
+package builds the compiler and runtime together. The CLI embeds the locked
+revision and verifies the package manifest and both hashes before loading it.
+Independent binary selection and precompiled Metal input are removed; PTX is
+snapshotted and translated by the verified compiler on each run.
+
+Validation on Apple Silicon:
+
+- The Nix package built successfully from the locked source. Its final artifact
+  hashes match the generated manifest.
+- All 51 CuMetal host library tests passed, including wrong-revision, replaced
+  compiler/runtime, and missing-manifest rejection. Aggregate CPU checking passed.
+- The real CLI rejects the old local build directory and retired override flags
+  before device execution. Linux `default`, `v7`, and `v21` shells remain available.
+- The documented Nix-shell invocation ran one 32-candidate Shallenge GPU batch
+  with seed 1, username `miner`, an all-ones target, and `--verify`. One verified
+  nonce was exported; every candidate and the match count agreed with the CPU.
+- The PTX hash matches the final LLVM 21 Shallenge artifact from the cleanup build
+  committed as vanity-miner `a2aba42`. Other modes were not run in this validation.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Compiler | `83b6f09816b5b68c56af230b90372ae7a588c85bb6ab7fe0f3f167226b301b7d` |
+| Runtime | `2c820652ebb7f129b61d0c01bbeaf0ae974304c7a8fe1ef5a193d65f3079a916` |
+| Shallenge PTX | `e39509140aaf2cb8272729c2888790788d6c24edcd2b65489fa19d55b1a042c3` |
+
+Package output: `/nix/store/wrgw94blr7h6p761zv4yj4jwwv3fwjy2-vanity-cumetal-98cf50573d09`.

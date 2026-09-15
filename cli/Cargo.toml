@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
-cumetal = ["dep:libloading"]
+cumetal = ["dep:libloading", "dep:serde", "dep:serde_json"]
 llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
@@ -40,6 +40,8 @@ self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
 libloading = { version = "0.8", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 ctrlc = { version = "3.4" }
 num-bigint-dig = { version = "0.8.6", default-features = false, features = ["prime", "zeroize"], optional = true }
 rsa = { version = "0.9.10", default-features = false, features = ["pem"], optional = true }
@@ -70,4 +72,8 @@ git = "https://github.com/brandonros/Rust-CUDA.git"
 rev = "f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 default-features = false
 features = ["rustc_codegen_nvvm"]
+optional = true
+
+[build-dependencies.serde_json]
+version = "1"
 optional = true

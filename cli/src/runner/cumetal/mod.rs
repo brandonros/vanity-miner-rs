@@ -25,17 +25,22 @@ pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 pub struct CumetalRunner {
     pub(crate) options: CumetalOptions,
+    toolchain: toolchain::Toolchain,
 }
 impl CumetalRunner {
     pub fn new(options: CumetalOptions) -> Result<Self, Error> {
-        if options.ptx.is_none() && options.module_dir.is_none() {
-            return Err("Specify --ptx or --module-dir for CuMetal".into());
+        if options.ptx.is_none() {
+            return Err("Specify --ptx for CuMetal".into());
         }
         options
             .blocks
             .checked_mul(options.threads_per_block)
             .ok_or("launch size overflow")?;
-        Ok(Self { options })
+        let root = options.cumetal_root.as_deref().ok_or(
+            "CuMetal package is required: build in `nix develop .#cumetal` or pass --cumetal-root from `nix build .#cumetal`",
+        )?;
+        let toolchain = toolchain::Toolchain::load(root)?;
+        Ok(Self { options, toolchain })
     }
 }
 
@@ -44,7 +49,7 @@ impl Runner for CumetalRunner {
         1
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> Result<(), Error> {
-        let driver = Driver::open(&self.options.cumetal_library)?;
+        let driver = Driver::open(&self.toolchain.runtime)?;
         match command {
             #[cfg(feature = "rsa-modulus")]
             Command::RsaModulusVanity(args) => {
@@ -90,3 +95,4 @@ impl Runner for CumetalRunner {
 mod options;
 pub use options::CumetalOptions;
 mod module;
+mod toolchain;

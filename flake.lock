@@ -1,5 +1,24 @@
 {
   "nodes": {
+    "cumetal": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789482134,
+        "narHash": "sha256-9+W1+7T2cLN8w6pU2lze0nqDT8eUDouEeHtArOgiKok=",
+        "ref": "upstream/ptx-live-predicate-facts",
+        "rev": "98cf50573d091162a507e83f1d9e07e45b477ed1",
+        "revCount": 583,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/brandonros/cuda-metal"
+      },
+      "original": {
+        "ref": "upstream/ptx-live-predicate-facts",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/brandonros/cuda-metal"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1789264731,
@@ -34,6 +53,7 @@
     },
     "root": {
       "inputs": {
+        "cumetal": "cumetal",
         "nixpkgs": "nixpkgs",
         "nixpkgs-llvm7": "nixpkgs-llvm7",
         "rust-overlay": "rust-overlay"

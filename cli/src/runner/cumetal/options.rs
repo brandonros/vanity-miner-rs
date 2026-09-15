@@ -3,17 +3,12 @@ use std::path::PathBuf;
 
 #[derive(Args, Clone)]
 pub struct CumetalOptions {
-    /// CuMetal driver library (libcumetal.dylib).
-    #[arg(long, global = true, default_value = "libcumetal.dylib")]
-    pub cumetal_library: PathBuf,
+    /// CuMetal package built from flake.lock; supplied by `nix develop .#cumetal`.
+    #[arg(long, global = true, default_value = option_env!("VANITY_CUMETAL_ROOT"))]
+    pub cumetal_root: Option<PathBuf>,
     /// Rust-CUDA PTX file, or a directory of separately compiled PTX modules.
     #[arg(long, global = true)]
     pub ptx: Option<PathBuf>,
-    /// Directory of precompiled ENTRY.metal files and their ABI sidecars.
-    #[arg(long, global = true)]
-    pub module_dir: Option<PathBuf>,
-    #[arg(long, global = true, default_value = "cumetalc")]
-    pub cumetalc: PathBuf,
     /// Stop after this many batches (four kernel stages per RSA modulus batch); omitted means keep searching.
     #[arg(long, global=true, value_parser=clap::value_parser!(u64).range(1..))]
     pub batches: Option<u64>,

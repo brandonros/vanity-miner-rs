@@ -6,12 +6,23 @@
     nixpkgs-llvm7.url = "github:NixOS/nixpkgs/nixos-23.05";
     rust-overlay.url = "github:oxalica/rust-overlay";
     rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    # Cumulative contribution series; flake.lock selects the exact tested commit.
+    # Include the VF64 submodule in the immutable source closure.
+    cumetal = {
+      url = "git+https://github.com/brandonros/cuda-metal?ref=upstream/ptx-live-predicate-facts&submodules=1";
+      flake = false;
+    };
   };
 
-  outputs = { nixpkgs, nixpkgs-llvm7, rust-overlay, ... }:
+  outputs = { nixpkgs, nixpkgs-llvm7, rust-overlay, cumetal, ... }:
     let
       systems = [ "aarch64-linux" "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
+      darwinPkgs = import nixpkgs {
+        system = "aarch64-darwin";
+        overlays = [ rust-overlay.overlays.default ];
+      };
+      cumetalPackage = darwinPkgs.callPackage ./nix/cumetal.nix { source = cumetal; };
 
       mkDevShell = system: version:
         let
@@ -115,10 +126,26 @@
         };
     in
     {
-      devShells = forAllSystems (system: {
+      packages.aarch64-darwin.cumetal = cumetalPackage;
+      devShells = (forAllSystems (system: {
         default = mkDevShell system 21;
         v7 = mkDevShell system 7;
         v21 = mkDevShell system 21;
-      });
+      })) // {
+        aarch64-darwin.cumetal = darwinPkgs.mkShell {
+          packages = [
+            (darwinPkgs.rust-bin.fromRustupToolchain {
+              inherit ((builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain) channel;
+              profile = "minimal";
+              components = [ "rustfmt" ];
+            })
+          ];
+          VANITY_CUMETAL_ROOT = "${cumetalPackage}";
+          shellHook = ''
+            echo "CuMetal ${cumetal.rev}"
+            echo "  VANITY_CUMETAL_ROOT=$VANITY_CUMETAL_ROOT"
+          '';
+        };
+      };
     };
 }

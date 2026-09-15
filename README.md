@@ -91,20 +91,52 @@ verified on the host. Rebuild PTX/CUBIN overrides after kernel interface changes
 
 ### Apple Silicon
 
-Build with `cumetal` instead of `gpu`, plus the desired mode features. All eight
-search commands and the numbered self-tests have CuMetal host dispatch. Supply
-`--ptx DIR` containing separately compiled PTX modules, with `cumetalc` available,
-or `--module-dir DIR` containing ENTRY.metal files and ABI sidecars. Translation
-uses the typed backend. `--ptx FILE` also accepts one selected mode's module.
-RSA/P-256 searches use 64-candidate shared-winner batches and the same host
-verification as CUDA. `--batches N` bounds launches; `--verify` additionally checks
-every candidate against CPU logic. Wiring and compilation alone do not establish
-GPU numerical correctness; validate the selected mode on your hardware.
-Current Apple M5 validation with CuMetal contribution commit `ddf496c` finds
+The `cumetal` Nix shell builds the compiler and runtime together from the exact
+fork revision in `flake.lock`, including its pinned submodule. Build the host
+with `cumetal` instead of `gpu`, plus the desired mode features:
+
+```bash
+nix develop .#cumetal --command cargo run --release --locked -p vanity-miner \
+  --no-default-features --features cumetal,shallenge -- \
+  --ptx /absolute/path/to/ptx --batches 1 --verify \
+  shallenge --username brandonros \
+  --target-hash ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+```
+
+All eight search commands and the numbered self-tests have CuMetal host dispatch.
+`--ptx DIR` accepts separately compiled PTX modules; `--ptx FILE` accepts one
+selected mode's module. Translation uses the pinned compiler's typed backend.
+P-256 and RSA-PSS use structured candidate batches; RSA modulus uses the persistent
+four-stage pipeline. Batch capacity is `--blocks` times `--threads-per-block`.
+`--batches N` bounds batches (four launches per RSA modulus cycle); `--verify`
+additionally checks candidates against CPU logic. Wiring and compilation alone
+do not establish GPU numerical correctness; validate the selected mode on your hardware.
+
+The CLI embeds the locked CuMetal revision at build time and checks the package's
+manifest and both artifact hashes before loading the runtime. It prints those
+identities and the hash of each PTX snapshot it translates. Missing packages,
+revision mismatches, and changed binaries fail before GPU initialization.
+`nix develop` supplies the package path automatically. For a host built outside
+that shell, build the same package with
+`nix build .#cumetal --out-link .cumetal-artifacts/toolchain` and pass the absolute
+`--cumetal-root "$PWD/.cumetal-artifacts/toolchain"` path.
+
+The independent `--cumetalc`, `--cumetal-library`, and `--module-dir` options have
+been removed so every run uses the verified compiler/runtime pair and translates
+its PTX with that compiler. To advance the contribution revision, update the
+CuMetal input ref if needed, run `nix flake update cumetal`, review the locked
+commit, and rebuild the host in the shell. See [validation provenance rules](AGENTS.md).
+
+The pinned `98cf505` compiler/runtime pair passed a 32-candidate Shallenge GPU
+batch with `--verify`. This validates the dependency selection and that mode's
+smoke test; it does not establish all-mode correctness. The exact artifact
+identities are recorded in [validation results](docs/module-consolidation.md#pinned-cumetal-validation).
+
+Historical Apple M5 validation with CuMetal contribution commit `ddf496c` found
 compiler blockers in all four RSA/P-256 production modules: pointer/integer
 mismatches in generated Metal for public-key/modulus searches, and undefined
-registers at control-flow joins for signature searches. These commands have real
-device dispatch but are not yet validated working searches on CuMetal.
+registers at control-flow joins for signature searches. These results describe
+that revision; the current contribution series needs validation from its own build.
 
 `gpu` and `cumetal` are mutually exclusive; do not use `--all-features`.
 
