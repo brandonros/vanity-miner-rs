@@ -5,7 +5,7 @@ impl Prepared<'_> {
         &self,
         control: &SearchControl,
         device: &mut EvaluateBatch<'_>,
-    ) -> Result<Option<Winner>, String> {
+    ) -> Result<Option<String>, String> {
         let config = self.config;
         let pattern = &self.pattern;
         let private = &self.private;
@@ -40,40 +40,18 @@ impl Prepared<'_> {
             },
             reserved: 0,
         });
-        if control.continuous_device() {
-            crate::runner::batches::stream(
-                |start, count| device(&request, pattern, original, start, count),
-                candidate_limit,
-                control,
-                |counter, bytes| {
-                    self.format_winner(Winner {
-                        counter,
-                        worker: 0,
-                        signature: bytes[..64].try_into().expect("fixed signature width"),
-                    })
-                },
-            )?;
-            return Ok(None);
-        }
-        let found = crate::runner::batches::find(
+        crate::runner::batches::search(
             |start, count| device(&request, pattern, original, start, count),
             candidate_limit,
             control,
             |counter, bytes| {
-                let winner = Winner {
+                self.format_winner(Winner {
                     counter,
                     worker: 0,
                     signature: bytes[..64].try_into().expect("fixed signature width"),
-                };
-                self.verify_winner(&winner).map(|_| true)
+                })
+                .map(Some)
             },
-        )?;
-        Ok(found.map(|(counter, result)| Winner {
-            counter,
-            worker: 0,
-            signature: result.bytes[..64]
-                .try_into()
-                .expect("fixed signature width"),
-        }))
+        )
     }
 }

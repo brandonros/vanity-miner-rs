@@ -45,7 +45,7 @@ pub const CASES: &[Case] = &[
     },
     Case {
         slot: 149,
-        label: "rsa modulus zero stride rejected",
+        label: "rsa modulus empty task rejected",
         kernel: "kernel_self_test_rsa_modulus",
         gpu_skip: None,
     },

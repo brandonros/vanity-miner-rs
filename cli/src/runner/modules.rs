@@ -1,18 +1,17 @@
 //! File names for independently compiled production kernels.
 pub fn production_module(kernel: &str) -> &'static str {
     match kernel {
-        "kernel_find_solana_vanity_private_key" => "solana",
-        "kernel_find_bitcoin_vanity_private_key" => "bitcoin",
-        "kernel_find_ethereum_vanity_private_key" => "ethereum",
-        "kernel_find_better_shallenge_nonce" => "shallenge",
+        "kernel_solana_vanity" => "solana",
+        "kernel_bitcoin_vanity" => "bitcoin",
+        "kernel_ethereum_vanity" => "ethereum",
+        "kernel_shallenge" => "shallenge",
         "kernel_p256_public_key_vanity" => "p256_public_key",
         "kernel_p256_signature_vanity" => "p256_signature",
         "kernel_rsa_pss_signature_vanity" => "rsa_pss",
-        "kernel_rsa_modulus_vanity_v2" => "rsa_modulus",
-        "kernel_rsa_generate_v3"
-        | "kernel_rsa_ranges_v3"
-        | "kernel_rsa_search_v3"
-        | "kernel_rsa_advance_v3" => "rsa_modulus",
+        "kernel_rsa_generate"
+        | "kernel_rsa_ranges"
+        | "kernel_rsa_search"
+        | "kernel_rsa_advance" => "rsa_modulus",
         _ => panic!("unknown production kernel: {kernel}"),
     }
 }

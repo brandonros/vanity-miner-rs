@@ -5,7 +5,7 @@ impl Prepared<'_> {
         &self,
         control: &SearchControl,
         device: &mut EvaluateBatch<'_>,
-    ) -> Result<Option<Winner>, String> {
+    ) -> Result<Option<String>, String> {
         let config = self.config;
         let pattern = &self.pattern;
         let seed = &self.seed;
@@ -22,41 +22,19 @@ impl Prepared<'_> {
             },
             reserved: 0,
         });
-        let mut winner = None;
-        if control.continuous_device() {
-            crate::runner::batches::stream(
-                |start, count| device(&request, pattern, &[], start, count),
-                u64::MAX,
-                control,
-                |counter, bytes| {
-                    let private = candidate_scalar(deriver, 0, counter as u128)
-                        .ok_or("device scalar reconstruction failed")?;
-                    self.format_winner(Winner {
-                        private,
-                        public: bytes[..65].try_into().expect("fixed point width"),
-                    })
-                },
-            )?;
-            return Ok(None);
-        }
-        let found = crate::runner::batches::find(
+        crate::runner::batches::search(
             |start, count| device(&request, pattern, &[], start, count),
             u64::MAX,
             control,
             |counter, bytes| {
                 let private = candidate_scalar(deriver, 0, counter as u128)
                     .ok_or("device scalar reconstruction failed")?;
-                let public = bytes[..65]
-                    .try_into()
-                    .map_err(|_| "invalid device point width")?;
-                let candidate = Winner { private, public };
-                if !verify_winner(&candidate, config.target, pattern) {
-                    return Err("device P-256 public key failed verification".into());
-                }
-                winner = Some(candidate);
-                Ok(true)
+                self.format_winner(Winner {
+                    private,
+                    public: bytes[..65].try_into().expect("fixed point width"),
+                })
+                .map(Some)
             },
-        )?;
-        Ok(if found.is_some() { winner } else { None })
+        )
     }
 }

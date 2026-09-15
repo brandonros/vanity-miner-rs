@@ -1,74 +1,97 @@
-//! Transport for the same RSA/P-256 kernels and host verification used by CUDA.
-use super::driver::Buffer;
-use super::{Driver, Error, driver::Module};
+//! Persistent transport for structured candidate requests and batch results.
+use super::{
+    Driver, Error,
+    driver::{Buffer, Module, record_bytes},
+};
 use logic::search::{
     candidate_result::{BatchResult, CandidateResult},
-    hex_pattern::HexPattern,
+    device_record::DeviceRecord,
 };
 use std::rc::Rc;
 use zeroize::Zeroizing;
 
-use logic::search::device_record::DeviceRecord;
 fn bytes<T: DeviceRecord>(value: &T) -> &[u8] {
-    // SAFETY: DeviceRecord guarantees padding-free integer records.
-    unsafe { std::slice::from_raw_parts((value as *const T).cast(), std::mem::size_of::<T>()) }
+    record_bytes(std::slice::from_ref(value))
 }
-struct SecretBuffer(Buffer);
-impl Drop for SecretBuffer {
-    fn drop(&mut self) {
-        if let Err(error) = self.0.clear() {
-            eprintln!("CuMetal buffer erasure failed: {error}");
+
+pub(crate) struct CumetalBatchTransport<'a> {
+    driver: &'a Rc<Driver>,
+    module: Module,
+    verify: bool,
+    threads: u32,
+    buffers: Option<[Buffer; 4]>,
+}
+impl<'a> CumetalBatchTransport<'a> {
+    pub fn new(driver: &'a Rc<Driver>, module: Module, verify: bool, threads: u32) -> Self {
+        Self {
+            driver,
+            module,
+            verify,
+            threads,
+            buffers: None,
         }
     }
-}
-pub(crate) struct CumetalBatchTransport<'a> {
-    pub(crate) driver: &'a Rc<Driver>,
-    pub(crate) module: Module,
-    pub(crate) verify: bool,
-}
-impl CumetalBatchTransport<'_> {
-    pub(crate) fn evaluate<T: DeviceRecord>(
+
+    pub(crate) fn evaluate<R: DeviceRecord, P: DeviceRecord>(
         &mut self,
-        request: &T,
-        pattern: &HexPattern,
+        request: &R,
+        pattern: &P,
         message: &[u8],
         start: u64,
         count: u32,
         reference: impl Fn(u64) -> CandidateResult,
     ) -> Result<BatchResult, String> {
-        if count == 0 || count > 64 || start.checked_add(count as u64 - 1).is_none() {
-            return Err("invalid CuMetal cryptographic batch range".into());
+        if count == 0 || count > 1_048_576 || start.checked_add(u64::from(count) - 1).is_none() {
+            return Err("invalid CuMetal candidate range".into());
         }
-        let result = (|| -> Result<BatchResult, Error> {
-            let request_device = SecretBuffer(self.driver.buffer(bytes(request))?);
-            let pattern_device = self.driver.buffer(bytes(pattern))?;
-            let message_device = SecretBuffer(self.driver.buffer(message)?);
-            let output = SecretBuffer(self.driver.buffer(bytes(&BatchResult::EMPTY))?);
+        (|| -> Result<BatchResult, Error> {
+            let inputs = [
+                bytes(request),
+                bytes(pattern),
+                message,
+                bytes(&BatchResult::EMPTY),
+            ];
+            if self.buffers.is_none() {
+                self.buffers = Some([
+                    self.driver.buffer(inputs[0])?,
+                    self.driver.buffer(inputs[1])?,
+                    self.driver.buffer(inputs[2])?,
+                    self.driver.buffer(inputs[3])?,
+                ]);
+            } else {
+                for (buffer, input) in self.buffers.as_ref().unwrap().iter().zip(inputs) {
+                    buffer.write(input)?;
+                }
+            }
+            let [request, pattern, message_device, output] = self.buffers.as_ref().unwrap();
             self.module.launch(
                 &mut [
-                    request_device.0.pointer(),
-                    pattern_device.pointer(),
-                    message_device.0.pointer(),
+                    request.pointer(),
+                    pattern.pointer(),
+                    message_device.pointer(),
                     message.len() as u64,
                     start,
-                    count as u64,
-                    output.0.pointer(),
+                    u64::from(count),
+                    output.pointer(),
                 ],
-                count.div_ceil(32),
-                32,
+                count.div_ceil(self.threads),
+                self.threads,
             )?;
-            let raw = Zeroizing::new(output.0.read()?);
-            // SAFETY: exact-sized BatchResult of integers; every bit pattern is valid.
-            let result = unsafe { std::ptr::read_unaligned(raw.as_ptr().cast::<BatchResult>()) };
-            // Check input guards as well as the result buffer's guards.
-            let _request = Zeroizing::new(request_device.0.read()?);
-            let _message = Zeroizing::new(message_device.0.read()?);
-            pattern_device.read()?;
+            let result = output.read_records::<BatchResult>(1)?[0];
+            for (buffer, expected) in [request, pattern, message_device]
+                .into_iter()
+                .zip(&inputs[..3])
+            {
+                let actual = Zeroizing::new(buffer.read()?);
+                if actual.as_slice() != *expected {
+                    return Err("kernel changed an input buffer".into());
+                }
+            }
+            result.winner(count)?;
             if self.verify {
-                let mut matches = 0;
-                let mut errors = 0;
+                let (mut matches, mut errors) = (0, 0);
                 for lane in 0..count {
-                    let candidate = Zeroizing::new(reference(start + lane as u64));
+                    let candidate = Zeroizing::new(reference(start + u64::from(lane)));
                     match candidate.status {
                         CandidateResult::STATUS_MISS => {}
                         CandidateResult::STATUS_MATCH => matches += 1,
@@ -86,17 +109,16 @@ impl CumetalBatchTransport<'_> {
                     return Err("CuMetal batch counts differ from CPU reference".into());
                 }
             }
-            result.winner(count)?;
             Ok(result)
         })()
-        .map_err(|e| e.to_string());
-        result
+        .map_err(|e| e.to_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use logic::search::hex_pattern::HexPattern;
     #[test]
     fn transport_records_have_no_padding_and_batch_result_round_trips() {
         assert_eq!(std::mem::size_of::<HexPattern>(), 516);

@@ -9,10 +9,10 @@ solana = ["dep:curve25519-dalek"]
 bitcoin = ["dep:k256"]
 ethereum = ["dep:k256", "dep:tiny-keccak"]
 shallenge = []
-p256-public-key = ["dep:p256", "dep:hmac", "dep:digest", "dep:zeroize"]
-p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest", "dep:zeroize"]
-rsa-pss = [ "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
-rsa-modulus = [ "dep:digest", "dep:hmac", "dep:zeroize", "dep:crypto-bigint"]
+p256-public-key = ["dep:p256", "dep:hmac", "dep:digest"]
+p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest"]
+rsa-pss = [ "dep:digest", "dep:crypto-bigint"]
+rsa-modulus = [ "dep:digest", "dep:hmac", "dep:crypto-bigint"]
 self_test = [
     "self_test_solana",
     "self_test_bitcoin",
@@ -38,7 +38,7 @@ crypto-bigint = { version = "0.5.5", default-features = false, features = ["zero
 ecdsa = { version = "0.16.9", default-features = false, features = ["hazmat"], optional = true }
 hmac = { version = "0.12.1", default-features = false, optional = true }
 digest = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }
-zeroize = { version = "1", default-features = false, optional = true }
+zeroize = { version = "1", default-features = false }
 p256 = { version = "0.13.2", default-features = false, features = ["arithmetic"], optional = true }
 curve25519-dalek = { version = "4.1.3", default-features = false, features = ["alloc", "precomputed-tables"], optional = true }
 k256 = { version = "0.13.4", default-features = false, features = ["alloc", "arithmetic", "precomputed-tables", "critical-section"], optional = true }

@@ -50,8 +50,7 @@ pub(super) fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
 #[cfg(any(
     feature = "self_test_p256_public_key",
     feature = "self_test_p256_signature",
-    feature = "self_test_rsa_pss",
-    feature = "self_test_rsa_modulus"
+    feature = "self_test_rsa_pss"
 ))]
 fn record_candidate(
     h: &mut crate::crypto::sha256::Sha256,

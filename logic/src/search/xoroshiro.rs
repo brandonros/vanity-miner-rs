@@ -58,3 +58,51 @@ mod test {
         }
     }
 }
+
+/// Reproduce a candidate from its session counter. Each batch advances the seed
+/// and starts its lane index at zero, preserving deterministic batch sequences.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct BatchSeed {
+    pub seed: u64,
+    pub width: u64,
+}
+impl BatchSeed {
+    pub fn position(&self, counter: u64) -> Option<(u64, usize)> {
+        if self.width == 0 || self.width > u32::MAX as u64 {
+            return None;
+        }
+        Some((
+            self.seed.wrapping_add(counter / self.width),
+            (counter % self.width) as usize,
+        ))
+    }
+}
+// SAFETY: repr(C), two initialized u64 fields, all bit patterns valid.
+unsafe impl super::device_record::DeviceRecord for BatchSeed {}
+
+#[cfg(test)]
+mod batch_seed_tests {
+    use super::*;
+    #[test]
+    fn global_counters_reproduce_batch_seed_and_lane() {
+        let seed = BatchSeed {
+            seed: u64::MAX,
+            width: 32,
+        };
+        for (counter, expected) in [
+            (0, (u64::MAX, 0)),
+            (31, (u64::MAX, 31)),
+            (32, (0, 0)),
+            (65, (1, 1)),
+        ] {
+            assert_eq!(seed.position(counter), Some(expected));
+            let (rng_seed, lane) = seed.position(counter).unwrap();
+            assert_eq!(
+                generate_random_private_key(lane, rng_seed),
+                generate_random_private_key(expected.1, expected.0)
+            );
+        }
+        assert!(BatchSeed { seed: 0, width: 0 }.position(0).is_none());
+    }
+}

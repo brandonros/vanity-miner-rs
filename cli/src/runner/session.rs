@@ -16,7 +16,7 @@ pub struct SearchControl {
     next: AtomicU64,
     batch_size: AtomicU32,
     device_launches_remaining: AtomicU64,
-    continuous_device: AtomicBool,
+    continuous: AtomicBool,
     stats: Arc<GlobalStats>,
 }
 
@@ -38,7 +38,7 @@ impl SearchControl {
             next: AtomicU64::new(0),
             batch_size: AtomicU32::new(64),
             device_launches_remaining: AtomicU64::new(u64::MAX),
-            continuous_device: AtomicBool::new(false),
+            continuous: AtomicBool::new(false),
             stats,
         }
     }
@@ -87,12 +87,12 @@ impl SearchControl {
     }
 
     /// Configure once before starting independent device searches.
-    pub fn set_continuous_device(&self) {
-        self.continuous_device.store(true, Ordering::Release);
+    pub fn set_continuous(&self) {
+        self.continuous.store(true, Ordering::Release);
     }
 
-    pub fn continuous_device(&self) -> bool {
-        self.continuous_device.load(Ordering::Acquire)
+    pub fn continuous(&self) -> bool {
+        self.continuous.load(Ordering::Acquire)
     }
 
     pub fn add_verified_match(&self) {
@@ -200,28 +200,17 @@ impl Drop for CancelOnExit<'_> {
     }
 }
 
-#[cfg(all(feature = "crypto-cli", not(feature = "gpu")))]
+#[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
 use crate::runner::RunResult;
 
 #[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
 pub(crate) fn run_controlled(
     stats: Arc<crate::runner::progress::GlobalStats>,
     unit: &'static str,
-    work: impl FnMut(Arc<SearchControl>) -> Result<bool, String>,
-) -> RunResult {
-    run_with_launch_limit(stats, unit, None, work)
-}
-
-#[cfg(all(feature = "crypto-cli", not(feature = "gpu")))]
-pub(crate) fn run_with_launch_limit(
-    stats: Arc<crate::runner::progress::GlobalStats>,
-    unit: &'static str,
-    launch_limit: Option<u64>,
     mut work: impl FnMut(Arc<SearchControl>) -> Result<bool, String>,
 ) -> RunResult {
     stats.set_unit(unit);
     let control = Arc::new(SearchControl::with_stats(stats.clone()));
-    control.set_device_launch_limit(launch_limit);
     let cancellation = control.clone();
     ctrlc::set_handler(move || cancellation.interrupt())
         .map_err(|_| "could not install Ctrl-C handler")?;
@@ -239,6 +228,25 @@ pub(crate) fn run_with_launch_limit(
     })();
     result?;
     Ok(())
+}
+
+/// Run a continuous device session once, preserving counters and prepared state.
+#[cfg(feature = "cumetal")]
+pub(crate) fn run_device_session(
+    stats: Arc<GlobalStats>,
+    unit: &'static str,
+    launches: Option<u64>,
+    batch_size: u32,
+    work: impl FnOnce(Arc<SearchControl>) -> Result<(), String>,
+) -> crate::runner::RunResult {
+    stats.set_unit(unit);
+    let control = Arc::new(SearchControl::with_stats(stats));
+    control.set_batch_size(batch_size)?;
+    control.set_device_launch_limit(launches);
+    control.set_continuous();
+    let cancellation = control.clone();
+    ctrlc::set_handler(move || cancellation.interrupt()).map_err(|e| e.to_string())?;
+    work(control).map_err(Into::into)
 }
 
 #[cfg(test)]

@@ -62,8 +62,6 @@ impl GpuRunner {
         crate::runner::workers::device::run(
             self.num_devices,
             control.clone(),
-            stats.clone(),
-            command.details().continuous_candidates,
             |ordinal| match command {
                 #[cfg(feature = "self_test_support")]
                 Command::SelfTest => GpuContext::without_module(ordinal),
@@ -149,11 +147,10 @@ impl Runner for GpuRunner {
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> RunResult {
         let control = Arc::new(SearchControl::with_stats(stats.clone()));
-        #[cfg(feature = "crypto-cli")]
-        if command.details().continuous_candidates {
-            control.set_continuous_device();
+        if command.details().cuda_module.is_some() {
+            control.set_continuous();
             let threads = GpuContext::configured_threads_per_block()? as u32;
-            let batch_size = if let Ok(value) = std::env::var("CRYPTO_BATCH_SIZE") {
+            let batch_size = if let Ok(value) = std::env::var("BATCH_SIZE") {
                 value.parse::<u32>()?
             } else {
                 // Four blocks per SM on the largest selected GPU, using the
@@ -173,7 +170,7 @@ impl Runner for GpuRunner {
             ctrlc::set_handler(move || cancellation.interrupt())
                 .map_err(|_| "could not install Ctrl-C handler")?;
             println!(
-                "CUDA crypto launch: up to {batch_size} candidates, {threads} threads/block, {} devices",
+                "CUDA launch: up to {batch_size} candidates, {threads} threads/block, {} devices",
                 self.num_devices
             );
         }
@@ -181,9 +178,16 @@ impl Runner for GpuRunner {
     }
 }
 
-#[cfg(feature = "crypto-cli")]
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge",
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss"
+))]
 pub(crate) mod batch;
-#[cfg(feature = "crypto-cli")]
 pub(crate) mod buffers;
 pub(crate) mod context;
 pub(crate) mod module;

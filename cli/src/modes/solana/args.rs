@@ -44,7 +44,6 @@ impl SolanaArgs {
             suffix_len: suffix.len(),
             cpu_threads: None,
             cuda_module: Some("solana"),
-            continuous_candidates: false,
             description: format!(
                 "Searching for solana vanity key with prefix '{}' and suffix '{}'",
                 prefix, suffix

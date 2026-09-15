@@ -108,3 +108,29 @@ mod test {
         );
     }
 }
+
+/// Structured device result; public output is reconstructed and verified by the host.
+pub fn candidate(
+    seed: &crate::search::xoroshiro::BatchSeed,
+    counter: u64,
+    pattern: &crate::search::vanity::BytePattern,
+) -> crate::search::candidate_result::CandidateResult {
+    use crate::search::candidate_result::CandidateResult;
+    let Some((rng_seed, thread_idx)) = seed.position(counter) else {
+        return CandidateResult::ERROR;
+    };
+    let Some((prefix, suffix)) = pattern.parts() else {
+        return CandidateResult::ERROR;
+    };
+    let result = generate_and_check_solana_vanity_key(&SolanaVanityKeyRequest {
+        prefix,
+        suffix,
+        thread_idx,
+        rng_seed,
+    });
+    if result.matches {
+        CandidateResult::matched(&result.private_key)
+    } else {
+        CandidateResult::MISS
+    }
+}

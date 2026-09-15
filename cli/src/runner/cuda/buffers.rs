@@ -40,6 +40,17 @@ impl<'a, T: DeviceRecord> Records<'a, T> {
         Ok(result)
     }
 
+    pub fn write(&mut self, values: &[T]) -> Result<(), String> {
+        if values.len() != self.count {
+            return Err("device record count changed".into());
+        }
+        // SAFETY: DeviceRecord guarantees initialized bytes without padding.
+        let bytes = unsafe {
+            std::slice::from_raw_parts(values.as_ptr().cast::<u8>(), std::mem::size_of_val(values))
+        };
+        self.bytes.copy_from(bytes).map_err(|e| e.to_string())
+    }
+
     pub fn pointer(&self) -> DevicePointer<u8> {
         // The driver transports addresses. T determines allocation size and
         // checked serialization; it need not implement cust's host-only trait.

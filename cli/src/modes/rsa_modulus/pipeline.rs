@@ -1,6 +1,6 @@
 //! Host setup and final verification for continuous device-owned RSA searches.
 use super::*;
-use logic::modes::rsa_modulus::pipeline::{self as device_logic, Counts, Pair, SearchConfig};
+use logic::modes::rsa_modulus::{self as device_logic, Counts, Pair, SearchConfig};
 use rand::RngCore;
 
 pub fn run(

@@ -34,22 +34,7 @@ pub unsafe extern "C" fn kernel_p256_signature_vanity(
     } else {
         CandidateResult::ERROR
     };
-    match result.status {
-        CandidateResult::STATUS_MISS => {}
-        CandidateResult::STATUS_MATCH => {
-            handle_match! {
-                thread_idx: lane,
-                found_matches_ptr: core::ptr::addr_of_mut!((*output).matches),
-                copies: [scalar: result => core::ptr::addr_of_mut!((*output).candidate);],
-                found_thread_idx_ptr: core::ptr::addr_of_mut!((*output).lane),
-            }
-        }
-        _ => unsafe {
-            cuda_std::atomic::mid::atomic_fetch_add_u32_device(
-                core::ptr::addr_of_mut!((*output).errors),
-                core::sync::atomic::Ordering::Relaxed,
-                1,
-            );
-        },
+    unsafe {
+        crate::match_handler::record(lane, result, output);
     }
 }

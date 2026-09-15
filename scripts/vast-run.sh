@@ -20,7 +20,7 @@ Everything after -- is passed literally to vanity-miner; no interactive menu.
 
 Environment: HOST (ssh2.vast.ai), PORT (37827), REMOTE_USER (root),
 LLVM_VARIANT (llvm21), LOCAL_BINARY, LOCAL_PTX_DIR, GITHUB_ASSET,
-CRYPTO_BATCH_SIZE (optional CUDA candidate count per launch), THREADS_PER_BLOCK (256),
+BATCH_SIZE (optional CUDA candidate count per launch), THREADS_PER_BLOCK (256),
 STACK_SIZE (defaults to 16384 bytes for Bitcoin/Ethereum; other commands use
 the application's per-thread stack limit). Explicit STACK_SIZE overrides win.
 Default local paths: <repo>/target/<LLVM_VARIANT>/release/{vanity-miner,ptx}.
@@ -182,7 +182,7 @@ if [ "$MODE" = rsync ]; then
     rsync -avz -e "ssh -p $PORT" -- "$LOCAL_PTX_DIR/" "$REMOTE_USER@$HOST:ptx/"
 fi
 
-printf -v REMOTE_RUN 'bash -s -- %q %q %q %q %q %q %q %q' "$MODE" "$VERSION" "$LLVM_VARIANT" "${GITHUB_ASSET:-}" "${STACK_SIZE:-}" "$PTX_MODULE" "${CRYPTO_BATCH_SIZE:-}" "${THREADS_PER_BLOCK:-256}"
+printf -v REMOTE_RUN 'bash -s -- %q %q %q %q %q %q %q %q' "$MODE" "$VERSION" "$LLVM_VARIANT" "${GITHUB_ASSET:-}" "${STACK_SIZE:-}" "$PTX_MODULE" "${BATCH_SIZE:-}" "${THREADS_PER_BLOCK:-256}"
 printf -v QUOTED_MINER_ARGS ' %q' "${MINER_ARGS[@]}"
 REMOTE_RUN+=$QUOTED_MINER_ARGS
 "${SSH[@]}" "$REMOTE_RUN" <<'EOF'
@@ -194,7 +194,7 @@ LLVM_VARIANT=$3
 ASSET=$4
 REQUESTED_STACK_SIZE=$5
 PTX_MODULE=$6
-REQUESTED_CRYPTO_BATCH_SIZE=$7
+REQUESTED_BATCH_SIZE=$7
 REQUESTED_THREADS_PER_BLOCK=$8
 shift 8
 MINER_ARGS=("$@")
@@ -274,14 +274,13 @@ echo "PTX .version is the PTX ISA version; .target is the GPU architecture targe
 echo "The driver must support the PTX version; the remote nvcc version does not determine JIT support."
 
 banner "RUNTIME ENV"
-if [ -n "$REQUESTED_CRYPTO_BATCH_SIZE" ]; then
-    export CRYPTO_BATCH_SIZE="$REQUESTED_CRYPTO_BATCH_SIZE"
+if [ -n "$REQUESTED_BATCH_SIZE" ]; then
+    export BATCH_SIZE="$REQUESTED_BATCH_SIZE"
 else
-    unset CRYPTO_BATCH_SIZE
+    unset BATCH_SIZE
 fi
-echo "CRYPTO_BATCH_SIZE=${CRYPTO_BATCH_SIZE:-automatic}"
+echo "BATCH_SIZE=${BATCH_SIZE:-automatic}"
 export CUDA_LOG_FILE="stdout"
-export BLOCKS_PER_SM="1024"
 export THREADS_PER_BLOCK="$REQUESTED_THREADS_PER_BLOCK"
 if [ -n "$REQUESTED_STACK_SIZE" ]; then
     export STACK_SIZE="$REQUESTED_STACK_SIZE"
@@ -292,7 +291,6 @@ else
     esac
 fi
 echo "CUDA_LOG_FILE=$CUDA_LOG_FILE"
-echo "BLOCKS_PER_SM=$BLOCKS_PER_SM"
 echo "THREADS_PER_BLOCK=$THREADS_PER_BLOCK"
 echo "STACK_SIZE=${STACK_SIZE:-application default}"
 

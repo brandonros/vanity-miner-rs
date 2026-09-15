@@ -43,7 +43,7 @@ keys that deliberately share p.
 
 ## Bounds and measurements
 
-`CRYPTO_BATCH_SIZE` sets both RSA workspace capacity and q-lane budget per cycle.
+`BATCH_SIZE` sets both RSA workspace capacity and q-lane budget per cycle.
 `THREADS_PER_BLOCK` controls every stage's launch geometry. These settings bound
 memory/work per cycle, not prefix difficulty. There is no 128-byte pattern cap or
 65536-q task cutoff in the CUDA pipeline. Syntax, contradictory overlap, modulus
@@ -74,8 +74,8 @@ Before throughput claims, run the rebuilt self-tests and bounded production
 searches on NVIDIA hardware, then compare one and multiple GPUs. Register spills,
 per-thread large-integer costs, and divergence still require measurement.
 
-The CuMetal reference transport still uses the v2 batch interface. The new CUDA
-stages have distinct entry names and require a matching host binary and PTX.
+CuMetal executes the same four RSA stages and persistent task records. CUDA and
+CuMetal require a matching host binary and rebuilt PTX/Metal artifacts.
 
 ### Implementation checks — 2026-09-15
 
@@ -86,8 +86,7 @@ stages have distinct entry names and require a matching host binary and PTX.
 - The aarch64 Linux release build passed with LLVM 21.1.8 and CUDA 13.3,
   producing PTX 9.3 targeting `sm_100` for all four production modules and the
   RSA self-test module. NVIDIA `ptxas` assembled all five modules successfully.
-- The CuMetal host configuration passed `cargo check`; its RSA transport remains
-  the reference path described above.
+- The CuMetal host configuration passed `cargo check`; its RSA transport now uses the shared persistent pipeline.
 
 The assembler reported these resources for the new production path:
 

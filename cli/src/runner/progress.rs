@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn bounded_and_legacy_searches_share_the_same_counters() {
+    fn search_workers_share_the_same_counters() {
         let stats = std::sync::Arc::new(GlobalStats::new(2, 0, 0));
         let control = crate::runner::session::SearchControl::with_stats(stats.clone());
         stats.add_launch(7);
@@ -163,7 +163,6 @@ pub(crate) fn estimate(bits: u32) {
     );
 }
 
-#[cfg(feature = "crypto-cli")]
 /// Hold stdout's lock for the whole record so devices cannot interleave keys.
 pub fn print_verified(
     control: &crate::runner::session::SearchControl,

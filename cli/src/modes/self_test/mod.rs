@@ -155,7 +155,7 @@ mod tests {
         );
     }
     #[test]
-    fn inventory_preserves_legacy_slots_and_unique_entries() {
+    fn inventory_preserves_slots_and_unique_entries() {
         let cases = inventory();
         let mut expected = [SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
         logic::self_test::run_self_test(&mut expected);

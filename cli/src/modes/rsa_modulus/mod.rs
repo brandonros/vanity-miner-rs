@@ -8,7 +8,6 @@ pub(crate) mod cuda;
 pub(crate) mod cumetal;
 
 mod constraints;
-mod device;
 pub mod pipeline;
 #[cfg(test)]
 mod tests;
@@ -38,7 +37,6 @@ pub struct ModulusReport {
     pub output: Option<String>,
 }
 
-use constraints::ceil_div;
 pub use constraints::{ModulusConstraints, QProgression};
 
 impl ModulusSearch {
@@ -55,34 +53,14 @@ pub fn run_cpu(
     config: &ModulusSearch,
     control: Arc<SearchControl>,
 ) -> Result<ModulusReport, String> {
-    run(config, control, None)
-}
-
-pub fn run_device(
-    config: &ModulusSearch,
-    control: Arc<SearchControl>,
-    device: &mut EvaluateBatch<'_>,
-) -> Result<ModulusReport, String> {
-    run(config, control, Some(device))
-}
-
-fn run(
-    config: &ModulusSearch,
-    control: Arc<SearchControl>,
-    device: Option<&mut EvaluateBatch<'_>>,
-) -> Result<ModulusReport, String> {
     let constraints = config.validate()?;
-    let outcome = if let Some(device) = device {
-        device::construct_device(&constraints, &control, device)?
-    } else {
-        thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for _ in 0..config.workers {
-                handles.push(scope.spawn(|| cpu::construct_worker(&constraints, &control)));
-            }
-            crate::runner::workers::join(handles, &control, "RSA modulus worker panicked")
-        })?
-    };
+    let outcome = thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for _ in 0..config.workers {
+            handles.push(scope.spawn(|| cpu::construct_worker(&constraints, &control)));
+        }
+        crate::runner::workers::join(handles, &control, "RSA modulus worker panicked")
+    })?;
     let found = outcome.is_some();
     let mut output = None;
     if let Some(key) = outcome {
@@ -107,12 +85,3 @@ fn run(
         output,
     })
 }
-
-pub type EvaluateBatch<'a> = dyn FnMut(
-        &logic::modes::rsa_modulus::RsaModulusRequest,
-        &logic::search::hex_pattern::HexPattern,
-        &[u8],
-        u64,
-        u32,
-    ) -> Result<logic::search::candidate_result::BatchResult, String>
-    + 'a;

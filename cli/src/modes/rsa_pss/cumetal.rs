@@ -1,7 +1,7 @@
 use crate::runner::cumetal::{
     CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
 };
-use crate::runner::{progress::GlobalStats, session::run_with_launch_limit};
+use crate::runner::{progress::GlobalStats, session::run_device_session};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -12,12 +12,13 @@ pub fn run(
 ) -> Result<(), Error> {
     let config = args.config(1)?;
     let module = runner.module(driver, "kernel_rsa_pss_signature_vanity")?;
-    let mut engine = CumetalBatchTransport {
+    let mut engine = CumetalBatchTransport::new(
         driver,
         module,
-        verify: runner.options.verify,
-    };
-    run_with_launch_limit(
+        runner.options.verify,
+        runner.options.threads_per_block,
+    );
+    run_device_session(
         stats,
         if matches!(config.source, crate::modes::rsa_pss::PssSource::Salt { .. }) {
             "salts"
@@ -25,6 +26,7 @@ pub fn run(
             "messages"
         },
         runner.options.batches,
+        runner.options.blocks * runner.options.threads_per_block,
         |control| {
             let report = crate::modes::rsa_pss::run_device(
                 &config,
@@ -35,7 +37,7 @@ pub fn run(
                     })
                 },
             );
-            report.map(|r| r.found)
+            report.map(|_| ())
         },
     )
 }

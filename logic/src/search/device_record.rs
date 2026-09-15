@@ -6,3 +6,6 @@
 /// Implementors must have a stable layout, no padding or pointers, and accept
 /// every bit pattern. All fields must be initialized before transfer.
 pub unsafe trait DeviceRecord: Copy {}
+
+// SAFETY: byte arrays have no padding and accept every bit pattern.
+unsafe impl<const N: usize> DeviceRecord for [u8; N] {}

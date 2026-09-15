@@ -115,14 +115,14 @@ fn run(
     device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<SearchReport, String> {
     let prepared = Prepared::new(config)?;
-    let outcome = match device {
+    let output = match device {
         Some(device) => prepared.search_device(&control, device)?,
-        None => prepared.search_cpu(&control)?,
+        None => prepared
+            .search_cpu(&control)?
+            .map(|winner| prepared.format_winner(winner))
+            .transpose()?,
     };
-    let found = outcome.is_some();
-    let output = outcome
-        .map(|winner| prepared.format_winner(winner))
-        .transpose()?;
+    let found = output.is_some();
     if let Some(record) = &output {
         println!("{record}");
     }

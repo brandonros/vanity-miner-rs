@@ -125,7 +125,7 @@ impl ModulusConstraints {
         &self,
         seed: [u8; 32],
         worker: u64,
-    ) -> Result<logic::modes::rsa_modulus::pipeline::SearchConfig, String> {
+    ) -> Result<logic::modes::rsa_modulus::SearchConfig, String> {
         let one = BigUint::from(1u8);
         let max = (&one << 1024usize) - &one;
         let mut min = ceil_div(&self.lower, &max).max(&one << 1023usize);
@@ -133,7 +133,7 @@ impl ModulusConstraints {
             min += &one;
         }
         let count = (&max - &min) / 2u8 + &one;
-        Ok(logic::modes::rsa_modulus::pipeline::SearchConfig {
+        Ok(logic::modes::rsa_modulus::SearchConfig {
             lower: *fixed_bytes(&self.lower)?,
             upper: *fixed_bytes(&self.upper)?,
             p_min: *fixed_bytes(&min)?,

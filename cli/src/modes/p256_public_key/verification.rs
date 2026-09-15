@@ -6,7 +6,7 @@ impl Prepared<'_> {
         let pattern = &self.pattern;
         // Recheck immediately before printing the matched key.
         if !verify_winner(&winner, config.target, pattern) {
-            return Err("P-256 winner failed final verification".into());
+            return Err("P-256 winner failed verification".into());
         }
         Ok(format!(
             "[p256-public-key] public_key={}\n[p256-public-key] sec1_public_key={}\n[p256-public-key] private_key={}",

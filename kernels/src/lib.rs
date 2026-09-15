@@ -26,28 +26,38 @@
 extern crate alloc;
 
 #[cfg(all(target_arch = "nvptx64", feature = "self_test"))]
-compile_error!("GPU self-tests must be compiled separately with one self_test_<mode> feature; self_test is the host-test aggregate");
+compile_error!(
+    "GPU self-tests must be compiled separately with one self_test_<mode> feature; self_test is the host-test aggregate"
+);
 
-#[macro_use]
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge",
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss"
+))]
 mod match_handler;
 
-#[cfg(feature = "solana")]
-pub mod solana;
 #[cfg(feature = "bitcoin")]
 pub mod bitcoin;
+#[cfg(feature = "repro_nonce_sequence")]
+pub mod codegen_repros;
 #[cfg(feature = "ethereum")]
 pub mod ethereum;
-#[cfg(feature = "shallenge")]
-pub mod shallenge;
 #[cfg(feature = "p256-public-key")]
 pub mod p256_public_key;
 #[cfg(feature = "p256-signature")]
 pub mod p256_signature;
-#[cfg(feature = "rsa-pss")]
-pub mod rsa_pss;
 #[cfg(feature = "rsa-modulus")]
 pub mod rsa_modulus;
-#[cfg(feature = "repro_nonce_sequence")]
-pub mod codegen_repros;
+#[cfg(feature = "rsa-pss")]
+pub mod rsa_pss;
+#[cfg(feature = "shallenge")]
+pub mod shallenge;
+#[cfg(feature = "solana")]
+pub mod solana;
 
 pub mod self_test;

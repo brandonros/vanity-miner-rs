@@ -2,26 +2,24 @@
 use super::buffers::{Message, Records};
 use crate::runner::cuda::context::GpuContext;
 use cust::{function::Function, launch};
-use logic::search::{
-    candidate_result::BatchResult, device_record::DeviceRecord, hex_pattern::HexPattern,
-};
+use logic::search::{candidate_result::BatchResult, device_record::DeviceRecord};
 
-pub(crate) struct CandidateBatch<'a, T: DeviceRecord> {
+pub(crate) struct CandidateBatch<'a, T: DeviceRecord, P: DeviceRecord> {
     gpu: &'a GpuContext,
     kernel: Function<'a>,
     request: Records<'a, T>,
-    pattern: Records<'a, HexPattern>,
+    pattern: Records<'a, P>,
     message: Message<'a>,
     message_len: usize,
     output: Records<'a, BatchResult>,
 }
 
-impl<'a, T: DeviceRecord> CandidateBatch<'a, T> {
+impl<'a, T: DeviceRecord, P: DeviceRecord> CandidateBatch<'a, T, P> {
     pub fn new(
         gpu: &'a GpuContext,
         name: &str,
         request: &T,
-        pattern: &HexPattern,
+        pattern: &P,
         message: &[u8],
     ) -> Result<Self, String> {
         Ok(Self {
@@ -36,6 +34,10 @@ impl<'a, T: DeviceRecord> CandidateBatch<'a, T> {
             message_len: message.len(),
             output: Records::zeroed(1, &gpu.stream)?,
         })
+    }
+
+    pub fn update_pattern(&mut self, pattern: &P) -> Result<(), String> {
+        self.pattern.write(std::slice::from_ref(pattern))
     }
 
     pub fn evaluate(&mut self, start: u64, count: u32) -> Result<BatchResult, String> {

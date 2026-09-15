@@ -25,7 +25,6 @@ impl PatternArgs {
             cpu_threads: self.threads,
             description: description.into(),
             cuda_module: Some(cuda_module),
-            continuous_candidates: true,
         }
     }
 }

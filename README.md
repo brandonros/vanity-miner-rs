@@ -55,13 +55,13 @@ An invalid override fails rather than falling back; use artifacts matching the
 binary's kernel interfaces and your GPU.
 
 `gpu` selects CUDA without enabling search modes or a CPU fallback. All eight
-modes support CUDA. RSA/P-256 CUDA searches retain their context, module, inputs,
+modes support CUDA. CUDA searches retain their context, module, inputs,
 and device buffers for the whole search. Devices run independently across matches;
 a bounded result queue overlaps host verification with subsequent GPU batches.
 The default launch size is four blocks per SM on the largest GPU.
 All CUDA modes use `THREADS_PER_BLOCK` (default 256); partial batches round up
 the block count, with excess lanes exiting immediately.
-`CRYPTO_BATCH_SIZE` overrides the candidate count per launch (1–1048576);
+`BATCH_SIZE` overrides the candidate count per launch (1–1048576);
 finite ranges use partial final batches. `vast-run.sh` forwards this setting.
 The default stack is 64 KiB; `STACK_SIZE` overrides it. Multi-GPU throughput and
 the new scheduling behavior still require hardware validation. CI builds LLVM 7 and 21 for both
@@ -78,14 +78,15 @@ keys. Statistics show p candidates, probable p factors, nonempty ranges, and q
 candidates separately, alongside verified matches. See [GPU search design](docs/gpu-search-pipeline.md).
 
 Rebuild the host binary and RSA PTX together. CUDA now requires
-`kernel_rsa_generate_v3`, `kernel_rsa_ranges_v3`, `kernel_rsa_search_v3`, and
-`kernel_rsa_advance_v3` in `rsa_modulus.ptx`; older overrides fail symbol lookup.
-The v2 entry remains for the CuMetal reference transport, which retains host range
-preparation. An existing GitHub Actions artifact does not include local changes.
+`kernel_rsa_generate`, `kernel_rsa_ranges`, `kernel_rsa_search`, and
+`kernel_rsa_advance` in `rsa_modulus.ptx`; older overrides fail symbol lookup.
+CuMetal uses these same four stages and persistent task records. Address and nonce
+kernels also use structured batch results; rebuild their PTX and Metal sidecars.
+An existing GitHub Actions artifact does not include local changes.
 
 Address modes, P-256, and RSA-PSS retain their atomic count and single-result
 protocol per launch. The RSA pipeline retains multiple factor results. Winning
-lanes depend on GPU scheduling. All RSA/P-256 exported results are independently
+lanes depend on GPU scheduling. All device-exported results are independently
 verified on the host. Rebuild PTX/CUBIN overrides after kernel interface changes.
 
 ### Apple Silicon
@@ -148,9 +149,8 @@ continues until Ctrl-C or exhaustion of a finite message/salt space.
 - **RSA modulus:** constructs a constrained q progression instead of rejecting
   complete random keys. Winners receive primality, factor-distance, and key checks.
   Prefix and suffix can be combined (for example, `--prefix a3b6 --suffix abcd`).
-  CPU and the CUDA pipeline accept patterns across the full 256-byte modulus;
-  overlapping prefix/suffix bytes must agree. The legacy CuMetal transport requires
-  suffixes shorter than 128 bytes. Long-prefix experiments can leave one or zero
+  CPU, CUDA, and CuMetal accept patterns across the full 256-byte modulus;
+  overlapping prefix/suffix bytes must agree. Long-prefix experiments can leave one or zero
   eligible q values per p and become much slower. Pattern width is not a prediction
   of feasibility or time to find a key. These constrained keys have no established
   security guarantee.

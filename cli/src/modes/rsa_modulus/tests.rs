@@ -1,5 +1,4 @@
 use super::*;
-use logic::search::candidate_result::BatchResult;
 use rand::RngCore;
 use rsa::pkcs8::{EncodePublicKey, LineEnding};
 use rsa::{
@@ -17,11 +16,10 @@ impl Drop for Directory {
 
 #[test]
 fn constructive_keys_round_trip_and_pass_libressl_checks() {
-    check_runner(false);
-    check_runner(true);
+    check_runner();
 }
 
-fn check_runner(device: bool) {
+fn check_runner() {
     let mut random = [0; 16];
     OsRng.fill_bytes(&mut random);
     let dir = Directory(
@@ -41,12 +39,7 @@ fn check_runner(device: bool) {
             workers: 2,
         };
         let control = Arc::new(SearchControl::new());
-        let report = if device {
-            run_device(&config, control, &mut evaluate_batch)
-        } else {
-            run_cpu(&config, control)
-        }
-        .unwrap();
+        let report = run_cpu(&config, control).unwrap();
         assert!(report.found);
         assert!(report.q_candidates_tested > 0);
         let record = report.output.as_ref().unwrap();
@@ -124,7 +117,7 @@ fn long_prefix_allows_single_candidate_interval() {
 }
 
 #[test]
-fn small_intervals_have_bounded_nonempty_device_batches() {
+fn small_intervals_have_bounded_nonempty_cpu_batches() {
     for size in [1u64, 2, 63, 64, 65, 65535, 65536, 65537] {
         let progression = QProgression {
             first: Zeroizing::new(BigUint::from(1u8)),
@@ -188,15 +181,4 @@ fn interval_and_residue_match_all_sampled_candidates() {
             );
         }
     }
-}
-fn evaluate_batch(
-    request: &logic::modes::rsa_modulus::RsaModulusRequest,
-    pattern: &HexPattern,
-    _message: &[u8],
-    start: u64,
-    count: u32,
-) -> Result<BatchResult, String> {
-    crate::modes::tests::evaluate_batch(start, count, |counter| {
-        logic::modes::rsa_modulus::rsa_modulus(request, counter, pattern)
-    })
 }

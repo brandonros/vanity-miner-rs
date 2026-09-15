@@ -218,17 +218,17 @@ fn run(
     device: Option<&mut EvaluateBatch<'_>>,
 ) -> Result<PssReport, String> {
     let prepared = Prepared::new(config)?;
-    let outcome = match device {
+    let output = match device {
         Some(device) => prepared.search_device(&control, device)?,
-        None => prepared.search_cpu(&control)?,
+        None => prepared
+            .search_cpu(&control)?
+            .map(|winner| prepared.format_winner(winner))
+            .transpose()?,
     };
-    if outcome.is_none() && !control.stopped() && !control.continuous_device() {
+    if output.is_none() && !control.stopped() && !control.continuous() {
         return Err("RSA-PSS search exhausted its unique candidate space without a match".into());
     }
-    let found = outcome.is_some();
-    let output = outcome
-        .map(|winner| prepared.format_winner(winner))
-        .transpose()?;
+    let found = output.is_some();
     if let Some(record) = &output {
         println!("{record}");
     }

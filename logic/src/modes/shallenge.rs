@@ -235,3 +235,34 @@ mod tests {
         }
     }
 }
+
+/// Structured nonce result, with a fixed-width length independent of host usize.
+pub fn candidate(
+    seed: &crate::search::xoroshiro::BatchSeed,
+    counter: u64,
+    target: &[u8; 32],
+    username: &[u8],
+) -> crate::search::candidate_result::CandidateResult {
+    use crate::search::candidate_result::CandidateResult;
+    let Some((rng_seed, thread_idx)) = seed.position(counter) else {
+        return CandidateResult::ERROR;
+    };
+    if username.is_empty() || username.len() > MAX_USERNAME_LEN {
+        return CandidateResult::ERROR;
+    }
+    let result = generate_and_check_shallenge(&ShallengeRequest {
+        username,
+        username_len: username.len(),
+        target_hash: target,
+        thread_idx,
+        rng_seed,
+    });
+    if !result.is_better {
+        return CandidateResult::MISS;
+    }
+    let mut bytes = [0; 100];
+    bytes[..32].copy_from_slice(&result.hash);
+    bytes[32..96].copy_from_slice(&result.nonce);
+    bytes[96..].copy_from_slice(&(result.nonce_len as u32).to_le_bytes());
+    CandidateResult::matched(&bytes)
+}

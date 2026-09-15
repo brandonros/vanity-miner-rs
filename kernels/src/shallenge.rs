@@ -1,74 +1,43 @@
+//! Structured candidate entry for shallenge.
 use cuda_std::prelude::*;
+use logic::search::{
+    candidate_result::{BatchResult, CandidateResult},
+    xoroshiro::BatchSeed,
+};
 
-/// Handle the infrastructure concerns when a better hash is found
-unsafe fn handle_shallenge_match_found(
-    result: logic::modes::shallenge::ShallengeResult,
-    thread_idx: usize,
-    found_matches_slice_ptr: *mut u32,
-    found_hash_ptr: *mut u8,
-    found_nonce_ptr: *mut u8,
-    found_nonce_len_ptr: *mut usize,
-    found_thread_idx_slice_ptr: *mut u32,
-) {
-    // Keep the first improvement to atomically claim the slot, not necessarily
-    // the best hash in this launch. Later improvements are counted but discarded.
-    // This preserves a consistent hash/nonce pair without a minimum reduction.
-    handle_match! {
-        thread_idx: thread_idx,
-        found_matches_ptr: found_matches_slice_ptr,
-        copies: [
-            result.hash => found_hash_ptr, 32;
-            result.nonce => found_nonce_ptr, 64;
-            scalar: result.nonce_len => found_nonce_len_ptr;
-        ],
-        found_thread_idx_ptr: found_thread_idx_slice_ptr,
-    }
-}
-
+/// # Safety
+/// Request and pattern are valid aligned records. Message is readable for its
+/// length. Output is initialized to EMPTY; inputs remain alive through synchronization.
 #[kernel]
-#[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe extern "C" fn kernel_find_better_shallenge_nonce(
-    // input
-    username_ptr: *const u8,
-    username_len: usize,
-    target_hash_ptr: *const u8,
-    rng_seed: u64,
-    // output
-    found_matches_slice_ptr: *mut u32,
-    found_hash_ptr: *mut u8,
-    found_nonce_ptr: *mut u8,
-    found_nonce_len_ptr: *mut usize,
-    found_thread_idx_slice_ptr: *mut u32,
+pub unsafe extern "C" fn kernel_shallenge(
+    request: *const BatchSeed,
+    pattern: *const [u8; 32],
+    message: *const u8,
+    message_len: usize,
+    start: u64,
+    count: u32,
+    output: *mut BatchResult,
 ) {
-    // Prepare request
-    let thread_idx = cuda_std::thread::index() as usize;
-    let username = unsafe { core::slice::from_raw_parts(username_ptr, username_len) };
-    let target_hash_slice = unsafe { core::slice::from_raw_parts(target_hash_ptr, 32) };
-    let target_hash: &[u8; 32] = unsafe { &*(target_hash_slice.as_ptr() as *const [u8; 32]) };
-    
-    let request = logic::modes::shallenge::ShallengeRequest {
-        username,
-        username_len,
-        target_hash,
-        thread_idx,
-        rng_seed,
+    let lane = cuda_std::thread::index() as usize;
+    if lane >= count as usize {
+        return;
+    }
+    let result = match start.checked_add(lane as u64) {
+        Some(counter) => unsafe {
+            logic::modes::shallenge::candidate(
+                &*request,
+                counter,
+                &*pattern,
+                if message_len == 0 {
+                    &[]
+                } else {
+                    core::slice::from_raw_parts(message, message_len)
+                },
+            )
+        },
+        None => CandidateResult::ERROR,
     };
-    
-    // Call pure business logic
-    let result = logic::modes::shallenge::generate_and_check_shallenge(&request);
-    
-    // Handle result (adapter layer)
-    if result.is_better {
-        unsafe { 
-            handle_shallenge_match_found(
-                result,
-                thread_idx,
-                found_matches_slice_ptr,
-                found_hash_ptr,
-                found_nonce_ptr,
-                found_nonce_len_ptr,
-                found_thread_idx_slice_ptr,
-            );
-        }
+    unsafe {
+        crate::match_handler::record(lane, result, output);
     }
 }

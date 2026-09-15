@@ -1,83 +1,71 @@
-//! Bounded batching, cancellation, and verified winner selection.
+//! Bounded batching, cancellation, and verified result delivery.
 use crate::runner::session::SearchControl;
-use logic::search::candidate_result::{BatchResult, CandidateResult};
+use logic::search::candidate_result::BatchResult;
 use zeroize::Zeroizing;
 
-/// Keep launching while a separate consumer reconstructs and verifies results.
-pub fn stream(
+/// One evaluation and verification path for both first-match and continuous
+/// searches. Continuous searches overlap device work with host verification.
+pub fn search(
     mut evaluate: impl FnMut(u64, u32) -> Result<BatchResult, String>,
     limit: u64,
     control: &SearchControl,
-    mut format_verified: impl FnMut(u64, &[u8; 256]) -> Result<String, String> + Send,
-) -> Result<(), String> {
-    crate::runner::batches::pump(
-        control,
-        || {
-            let Some(batch) = control.reserve_bounded_batch(u64::from(control.batch_size()), limit)
-            else {
-                return Ok(None);
-            };
-            if !control.reserve_device_launch() {
-                return Ok(None);
-            }
-            let count = (batch.end - batch.start) as u32;
-            let result = Zeroizing::new(evaluate(batch.start, count)?);
-            result.winner(count)?;
-            control.add_tested(u64::from(count));
-            Ok(Some((batch.start, count, result)))
-        },
-        |(start, count, result)| {
-            if let Some((lane, candidate)) = result.winner(count)? {
-                let candidate = Zeroizing::new(candidate);
-                let output = format_verified(start + u64::from(lane), &candidate.bytes)?;
-                crate::runner::progress::print_verified(control, output)?;
-            }
-            Ok(())
-        },
-    )
-}
-
-/// Verify the GPU-selected winner before claiming the output. Rejected winners
-/// discard the rest of that batch, matching the original shared-winner protocol.
-/// Fixed batches make cancellation observable between launches.
-pub fn find(
-    mut evaluate: impl FnMut(u64, u32) -> Result<BatchResult, String>,
-    limit: u64,
-    control: &SearchControl,
-    mut verify: impl FnMut(u64, &[u8; 256]) -> Result<bool, String>,
-) -> Result<Option<(u64, CandidateResult)>, String> {
+    mut format_verified: impl FnMut(u64, &[u8; 256]) -> Result<Option<String>, String> + Send,
+) -> Result<Option<String>, String> {
     let stop = control.cancel_on_exit();
-    while let Some(batch) = control.reserve_bounded_batch(u64::from(control.batch_size()), limit) {
+    let mut output = None;
+    let mut produce = || {
+        let Some(batch) = control.reserve_bounded_batch(u64::from(control.batch_size()), limit)
+        else {
+            return Ok(None);
+        };
         if !control.reserve_device_launch() {
-            break;
-        }
-        let count = (batch.end - batch.start) as u32;
-        let results = Zeroizing::new(evaluate(batch.start, count)?);
-        let winner = results.winner(count)?;
-        control.add_tested(count as u64);
-        if control.stopped() {
             return Ok(None);
         }
-        if let Some((lane, result)) = winner {
-            let counter = batch.start + lane as u64;
-            if verify(counter, &result.bytes)? && control.claim_verified_winner() {
-                return Ok(Some((counter, result)));
+        let count = (batch.end - batch.start) as u32;
+        let result = Zeroizing::new(evaluate(batch.start, count)?);
+        result.winner(count)?;
+        control.add_tested(u64::from(count));
+        Ok(Some((batch.start, count, result)))
+    };
+    let mut consume = |(start, count, result): (u64, u32, Zeroizing<BatchResult>)| {
+        if let Some((lane, candidate)) = result.winner(count)? {
+            let candidate = Zeroizing::new(candidate);
+            if let Some(record) = format_verified(start + u64::from(lane), &candidate.bytes)? {
+                if control.continuous() {
+                    crate::runner::progress::print_verified(control, record)?;
+                } else if control.claim_verified_winner() {
+                    output = Some(record);
+                }
             }
+        }
+        Ok(())
+    };
+    if control.continuous() {
+        pump(control, produce, consume)?;
+    } else {
+        // First-match callers must observe verification before reserving the
+        // next batch, so launch limits cannot discard the last verified winner.
+        while !control.stopped() {
+            let Some(batch) = produce()? else {
+                break;
+            };
+            consume(batch)?;
         }
     }
     stop.finish();
-    Ok(None)
+    Ok(output)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use logic::search::candidate_result::CandidateResult;
 
     #[test]
     fn launch_limit_keeps_last_winner_and_persists_across_rounds() {
         let control = SearchControl::new();
         control.set_device_launch_limit(Some(1));
-        let found = find(
+        let found = search(
             |_, _| {
                 Ok(BatchResult {
                     matches: 1,
@@ -88,13 +76,13 @@ mod tests {
             },
             1024,
             &control,
-            |_, _| Ok(true),
+            |_, _| Ok(Some("winner".into())),
         )
         .unwrap();
         assert!(found.is_some());
         assert!(control.resume_after_match());
         assert!(
-            find(
+            search(
                 |_, _| panic!("launch limit must persist after a match"),
                 1024,
                 &control,
@@ -112,7 +100,7 @@ mod tests {
         control.set_device_launch_limit(Some(2));
         let mut launches = 0;
         assert!(
-            find(
+            search(
                 |_, _| {
                     launches += 1;
                     Ok(BatchResult::EMPTY)
@@ -134,7 +122,7 @@ mod tests {
         control.set_batch_size(4096).unwrap();
         let mut batches = Vec::new();
         assert!(
-            find(
+            search(
                 |start, count| {
                     batches.push((start, count));
                     Ok(BatchResult::EMPTY)
@@ -157,7 +145,7 @@ mod tests {
         let control = SearchControl::new();
         let mut batches = Vec::new();
         let mut verified = Vec::new();
-        let found = find(
+        let found = search(
             |start, count| {
                 batches.push((start, count));
                 Ok(BatchResult {
@@ -171,11 +159,11 @@ mod tests {
             &control,
             |counter, _| {
                 verified.push(counter);
-                Ok(counter == 64)
+                Ok((counter == 64).then(|| counter.to_string()))
             },
         )
         .unwrap();
-        assert_eq!(found.unwrap().0, 64);
+        assert_eq!(found.unwrap(), "64");
         assert_eq!(batches, [(0, 64), (64, 1)]);
         assert_eq!(verified, [0, 64]);
         assert_eq!(control.statistics().0, 65);
@@ -185,7 +173,7 @@ mod tests {
     #[test]
     fn malformed_batch_cancels_without_verifying() {
         let control = SearchControl::new();
-        let result = find(
+        let result = search(
             |_, _| {
                 Ok(BatchResult {
                     matches: 2,
@@ -205,7 +193,7 @@ mod tests {
     fn cancelled_search_never_evaluates_a_batch() {
         let control = SearchControl::new();
         control.cancel();
-        let result = find(
+        let result = search(
             |_, _| panic!("cancelled search launched work"),
             1,
             &control,

@@ -3,7 +3,7 @@ use crate::runner::cuda::buffers::Records;
 use crate::runner::cuda::context::GpuContext;
 use cust::{function::Function, launch, memory::DeviceBuffer};
 use logic::{
-    modes::rsa_modulus::pipeline::{Counts, Pair, SearchConfig, Task},
+    modes::rsa_modulus::{Counts, Pair, SearchConfig, Task},
     search::hex_pattern::HexPattern,
 };
 use zeroize::Zeroizing;
@@ -42,10 +42,10 @@ impl<'a> RsaPipeline<'a> {
         };
         Ok(Self {
             gpu,
-            generate: function("kernel_rsa_generate_v3")?,
-            ranges: function("kernel_rsa_ranges_v3")?,
-            search: function("kernel_rsa_search_v3")?,
-            advance: function("kernel_rsa_advance_v3")?,
+            generate: function("kernel_rsa_generate")?,
+            ranges: function("kernel_rsa_ranges")?,
+            search: function("kernel_rsa_search")?,
+            advance: function("kernel_rsa_advance")?,
             config: Records::from_slice(std::slice::from_ref(config), &gpu.stream)?,
             pattern: Records::from_slice(std::slice::from_ref(pattern), &gpu.stream)?,
             tasks: Records::zeroed(capacity as usize, &gpu.stream)?,

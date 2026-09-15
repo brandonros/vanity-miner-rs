@@ -14,7 +14,7 @@ pub(crate) fn assert_continuous(
     use std::sync::Arc;
     let stats = Arc::new(GlobalStats::new(1, 0, 0));
     let control = Arc::new(SearchControl::with_stats(stats.clone()));
-    control.set_continuous_device();
+    control.set_continuous();
     control.set_batch_size(1).unwrap();
     control.set_device_launch_limit(Some(2));
     run(control.clone()).unwrap();

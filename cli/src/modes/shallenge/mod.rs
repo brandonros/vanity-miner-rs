@@ -5,7 +5,10 @@ pub(crate) mod cuda;
 #[cfg(feature = "cumetal")]
 pub(crate) mod cumetal;
 
-#[cfg(not(feature = "cumetal"))]
 pub(crate) mod shared_best_hash;
 
 pub(crate) mod args;
+
+#[cfg(any(feature = "gpu", feature = "cumetal", test))]
+#[cfg_attr(not(any(feature = "gpu", feature = "cumetal")), allow(dead_code))]
+mod device;

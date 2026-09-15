@@ -45,7 +45,6 @@ impl ShallengeArgs {
             suffix_len: 0,
             cpu_threads: None,
             cuda_module: Some("shallenge"),
-            continuous_candidates: false,
             description: format!(
                 "Starting shallenge for username '{}' with target hash '{}'",
                 username, target_hash

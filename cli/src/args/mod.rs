@@ -174,8 +174,6 @@ pub struct CommandDetails {
     pub cpu_threads: Option<usize>,
     #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
     pub cuda_module: Option<&'static str>,
-    #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
-    pub continuous_candidates: bool,
 }
 
 impl Command {
@@ -203,7 +201,6 @@ impl Command {
                 suffix_len: 0,
                 cpu_threads: None,
                 cuda_module: None,
-                continuous_candidates: false,
                 description: "Running on-device self-test".into(),
             },
         }

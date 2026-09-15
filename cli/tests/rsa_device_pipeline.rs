@@ -1,5 +1,5 @@
 #![cfg(feature = "rsa-modulus")]
-use logic::modes::rsa_modulus::pipeline::{self, SearchConfig, Task};
+use logic::modes::rsa_modulus::{self as pipeline, SearchConfig, Task};
 use num_bigint_dig::{BigUint, ModInverse};
 
 fn bytes<const N: usize>(n: &BigUint) -> [u8; N] {

@@ -1,7 +1,7 @@
 use crate::runner::cumetal::{
     CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
 };
-use crate::runner::{progress::GlobalStats, session::run_with_launch_limit};
+use crate::runner::{progress::GlobalStats, session::run_device_session};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -12,21 +12,28 @@ pub fn run(
 ) -> Result<(), Error> {
     let config = args.config(1);
     let module = runner.module(driver, "kernel_p256_public_key_vanity")?;
-    let mut engine = CumetalBatchTransport {
+    let mut engine = CumetalBatchTransport::new(
         driver,
         module,
-        verify: runner.options.verify,
-    };
-    run_with_launch_limit(stats, "keys", runner.options.batches, |control| {
-        let report = crate::modes::p256_public_key::run_device(
-            &config,
-            control,
-            &mut |r, p, m, start, count| {
-                engine.evaluate(r, p, m, start, count, |counter| {
-                    logic::modes::p256_public_key::p256_public(r, counter, p)
-                })
-            },
-        );
-        report.map(|r| r.found)
-    })
+        runner.options.verify,
+        runner.options.threads_per_block,
+    );
+    run_device_session(
+        stats,
+        "keys",
+        runner.options.batches,
+        runner.options.blocks * runner.options.threads_per_block,
+        |control| {
+            let report = crate::modes::p256_public_key::run_device(
+                &config,
+                control,
+                &mut |r, p, m, start, count| {
+                    engine.evaluate(r, p, m, start, count, |counter| {
+                        logic::modes::p256_public_key::p256_public(r, counter, p)
+                    })
+                },
+            );
+            report.map(|_| ())
+        },
+    )
 }

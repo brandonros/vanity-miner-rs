@@ -29,12 +29,6 @@ pub trait Runner {
     ) -> Result<(), Box<dyn Error + Send + Sync>>;
 }
 
-#[cfg(any(
-    feature = "p256-public-key",
-    feature = "p256-signature",
-    feature = "rsa-modulus",
-    feature = "rsa-pss"
-))]
 pub mod batches;
 pub mod modules;
 pub mod progress;

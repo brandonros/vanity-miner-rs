@@ -93,7 +93,6 @@ impl BitcoinArgs {
             suffix_len: suffix.len(),
             cpu_threads: None,
             cuda_module: Some("bitcoin"),
-            continuous_candidates: false,
             description: format!(
                 "Searching for bitcoin vanity key with prefix '{}' and suffix '{}'",
                 prefix, suffix

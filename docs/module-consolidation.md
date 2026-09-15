@@ -80,7 +80,7 @@ Paths below are relative to the repository. The left column records the source l
 | `cli/src/modes/rsa_modulus/mod.rs` | `cli/src/modes/rsa_modulus/mod.rs` | Keep under its mode; update imports and declarations |
 | `cli/src/modes/rsa_modulus/search/constraints.rs` | `cli/src/modes/rsa_modulus/constraints.rs` | Mode owns its algorithm, result verification, and tests |
 | `cli/src/modes/rsa_modulus/search/cpu.rs` | `cli/src/modes/rsa_modulus/cpu.rs` | Mode owns its algorithm, result verification, and tests |
-| `cli/src/modes/rsa_modulus/search/device.rs` | `cli/src/modes/rsa_modulus/device.rs` | Mode owns its algorithm, result verification, and tests |
+| `cli/src/modes/rsa_modulus/search/device.rs` | Removed; `cli/src/modes/rsa_modulus/pipeline.rs` and backend adapters | Both device backends use persistent RSA stages |
 | `cli/src/modes/rsa_modulus/search/mod.rs` | `cli/src/modes/rsa_modulus/mod.rs` | Mode owns its algorithm, result verification, and tests |
 | `cli/src/modes/rsa_modulus/search/pipeline.rs` | `cli/src/modes/rsa_modulus/pipeline.rs` | Mode owns its algorithm, result verification, and tests |
 | `cli/src/modes/rsa_modulus/search/tests.rs` | `cli/src/modes/rsa_modulus/tests.rs` | Mode owns its algorithm, result verification, and tests |
@@ -110,7 +110,7 @@ Paths below are relative to the repository. The left column records the source l
 | `cli/src/runner/cpu.rs` | `cli/src/runner/cpu.rs` | Keep backend execution responsibility; update imports |
 | `cli/src/runner/cuda_buffers.rs` | `cli/src/runner/cuda/buffers.rs` | Shared persistent device allocations and erasure |
 | `cli/src/runner/cuda_transport.rs` | `cli/src/runner/cuda/batch.rs` | Consolidate the persistent candidate transport and its newer replacement under one owner |
-| `cli/src/runner/cumetal/address_transport.rs` | `cli/src/runner/cumetal/address_transport.rs` | Keep backend execution responsibility; update imports |
+| `cli/src/runner/cumetal/address_transport.rs` | Removed; `cli/src/runner/cumetal/batch_transport.rs` | All candidate modes now share structured results and persistent buffers |
 | `cli/src/runner/cumetal/batch_transport.rs` | `cli/src/runner/cumetal/batch_transport.rs` | Keep backend execution responsibility; update imports |
 | `cli/src/runner/cumetal/driver.rs` | `cli/src/runner/cumetal/driver.rs` | Keep backend execution responsibility; update imports |
 | `cli/src/runner/cumetal/mod.rs` | `cli/src/runner/cumetal/mod.rs` | Keep backend execution responsibility; update imports |
@@ -170,8 +170,8 @@ Paths below are relative to the repository. The left column records the source l
 | `logic/src/modes/mod.rs` | `logic/src/modes/mod.rs` | Keep under its mode; update imports and declarations |
 | `logic/src/modes/p256_public_key_vanity.rs` | `logic/src/modes/p256_public_key.rs` | Same mode name across crates; device-compatible implementation |
 | `logic/src/modes/p256_signature_vanity.rs` | `logic/src/modes/p256_signature.rs` | Same mode name across crates; device-compatible implementation |
-| `logic/src/modes/rsa_modulus_vanity.rs` | `logic/src/modes/rsa_modulus/mod.rs` | Same mode name across crates; device-compatible implementation |
-| `logic/src/modes/rsa_modulus_vanity/pipeline.rs` | `logic/src/modes/rsa_modulus/pipeline.rs` | Mode-owned fixed-width device pipeline |
+| `logic/src/modes/rsa_modulus_vanity.rs` | `logic/src/modes/rsa_modulus.rs` | Same mode name across crates; device-compatible implementation |
+| `logic/src/modes/rsa_modulus_vanity/pipeline.rs` | `logic/src/modes/rsa_modulus.rs` | Mode-owned fixed-width device pipeline |
 | `logic/src/modes/rsa_pss_signature_vanity.rs` | `logic/src/modes/rsa_pss.rs` | Same mode name across crates; device-compatible implementation |
 | `logic/src/modes/shallenge.rs` | `logic/src/modes/shallenge.rs` | Keep under its mode; update imports and declarations |
 | `logic/src/modes/solana_vanity.rs` | `logic/src/modes/solana.rs` | Same mode name across crates; device-compatible implementation |
@@ -216,14 +216,37 @@ Paths below are relative to the repository. The left column records the source l
 | `logic/src/self_test/solana/layout_probes.rs` | `logic/src/self_test/solana/layout_probes.rs` | Keep: mode checks, case inventory, fixtures, or focused arithmetic probe |
 | `logic/src/self_test/solana/mod.rs` | `logic/src/self_test/solana/mod.rs` | Keep: mode checks, case inventory, fixtures, or focused arithmetic probe |
 
-## Validation
+## Removal of superseded execution paths
 
-- Aggregate CPU and CuMetal compilation passed. All 24 individual CPU, CuMetal, and CPU self-test feature combinations passed `cargo check --all-targets` without warnings.
-- Final release host tests: 45 library tests, 8 RSA pipeline integration tests, and 1 independent RSA-PSS interoperability test passed. The earlier debug host suite also passed.
-- Shared logic: 78 tests passed. The actual CLI `self-test` command passed all 160 checks.
-- Kernel self-test slot ownership and guard checks passed on the host. CuMetal runner tests: 24 passed.
-- The Linux Lima aggregate release build compiled all eight CUDA production modes and eight self-test PTX modules successfully. A final repeat and individual CUDA feature checks were interrupted by host disk exhaustion and Lima EXT4 journal/write errors. Those additional checks remain incomplete.
-- CUDA runtime execution remains unverified: the Lima builder has no NVIDIA GPU.
-- Root workspace formatting and `git diff --check` passed.
+- Device workers execute once for their lifetime; the winner-round coordinator is removed.
+- Candidate modes use one evaluation and verification path. First-match library calls
+  stop after verification; continuous device sessions overlap launches and verification.
+- CUDA and CuMetal share structured candidate results for addresses, nonces, P-256,
+  and RSA-PSS. Address/nonce output is reconstructed on the CPU before publication.
+- RSA modulus uses the same persistent four-stage pipeline on both device backends.
+  The old batch request, host device constructor, and versioned entry points are removed.
+  CPU modulus construction and independent arithmetic references remain.
+- Both LLVM 7 and LLVM 21 build configurations remain supported.
 
-The disk incident was mitigated by removing disposable host incremental compiler caches (about 2 GB). No source files or compiled executables were deleted. The Lima filesystem failure needs separate recovery before further builds there.
+Rebuild host binaries, PTX overrides, and CuMetal artifacts together after these ABI changes.
+CuMetal's RSA `--batches` limit counts pipeline cycles, each containing four kernel launches.
+Match statistics count verified exported records; a batch can contain additional matching lanes.
+
+`BATCH_SIZE` now controls all CUDA candidate batches. It replaces `CRYPTO_BATCH_SIZE`;
+the old `BLOCKS_PER_SM` address-only launch setting is removed.
+
+## Validation after removal
+
+- Aggregate CPU and CuMetal compilation passed. All 16 individual production-mode
+  CPU/CuMetal combinations passed `cargo check --all-targets`.
+- Host tests: 49 CLI library tests, 8 RSA pipeline integration tests, and 1 independent
+  RSA-PSS interoperability test passed. The CuMetal configuration passed 48 library tests.
+- Shared logic: 78 tests passed. The actual CPU CLI `self-test` command passed all 160 checks.
+- All eight kernel modes passed host compilation; the kernel self-test slot and guard test passed.
+- The Linux Lima LLVM 21 release check compiled all eight CUDA production PTX modules
+  and eight self-test PTX modules. LLVM 7 configuration is retained; it was not rebuilt here.
+- CUDA runtime execution remains unverified because the Lima builder has no NVIDIA GPU.
+- CuMetal runtime execution remains unverified. The installed Nix compiler rejects
+  `shf.l.wrap.b32` in the generated Shallenge and RSA PTX. The installed Apple compiler
+  rejects pointer subtraction in the Shallenge PTX. These attempts did not reach kernel execution.
+- Root and kernel workspace formatting, shell syntax, and `git diff --check` passed.

@@ -14,7 +14,7 @@ pub struct CumetalOptions {
     pub module_dir: Option<PathBuf>,
     #[arg(long, global = true, default_value = "cumetalc")]
     pub cumetalc: PathBuf,
-    /// Stop after this many launches; omitted means keep searching.
+    /// Stop after this many batches (four kernel stages per RSA modulus batch); omitted means keep searching.
     #[arg(long, global=true, value_parser=clap::value_parser!(u64).range(1..))]
     pub batches: Option<u64>,
     #[arg(long, global=true, default_value_t=32, value_parser=clap::value_parser!(u32).range(1..=1024))]

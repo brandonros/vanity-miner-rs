@@ -6,12 +6,6 @@
     feature = "rsa-modulus"
 ))]
 pub mod candidate_derivation;
-#[cfg(any(
-    feature = "p256-public-key",
-    feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
-))]
 pub mod candidate_result;
 pub mod hex_pattern;
 #[cfg(any(feature = "p256-signature", feature = "rsa-pss"))]

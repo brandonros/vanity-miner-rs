@@ -2,12 +2,14 @@
 //! Signatures match CuMetal's public CUDA driver header; no NVIDIA SDK is needed.
 use super::Error;
 use libloading::Library;
+use logic::search::device_record::DeviceRecord;
 use std::{
     ffi::{CString, c_void},
     path::Path,
     ptr,
     rc::Rc,
 };
+use zeroize::{Zeroize, Zeroizing};
 type Handle = *mut c_void;
 type Init = unsafe extern "C" fn(u32) -> i32;
 type Create = unsafe extern "C" fn(*mut Handle, u32, i32) -> i32;
@@ -82,7 +84,13 @@ impl Driver {
     }
     pub fn buffer(self: &Rc<Self>, initial: &[u8]) -> Result<Buffer, Error> {
         // Guard both sides. Empty inputs still get a valid device address.
-        let mut bytes = vec![0xa5; initial.len() + 32];
+        let mut bytes = Zeroizing::new(vec![
+            0xa5;
+            initial
+                .len()
+                .checked_add(32)
+                .ok_or("device allocation overflow")?
+        ]);
         bytes[16..16 + initial.len()].copy_from_slice(initial);
         let mut b = Buffer {
             driver: self.clone(),
@@ -132,7 +140,6 @@ pub struct Buffer {
     size: usize,
 }
 impl Buffer {
-    #[cfg(feature = "crypto-cli")]
     pub fn clear(&self) -> Result<(), Error> {
         let zeros = vec![0u8; self.size + 32];
         unsafe {
@@ -144,11 +151,43 @@ impl Buffer {
         }
     }
 
+    /// Update data in place, retaining guard bytes and allocation ownership.
+    pub fn write(&self, bytes: &[u8]) -> Result<(), Error> {
+        if bytes.len() != self.size {
+            return Err("device buffer size changed".into());
+        }
+        unsafe {
+            check(
+                (self.driver.to_device)(self.pointer(), bytes.as_ptr().cast(), bytes.len()),
+                "cuMemcpyHtoD",
+            )
+        }
+    }
+
+    pub fn read_records<T: DeviceRecord + Zeroize>(
+        &self,
+        count: usize,
+    ) -> Result<Zeroizing<Vec<T>>, Error> {
+        let size = std::mem::size_of::<T>();
+        if size == 0 || count.checked_mul(size).is_none_or(|n| n > self.size) {
+            return Err("device record count exceeds allocation".into());
+        }
+        let bytes = Zeroizing::new(self.read()?);
+        // SAFETY: DeviceRecord accepts every bit pattern; bounded chunks have
+        // exactly the record's size. The transfer buffer need not be aligned.
+        Ok(Zeroizing::new(
+            bytes[..count * size]
+                .chunks_exact(size)
+                .map(|bytes| unsafe { std::ptr::read_unaligned(bytes.as_ptr().cast::<T>()) })
+                .collect(),
+        ))
+    }
+
     pub fn pointer(&self) -> u64 {
         self.base + 16
     }
     pub fn read(&self) -> Result<Vec<u8>, Error> {
-        let mut bytes = vec![0; self.size + 32];
+        let mut bytes = Zeroizing::new(vec![0; self.size + 32]);
         unsafe {
             check(
                 (self.driver.to_host)(bytes.as_mut_ptr().cast(), self.base, bytes.len()),
@@ -168,6 +207,9 @@ impl Buffer {
 impl Drop for Buffer {
     fn drop(&mut self) {
         if self.base != 0 {
+            if let Err(error) = self.clear() {
+                eprintln!("CuMetal buffer erasure failed: {error}");
+            }
             unsafe {
                 (self.driver.free)(self.base);
             }
@@ -214,4 +256,10 @@ impl Drop for Module {
             }
         }
     }
+}
+
+/// Initialized integer records have an exact, padding-free byte representation.
+pub fn record_bytes<T: DeviceRecord>(values: &[T]) -> &[u8] {
+    // SAFETY: guaranteed by DeviceRecord, including initialization of all bytes.
+    unsafe { std::slice::from_raw_parts(values.as_ptr().cast(), std::mem::size_of_val(values)) }
 }

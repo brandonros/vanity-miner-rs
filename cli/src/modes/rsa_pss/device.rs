@@ -5,7 +5,7 @@ impl Prepared<'_> {
         &self,
         control: &SearchControl,
         device: &mut EvaluateBatch<'_>,
-    ) -> Result<Option<Winner>, String> {
+    ) -> Result<Option<String>, String> {
         let config = self.config;
         let pattern = &self.pattern;
         let key = &self.key;
@@ -36,35 +36,17 @@ impl Prepared<'_> {
             salt_length: base_salt.len() as u32,
         });
         request.salt[..base_salt.len()].copy_from_slice(base_salt);
-        if control.continuous_device() {
-            crate::runner::batches::stream(
-                |start, count| device(&request, pattern, original, start, count),
-                limit,
-                control,
-                |counter, bytes| {
-                    self.format_winner(Winner {
-                        counter,
-                        signature: *bytes,
-                    })
-                },
-            )?;
-            return Ok(None);
-        }
-        let found = crate::runner::batches::find(
+        crate::runner::batches::search(
             |start, count| device(&request, pattern, original, start, count),
             limit,
             control,
             |counter, bytes| {
-                let winner = Winner {
+                self.format_winner(Winner {
                     counter,
                     signature: *bytes,
-                };
-                self.verify_winner(&winner).map(|_| true)
+                })
+                .map(Some)
             },
-        )?;
-        Ok(found.map(|(counter, result)| Winner {
-            counter,
-            signature: result.bytes,
-        }))
+        )
     }
 }

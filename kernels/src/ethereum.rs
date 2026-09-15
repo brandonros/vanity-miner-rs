@@ -1,55 +1,34 @@
+//! Structured candidate entry for ethereum.
 use cuda_std::prelude::*;
+use logic::search::{
+    candidate_result::{BatchResult, CandidateResult},
+    xoroshiro::BatchSeed,
+};
 
+/// # Safety
+/// Request and pattern are valid aligned records. Message is readable for its
+/// length. Output is initialized to EMPTY; inputs remain alive through synchronization.
 #[kernel]
-#[allow(improper_ctypes_definitions, clippy::missing_safety_doc)]
-pub unsafe extern "C" fn kernel_find_ethereum_vanity_private_key(
-    // input
-    vanity_prefix_ptr: *const u8, 
-    vanity_prefix_len: usize, 
-    vanity_suffix_ptr: *const u8,
-    vanity_suffix_len: usize,
-    rng_seed: u64,
-    // output
-    found_matches_slice_ptr: *mut u32,
-    found_private_key_ptr: *mut u8,
-    found_public_key_ptr: *mut u8,
-    found_address_ptr: *mut u8,
-    found_thread_idx_slice_ptr: *mut u32,
+pub unsafe extern "C" fn kernel_ethereum_vanity(
+    request: *const BatchSeed,
+    pattern: *const logic::search::vanity::BytePattern,
+    _message: *const u8,
+    _message_len: usize,
+    start: u64,
+    count: u32,
+    output: *mut BatchResult,
 ) {
-    // Prepare request
-    let thread_idx = cuda_std::thread::index() as usize;
-    // Empty device buffers may have null pointers, which cannot back Rust slices.
-    let vanity_prefix = if vanity_prefix_len == 0 {
-        &[]
-    } else {
-        unsafe { core::slice::from_raw_parts(vanity_prefix_ptr, vanity_prefix_len) }
+    let lane = cuda_std::thread::index() as usize;
+    if lane >= count as usize {
+        return;
+    }
+    let result = match start.checked_add(lane as u64) {
+        Some(counter) => unsafe {
+            logic::modes::ethereum::candidate(&*request, counter, &*pattern)
+        },
+        None => CandidateResult::ERROR,
     };
-    let vanity_suffix = if vanity_suffix_len == 0 {
-        &[]
-    } else {
-        unsafe { core::slice::from_raw_parts(vanity_suffix_ptr, vanity_suffix_len) }
-    };
-    let request = logic::modes::ethereum::EthereumVanityKeyRequest {
-        prefix: vanity_prefix,
-        suffix: vanity_suffix,
-        thread_idx,
-        rng_seed,
-    };
-    
-    // Call pure business logic
-    let result = logic::modes::ethereum::generate_and_check_ethereum_vanity_key(&request);
-    
-    // Handle result (adapter layer)
-    if result.matches {
-        handle_match! {
-            thread_idx: thread_idx,
-            found_matches_ptr: found_matches_slice_ptr,
-            copies: [
-                result.private_key => found_private_key_ptr, 32;
-                result.public_key => found_public_key_ptr, 64;
-                result.address => found_address_ptr, 20;
-            ],
-            found_thread_idx_ptr: found_thread_idx_slice_ptr,
-        }
+    unsafe {
+        crate::match_handler::record(lane, result, output);
     }
 }

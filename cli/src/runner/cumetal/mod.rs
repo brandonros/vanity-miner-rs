@@ -7,7 +7,15 @@ use crate::modes::ethereum::args::EthereumArgs;
 use crate::modes::shallenge::args::ShallengeArgs;
 #[cfg(feature = "solana")]
 use crate::modes::solana::args::SolanaArgs;
-#[cfg(feature = "crypto-cli")]
+#[cfg(any(
+    feature = "solana",
+    feature = "bitcoin",
+    feature = "ethereum",
+    feature = "shallenge",
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss"
+))]
 pub(crate) mod batch_transport;
 pub(crate) mod driver;
 use crate::{args::Command, runner::Runner, runner::progress::GlobalStats};
@@ -81,11 +89,4 @@ impl Runner for CumetalRunner {
 
 mod options;
 pub use options::CumetalOptions;
-#[cfg(any(
-    feature = "solana",
-    feature = "bitcoin",
-    feature = "ethereum",
-    feature = "shallenge"
-))]
-pub(crate) mod address_transport;
 mod module;

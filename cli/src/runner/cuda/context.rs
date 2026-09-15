@@ -7,9 +7,7 @@ use std::error::Error;
 pub struct GpuContext {
     module: Option<cust::module::Module>,
     pub stream: Stream,
-    pub blocks_per_grid: usize,
     pub threads_per_block: usize,
-    pub operations_per_launch: usize,
     // Keep context alive for the lifetime of GpuContext
     #[allow(dead_code)]
     ctx: Context,
@@ -79,30 +77,22 @@ impl GpuContext {
 
         let stream = Stream::new(StreamFlags::NON_BLOCKING, None)?;
 
-        let number_of_streaming_multiprocessors =
-            device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)? as usize;
-        let blocks_per_sm = std::env::var("BLOCKS_PER_SM")
-            .unwrap_or_else(|_| "128".to_string())
-            .parse::<usize>()?;
         let threads_per_block = Self::configured_threads_per_block()?;
-        let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
-        let operations_per_launch = blocks_per_grid * threads_per_block;
 
         let module = load()?;
         Ok(Self {
             module,
             stream,
-            blocks_per_grid,
             threads_per_block,
-            operations_per_launch,
             ctx,
         })
     }
 
-    pub fn print_launch_info(&self, ordinal: usize, mode_name: &str) {
+    pub fn print_launch_info(&self, ordinal: usize, mode_name: &str, count: u32) {
         println!(
-            "[{ordinal}] Starting {mode_name} search loop ({} blocks per grid, {} threads per block, {} operations per launch)",
-            self.blocks_per_grid, self.threads_per_block, self.operations_per_launch
+            "[{ordinal}] Starting {mode_name} search ({} blocks, {} threads/block, up to {count} candidates/launch)",
+            count.div_ceil(self.threads_per_block as u32),
+            self.threads_per_block
         );
     }
 }
