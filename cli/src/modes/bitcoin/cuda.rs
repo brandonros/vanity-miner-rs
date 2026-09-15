@@ -1,8 +1,8 @@
-use crate::common::GlobalStats;
+use crate::runner::progress::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 
-use crate::common::GpuContext;
+use crate::runner::cuda::context::GpuContext;
 use cust::launch;
 use cust::memory::CopyDestination;
 use cust::util::SliceExt;
@@ -14,12 +14,12 @@ pub fn run(
     suffix: String,
     gpu: &GpuContext,
     global_stats: Arc<GlobalStats>,
-    control: Arc<vanity_miner::search_control::SearchControl>,
+    control: Arc<crate::runner::session::SearchControl>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let prefix_bytes = prefix.as_bytes().to_vec();
     let suffix_bytes = suffix.as_bytes().to_vec();
 
-    let module = &gpu.module;
+    let module = gpu.module()?;
     let kernel = module.get_function("kernel_find_bitcoin_vanity_private_key")?;
     gpu.print_launch_info(ordinal, "bitcoin vanity");
 
@@ -92,7 +92,7 @@ pub fn run(
 
             // Generate WIF private key format
             let mut encoded_private_key = [0u8; 64];
-            let encoded_private_key_len = logic::modes::bitcoin_vanity::private_key_to_wif(
+            let encoded_private_key_len = logic::modes::bitcoin::private_key_to_wif(
                 &found_private_key,
                 true,
                 false,

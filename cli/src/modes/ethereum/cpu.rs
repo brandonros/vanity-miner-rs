@@ -1,8 +1,8 @@
-use crate::common::GlobalStats;
+use crate::runner::progress::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 
-use crate::common::spawn_cpu_workers;
+use crate::runner::workers::cpu::spawn_cpu_workers;
 use rand::Rng as _;
 
 struct WorkerData {
@@ -14,24 +14,23 @@ struct WorkerData {
 fn worker(
     thread_id: usize,
     data: Arc<WorkerData>,
-    cancelled: Arc<std::sync::atomic::AtomicBool>,
+    cancelled: Arc<crate::runner::session::SearchControl>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut rng = rand::thread_rng();
 
     println!("[CPU-{thread_id}] Starting CPU ethereum vanity worker thread");
 
-    while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+    while !cancelled.stopped() {
         let rng_seed: u64 = rng.r#gen();
 
-        let request = logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
+        let request = logic::modes::ethereum::EthereumVanityKeyRequest {
             prefix: &data.prefix_bytes,
             suffix: &data.suffix_bytes,
             thread_idx: thread_id,
             rng_seed,
         };
 
-        let result =
-            logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(&request);
+        let result = logic::modes::ethereum::generate_and_check_ethereum_vanity_key(&request);
 
         data.global_stats.add_launch(1);
 

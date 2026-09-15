@@ -13,6 +13,8 @@ use zeroize::Zeroize;
 pub enum CandidateDomain {
     P256PrivateKey,
     P256Ephemeral,
+    RsaFactor,
+    RsaRangeStart,
 }
 
 impl CandidateDomain {
@@ -20,6 +22,8 @@ impl CandidateDomain {
         match self {
             Self::P256PrivateKey => b"p256-private-key",
             Self::P256Ephemeral => b"p256-ecdsa-ephemeral",
+            Self::RsaFactor => b"rsa-factor",
+            Self::RsaRangeStart => b"rsa-range-start",
         }
     }
 }

@@ -1,5 +1,4 @@
 use crate::args::Command;
-use crate::common::GlobalStats;
 #[cfg(any(
     feature = "solana",
     feature = "bitcoin",
@@ -9,7 +8,16 @@ use crate::common::GlobalStats;
     feature = "crypto-cli"
 ))]
 use crate::modes;
+#[cfg(feature = "bitcoin")]
+use crate::modes::bitcoin::args::BitcoinArgs;
+#[cfg(feature = "ethereum")]
+use crate::modes::ethereum::args::EthereumArgs;
+#[cfg(feature = "shallenge")]
+use crate::modes::shallenge::args::ShallengeArgs;
+#[cfg(feature = "solana")]
+use crate::modes::solana::args::SolanaArgs;
 use crate::runner::Runner;
+use crate::runner::progress::GlobalStats;
 use std::error::Error;
 use std::sync::Arc;
 
@@ -38,7 +46,7 @@ impl Runner for CpuRunner {
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
         println!(
             "Starting CPU mode with {} threads",
-            command.cpu_threads(self.num_threads)
+            command.details().cpu_threads.unwrap_or(self.num_threads)
         );
         let _ = &stats;
 
@@ -60,22 +68,22 @@ impl Runner for CpuRunner {
                 modes::p256_signature::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "solana")]
-            Command::SolanaVanity { prefix, suffix } => {
+            Command::SolanaVanity(SolanaArgs { prefix, suffix }) => {
                 modes::solana::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
             #[cfg(feature = "bitcoin")]
-            Command::BitcoinVanity { prefix, suffix } => {
+            Command::BitcoinVanity(BitcoinArgs { prefix, suffix }) => {
                 modes::bitcoin::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
             #[cfg(feature = "ethereum")]
-            Command::EthereumVanity { prefix, suffix } => {
+            Command::EthereumVanity(EthereumArgs { prefix, suffix }) => {
                 modes::ethereum::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
             }
             #[cfg(feature = "shallenge")]
-            Command::Shallenge {
+            Command::Shallenge(ShallengeArgs {
                 username,
                 target_hash,
-            } => {
+            }) => {
                 let target_hash_bytes = hex::decode(target_hash)?;
                 modes::shallenge::cpu::run(
                     self.num_threads,

@@ -74,7 +74,7 @@ pub fn check_p256_public_key_y_encoding() -> u32 {
 
 fn self_test_digest_p256_public() -> [u8; 32] {
     use crate::crypto::sha256::Sha256;
-    use crate::{modes::p256_public_key_vanity::*, search::hex_pattern::HexPattern};
+    use crate::{modes::p256_public_key::*, search::hex_pattern::HexPattern};
     let mut h = Sha256::new();
     for (target, width) in [(0, 32), (1, 32), (2, 64), (3, 65)] {
         let request = black_box(P256PublicRequest {

@@ -106,7 +106,7 @@ pub fn check_p256_signature_ephemeral_hmac() -> u32 {
 
 fn self_test_digest_p256_signature() -> [u8; 32] {
     use crate::crypto::sha256::Sha256;
-    use crate::{modes::p256_signature_vanity::*, search::hex_pattern::HexPattern};
+    use crate::{modes::p256_signature::*, search::hex_pattern::HexPattern};
     let mut h = Sha256::new();
     let mut private = [0; 32];
     private[31] = 1;

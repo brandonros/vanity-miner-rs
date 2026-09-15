@@ -1,9 +1,9 @@
 //! ethereum self-tests: primitives, pipeline stages, and regressions.
 use crate::crypto::keccak256::keccak256_64bytes;
 use crate::crypto::secp256k1::secp256k1_derive_public_key_uncompressed;
-use crate::modes::ethereum_vanity::EthereumVanityKeyRequest;
-use crate::modes::ethereum_vanity::EthereumVanityKeyResult;
-use crate::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key;
+use crate::modes::ethereum::EthereumVanityKeyRequest;
+use crate::modes::ethereum::EthereumVanityKeyResult;
+use crate::modes::ethereum::generate_and_check_ethereum_vanity_key;
 
 // === Non-solana primitive bisect (slots 4-9) ===
 // Same idea as slots 0-3, but for the primitives consumed by the bitcoin /

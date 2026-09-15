@@ -43,3 +43,27 @@ pub fn expected(first: &[u8], second: &[u8], seed: u64, index: usize) -> Result<
 
 pub const ENTRY: &str = "kernel_find_better_shallenge_nonce";
 pub const PAYLOAD_SIZES: &[usize] = &[32, 64, 8];
+
+pub fn run(
+    runner: &crate::runner::cumetal::CumetalRunner,
+    username: &str,
+    target_hash: &str,
+    driver: &std::rc::Rc<crate::runner::cumetal::driver::Driver>,
+    stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+) -> Result<(), Error> {
+    use crate::runner::cumetal::address_transport::{AddressBatch, ParameterLayout};
+    let (first, second) = inputs(username, target_hash)?;
+    runner.address_search(
+        AddressBatch {
+            entry: ENTRY,
+            payload_sizes: PAYLOAD_SIZES,
+            first,
+            second,
+            layout: ParameterLayout::Shallenge,
+            reference: expected,
+            print: print_payloads,
+        },
+        driver,
+        stats,
+    )
+}

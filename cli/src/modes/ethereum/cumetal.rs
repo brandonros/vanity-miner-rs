@@ -15,8 +15,8 @@ pub fn inputs(prefix: &str, suffix: &str) -> Result<(Vec<u8>, Vec<u8>), Error> {
 
 pub fn expected(first: &[u8], second: &[u8], seed: u64, index: usize) -> Result<Expected, Error> {
     Ok({
-        let r = logic::modes::ethereum_vanity::generate_and_check_ethereum_vanity_key(
-            &logic::modes::ethereum_vanity::EthereumVanityKeyRequest {
+        let r = logic::modes::ethereum::generate_and_check_ethereum_vanity_key(
+            &logic::modes::ethereum::EthereumVanityKeyRequest {
                 prefix: &first,
                 suffix: &second,
                 thread_idx: index,
@@ -36,3 +36,53 @@ pub fn expected(first: &[u8], second: &[u8], seed: u64, index: usize) -> Result<
 
 pub const ENTRY: &str = "kernel_find_ethereum_vanity_private_key";
 pub const PAYLOAD_SIZES: &[usize] = &[32, 64, 20];
+
+pub fn run(
+    runner: &crate::runner::cumetal::CumetalRunner,
+    prefix: &str,
+    suffix: &str,
+    driver: &std::rc::Rc<crate::runner::cumetal::driver::Driver>,
+    stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+) -> Result<(), Error> {
+    use crate::runner::cumetal::address_transport::{AddressBatch, ParameterLayout};
+    let (first, second) = inputs(prefix, suffix)?;
+    runner.address_search(
+        AddressBatch {
+            entry: ENTRY,
+            payload_sizes: PAYLOAD_SIZES,
+            first,
+            second,
+            layout: ParameterLayout::Patterns,
+            reference: expected,
+            print: print_payloads,
+        },
+        driver,
+        stats,
+    )
+}
+
+#[cfg(test)]
+mod input_tests {
+    use super::*;
+
+    #[test]
+    fn ethereum_hex_patterns_match_known_seed_address() {
+        let (prefix, suffix) = inputs("5395", "279A").unwrap();
+        let candidate = logic::modes::ethereum::generate_and_check_ethereum_vanity_key(
+            &logic::modes::ethereum::EthereumVanityKeyRequest {
+                prefix: &prefix,
+                suffix: &suffix,
+                thread_idx: 0,
+                rng_seed: 1,
+            },
+        );
+        assert_eq!(
+            hex::encode(candidate.address),
+            "539571f1569bfcb63397630dd2e7765555ae279a"
+        );
+        assert!(candidate.matches, "known nonempty hex patterns must match");
+        for invalid in ["539", "zz"] {
+            assert!(inputs(invalid, "").is_err());
+        }
+    }
+}

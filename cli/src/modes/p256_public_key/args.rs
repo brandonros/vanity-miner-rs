@@ -1,4 +1,4 @@
-use crate::common::pattern_args::PatternArgs;
+use crate::args::pattern::PatternArgs;
 use clap::Args;
 use clap::ValueEnum;
 
@@ -19,9 +19,9 @@ pub struct P256PublicArgs {
 }
 
 impl P256PublicArgs {
-    pub fn config(&self, workers: usize) -> vanity_miner::search::p256_public_key::PublicKeySearch {
+    pub fn config(&self, workers: usize) -> crate::modes::p256_public_key::PublicKeySearch {
         use logic::crypto::p256::PublicTarget as Target;
-        vanity_miner::search::p256_public_key::PublicKeySearch {
+        crate::modes::p256_public_key::PublicKeySearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
             target: match self.target {
@@ -32,5 +32,16 @@ impl P256PublicArgs {
             },
             workers: self.pattern.threads.unwrap_or(workers),
         }
+    }
+}
+
+impl P256PublicArgs {
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.config(1).validate()?;
+        Ok(())
+    }
+    pub fn details(&self) -> crate::args::CommandDetails {
+        self.pattern
+            .details("Searching NIST P-256 public points", "p256_public_key")
     }
 }

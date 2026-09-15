@@ -1,4 +1,4 @@
-use crate::common::pattern_args::PatternArgs;
+use crate::args::pattern::PatternArgs;
 use clap::Args;
 use clap::ValueEnum;
 use std::path::PathBuf;
@@ -32,11 +32,8 @@ pub struct RsaPssArgs {
 }
 
 impl RsaPssArgs {
-    pub fn config(
-        &self,
-        workers: usize,
-    ) -> Result<vanity_miner::search::rsa_pss::PssSearch, String> {
-        use vanity_miner::search::rsa_pss::PssSource;
+    pub fn config(&self, workers: usize) -> Result<crate::modes::rsa_pss::PssSearch, String> {
+        use crate::modes::rsa_pss::PssSource;
         if self.hash != "sha256" {
             return Err("only SHA-256 is supported".into());
         }
@@ -79,7 +76,7 @@ impl RsaPssArgs {
                 }
             }
         };
-        Ok(vanity_miner::search::rsa_pss::PssSearch {
+        Ok(crate::modes::rsa_pss::PssSearch {
             key: self.key.clone(),
             message: self.message.clone(),
             source,
@@ -87,5 +84,16 @@ impl RsaPssArgs {
             suffix: self.pattern.suffix.clone(),
             workers: self.pattern.threads.unwrap_or(workers),
         })
+    }
+}
+
+impl RsaPssArgs {
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.config(1)?.validate()?;
+        Ok(())
+    }
+    pub fn details(&self) -> crate::args::CommandDetails {
+        self.pattern
+            .details("Searching raw RSA-PSS signatures", "rsa_pss")
     }
 }

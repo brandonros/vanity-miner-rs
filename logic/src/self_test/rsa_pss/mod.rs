@@ -134,7 +134,7 @@ fn self_test_crt_key() -> crate::crypto::rsa_crt::Rsa2048Crt {
 
 fn self_test_digest_rsa_pss() -> [u8; 32] {
     use crate::crypto::sha256::Sha256;
-    use crate::{modes::rsa_pss_signature_vanity::*, search::hex_pattern::HexPattern};
+    use crate::{modes::rsa_pss::*, search::hex_pattern::HexPattern};
     let mut h = Sha256::new();
     let message = black_box(b"header\0\0footer");
     for source in [0, 1] {

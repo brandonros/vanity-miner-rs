@@ -5,9 +5,9 @@ use crate::crypto::ed25519::ed25519_derive_public_key;
 use crate::crypto::sha512::sha512_32bytes_from_bytes;
 use crate::encoding::base58::base58_encode;
 use crate::encoding::base58::base58_encode_32;
-use crate::modes::solana_vanity::SolanaVanityKeyRequest;
-use crate::modes::solana_vanity::SolanaVanityKeyResult;
-use crate::modes::solana_vanity::generate_and_check_solana_vanity_key;
+use crate::modes::solana::SolanaVanityKeyRequest;
+use crate::modes::solana::SolanaVanityKeyResult;
+use crate::modes::solana::generate_and_check_solana_vanity_key;
 use crate::search::xoroshiro::generate_random_private_key;
 
 // === Solana per-primitive bisect (slots 0-3) ===

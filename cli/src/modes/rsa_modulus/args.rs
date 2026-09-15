@@ -1,4 +1,4 @@
-use crate::common::pattern_args::PatternArgs;
+use crate::args::pattern::PatternArgs;
 use clap::Args;
 
 #[derive(Args, Clone)]
@@ -17,17 +17,28 @@ impl RsaModulusArgs {
     pub fn config(
         &self,
         workers: usize,
-    ) -> Result<vanity_miner::search::rsa_modulus::ModulusSearch, String> {
+    ) -> Result<crate::modes::rsa_modulus::ModulusSearch, String> {
         if self.bits != 2048 || self.public_exponent != 65537 {
             return Err("RSA modulus search requires --bits 2048 --public-exponent 65537".into());
         }
         if self.strategy != "constructive" {
             return Err("only constructive RSA modulus search is supported".into());
         }
-        Ok(vanity_miner::search::rsa_modulus::ModulusSearch {
+        Ok(crate::modes::rsa_modulus::ModulusSearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
             workers: self.pattern.threads.unwrap_or(workers),
         })
+    }
+}
+
+impl RsaModulusArgs {
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.config(1)?.validate()?;
+        Ok(())
+    }
+    pub fn details(&self) -> crate::args::CommandDetails {
+        self.pattern
+            .details("Constructing an RSA-2048 vanity modulus", "rsa_modulus")
     }
 }

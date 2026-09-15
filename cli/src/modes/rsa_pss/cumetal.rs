@@ -1,7 +1,7 @@
-use crate::common::{GlobalStats, search_session::run_with_launch_limit};
 use crate::runner::cumetal::{
     CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
 };
+use crate::runner::{progress::GlobalStats, session::run_with_launch_limit};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -19,22 +19,19 @@ pub fn run(
     };
     run_with_launch_limit(
         stats,
-        if matches!(
-            config.source,
-            vanity_miner::search::rsa_pss::PssSource::Salt { .. }
-        ) {
+        if matches!(config.source, crate::modes::rsa_pss::PssSource::Salt { .. }) {
             "salts"
         } else {
             "messages"
         },
         runner.options.batches,
         |control| {
-            let report = vanity_miner::search::rsa_pss::run_device(
+            let report = crate::modes::rsa_pss::run_device(
                 &config,
                 control,
                 &mut |r, p, m, start, count| {
                     engine.evaluate(r, p, m, start, count, |counter| {
-                        logic::modes::rsa_pss_signature_vanity::rsa_pss(r, m, counter, p)
+                        logic::modes::rsa_pss::rsa_pss(r, m, counter, p)
                     })
                 },
             );

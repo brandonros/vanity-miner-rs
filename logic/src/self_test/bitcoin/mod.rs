@@ -6,10 +6,10 @@ use crate::crypto::secp256k1::secp256k1_derive_public_key;
 use crate::crypto::sha256::sha256_32_from_bytes;
 use crate::encoding::base58::base58_encode;
 use crate::encoding::bech32::encode_p2wpkh_address;
-use crate::modes::bitcoin_vanity::BitcoinVanityKeyRequest;
-use crate::modes::bitcoin_vanity::BitcoinVanityKeyResult;
-use crate::modes::bitcoin_vanity::generate_and_check_bitcoin_vanity_key;
-use crate::modes::bitcoin_vanity::private_key_to_wif;
+use crate::modes::bitcoin::BitcoinVanityKeyRequest;
+use crate::modes::bitcoin::BitcoinVanityKeyResult;
+use crate::modes::bitcoin::generate_and_check_bitcoin_vanity_key;
+use crate::modes::bitcoin::private_key_to_wif;
 
 // === Non-solana primitive bisect (slots 4-9) ===
 // Same idea as slots 0-3, but for the primitives consumed by the bitcoin /

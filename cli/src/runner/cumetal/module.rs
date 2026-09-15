@@ -18,12 +18,12 @@ impl CumetalRunner {
             let input = if input.is_dir() {
                 #[cfg(feature = "self_test_support")]
                 let name = if entry.starts_with("kernel_self_test_") {
-                    vanity_miner::self_test_suite::module_name(entry)
+                    crate::runner::modules::self_test_module(entry)
                 } else {
-                    vanity_miner::kernel_modules::production_module(entry)
+                    crate::runner::modules::production_module(entry)
                 };
                 #[cfg(not(feature = "self_test_support"))]
-                let name = vanity_miner::kernel_modules::production_module(entry);
+                let name = crate::runner::modules::production_module(entry);
                 module_path = input.join(format!("{name}.ptx"));
                 &module_path
             } else {

@@ -6,7 +6,7 @@
 pub mod bitcoin;
 #[cfg(feature = "ethereum")]
 pub mod ethereum;
-#[cfg(all(feature = "self_test_support", not(feature = "cumetal")))]
+#[cfg(feature = "self_test_support")]
 pub mod self_test;
 #[cfg(feature = "shallenge")]
 pub mod shallenge;
@@ -21,3 +21,16 @@ pub mod p256_signature;
 pub mod rsa_modulus;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss;
+
+#[cfg(feature = "rsa-common")]
+pub(crate) mod rsa_keys;
+#[cfg(all(
+    test,
+    any(
+        feature = "p256-public-key",
+        feature = "p256-signature",
+        feature = "rsa-modulus",
+        feature = "rsa-pss"
+    )
+))]
+pub(crate) mod tests;

@@ -3,7 +3,7 @@
 //! ## Per-thread stack size
 //!
 //! Rust-CUDA's NVVM backend inlines whole pipelines per kernel. The k256
-//! (secp256k1) derive — used by `ethereum_vanity` and `bitcoin_vanity` — pulls
+//! (secp256k1) derive — used by `ethereum` and `bitcoin` — pulls
 //! in deep nested `.func` calls (`ProjectivePoint::add`/`::double`,
 //! `FieldElement::invert`, plus the SecretKey→Scalar→AffinePoint chain) that
 //! together overflow CUDA's default per-thread stack of **1024 bytes** the
@@ -17,7 +17,7 @@
 //! default. The original 118-slot self-test ran clean at 16 KiB; RSA/P-256 checks use the larger host-configured stack.
 //!
 //! The CLI sets `cudaLimitStackSize = 16 KiB` by default in
-//! `cli/src/common/gpu_context.rs`; override with `STACK_SIZE=N`. If you add
+//! `cli/src/runner/cuda/context.rs`; override with `STACK_SIZE=N`. If you add
 //! a kernel that composes k256 with an even deeper consumer, bump that
 //! default first.
 
@@ -31,82 +31,23 @@ compile_error!("GPU self-tests must be compiled separately with one self_test_<m
 #[macro_use]
 mod match_handler;
 
-#[cfg(feature = "bitcoin")]
-mod bitcoin_vanity;
-#[cfg(feature = "ethereum")]
-mod ethereum_vanity;
-#[cfg(feature = "shallenge")]
-mod shallenge;
 #[cfg(feature = "solana")]
-mod solana_vanity;
-
+pub mod solana;
 #[cfg(feature = "bitcoin")]
-pub use bitcoin_vanity::*;
+pub mod bitcoin;
 #[cfg(feature = "ethereum")]
-pub use ethereum_vanity::*;
+pub mod ethereum;
 #[cfg(feature = "shallenge")]
-pub use shallenge::*;
-#[cfg(feature = "solana")]
-pub use solana_vanity::*;
-
+pub mod shallenge;
 #[cfg(feature = "p256-public-key")]
-mod p256_public_key_vanity;
-#[cfg(feature = "p256-public-key")]
-pub use p256_public_key_vanity::*;
+pub mod p256_public_key;
 #[cfg(feature = "p256-signature")]
-mod p256_signature_vanity;
-#[cfg(feature = "p256-signature")]
-pub use p256_signature_vanity::*;
+pub mod p256_signature;
 #[cfg(feature = "rsa-pss")]
-mod rsa_pss_signature_vanity;
-#[cfg(feature = "rsa-pss")]
-pub use rsa_pss_signature_vanity::*;
+pub mod rsa_pss;
 #[cfg(feature = "rsa-modulus")]
-mod rsa_modulus_vanity;
-#[cfg(feature = "rsa-modulus")]
-pub use rsa_modulus_vanity::*;
-
+pub mod rsa_modulus;
 #[cfg(feature = "repro_nonce_sequence")]
-mod codegen_repros;
-#[cfg(feature = "repro_nonce_sequence")]
-pub use codegen_repros::*;
+pub mod codegen_repros;
 
-#[cfg(feature = "self_test_solana")]
-mod self_test_solana;
-#[cfg(feature = "self_test_solana")]
-pub use self_test_solana::*;
-
-#[cfg(feature = "self_test_bitcoin")]
-mod self_test_bitcoin;
-#[cfg(feature = "self_test_bitcoin")]
-pub use self_test_bitcoin::*;
-
-#[cfg(feature = "self_test_ethereum")]
-mod self_test_ethereum;
-#[cfg(feature = "self_test_ethereum")]
-pub use self_test_ethereum::*;
-
-#[cfg(feature = "self_test_shallenge")]
-mod self_test_shallenge;
-#[cfg(feature = "self_test_shallenge")]
-pub use self_test_shallenge::*;
-
-#[cfg(feature = "self_test_p256_public_key")]
-mod self_test_p256_public_key;
-#[cfg(feature = "self_test_p256_public_key")]
-pub use self_test_p256_public_key::*;
-
-#[cfg(feature = "self_test_p256_signature")]
-mod self_test_p256_signature;
-#[cfg(feature = "self_test_p256_signature")]
-pub use self_test_p256_signature::*;
-
-#[cfg(feature = "self_test_rsa_pss")]
-mod self_test_rsa_pss;
-#[cfg(feature = "self_test_rsa_pss")]
-pub use self_test_rsa_pss::*;
-
-#[cfg(feature = "self_test_rsa_modulus")]
-mod self_test_rsa_modulus;
-#[cfg(feature = "self_test_rsa_modulus")]
-pub use self_test_rsa_modulus::*;
+pub mod self_test;

@@ -79,7 +79,7 @@ impl core::ops::IndexMut<usize> for IdxProbe {
     }
 }
 
-pub const SELF_TEST_NUM_CHECKS: usize = 157;
+pub const SELF_TEST_NUM_CHECKS: usize = 160;
 
 pub mod metadata;
 pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = metadata::labels();

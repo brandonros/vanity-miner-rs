@@ -55,8 +55,10 @@ An invalid override fails rather than falling back; use artifacts matching the
 binary's kernel interfaces and your GPU.
 
 `gpu` selects CUDA without enabling search modes or a CPU fallback. All eight
-modes support CUDA. RSA/P-256 CUDA searches retain one context/module per device
-across matches and default to four blocks per SM on the largest GPU.
+modes support CUDA. RSA/P-256 CUDA searches retain their context, module, inputs,
+and device buffers for the whole search. Devices run independently across matches;
+a bounded result queue overlaps host verification with subsequent GPU batches.
+The default launch size is four blocks per SM on the largest GPU.
 All CUDA modes use `THREADS_PER_BLOCK` (default 256); partial batches round up
 the block count, with excess lanes exiting immediately.
 `CRYPTO_BATCH_SIZE` overrides the candidate count per launch (1–1048576);
@@ -65,22 +67,26 @@ The default stack is 64 KiB; `STACK_SIZE` overrides it. Multi-GPU throughput and
 the new scheduling behavior still require hardware validation. CI builds LLVM 7 and 21 for both
 Linux host architectures.
 
-RSA modulus search filters both candidate p and q factors on the GPU. The host
-samples bounded progressions, computes prefix/suffix constraints, and independently
-checks returned factors and completed keys. Its device throughput unit is
-`factor candidates (p + q)`. Each launch still returns one winner, and p and q
-stages synchronize separately; very narrow q intervals can leave little parallel
-work in the q stage. This does not guarantee linear scaling across GPUs.
+RSA modulus search generates p candidates, constructs constrained q ranges,
+tests factors, and advances persistent tasks on the GPU. Short ranges from many
+factors share a launch; large ranges continue across launches without a 65536-q
+cutoff. Range construction removes the interval forbidden by factor separation.
+For narrow patterns it checks for an eligible range before testing p's primality.
+Each factor task exports at most one pair and is then retired. The host supplies
+search-wide bounds and entropy, independently verifies completed pairs, and exports
+keys. Statistics show p candidates, probable p factors, nonempty ranges, and q
+candidates separately, alongside verified matches. See [GPU search design](docs/gpu-search-pipeline.md).
 
-The RSA request layout changed to include a p-filter stage: rebuild the host
-binary and RSA PTX together. The new entry point is `kernel_rsa_modulus_vanity_v2`,
-so older PTX overrides fail symbol lookup rather than receiving mismatched requests.
+Rebuild the host binary and RSA PTX together. CUDA now requires
+`kernel_rsa_generate_v3`, `kernel_rsa_ranges_v3`, `kernel_rsa_search_v3`, and
+`kernel_rsa_advance_v3` in `rsa_modulus.ptx`; older overrides fail symbol lookup.
+The v2 entry remains for the CuMetal reference transport, which retains host range
+preparation. An existing GitHub Actions artifact does not include local changes.
 
-All eight modes count matches atomically and return one winner per launch.
-The winning lane depends on GPU scheduling. RSA/P-256 winners are independently
-verified on the host; an RSA candidate rejected by stronger primality checks is
-discarded with the rest of its batch, and the search advances to the next batch.
-Rebuild PTX/CUBIN overrides after kernel interface changes.
+Address modes, P-256, and RSA-PSS retain their atomic count and single-result
+protocol per launch. The RSA pipeline retains multiple factor results. Winning
+lanes depend on GPU scheduling. All RSA/P-256 exported results are independently
+verified on the host. Rebuild PTX/CUBIN overrides after kernel interface changes.
 
 ### Apple Silicon
 
@@ -142,11 +148,12 @@ continues until Ctrl-C or exhaustion of a finite message/salt space.
 - **RSA modulus:** constructs a constrained q progression instead of rejecting
   complete random keys. Winners receive primality, factor-distance, and key checks.
   Prefix and suffix can be combined (for example, `--prefix a3b6 --suffix abcd`).
-  Together they may specify up to 128 bytes (256 hex digits); a suffix alone
-  must be shorter than 128 bytes. Long-prefix experiments may leave only one
-  candidate q per p and can be much slower. The former minimum q-interval size
-  of 2^256 is no longer enforced; these constrained keys have no established
-  security guarantee. CPU and GPU searches handle partial candidate batches.
+  CPU and the CUDA pipeline accept patterns across the full 256-byte modulus;
+  overlapping prefix/suffix bytes must agree. The legacy CuMetal transport requires
+  suffixes shorter than 128 bytes. Long-prefix experiments can leave one or zero
+  eligible q values per p and become much slower. Pattern width is not a prediction
+  of feasibility or time to find a key. These constrained keys have no established
+  security guarantee.
   The first hex digit must be `8`–`f` and the last must be odd. Validation rejects
   patterns whose interval and suffix cannot satisfy the required factor separation
   `|p - q| > 2^924`, including prefixes of 25 or more consecutive `f` digits.
@@ -200,7 +207,7 @@ The `logic/src/self_test/` folder has one file per mode: `solana.rs`, `bitcoin.r
 `ethereum.rs`, `shallenge.rs`, `p256_public_key.rs`, `p256_signature.rs`,
 `rsa_pss.rs`, and `rsa_modulus.rs`. Each contains that mode's primitive, pipeline,
 boundary, and regression checks. Shared RSA/P-256 constants live in `fixtures.rs`.
-`mod.rs` owns all 157 slot labels and the CPU dispatcher. Eight
+`mod.rs` owns all 160 slot labels and the CPU dispatcher. Eight
 `kernels/src/self_test_<mode>.rs` kernels each run once and write their checks to
 the same numbered slots. Each mode is compiled separately into its own PTX file;
 the CLI embeds the selected modules and loads the appropriate one for each group.
@@ -208,7 +215,7 @@ Each kernel feature enables only its matching logic self-tests and mode dependen
 The standalone nonce reproduction uses the kernel-only `repro_nonce_sequence`
 feature; it is not included in mode self-tests.
 Shared primitives and compiler regressions have one
-owner; checks are not duplicated across modes. With all groups enabled, CPU runs report 157 passes with no skips.
+owner; checks are not duplicated across modes. With all groups enabled, CPU runs report 160 passes with no skips.
 
 GPU slot 155 (RSA-PSS end-to-end candidate pipeline) is temporarily disabled and
 reported as SKIP. Its isolated LLVM 21 build took 429 seconds, peaked near 7.1 GiB,
@@ -235,6 +242,7 @@ To override the embedded self-tests, set `PTX_PATH` to this directory and leave
 | 135–144 | SHA-256, MGF1, PSS salt boundaries, CRT and rejection |
 | 145–152 | RSA multiplication, progression, primality, boundaries |
 | 153–156 | Full RSA/P-256 candidate pipelines against fixed CPU references |
+| 157–159 | RSA device range construction, cursor retirement, and factor derivation |
 
 These kernels test candidate logic, not production CUDA argument passing or batch
 buffer layouts. CPU passes and successful CUDA compilation do not establish GPU

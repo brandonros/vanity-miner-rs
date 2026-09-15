@@ -1,4 +1,4 @@
-use crate::common::pattern_args::PatternArgs;
+use crate::args::pattern::PatternArgs;
 use clap::Args;
 use clap::ValueEnum;
 use std::path::PathBuf;
@@ -47,9 +47,9 @@ impl P256SignatureArgs {
     pub fn config(
         &self,
         workers: usize,
-    ) -> Result<vanity_miner::search::p256_signature::SignatureSearch, String> {
+    ) -> Result<crate::modes::p256_signature::SignatureSearch, String> {
+        use crate::modes::p256_signature::SearchSource;
         use logic::crypto::p256::signatures::{SForm as Form, SignatureTarget as Target};
-        use vanity_miner::search::p256_signature::SearchSource;
         if self.hash != "sha256" {
             return Err("only SHA-256 is supported".into());
         }
@@ -69,7 +69,7 @@ impl P256SignatureArgs {
                 SearchSource::Ephemeral
             }
         };
-        Ok(vanity_miner::search::p256_signature::SignatureSearch {
+        Ok(crate::modes::p256_signature::SignatureSearch {
             key: self.key.clone(),
             message: self.message.clone(),
             source,
@@ -87,5 +87,16 @@ impl P256SignatureArgs {
             },
             workers: self.pattern.threads.unwrap_or(workers),
         })
+    }
+}
+
+impl P256SignatureArgs {
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.config(1)?.validate()?;
+        Ok(())
+    }
+    pub fn details(&self) -> crate::args::CommandDetails {
+        self.pattern
+            .details("Searching NIST P-256 signatures", "p256_signature")
     }
 }

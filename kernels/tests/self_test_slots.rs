@@ -13,21 +13,21 @@ mod tests {
     fn mode_kernels_write_every_slot_once_without_touching_guards() {
         let kernels: &[unsafe extern "C" fn(*mut u32)] = &[
             #[cfg(feature = "self_test_solana")]
-            kernels::kernel_self_test_solana,
+            kernels::self_test::solana::kernel_self_test_solana,
             #[cfg(feature = "self_test_bitcoin")]
-            kernels::kernel_self_test_bitcoin,
+            kernels::self_test::bitcoin::kernel_self_test_bitcoin,
             #[cfg(feature = "self_test_ethereum")]
-            kernels::kernel_self_test_ethereum,
+            kernels::self_test::ethereum::kernel_self_test_ethereum,
             #[cfg(feature = "self_test_shallenge")]
-            kernels::kernel_self_test_shallenge,
+            kernels::self_test::shallenge::kernel_self_test_shallenge,
             #[cfg(feature = "self_test_p256_public_key")]
-            kernels::kernel_self_test_p256_public_key,
+            kernels::self_test::p256_public_key::kernel_self_test_p256_public_key,
             #[cfg(feature = "self_test_p256_signature")]
-            kernels::kernel_self_test_p256_signature,
+            kernels::self_test::p256_signature::kernel_self_test_p256_signature,
             #[cfg(feature = "self_test_rsa_pss")]
-            kernels::kernel_self_test_rsa_pss,
+            kernels::self_test::rsa_pss::kernel_self_test_rsa_pss,
             #[cfg(feature = "self_test_rsa_modulus")]
-            kernels::kernel_self_test_rsa_modulus,
+            kernels::self_test::rsa_modulus::kernel_self_test_rsa_modulus,
         ];
         let mut seen = [false; logic::self_test::SELF_TEST_NUM_CHECKS];
         for kernel in kernels {

@@ -1,7 +1,7 @@
-use crate::common::{GlobalStats, search_session::run_with_launch_limit};
 use crate::runner::cumetal::{
     CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
 };
+use crate::runner::{progress::GlobalStats, session::run_with_launch_limit};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -18,12 +18,12 @@ pub fn run(
         verify: runner.options.verify,
     };
     run_with_launch_limit(stats, "keys", runner.options.batches, |control| {
-        let report = vanity_miner::search::p256_public_key::run_device(
+        let report = crate::modes::p256_public_key::run_device(
             &config,
             control,
             &mut |r, p, m, start, count| {
                 engine.evaluate(r, p, m, start, count, |counter| {
-                    logic::modes::p256_public_key_vanity::p256_public(r, counter, p)
+                    logic::modes::p256_public_key::p256_public(r, counter, p)
                 })
             },
         );

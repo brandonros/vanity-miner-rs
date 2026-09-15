@@ -1,9 +1,9 @@
-use crate::common::GlobalStats;
 use crate::modes::shallenge::shared_best_hash::SharedBestHash;
+use crate::runner::progress::GlobalStats;
 use std::error::Error;
 use std::sync::{Arc, RwLock};
 
-use crate::common::spawn_cpu_workers;
+use crate::runner::workers::cpu::spawn_cpu_workers;
 use rand::Rng as _;
 
 struct WorkerData {
@@ -15,13 +15,13 @@ struct WorkerData {
 fn worker(
     thread_id: usize,
     data: Arc<WorkerData>,
-    cancelled: Arc<std::sync::atomic::AtomicBool>,
+    cancelled: Arc<crate::runner::session::SearchControl>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut rng = rand::thread_rng();
 
     println!("[CPU-{}] Starting CPU shallenge worker thread", thread_id);
 
-    while !cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+    while !cancelled.stopped() {
         let rng_seed: u64 = rng.r#gen();
 
         // Get the current best hash (with minimal lock time)

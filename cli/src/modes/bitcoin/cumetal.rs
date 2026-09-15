@@ -18,8 +18,8 @@ pub fn inputs(prefix: &str, suffix: &str) -> Result<(Vec<u8>, Vec<u8>), Error> {
 
 pub fn expected(first: &[u8], second: &[u8], seed: u64, index: usize) -> Result<Expected, Error> {
     Ok({
-        let r = logic::modes::bitcoin_vanity::generate_and_check_bitcoin_vanity_key(
-            &logic::modes::bitcoin_vanity::BitcoinVanityKeyRequest {
+        let r = logic::modes::bitcoin::generate_and_check_bitcoin_vanity_key(
+            &logic::modes::bitcoin::BitcoinVanityKeyRequest {
                 prefix: &first,
                 suffix: &second,
                 thread_idx: index,
@@ -43,3 +43,27 @@ pub fn expected(first: &[u8], second: &[u8], seed: u64, index: usize) -> Result<
 
 pub const ENTRY: &str = "kernel_find_bitcoin_vanity_private_key";
 pub const PAYLOAD_SIZES: &[usize] = &[32, 33, 20, 64, 4];
+
+pub fn run(
+    runner: &crate::runner::cumetal::CumetalRunner,
+    prefix: &str,
+    suffix: &str,
+    driver: &std::rc::Rc<crate::runner::cumetal::driver::Driver>,
+    stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+) -> Result<(), Error> {
+    use crate::runner::cumetal::address_transport::{AddressBatch, ParameterLayout};
+    let (first, second) = inputs(prefix, suffix)?;
+    runner.address_search(
+        AddressBatch {
+            entry: ENTRY,
+            payload_sizes: PAYLOAD_SIZES,
+            first,
+            second,
+            layout: ParameterLayout::Patterns,
+            reference: expected,
+            print: print_payloads,
+        },
+        driver,
+        stats,
+    )
+}

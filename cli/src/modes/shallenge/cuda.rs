@@ -1,9 +1,9 @@
-use crate::common::GlobalStats;
 use crate::modes::shallenge::shared_best_hash::SharedBestHash;
+use crate::runner::progress::GlobalStats;
 use std::error::Error;
 use std::sync::{Arc, RwLock};
 
-use crate::common::GpuContext;
+use crate::runner::cuda::context::GpuContext;
 use cust::launch;
 use cust::memory::CopyDestination;
 use cust::util::SliceExt;
@@ -15,12 +15,12 @@ pub fn run(
     shared_best_hash: Arc<RwLock<SharedBestHash>>,
     gpu: &GpuContext,
     global_stats: Arc<GlobalStats>,
-    control: Arc<vanity_miner::search_control::SearchControl>,
+    control: Arc<crate::runner::session::SearchControl>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     let username_bytes = username.as_bytes();
     let username_len: usize = username_bytes.len();
 
-    let module = &gpu.module;
+    let module = gpu.module()?;
     let kernel = module.get_function("kernel_find_better_shallenge_nonce")?;
     gpu.print_launch_info(ordinal, "shallenge");
 

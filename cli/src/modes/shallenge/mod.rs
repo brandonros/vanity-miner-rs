@@ -1,9 +1,11 @@
 #[cfg(not(any(feature = "gpu", feature = "cumetal")))]
-pub mod cpu;
+pub(crate) mod cpu;
 #[cfg(feature = "gpu")]
-pub mod cuda;
+pub(crate) mod cuda;
 #[cfg(feature = "cumetal")]
-pub mod cumetal;
+pub(crate) mod cumetal;
 
 #[cfg(not(feature = "cumetal"))]
-pub mod shared_best_hash;
+pub(crate) mod shared_best_hash;
+
+pub(crate) mod args;

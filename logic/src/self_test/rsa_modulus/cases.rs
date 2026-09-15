@@ -2,6 +2,24 @@ use super::Case;
 
 pub const CASES: &[Case] = &[
     Case {
+        slot: 157,
+        label: "rsa device full-width range construction",
+        kernel: "kernel_self_test_rsa_modulus",
+        gpu_skip: None,
+    },
+    Case {
+        slot: 158,
+        label: "rsa device range cursor wrap and retirement",
+        kernel: "kernel_self_test_rsa_modulus",
+        gpu_skip: None,
+    },
+    Case {
+        slot: 159,
+        label: "rsa device factor derivation known answer",
+        kernel: "kernel_self_test_rsa_modulus",
+        gpu_skip: None,
+    },
+    Case {
         slot: 145,
         label: "rsa modulus multiplication carry",
         kernel: "kernel_self_test_rsa_modulus",

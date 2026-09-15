@@ -1,7 +1,7 @@
-use crate::common::{GlobalStats, search_session::run_with_launch_limit};
 use crate::runner::cumetal::{
     CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
 };
+use crate::runner::{progress::GlobalStats, session::run_with_launch_limit};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -21,7 +21,7 @@ pub fn run(
         stats,
         if matches!(
             config.source,
-            vanity_miner::search::p256_signature::SearchSource::Message { .. }
+            crate::modes::p256_signature::SearchSource::Message { .. }
         ) {
             "messages"
         } else {
@@ -29,12 +29,12 @@ pub fn run(
         },
         runner.options.batches,
         |control| {
-            let report = vanity_miner::search::p256_signature::run_device(
+            let report = crate::modes::p256_signature::run_device(
                 &config,
                 control,
                 &mut |r, p, m, start, count| {
                     engine.evaluate(r, p, m, start, count, |counter| {
-                        logic::modes::p256_signature_vanity::p256_signature(r, m, counter, p)
+                        logic::modes::p256_signature::p256_signature(r, m, counter, p)
                     })
                 },
             );
