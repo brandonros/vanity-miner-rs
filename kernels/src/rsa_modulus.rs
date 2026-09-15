@@ -1,4 +1,4 @@
-//! CUDA entry point for rsa-modulus: one shared winner per launch.
+//! CUDA RSA modulus entries: persistent v3 stages and the v2 reference batch.
 use cuda_std::prelude::*;
 use logic::{
     modes::rsa_modulus::{RsaModulusRequest, rsa_modulus},

@@ -76,3 +76,37 @@ per-thread large-integer costs, and divergence still require measurement.
 
 The CuMetal reference transport still uses the v2 batch interface. The new CUDA
 stages have distinct entry names and require a matching host binary and PTX.
+
+### Implementation checks — 2026-09-15
+
+- 48 CLI unit/integration tests passed with the four crypto modes and
+  `self_test_rsa_modulus` enabled, including independent RSA key verification,
+  continuous searches, queue cancellation, and RSA-PSS interoperability.
+- 27 logic tests and all 12 RSA self-test checks passed on the CPU.
+- The aarch64 Linux release build passed with LLVM 21.1.8 and CUDA 13.3,
+  producing PTX 9.3 targeting `sm_100` for all four production modules and the
+  RSA self-test module. NVIDIA `ptxas` assembled all five modules successfully.
+- The CuMetal host configuration passed `cargo check`; its RSA transport remains
+  the reference path described above.
+
+The assembler reported these resources for the new production path:
+
+| Entry | Registers/thread | Cumulative stack bytes |
+| --- | ---: | ---: |
+| RSA generate | 255 | 6848 |
+| RSA ranges | 255 | 7424 |
+| RSA search | 255 | 6896 |
+| RSA advance | 168 | 400 |
+| RSA-PSS | 255 | 20128 |
+| P-256 public key | 255 | 3984 |
+| P-256 signature | 255 | 5760 |
+
+Every listed entry except RSA advance has register spills. These are static
+assembler reports, not timings or a measured minimum `STACK_SIZE`. Parallel work
+distribution is implemented; the large-integer arithmetic still needs hardware
+profiling before claiming a throughput improvement.
+
+NVIDIA runtime tests and multi-GPU measurements were unavailable: the configured
+Vast SSH endpoint refused the connection. LLVM 7 / CUDA 12.9 validation was
+interrupted by storage exhaustion in the build environment; the VM recovered,
+but that toolchain has not passed this implementation check.

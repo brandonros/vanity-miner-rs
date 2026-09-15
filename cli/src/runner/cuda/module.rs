@@ -1,4 +1,4 @@
-use cust::module::{Module, ModuleJitOption};
+use cust::module::Module;
 use cust_raw::driver_sys;
 use std::error::Error;
 use std::ffi::{CStr, CString, c_void};
@@ -143,8 +143,7 @@ fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error 
         return Err(format!("cuModuleLoadDataEx failed: {:?}", res).into());
     }
 
-    // The driver accepted the PTX; drop our raw handle and re-load via cust so the
-    // caller gets a typed Module with cust's lifetime/drop machinery.
-    let _ = unsafe { driver_sys::cuModuleUnload(module_ptr) };
-    Module::from_ptx(ptx, &[ModuleJitOption::MaxRegisters(255)]).map_err(|e| e.into())
+    // SAFETY: cuModuleLoadDataEx succeeded in the current context. Transfer sole
+    // ownership to cust so this same module is unloaded when its owner drops.
+    Ok(unsafe { Module::from_raw(module_ptr) })
 }

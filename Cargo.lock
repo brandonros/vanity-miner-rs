@@ -334,7 +334,7 @@ dependencies = [
 [[package]]
 name = "cuda_builder"
 version = "0.3.0"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "nvvm",
  "rustc_codegen_nvvm",
@@ -401,7 +401,7 @@ dependencies = [
 [[package]]
 name = "cust"
 version = "0.3.2"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "bitflags",
  "bytemuck",
@@ -417,7 +417,7 @@ dependencies = [
 [[package]]
 name = "cust_core"
 version = "0.1.1"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "cust_derive",
  "glam",
@@ -428,7 +428,7 @@ dependencies = [
 [[package]]
 name = "cust_derive"
 version = "0.2.0"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -438,7 +438,7 @@ dependencies = [
 [[package]]
 name = "cust_raw"
 version = "0.11.3"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "bimap",
  "bindgen",
@@ -946,7 +946,7 @@ dependencies = [
 [[package]]
 name = "nvvm"
 version = "0.1.1"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "cust_raw",
  "strum",
@@ -1249,7 +1249,7 @@ checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
 [[package]]
 name = "rustc_codegen_nvvm"
 version = "0.3.0"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "bitflags",
  "build-helper",
@@ -1273,7 +1273,7 @@ dependencies = [
 [[package]]
 name = "rustc_codegen_nvvm_macros"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=5f27c96d0555b7552813f55270917a2c8ea469c4#5f27c96d0555b7552813f55270917a2c8ea469c4"
+source = "git+https://github.com/brandonros/Rust-CUDA.git?rev=f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588#f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
 dependencies = [
  "proc-macro2",
  "quote",

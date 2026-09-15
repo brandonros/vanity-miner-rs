@@ -1,4 +1,4 @@
-//! Persistent thread-owned device state with synchronized winner rounds.
+//! Persistent thread-owned device state and mode-specific scheduling.
 use crate::{runner::progress::GlobalStats, runner::session::SearchControl};
 use std::{
     error::Error,
@@ -8,7 +8,7 @@ use std::{
 pub type RunResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 /// State is created and destroyed on its worker thread; it need not be Send.
-/// No worker starts a new round until every peer has completed the previous one.
+/// Continuous CUDA searches run independently; legacy winner rounds synchronize peers.
 pub fn run<State>(
     count: usize,
     control: Arc<SearchControl>,
