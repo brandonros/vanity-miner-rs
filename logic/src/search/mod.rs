@@ -1,8 +1,18 @@
 //! Search used by the shared host/device logic.
 
-#[cfg(feature = "crypto-search")]
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss",
+    feature = "rsa-modulus"
+))]
 pub mod candidate_result;
-#[cfg(feature = "crypto-search")]
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss",
+    feature = "rsa-modulus"
+))]
 pub mod crypto_search;
 pub mod hex_pattern;
 #[cfg(any(feature = "solana", feature = "bitcoin", feature = "ethereum"))]

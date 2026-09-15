@@ -16,7 +16,22 @@ pub mod rsa_prime;
 pub mod rsa_pss;
 #[cfg(any(feature = "bitcoin", feature = "ethereum"))]
 pub mod secp256k1;
-#[cfg(feature = "sha256")]
+#[cfg(any(
+    feature = "bitcoin",
+    feature = "shallenge",
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss",
+    feature = "rsa-modulus",
+    feature = "cumetal"
+))]
 pub mod sha256;
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss",
+    feature = "rsa-modulus"
+))]
+mod sha256_digest;
 #[cfg(feature = "solana")]
 pub mod sha512;

@@ -175,83 +175,6 @@ fn sha256_32(input: [u32; 8]) -> [u32; 8] {
     ]
 }
 
-fn sha256_variable_length(input: &[u8]) -> [u32; 8] {
-    let input_len = input.len();
-    let input_bits = (input_len as u64) * 8;
-
-    // Initialize hash state
-    let mut state = H0;
-
-    // Process complete 64-byte blocks
-    let complete_blocks = input_len / 64;
-    for block_idx in 0..complete_blocks {
-        let mut block = [0u32; 16];
-        let start = block_idx * 64;
-
-        // Convert 64 bytes to 16 u32 words (big-endian)
-        for i in 0..16 {
-            let byte_idx = start + i * 4;
-            block[i] = u32::from_be_bytes([
-                input[byte_idx],
-                input[byte_idx + 1],
-                input[byte_idx + 2],
-                input[byte_idx + 3],
-            ]);
-        }
-
-        process_block(&block, &mut state);
-    }
-
-    // Handle the final partial block with padding
-    let remaining_bytes = input_len % 64;
-    let remaining_start = complete_blocks * 64;
-
-    let mut final_block = [0u32; 16];
-
-    // Convert remaining bytes to words
-    let complete_words_in_final = remaining_bytes / 4;
-    for i in 0..complete_words_in_final {
-        let byte_idx = remaining_start + i * 4;
-        final_block[i] = u32::from_be_bytes([
-            input[byte_idx],
-            input[byte_idx + 1],
-            input[byte_idx + 2],
-            input[byte_idx + 3],
-        ]);
-    }
-
-    // Handle the last partial word (if any) and add padding
-    let remaining_bytes_in_word = remaining_bytes % 4;
-    if remaining_bytes_in_word > 0 {
-        let mut last_word_bytes = [0u8; 4];
-        for i in 0..remaining_bytes_in_word {
-            last_word_bytes[i] = input[remaining_start + complete_words_in_final * 4 + i];
-        }
-        // Add the padding bit (0x80) right after the last byte
-        last_word_bytes[remaining_bytes_in_word] = 0x80;
-        final_block[complete_words_in_final] = u32::from_be_bytes(last_word_bytes);
-    } else {
-        // remaining_bytes ∈ [0,63] ⇒ complete_words_in_final = remaining_bytes/4 ∈ [0,15],
-        // so this index is always in range and the "no room" branch is unreachable.
-        final_block[complete_words_in_final] = 0x80000000;
-    }
-
-    // If 0x80 lands in word 14 or 15, the 8-byte length (words 14 and 15)
-    // doesn't fit in this block — push it and start a fresh padding block.
-    if complete_words_in_final + 1 > 14 {
-        process_block(&final_block, &mut state);
-        final_block = [0u32; 16];
-    }
-
-    // Add length in bits as the last 64 bits (big-endian)
-    final_block[14] = (input_bits >> 32) as u32; // Upper 32 bits
-    final_block[15] = input_bits as u32; // Lower 32 bits
-
-    process_block(&final_block, &mut state);
-
-    state
-}
-
 fn hash_to_bytes(hash: [u32; 8]) -> [u8; 32] {
     let mut output = [0u8; 32];
     seq!(I in 0..8 {
@@ -281,13 +204,10 @@ pub fn sha256_32_from_bytes(input: &[u8; 32]) -> [u8; 32] {
 }
 
 pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
-    let hash_words = sha256_variable_length(input);
-    let mut result = [0u8; 32];
-    seq!(N in 0..8 {
-        let bytes = hash_words[N].to_be_bytes();
-        result[N * 4..N * 4 + 4].copy_from_slice(&bytes);
-    });
-    result
+    // TODO: used to seq!
+    let mut hash = Sha256::new();
+    hash.update(input);
+    hash.finalize()
 }
 
 /// Incremental SHA-256 using the same compression function as the one-shot paths.
@@ -363,43 +283,6 @@ impl Sha256 {
 impl Default for Sha256 {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// The crypto-search callers use RustCrypto's HMAC and RSA digest interfaces.
-// Bitcoin/Shallenge's existing paths do not enable this dependency.
-#[cfg(feature = "crypto-search")]
-mod digest_traits {
-    use super::Sha256;
-    use digest::{
-        FixedOutput, FixedOutputReset, HashMarker, Output, OutputSizeUser, Reset, Update,
-    };
-    impl HashMarker for Sha256 {}
-    impl OutputSizeUser for Sha256 {
-        type OutputSize = digest::consts::U32;
-    }
-    impl digest::core_api::BlockSizeUser for Sha256 {
-        type BlockSize = digest::consts::U64;
-    }
-    impl Update for Sha256 {
-        fn update(&mut self, data: &[u8]) {
-            self.update_slice(data);
-        }
-    }
-    impl FixedOutput for Sha256 {
-        fn finalize_into(self, out: &mut Output<Self>) {
-            out.copy_from_slice(&self.finalize());
-        }
-    }
-    impl Reset for Sha256 {
-        fn reset(&mut self) {
-            *self = Self::new();
-        }
-    }
-    impl FixedOutputReset for Sha256 {
-        fn finalize_into_reset(&mut self, out: &mut Output<Self>) {
-            out.copy_from_slice(&core::mem::take(self).finalize());
-        }
     }
 }
 
@@ -621,7 +504,12 @@ mod streaming_tests {
         );
     }
 
-    #[cfg(feature = "crypto-search")]
+    #[cfg(any(
+        feature = "p256-public-key",
+        feature = "p256-signature",
+        feature = "rsa-pss",
+        feature = "rsa-modulus"
+    ))]
     #[test]
     fn digest_reset_and_cloned_prefixes() {
         let mut hash = Sha256::new();
@@ -642,7 +530,12 @@ mod streaming_tests {
         );
     }
 
-    #[cfg(feature = "crypto-search")]
+    #[cfg(any(
+        feature = "p256-public-key",
+        feature = "p256-signature",
+        feature = "rsa-pss",
+        feature = "rsa-modulus"
+    ))]
     #[test]
     fn rfc4231_hmac_short_and_long_keys() {
         use hmac::{Mac, SimpleHmac};

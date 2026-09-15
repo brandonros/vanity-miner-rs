@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace", "dep:cuda_builder"]
-cumetal = ["dep:libloading", "logic/sha256"]
+cumetal = ["dep:libloading", "logic/cumetal"]
 llvm21 = ["gpu", "cuda_builder/llvm21"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]

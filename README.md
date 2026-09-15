@@ -161,7 +161,10 @@ Add `gpu,llvm21` in the v21 shell for CUDA. Multiple self-test features still
 produce separate PTX files. The same `self-test` command runs the selected groups
 on the backend chosen at build time.
 
-The `logic/src/self_test/` folder groups checks and fixtures by subject. Its
+The `logic/src/self_test/` folder has one file per mode: `solana.rs`, `bitcoin.rs`,
+`ethereum.rs`, `shallenge.rs`, `p256_public_key.rs`, `p256_signature.rs`,
+`rsa_pss.rs`, and `rsa_modulus.rs`. Each contains that mode's primitive, pipeline,
+boundary, and regression checks. Shared RSA/P-256 constants live in `fixtures.rs`.
 `mod.rs` owns all 157 slot labels and the CPU dispatcher. Eight
 `kernels/src/self_test_<mode>.rs` kernels each run once and write their checks to
 the same numbered slots. Each mode is compiled separately into its own PTX file;

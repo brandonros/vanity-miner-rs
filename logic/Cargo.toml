@@ -6,15 +6,15 @@ edition = "2024"
 [features]
 default = ["shallenge"]
 solana = ["dep:curve25519-dalek"]
-bitcoin = ["dep:k256", "sha256"]
+bitcoin = ["dep:k256"]
 ethereum = ["dep:k256", "dep:tiny-keccak"]
-shallenge = ["sha256"]
-sha256 = []
-p256-public-key = ["dep:p256", "crypto-search"]
-p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "crypto-search"]
-crypto-search = ["sha256", "dep:hmac", "dep:digest", "dep:zeroize"]
-rsa-pss = ["crypto-search", "dep:crypto-bigint"]
-rsa-modulus = ["crypto-search", "dep:crypto-bigint"]
+shallenge = []
+# The CuMetal backend also hashes its compiled-module cache keys.
+cumetal = []
+p256-public-key = ["dep:p256", "dep:hmac", "dep:digest", "dep:zeroize"]
+p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest", "dep:zeroize"]
+rsa-pss = ["dep:hmac", "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
+rsa-modulus = ["dep:hmac", "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
 self_test = [
     "self_test_solana",
     "self_test_bitcoin",
