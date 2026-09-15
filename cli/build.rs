@@ -3,9 +3,6 @@ fn main() {
 
     #[cfg(feature = "gpu")]
     build_gpu();
-
-    #[cfg(feature = "self_test_support")]
-    export_self_test_names();
 }
 
 #[cfg(feature = "gpu")]
@@ -136,59 +133,4 @@ fn build_gpu() {
     }
     embedded.push_str("_ => None, } }\n");
     std::fs::write(out_path.join("kernel_ptx.rs"), embedded).unwrap();
-}
-
-#[cfg(feature = "self_test_support")]
-fn export_self_test_names() {
-    use std::{env, fs, path::PathBuf};
-    let directory = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("../kernels/src");
-    println!("cargo::rerun-if-changed={}", directory.display());
-    let mut names = std::collections::BTreeMap::new();
-    for source in fs::read_dir(directory).unwrap() {
-        let source = source.unwrap().path();
-        if !source
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .starts_with("self_test_")
-        {
-            continue;
-        }
-        let mut entry = None;
-        for line in fs::read_to_string(source).unwrap().lines() {
-            if let Some(tail) = line.trim().strip_prefix(r#"pub unsafe extern "C" fn "#) {
-                entry = Some(tail.split('(').next().unwrap().to_owned());
-            }
-            if let Some(tail) = line.trim().strip_prefix("results[") {
-                let slot: usize = tail.split(']').next().unwrap().parse().unwrap();
-                let name = entry.as_ref().expect("slot without kernel entry");
-                assert!(
-                    names.insert(slot, name.clone()).is_none(),
-                    "duplicate slot {slot}"
-                );
-            }
-        }
-    }
-    let count = names.len();
-    assert!(count > 0);
-    assert_eq!(
-        names.keys().copied().collect::<Vec<_>>(),
-        (0..count).collect::<Vec<_>>()
-    );
-    let enabled: Vec<bool> = names
-        .values()
-        .map(|kernel| {
-            let feature = kernel.strip_prefix("kernel_").unwrap().to_ascii_uppercase();
-            env::var_os(format!("CARGO_FEATURE_{feature}")).is_some()
-        })
-        .collect();
-    let text = format!(
-        "const SELF_TEST_ENTRIES: [&str; {count}] = {:?};\nconst SELF_TEST_ENABLED: [bool; {count}] = {enabled:?};",
-        names.values().collect::<Vec<_>>()
-    );
-    fs::write(
-        PathBuf::from(env::var("OUT_DIR").unwrap()).join("self_test_entries.rs"),
-        text,
-    )
-    .unwrap();
 }

@@ -49,11 +49,11 @@ impl Runner for CpuRunner {
             }
             #[cfg(feature = "rsa-pss")]
             Command::RsaPssSignatureVanity(args) => {
-                modes::rsa_pss_search::cpu::run(args, self.num_threads, stats)
+                modes::rsa_pss::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "p256-public-key")]
             Command::P256PublicKeyVanity(args) => {
-                modes::p256_public::cpu::run(args, self.num_threads, stats)
+                modes::p256_public_key::cpu::run(args, self.num_threads, stats)
             }
             #[cfg(feature = "p256-signature")]
             Command::P256SignatureVanity(args) => {

@@ -18,8 +18,8 @@ pub fn p256_public(
     pattern: &HexPattern,
 ) -> CandidateResult {
     use crate::{
-        crypto::p256_vanity::{PublicTarget, candidate_scalar, public_point},
-        search::crypto_search::{CandidateDeriver, CandidateDomain},
+        crypto::p256::{PublicTarget, candidate_scalar, public_point},
+        search::candidate_derivation::{CandidateDeriver, CandidateDomain},
     };
     let target = match request.target {
         0 => PublicTarget::X,
@@ -64,3 +64,6 @@ mod tests {
         assert_eq!(core::mem::size_of::<super::P256PublicRequest>(), 48);
     }
 }
+
+// SAFETY: repr(C), padding-free integer fields and arrays; all bit patterns are valid.
+unsafe impl crate::search::device_record::DeviceRecord for P256PublicRequest {}

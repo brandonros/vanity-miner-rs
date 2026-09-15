@@ -92,7 +92,7 @@ pub fn run<State>(
                 .unwrap_or_else(|_| Err("device worker panicked".into()));
             if let Err(error) = result {
                 control.cancel();
-                first_error = Some(error);
+                first_error.get_or_insert(error);
             }
         }
         first_error.map_or(Ok(()), Err)

@@ -1,19 +1,11 @@
 //! Host support for bounded cryptographic searches.
 
-#[cfg(feature = "p256-public-key")]
-pub mod p256_public;
-#[cfg(feature = "p256-signature")]
-pub mod p256_signature;
+pub mod device_workers;
 #[cfg(feature = "rsa-common")]
 pub mod rsa_host;
 #[cfg(all(test, feature = "rsa-pss"))]
 mod rsa_interop;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa_modulus;
-#[cfg(feature = "rsa-pss")]
-pub mod rsa_pss_search;
 pub mod search_control;
-pub mod device_workers;
 
 #[cfg(any(
     feature = "rsa-modulus",
@@ -24,7 +16,7 @@ pub mod device_workers;
 pub mod search_batches;
 
 #[cfg(all(
-    any(test, feature = "self_test_support"),
+    test,
     any(
         feature = "p256-public-key",
         feature = "p256-signature",
@@ -40,3 +32,5 @@ pub mod stats;
 pub mod self_test_suite;
 
 pub mod kernel_modules;
+
+pub mod search;

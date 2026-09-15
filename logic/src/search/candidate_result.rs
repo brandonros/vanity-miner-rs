@@ -156,3 +156,6 @@ mod winner_tests {
         );
     }
 }
+
+// SAFETY: repr(C) record containing only padding-free u32 fields and byte arrays.
+unsafe impl super::device_record::DeviceRecord for BatchResult {}

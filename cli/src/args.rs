@@ -18,16 +18,16 @@ pub struct Cli {
 pub enum Command {
     /// Continuously print matching RSA-2048 moduli and key pairs
     #[cfg(feature = "rsa-modulus")]
-    RsaModulusVanity(crate::crypto_args::RsaModulusArgs),
+    RsaModulusVanity(crate::modes::rsa_modulus::args::RsaModulusArgs),
     /// Search raw RSA-PSS signatures over salts or a message window
     #[cfg(feature = "rsa-pss")]
-    RsaPssSignatureVanity(crate::crypto_args::RsaPssArgs),
+    RsaPssSignatureVanity(crate::modes::rsa_pss::args::RsaPssArgs),
     /// Continuously print matching NIST P-256 public points and private keys
     #[cfg(feature = "p256-public-key")]
-    P256PublicKeyVanity(crate::crypto_args::P256PublicArgs),
+    P256PublicKeyVanity(crate::modes::p256_public_key::args::P256PublicArgs),
     /// Search P-256 signatures over a message window or secret ephemeral nonces
     #[cfg(feature = "p256-signature")]
-    P256SignatureVanity(crate::crypto_args::P256SignatureArgs),
+    P256SignatureVanity(crate::modes::p256_signature::args::P256SignatureArgs),
     /// Generate Solana vanity address (base58)
     #[cfg(feature = "solana")]
     SolanaVanity {
@@ -74,7 +74,7 @@ pub enum Command {
 }
 
 impl Command {
-    #[cfg(not(feature = "gpu"))]
+    #[cfg(not(any(feature = "gpu", feature = "cumetal")))]
     pub fn cpu_threads(&self, default: usize) -> usize {
         match self {
             #[cfg(feature = "rsa-modulus")]

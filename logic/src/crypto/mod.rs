@@ -5,7 +5,7 @@ pub mod ed25519;
 #[cfg(feature = "ethereum")]
 pub mod keccak256;
 #[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
-pub mod p256_vanity;
+pub mod p256;
 #[cfg(feature = "bitcoin")]
 pub mod ripemd160;
 #[cfg(feature = "rsa-pss")]

@@ -56,19 +56,19 @@ impl GpuRunner {
             |gpu, ordinal| match command {
                 #[cfg(feature = "p256-public-key")]
                 Command::P256PublicKeyVanity(args) => {
-                    modes::p256_public::gpu::run(args, gpu, stats.clone(), control.clone())
+                    modes::p256_public_key::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
                 #[cfg(feature = "p256-signature")]
                 Command::P256SignatureVanity(args) => {
-                    modes::p256_signature::gpu::run(args, gpu, stats.clone(), control.clone())
+                    modes::p256_signature::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
                 #[cfg(feature = "rsa-pss")]
                 Command::RsaPssSignatureVanity(args) => {
-                    modes::rsa_pss_search::gpu::run(args, gpu, stats.clone(), control.clone())
+                    modes::rsa_pss::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
                 #[cfg(feature = "rsa-modulus")]
                 Command::RsaModulusVanity(args) => {
-                    modes::rsa_modulus::gpu::run(args, gpu, stats.clone(), control.clone())
+                    modes::rsa_modulus::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
                 #[cfg(feature = "solana")]
                 Command::SolanaVanity { prefix, suffix } => modes::solana::gpu::run(

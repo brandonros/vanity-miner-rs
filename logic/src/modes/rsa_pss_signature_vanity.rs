@@ -29,7 +29,7 @@ pub fn rsa_pss(
     use crate::{
         crypto::rsa_crt::Rsa2048Crt,
         crypto::rsa_pss::encode_sha256,
-        search::crypto_search::{hash_message_counter, write_salt_counter},
+        search::{message_window::hash_message_counter, salt_counter::write_salt_counter},
     };
     let length = request.salt_length as usize;
     if length > 222 {
@@ -106,3 +106,6 @@ mod tests {
         assert_eq!(core::mem::size_of::<super::RsaPssRequest>(), 920);
     }
 }
+
+// SAFETY: repr(C), padding-free integer fields and arrays; all bit patterns are valid.
+unsafe impl crate::search::device_record::DeviceRecord for RsaPssRequest {}

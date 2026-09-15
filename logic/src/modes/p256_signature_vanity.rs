@@ -28,8 +28,11 @@ pub fn p256_signature(
     pattern: &HexPattern,
 ) -> CandidateResult {
     use crate::{
-        crypto::p256_vanity::{candidate_scalar, signatures::*},
-        search::crypto_search::{CandidateDeriver, CandidateDomain, hash_message_counter},
+        crypto::p256::{candidate_scalar, signatures::*},
+        search::{
+            candidate_derivation::{CandidateDeriver, CandidateDomain},
+            message_window::hash_message_counter,
+        },
     };
     let target = match request.target {
         0 => SignatureTarget::Raw,
@@ -107,3 +110,6 @@ mod tests {
         assert_eq!(core::mem::size_of::<super::P256SignatureRequest>(), 168);
     }
 }
+
+// SAFETY: repr(C), padding-free integer fields and arrays; all bit patterns are valid.
+unsafe impl crate::search::device_record::DeviceRecord for P256SignatureRequest {}

@@ -14,6 +14,9 @@ pub fn find(
 ) -> Result<Option<(u64, CandidateResult)>, String> {
     let stop = control.cancel_on_exit();
     while let Some(batch) = control.reserve_bounded_batch(u64::from(control.batch_size()), limit) {
+        if !control.reserve_device_launch() {
+            break;
+        }
         let count = (batch.end - batch.start) as u32;
         let results = Zeroizing::new(evaluate(batch.start, count)?);
         let winner = results.winner(count)?;

@@ -1,5 +1,5 @@
 #[cfg(feature = "cumetal")]
-mod cumetal;
+pub(crate) mod cumetal;
 #[cfg(feature = "cumetal")]
 pub use cumetal::{CumetalOptions, CumetalRunner};
 
@@ -28,4 +28,4 @@ pub trait Runner {
 }
 
 #[cfg(all(feature = "gpu", feature = "crypto-cli"))]
-pub(crate) mod cuda_batches;
+pub(crate) mod cuda_transport;

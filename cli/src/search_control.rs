@@ -6,12 +6,16 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
+const RUNNING: u8 = 0;
+const CANCELLED: u8 = 1;
+const WINNER: u8 = 2;
+
 pub struct SearchControl {
-    // 0 = running, 1 = cancelled, 2 = verified winner reserved.
     state: AtomicU8,
     interrupted: AtomicBool,
     next: AtomicU64,
     batch_size: AtomicU32,
+    device_launches_remaining: AtomicU64,
     stats: Arc<GlobalStats>,
 }
 
@@ -28,10 +32,11 @@ impl SearchControl {
 
     pub fn with_stats(stats: Arc<GlobalStats>) -> Self {
         Self {
-            state: AtomicU8::new(0),
+            state: AtomicU8::new(RUNNING),
             interrupted: AtomicBool::new(false),
             next: AtomicU64::new(0),
             batch_size: AtomicU32::new(64),
+            device_launches_remaining: AtomicU64::new(u64::MAX),
             stats,
         }
     }
@@ -39,10 +44,40 @@ impl SearchControl {
     /// Candidate count per device launch; finite searches clamp the final batch.
     pub fn set_batch_size(&self, count: u32) -> Result<(), &'static str> {
         if count == 0 || count > 1_048_576 {
-            return Err("CRYPTO_BATCH_SIZE must be between 1 and 1048576");
+            return Err("batch size must be between 1 and 1048576");
         }
         self.batch_size.store(count, Ordering::Relaxed);
         Ok(())
+    }
+
+    /// Configure a session-wide launch limit before starting its workers.
+    pub fn set_device_launch_limit(&self, limit: Option<u64>) {
+        self.device_launches_remaining
+            .store(limit.unwrap_or(u64::MAX), Ordering::Release);
+    }
+
+    /// Consume one launch permit. Exhaustion stops before another launch and
+    /// leaves the previous batch available for winner verification and output.
+    pub fn reserve_device_launch(&self) -> bool {
+        if self.stopped() {
+            return false;
+        }
+        let reserved = self
+            .device_launches_remaining
+            .fetch_update(
+                Ordering::AcqRel,
+                Ordering::Acquire,
+                |remaining| match remaining {
+                    u64::MAX => Some(u64::MAX),
+                    0 => None,
+                    n => Some(n - 1),
+                },
+            )
+            .is_ok();
+        if !reserved {
+            self.cancel();
+        }
+        reserved
     }
 
     pub fn batch_size(&self) -> u32 {
@@ -50,11 +85,11 @@ impl SearchControl {
     }
 
     pub fn has_winner(&self) -> bool {
-        self.state.load(Ordering::Acquire) == 2
+        self.state.load(Ordering::Acquire) == WINNER
     }
 
     pub fn stopped(&self) -> bool {
-        self.interrupted.load(Ordering::Acquire) || self.state.load(Ordering::Acquire) != 0
+        self.interrupted.load(Ordering::Acquire) || self.state.load(Ordering::Acquire) != RUNNING
     }
 
     /// Process/user cancellation persists across match boundaries.
@@ -69,14 +104,14 @@ impl SearchControl {
         !self.interrupted.load(Ordering::Acquire)
             && self
                 .state
-                .compare_exchange(2, 0, Ordering::AcqRel, Ordering::Acquire)
+                .compare_exchange(WINNER, RUNNING, Ordering::AcqRel, Ordering::Acquire)
                 .is_ok()
     }
 
     pub fn cancel(&self) {
-        let _ = self
-            .state
-            .compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire);
+        let _ =
+            self.state
+                .compare_exchange(RUNNING, CANCELLED, Ordering::AcqRel, Ordering::Acquire);
     }
 
     /// Reserve disjoint global candidate identifiers. Overflow ends the search;
@@ -102,7 +137,7 @@ impl SearchControl {
     /// until the host has printed the match and joined the workers.
     pub fn claim_verified_winner(&self) -> bool {
         self.state
-            .compare_exchange(0, 2, Ordering::AcqRel, Ordering::Acquire)
+            .compare_exchange(RUNNING, WINNER, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
     }
 

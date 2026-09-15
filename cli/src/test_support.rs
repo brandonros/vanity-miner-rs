@@ -1,10 +1,7 @@
-//! Host execution adapters used only by tests and self-test.
-use logic::{
-    search::candidate_result::{BatchResult, CandidateResult},
-    search::hex_pattern::HexPattern,
-};
+//! Host execution adapters used only by unit tests.
+use logic::search::candidate_result::{BatchResult, CandidateResult};
 
-fn evaluate(
+pub(crate) fn evaluate(
     start: u64,
     count: u32,
     mut candidate: impl FnMut(u64) -> CandidateResult,
@@ -28,58 +25,6 @@ fn evaluate(
         }
     }
     Ok(output)
-}
-
-#[cfg(feature = "p256-public-key")]
-pub fn p256_public(
-    request: &logic::modes::p256_public_key_vanity::P256PublicRequest,
-    pattern: &HexPattern,
-    _message: &[u8],
-    start: u64,
-    count: u32,
-) -> Result<BatchResult, String> {
-    evaluate(start, count, |counter| {
-        logic::modes::p256_public_key_vanity::p256_public(request, counter, pattern)
-    })
-}
-
-#[cfg(feature = "p256-signature")]
-pub fn p256_signature(
-    request: &logic::modes::p256_signature_vanity::P256SignatureRequest,
-    pattern: &HexPattern,
-    message: &[u8],
-    start: u64,
-    count: u32,
-) -> Result<BatchResult, String> {
-    evaluate(start, count, |counter| {
-        logic::modes::p256_signature_vanity::p256_signature(request, message, counter, pattern)
-    })
-}
-
-#[cfg(feature = "rsa-pss")]
-pub fn rsa_pss(
-    request: &logic::modes::rsa_pss_signature_vanity::RsaPssRequest,
-    pattern: &HexPattern,
-    message: &[u8],
-    start: u64,
-    count: u32,
-) -> Result<BatchResult, String> {
-    evaluate(start, count, |counter| {
-        logic::modes::rsa_pss_signature_vanity::rsa_pss(request, message, counter, pattern)
-    })
-}
-
-#[cfg(feature = "rsa-modulus")]
-pub fn rsa_modulus(
-    request: &logic::modes::rsa_modulus_vanity::RsaModulusRequest,
-    pattern: &HexPattern,
-    _message: &[u8],
-    start: u64,
-    count: u32,
-) -> Result<BatchResult, String> {
-    evaluate(start, count, |counter| {
-        logic::modes::rsa_modulus_vanity::rsa_modulus(request, counter, pattern)
-    })
 }
 
 #[cfg(test)]

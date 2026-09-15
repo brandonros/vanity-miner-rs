@@ -84,3 +84,6 @@ mod tests {
         assert_eq!(core::mem::size_of::<super::RsaModulusRequest>(), 520);
     }
 }
+
+// SAFETY: repr(C), padding-free integer fields and arrays; all bit patterns are valid.
+unsafe impl crate::search::device_record::DeviceRecord for RsaModulusRequest {}

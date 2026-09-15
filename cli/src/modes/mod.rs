@@ -15,22 +15,22 @@
 //! The previous trait hierarchy (VanityMode, GpuVanityMode, GpuBuffers) was removed
 //! because it added complexity without real benefit for the original concrete types.
 
-#[cfg(feature = "bitcoin")]
+#[cfg(all(feature = "bitcoin", not(feature = "cumetal")))]
 pub mod bitcoin;
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", not(feature = "cumetal")))]
 pub mod ethereum;
-#[cfg(feature = "self_test_support")]
+#[cfg(all(feature = "self_test_support", not(feature = "cumetal")))]
 pub mod self_test;
-#[cfg(feature = "shallenge")]
+#[cfg(all(feature = "shallenge", not(feature = "cumetal")))]
 pub mod shallenge;
-#[cfg(feature = "solana")]
+#[cfg(all(feature = "solana", not(feature = "cumetal")))]
 pub mod solana;
 
 #[cfg(feature = "p256-public-key")]
-pub mod p256_public;
+pub mod p256_public_key;
 #[cfg(feature = "p256-signature")]
 pub mod p256_signature;
 #[cfg(feature = "rsa-modulus")]
 pub mod rsa_modulus;
 #[cfg(feature = "rsa-pss")]
-pub mod rsa_pss_search;
+pub mod rsa_pss;

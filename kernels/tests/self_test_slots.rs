@@ -40,7 +40,7 @@ mod tests {
                 if result != 0xa5a5a5a5 {
                     assert_eq!(
                         result,
-                        if slot == 155 { 2 } else { 1 },
+                        if logic::self_test::metadata::GROUPS.iter().flat_map(|(cases, _)| cases.iter()).find(|case| case.slot == slot).unwrap().gpu_skip.is_some() { 2 } else { 1 },
                         "failed slot {slot}"
                     );
                     assert!(!seen[slot], "duplicate slot {slot}");

@@ -1,7 +1,7 @@
 //! CuMetal host backend: consume prebuilt PTX without a local NVIDIA toolchain.
 #[cfg(feature = "crypto-cli")]
-mod crypto_batches;
-mod driver;
+pub(crate) mod batch_transport;
+pub(crate) mod driver;
 use crate::{args::Command, common::GlobalStats, runner::Runner};
 use clap::Args;
 use driver::{Driver, Module};
@@ -45,7 +45,7 @@ pub struct CumetalOptions {
 }
 
 pub struct CumetalRunner {
-    options: CumetalOptions,
+    pub(crate) options: CumetalOptions,
 }
 impl CumetalRunner {
     pub fn new(options: CumetalOptions) -> Result<Self, Error> {
@@ -58,7 +58,7 @@ impl CumetalRunner {
             .ok_or("launch size overflow")?;
         Ok(Self { options })
     }
-    fn module(&self, driver: &Rc<Driver>, entry: &str) -> Result<Module, Error> {
+    pub(crate) fn module(&self, driver: &Rc<Driver>, entry: &str) -> Result<Module, Error> {
         let mut temporary = None;
         let path = if let Some(directory) = &self.options.module_dir {
             directory.join(format!("{entry}.metal"))
@@ -546,5 +546,36 @@ impl CumetalRunner {
             })
         })
         .map_err(Into::into)
+    }
+}
+
+#[cfg(feature = "crypto-cli")]
+impl CumetalRunner {
+    pub(super) fn crypto_search(
+        &self,
+        command: &Command,
+        driver: &Rc<Driver>,
+        stats: Arc<GlobalStats>,
+    ) -> Option<Result<(), Error>> {
+        match command {
+            #[cfg(feature = "rsa-modulus")]
+            Command::RsaModulusVanity(args) => Some(crate::modes::rsa_modulus::cumetal::run(
+                self, args, driver, stats,
+            )),
+            #[cfg(feature = "p256-public-key")]
+            Command::P256PublicKeyVanity(args) => Some(
+                crate::modes::p256_public_key::cumetal::run(self, args, driver, stats),
+            ),
+            #[cfg(feature = "p256-signature")]
+            Command::P256SignatureVanity(args) => Some(crate::modes::p256_signature::cumetal::run(
+                self, args, driver, stats,
+            )),
+            #[cfg(feature = "rsa-pss")]
+            Command::RsaPssSignatureVanity(args) => Some(crate::modes::rsa_pss::cumetal::run(
+                self, args, driver, stats,
+            )),
+            #[allow(unreachable_patterns)]
+            _ => None,
+        }
     }
 }

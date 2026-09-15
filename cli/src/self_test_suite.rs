@@ -1,30 +1,18 @@
 //! Shared test inventory and reporting for CPU, CUDA, and CuMetal.
-include!(concat!(env!("OUT_DIR"), "/self_test_entries.rs"));
-const _: [(); logic::self_test::SELF_TEST_NUM_CHECKS] = [(); SELF_TEST_ENTRIES.len()];
-
-#[derive(Clone, Copy)]
-pub struct Case {
-    /// Stable result slot shared by all backends.
-    pub slot: usize,
-    pub label: &'static str,
-    pub kernel: &'static str,
-}
+pub use logic::self_test::metadata::Case;
 /// Standalone PTX containing this entry.
 pub fn module_name(kernel: &str) -> &str {
     kernel.strip_prefix("kernel_").expect("kernel entry prefix")
 }
 
 pub fn inventory() -> Vec<Case> {
-    SELF_TEST_ENTRIES
+    let mut cases: Vec<_> = logic::self_test::metadata::GROUPS
         .iter()
-        .enumerate()
-        .filter(|(slot, _)| SELF_TEST_ENABLED[*slot])
-        .map(|(slot, &kernel)| Case {
-            slot,
-            label: logic::self_test::SELF_TEST_LABELS[slot],
-            kernel,
-        })
-        .collect()
+        .filter(|(_, enabled)| *enabled)
+        .flat_map(|(cases, _)| cases.iter().copied())
+        .collect();
+    cases.sort_by_key(|case| case.slot);
+    cases
 }
 /// Cache each mode's launch while retaining per-slot reporting.
 #[derive(Default)]
@@ -40,11 +28,14 @@ impl DeviceResults {
     ) -> Result<Outcome, String> {
         let results = self.kernels.entry(case.kernel).or_insert_with(|| {
             let results = launch()?;
-            if results.len() != SELF_TEST_ENTRIES.len() {
+            if results.len() != logic::self_test::SELF_TEST_NUM_CHECKS {
                 return Err("incorrect self-test result length".into());
             }
             for (slot, &value) in results.iter().enumerate() {
-                let owned = SELF_TEST_ENTRIES[slot] == case.kernel;
+                let owned = logic::self_test::metadata::GROUPS
+                    .iter()
+                    .flat_map(|(cases, _)| cases.iter())
+                    .any(|owner| owner.slot == slot && owner.kernel == case.kernel);
                 if !owned && value != SENTINEL {
                     return Err(format!("{} overwrote unrelated slot {slot}", case.kernel));
                 }
@@ -53,10 +44,10 @@ impl DeviceResults {
         });
         let results = results.as_ref().map_err(Clone::clone)?;
         let slot = case.slot;
-        if slot == 155 && results[slot] == 2 {
-            return Ok(Outcome::Skipped(
-                "temporarily disabled: RSA-PSS end-to-end GPU compilation takes ~7 min / 7.1 GiB and can OOM",
-            ));
+        if results[slot] == 2 {
+            if let Some(reason) = case.gpu_skip {
+                return Ok(Outcome::Skipped(reason));
+            }
         }
         if results[slot] != 1 {
             return Err(format!(
@@ -113,7 +104,7 @@ mod tests {
         for value in [0, 1, 2, SENTINEL] {
             let mut cache = DeviceResults::default();
             let outcome = cache.check(case, || {
-                let mut results = vec![SENTINEL; SELF_TEST_ENTRIES.len()];
+                let mut results = vec![SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
                 results[155] = value;
                 Ok(results)
             });
@@ -132,10 +123,10 @@ mod tests {
         for case in inventory() {
             let result = cache.check(case, || {
                 launches += 1;
-                let mut results = vec![SENTINEL; SELF_TEST_ENTRIES.len()];
-                for (slot, &kernel) in SELF_TEST_ENTRIES.iter().enumerate() {
-                    if kernel == case.kernel {
-                        results[slot] = if slot == 0 { 0 } else { 1 };
+                let mut results = vec![SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
+                for owner in inventory() {
+                    if owner.kernel == case.kernel {
+                        results[owner.slot] = if owner.slot == 0 { 0 } else { 1 };
                     }
                 }
                 Ok(results)
@@ -152,7 +143,7 @@ mod tests {
         let mut cache = DeviceResults::default();
         assert!(
             cache
-                .check(case, || Ok(vec![1; SELF_TEST_ENTRIES.len()]))
+                .check(case, || Ok(vec![1; logic::self_test::SELF_TEST_NUM_CHECKS]))
                 .is_err()
         );
         assert!(
