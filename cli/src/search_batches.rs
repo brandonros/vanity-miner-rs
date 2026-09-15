@@ -13,7 +13,7 @@ pub fn find(
     mut verify: impl FnMut(u64, &[u8; 256]) -> Result<bool, String>,
 ) -> Result<Option<(u64, CandidateResult)>, String> {
     let stop = control.cancel_on_exit();
-    while let Some(batch) = control.reserve_bounded_batch(64, limit) {
+    while let Some(batch) = control.reserve_bounded_batch(u64::from(control.batch_size()), limit) {
         let count = (batch.end - batch.start) as u32;
         let results = Zeroizing::new(evaluate(batch.start, count)?);
         let winner = results.winner(count)?;
@@ -35,6 +35,30 @@ pub fn find(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn large_batches_cover_the_tail_without_overlap() {
+        let control = SearchControl::new();
+        control.set_batch_size(4096).unwrap();
+        let mut batches = Vec::new();
+        assert!(
+            find(
+                |start, count| {
+                    batches.push((start, count));
+                    Ok(BatchResult::EMPTY)
+                },
+                8200,
+                &control,
+                |_, _| panic!("no winner")
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert_eq!(batches, [(0, 4096), (4096, 4096), (8192, 8)]);
+        assert_eq!(control.statistics().0, 8200);
+        assert!(control.set_batch_size(0).is_err());
+        assert!(control.set_batch_size(1_048_577).is_err());
+    }
 
     #[test]
     fn rejected_winner_advances_to_next_batch_without_replay() {

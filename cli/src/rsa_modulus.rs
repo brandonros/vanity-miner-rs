@@ -227,8 +227,48 @@ fn construct_device(
     let one = BigUint::from(1u8);
     let e = BigUint::from(65537u32);
     while !control.stopped() {
-        let p = Zeroizing::new(constraints.random_p_candidate());
-        if (&*p - &one) % &e == BigUint::from(0u8) || !probably_prime(&p, 32) {
+        // Filter independent p candidates on the device. The CPU only samples
+        // an eligible odd interval and independently validates the returned p.
+        let max = (&one << 1024usize) - &one;
+        let mut min = ceil_div(&constraints.lower, &max).max(&one << 1023usize);
+        if &min % 2u8 == BigUint::from(0u8) {
+            min += &one;
+        }
+        let candidates = (&max - &min) / 2u8 + &one;
+        let p_count = if candidates >= BigUint::from(control.batch_size()) {
+            control.batch_size()
+        } else {
+            candidates
+                .to_bytes_be()
+                .iter()
+                .fold(0u32, |n, b| (n << 8) | u32::from(*b))
+        };
+        let offset =
+            Zeroizing::new(OsRng.gen_biguint_below(&(&candidates - BigUint::from(p_count - 1))));
+        let first_p = Zeroizing::new(&min + &*offset * 2u8);
+        let upper_p = Zeroizing::new(&*first_p + BigUint::from(p_count - 1) * 2u8);
+        let p_request = Zeroizing::new(RsaModulusRequest {
+            stage: 1,
+            reserved: 0,
+            p: [0; 128],
+            first: *fixed_bytes(&first_p)?,
+            stride: *fixed_bytes(&BigUint::from(2u8))?,
+            upper: *fixed_bytes(&upper_p)?,
+        });
+        let results = Zeroizing::new(device(&p_request, &constraints.pattern, &[], 0, p_count)?);
+        let winner = results.winner(p_count)?;
+        control.add_tested(u64::from(p_count));
+        if control.stopped() {
+            return Ok(None);
+        }
+        let Some((lane, result)) = winner else {
+            continue;
+        };
+        let p = Zeroizing::new(&*first_p + BigUint::from(lane) * 2u8);
+        if result.bytes[..128] != fixed_bytes::<128>(&p)?[..] {
+            return Err("device RSA p factor failed reconstruction".into());
+        }
+        if (&*p - &one) % &e == BigUint::from(0u8) || !crate::rsa_host::strong_probable_prime(&p) {
             continue;
         }
         let Some(progression) = constraints.progression(&p) else {
@@ -242,16 +282,18 @@ fn construct_device(
         let first = Zeroizing::new(&*progression.first + &*start * &progression.stride);
         let upper = Zeroizing::new(&*first + BigUint::from(budget - 1) * &progression.stride);
         let request = Zeroizing::new(RsaModulusRequest {
+            stage: 0,
+            reserved: 0,
             p: *fixed_bytes(&p)?,
             first: *fixed_bytes(&first)?,
             stride: *fixed_bytes(&progression.stride)?,
             upper: *fixed_bytes(&upper)?,
         });
-        for start in (0..budget).step_by(64) {
+        for start in (0..budget).step_by(control.batch_size() as usize) {
             if control.stopped() {
                 return Ok(None);
             }
-            let count = (budget - start).min(64) as u32;
+            let count = (budget - start).min(u64::from(control.batch_size())) as u32;
             let results =
                 Zeroizing::new(device(&request, &constraints.pattern, &[], start, count)?);
             let winner = results.winner(count)?;

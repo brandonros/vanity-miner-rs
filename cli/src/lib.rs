@@ -13,6 +13,7 @@ pub mod rsa_modulus;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss_search;
 pub mod search_control;
+pub mod device_workers;
 
 #[cfg(any(
     feature = "rsa-modulus",

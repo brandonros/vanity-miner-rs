@@ -55,10 +55,26 @@ An invalid override fails rather than falling back; use artifacts matching the
 binary's kernel interfaces and your GPU.
 
 `gpu` selects CUDA without enabling search modes or a CPU fallback. All eight
-modes support CUDA. RSA/P-256 searches use 64-candidate batches per device and a
-64-KiB default stack; `STACK_SIZE` overrides the stack size. Their GPU performance
-and numerical correctness remain unverified. CI builds LLVM 7 and 21 for both
+modes support CUDA. RSA/P-256 CUDA searches retain one context/module per device
+across matches and default to four blocks per SM on the largest GPU.
+All CUDA modes use `THREADS_PER_BLOCK` (default 256); partial batches round up
+the block count, with excess lanes exiting immediately.
+`CRYPTO_BATCH_SIZE` overrides the candidate count per launch (1–1048576);
+finite ranges use partial final batches. `vast-run.sh` forwards this setting.
+The default stack is 64 KiB; `STACK_SIZE` overrides it. Multi-GPU throughput and
+the new scheduling behavior still require hardware validation. CI builds LLVM 7 and 21 for both
 Linux host architectures.
+
+RSA modulus search filters both candidate p and q factors on the GPU. The host
+samples bounded progressions, computes prefix/suffix constraints, and independently
+checks returned factors and completed keys. Its device throughput unit is
+`factor candidates (p + q)`. Each launch still returns one winner, and p and q
+stages synchronize separately; very narrow q intervals can leave little parallel
+work in the q stage. This does not guarantee linear scaling across GPUs.
+
+The RSA request layout changed to include a p-filter stage: rebuild the host
+binary and RSA PTX together. The new entry point is `kernel_rsa_modulus_vanity_v2`,
+so older PTX overrides fail symbol lookup rather than receiving mismatched requests.
 
 All eight modes count matches atomically and return one winner per launch.
 The winning lane depends on GPU scheduling. RSA/P-256 winners are independently

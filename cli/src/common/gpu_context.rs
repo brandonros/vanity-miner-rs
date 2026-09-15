@@ -16,6 +16,16 @@ pub struct GpuContext {
 }
 
 impl GpuContext {
+    pub fn configured_threads_per_block() -> Result<usize, Box<dyn Error + Send + Sync>> {
+        let threads = std::env::var("THREADS_PER_BLOCK")
+            .unwrap_or_else(|_| "256".to_string())
+            .parse::<usize>()?;
+        if !(1..=1024).contains(&threads) {
+            return Err("THREADS_PER_BLOCK must be between 1 and 1024".into());
+        }
+        Ok(threads)
+    }
+
     pub fn new(ordinal: usize, module: &str) -> Result<Self, Box<dyn Error + Send + Sync>> {
         Self::with_module(ordinal, || super::cuda_module::load_module(ordinal, module))
     }
@@ -70,9 +80,7 @@ impl GpuContext {
         let blocks_per_sm = std::env::var("BLOCKS_PER_SM")
             .unwrap_or_else(|_| "128".to_string())
             .parse::<usize>()?;
-        let threads_per_block = std::env::var("THREADS_PER_BLOCK")
-            .unwrap_or_else(|_| "256".to_string())
-            .parse::<usize>()?;
+        let threads_per_block = Self::configured_threads_per_block()?;
         let blocks_per_grid = number_of_streaming_multiprocessors * blocks_per_sm;
         let operations_per_launch = blocks_per_grid * threads_per_block;
 

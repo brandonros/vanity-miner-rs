@@ -255,7 +255,7 @@ impl CumetalRunner {
             #[cfg(feature = "rsa-modulus")]
             Command::RsaModulusVanity(args) => Some((|| -> Result<(), Error> {
                 let config = args.config(1)?;
-                let module = self.module(driver, "kernel_rsa_modulus_vanity")?;
+                let module = self.module(driver, "kernel_rsa_modulus_vanity_v2")?;
                 let mut engine = Engine {
                     driver,
                     module,
@@ -263,7 +263,7 @@ impl CumetalRunner {
                     remaining: self.options.batches,
                     exhausted: false,
                 };
-                run_controlled(stats, "q candidates", |control| {
+                run_controlled(stats, "factor candidates (p + q)", |control| {
                     if engine.remaining == Some(0) {
                         return Ok(false);
                     }
@@ -303,7 +303,7 @@ mod tests {
         #[cfg(feature = "rsa-pss")]
         assert_eq!(std::mem::size_of::<RsaPssRequest>(), 920);
         #[cfg(feature = "rsa-modulus")]
-        assert_eq!(std::mem::size_of::<RsaModulusRequest>(), 512);
+        assert_eq!(std::mem::size_of::<RsaModulusRequest>(), 520);
         let original = BatchResult {
             matches: 3,
             errors: 0,

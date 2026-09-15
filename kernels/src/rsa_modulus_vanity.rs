@@ -11,7 +11,7 @@ use logic::{
 /// to one BatchResult initialized to EMPTY before each launch. `message` must
 /// hold `message_len` readable bytes when nonzero. Inputs must remain immutable until stream synchronization.
 #[kernel]
-pub unsafe extern "C" fn kernel_rsa_modulus_vanity(
+pub unsafe extern "C" fn kernel_rsa_modulus_vanity_v2(
     request: *const RsaModulusRequest,
     pattern: *const HexPattern,
     message: *const u8,

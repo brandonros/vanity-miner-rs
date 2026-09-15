@@ -3,7 +3,7 @@
 use crate::stats::GlobalStats;
 use std::ops::Range;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::time::Duration;
 
 pub struct SearchControl {
@@ -11,6 +11,7 @@ pub struct SearchControl {
     state: AtomicU8,
     interrupted: AtomicBool,
     next: AtomicU64,
+    batch_size: AtomicU32,
     stats: Arc<GlobalStats>,
 }
 
@@ -30,8 +31,22 @@ impl SearchControl {
             state: AtomicU8::new(0),
             interrupted: AtomicBool::new(false),
             next: AtomicU64::new(0),
+            batch_size: AtomicU32::new(64),
             stats,
         }
+    }
+
+    /// Candidate count per device launch; finite searches clamp the final batch.
+    pub fn set_batch_size(&self, count: u32) -> Result<(), &'static str> {
+        if count == 0 || count > 1_048_576 {
+            return Err("CRYPTO_BATCH_SIZE must be between 1 and 1048576");
+        }
+        self.batch_size.store(count, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn batch_size(&self) -> u32 {
+        self.batch_size.load(Ordering::Relaxed)
     }
 
     pub fn has_winner(&self) -> bool {

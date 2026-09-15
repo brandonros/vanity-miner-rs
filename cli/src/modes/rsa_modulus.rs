@@ -33,7 +33,7 @@ pub mod gpu {
         let mut engine = crate::runner::cuda_batches::Engine::new(gpu);
         let config = args.config(1)?;
         {
-            stats.set_unit("q candidates");
+            stats.set_unit("factor candidates (p + q)");
             vanity_miner::rsa_modulus::run_device(&config, control, &mut |r, p, m, s, c| {
                 engine.rsa_modulus(r, p, m, s, c)
             })

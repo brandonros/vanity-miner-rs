@@ -42,99 +42,74 @@ impl GpuRunner {
             #[allow(unreachable_patterns)]
             _ => None,
         };
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for ordinal in 0..self.num_devices {
-                let stats = stats.clone();
-                let control = control.clone();
-                #[cfg(feature = "shallenge")]
-                let shared_best_hash = shared_best_hash.clone();
-                handles.push(scope.spawn(move || -> RunResult {
-                    // Any error or panic cancels peers before scoped joins finish.
-                    let stop = control.cancel_on_exit();
-                    let gpu = match command {
-                        #[cfg(feature = "self_test_support")]
-                        Command::SelfTest => GpuContext::for_self_test(ordinal)?,
-                        #[allow(unreachable_patterns)]
-                        _ => GpuContext::new(ordinal, command.ptx_module())?,
-                    };
-
-                    let result = match command {
-                        #[cfg(feature = "p256-public-key")]
-                        Command::P256PublicKeyVanity(args) => {
-                            modes::p256_public::gpu::run(args, &gpu, stats, control.clone())
-                        }
-                        #[cfg(feature = "p256-signature")]
-                        Command::P256SignatureVanity(args) => {
-                            modes::p256_signature::gpu::run(args, &gpu, stats, control.clone())
-                        }
-                        #[cfg(feature = "rsa-pss")]
-                        Command::RsaPssSignatureVanity(args) => {
-                            modes::rsa_pss_search::gpu::run(args, &gpu, stats, control.clone())
-                        }
-                        #[cfg(feature = "rsa-modulus")]
-                        Command::RsaModulusVanity(args) => {
-                            modes::rsa_modulus::gpu::run(args, &gpu, stats, control.clone())
-                        }
-                        #[cfg(feature = "solana")]
-                        Command::SolanaVanity { prefix, suffix } => modes::solana::gpu::run(
-                            ordinal,
-                            prefix.clone(),
-                            suffix.clone(),
-                            &gpu,
-                            stats,
-                            control.clone(),
-                        ),
-                        #[cfg(feature = "bitcoin")]
-                        Command::BitcoinVanity { prefix, suffix } => modes::bitcoin::gpu::run(
-                            ordinal,
-                            prefix.clone(),
-                            suffix.clone(),
-                            &gpu,
-                            stats,
-                            control.clone(),
-                        ),
-                        #[cfg(feature = "ethereum")]
-                        Command::EthereumVanity { prefix, suffix } => modes::ethereum::gpu::run(
-                            ordinal,
-                            prefix.clone(),
-                            suffix.clone(),
-                            &gpu,
-                            stats,
-                            control.clone(),
-                        ),
-                        #[cfg(feature = "shallenge")]
-                        Command::Shallenge { username, .. } => modes::shallenge::gpu::run(
-                            ordinal,
-                            username.clone(),
-                            shared_best_hash.unwrap(),
-                            &gpu,
-                            stats,
-                            control.clone(),
-                        ),
-                        #[cfg(feature = "self_test_support")]
-                        Command::SelfTest => modes::self_test::gpu::run(ordinal, &gpu),
-                    };
-                    if result.is_ok() {
-                        stop.finish();
-                    }
-                    result
-                }));
-            }
-            let mut first_error = None;
-            for handle in handles {
-                let result = handle
-                    .join()
-                    .unwrap_or_else(|_| Err("CUDA worker panicked".into()));
-                if let Err(error) = result {
-                    control.cancel();
-                    if first_error.is_none() {
-                        first_error = Some(error);
-                    }
+        vanity_miner::device_workers::run(
+            self.num_devices,
+            control.clone(),
+            stats.clone(),
+            is_crypto_search(command),
+            |ordinal| match command {
+                #[cfg(feature = "self_test_support")]
+                Command::SelfTest => GpuContext::for_self_test(ordinal),
+                #[allow(unreachable_patterns)]
+                _ => GpuContext::new(ordinal, command.ptx_module()),
+            },
+            |gpu, ordinal| match command {
+                #[cfg(feature = "p256-public-key")]
+                Command::P256PublicKeyVanity(args) => {
+                    modes::p256_public::gpu::run(args, gpu, stats.clone(), control.clone())
                 }
-            }
-            first_error.map_or(Ok(()), Err)
-        })
+                #[cfg(feature = "p256-signature")]
+                Command::P256SignatureVanity(args) => {
+                    modes::p256_signature::gpu::run(args, gpu, stats.clone(), control.clone())
+                }
+                #[cfg(feature = "rsa-pss")]
+                Command::RsaPssSignatureVanity(args) => {
+                    modes::rsa_pss_search::gpu::run(args, gpu, stats.clone(), control.clone())
+                }
+                #[cfg(feature = "rsa-modulus")]
+                Command::RsaModulusVanity(args) => {
+                    modes::rsa_modulus::gpu::run(args, gpu, stats.clone(), control.clone())
+                }
+                #[cfg(feature = "solana")]
+                Command::SolanaVanity { prefix, suffix } => modes::solana::gpu::run(
+                    ordinal,
+                    prefix.clone(),
+                    suffix.clone(),
+                    gpu,
+                    stats.clone(),
+                    control.clone(),
+                ),
+                #[cfg(feature = "bitcoin")]
+                Command::BitcoinVanity { prefix, suffix } => modes::bitcoin::gpu::run(
+                    ordinal,
+                    prefix.clone(),
+                    suffix.clone(),
+                    gpu,
+                    stats.clone(),
+                    control.clone(),
+                ),
+                #[cfg(feature = "ethereum")]
+                Command::EthereumVanity { prefix, suffix } => modes::ethereum::gpu::run(
+                    ordinal,
+                    prefix.clone(),
+                    suffix.clone(),
+                    gpu,
+                    stats.clone(),
+                    control.clone(),
+                ),
+                #[cfg(feature = "shallenge")]
+                Command::Shallenge { username, .. } => modes::shallenge::gpu::run(
+                    ordinal,
+                    username.clone(),
+                    shared_best_hash.clone().unwrap(),
+                    gpu,
+                    stats.clone(),
+                    control.clone(),
+                ),
+                #[cfg(feature = "self_test_support")]
+                Command::SelfTest => modes::self_test::gpu::run(ordinal, &gpu),
+            },
+        )
     }
 }
 impl Runner for GpuRunner {
@@ -142,36 +117,49 @@ impl Runner for GpuRunner {
         self.num_devices
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> RunResult {
+        let control = Arc::new(SearchControl::with_stats(stats.clone()));
         #[cfg(feature = "crypto-cli")]
-        {
-            let bounded = match command {
-                #[cfg(feature = "p256-public-key")]
-                Command::P256PublicKeyVanity(..) => true,
-                #[cfg(feature = "p256-signature")]
-                Command::P256SignatureVanity(..) => true,
-                #[cfg(feature = "rsa-pss")]
-                Command::RsaPssSignatureVanity(..) => true,
-                #[cfg(feature = "rsa-modulus")]
-                Command::RsaModulusVanity(..) => true,
-                #[allow(unreachable_patterns)]
-                _ => false,
+        if is_crypto_search(command) {
+            let threads = GpuContext::configured_threads_per_block()? as u32;
+            let batch_size = if let Ok(value) = std::env::var("CRYPTO_BATCH_SIZE") {
+                value.parse::<u32>()?
+            } else {
+                // Four blocks per SM on the largest selected GPU, using the
+                // same configured block size as the other search modes.
+                let mut sms = 1u32;
+                for ordinal in 0..self.num_devices {
+                    let device = cust::device::Device::get_device(ordinal as u32)?;
+                    sms = sms.max(
+                        device.get_attribute(cust::device::DeviceAttribute::MultiprocessorCount)?
+                            as u32,
+                    );
+                }
+                sms.saturating_mul(4).saturating_mul(threads).min(1_048_576)
             };
-            if bounded {
-                return crate::common::search_session::run_controlled(
-                    stats.clone(),
-                    "candidates",
-                    |control| {
-                        self.run_devices(command, stats.clone(), control.clone())
-                            .map_err(|e| e.to_string())?;
-                        Ok(control.has_winner())
-                    },
-                );
-            }
+            control.set_batch_size(batch_size)?;
+            let cancellation = control.clone();
+            ctrlc::set_handler(move || cancellation.interrupt())
+                .map_err(|_| "could not install Ctrl-C handler")?;
+            println!(
+                "CUDA crypto launch: up to {batch_size} candidates, {threads} threads/block, {} devices",
+                self.num_devices
+            );
         }
-        self.run_devices(
-            command,
-            stats.clone(),
-            Arc::new(SearchControl::with_stats(stats)),
-        )
+        self.run_devices(command, stats, control)
+    }
+}
+
+fn is_crypto_search(command: &Command) -> bool {
+    match command {
+        #[cfg(feature = "p256-public-key")]
+        Command::P256PublicKeyVanity(..) => true,
+        #[cfg(feature = "p256-signature")]
+        Command::P256SignatureVanity(..) => true,
+        #[cfg(feature = "rsa-pss")]
+        Command::RsaPssSignatureVanity(..) => true,
+        #[cfg(feature = "rsa-modulus")]
+        Command::RsaModulusVanity(..) => true,
+        #[allow(unreachable_patterns)]
+        _ => false,
     }
 }

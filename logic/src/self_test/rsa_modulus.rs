@@ -24,7 +24,29 @@ pub fn check_rsa_modulus_progression_carry() -> u32 {
 
 pub fn check_rsa_modulus_prime_filter() -> u32 {
     u32::from((|| {
-        crate::crypto::rsa_prime::probable_prime(&black_box(crypto_bigint::U1024::from_u64(104729)))
+        use crate::modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus};
+        let mut stride = [0u8; 128];
+        stride[127] = 2;
+        let mut request = RsaModulusRequest {
+            stage: 1,
+            reserved: 0,
+            p: [0; 128],
+            first: SELF_TEST_RSA_P,
+            stride,
+            upper: SELF_TEST_RSA_P,
+        };
+        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let result = rsa_modulus(&black_box(request), black_box(0), &pattern);
+        if result.status != 1 || result.bytes[..128] != SELF_TEST_RSA_P {
+            return false;
+        }
+        if rsa_modulus(&black_box(request), black_box(1), &pattern).status != 2 {
+            return false;
+        }
+        // The prime-filter stage must reject an even 1024-bit candidate.
+        request.first[127] &= 0xfe;
+        request.upper = request.first;
+        rsa_modulus(&black_box(request), black_box(0), &pattern).status == 0
     })())
 }
 
@@ -40,6 +62,8 @@ pub fn check_rsa_modulus_zero_stride_rejected() -> u32 {
     u32::from((|| {
         use crate::modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus};
         let mut request = RsaModulusRequest {
+            stage: 0,
+            reserved: 0,
             p: [0; 128],
             first: [0; 128],
             stride: [0; 128],
@@ -58,6 +82,8 @@ pub fn check_rsa_modulus_upper_bound_rejected() -> u32 {
     u32::from((|| {
         use crate::modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus};
         let mut request = RsaModulusRequest {
+            stage: 0,
+            reserved: 0,
             p: [0; 128],
             first: [0; 128],
             stride: [0; 128],
@@ -76,6 +102,8 @@ pub fn check_rsa_modulus_equal_factors_rejected() -> u32 {
     u32::from((|| {
         use crate::modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus};
         let mut request = RsaModulusRequest {
+            stage: 0,
+            reserved: 0,
             p: [0; 128],
             first: [0; 128],
             stride: [0; 128],
@@ -94,6 +122,8 @@ pub fn check_rsa_modulus_undersized_factor_rejected() -> u32 {
     u32::from((|| {
         use crate::modes::rsa_modulus_vanity::{RsaModulusRequest, rsa_modulus};
         let mut request = RsaModulusRequest {
+            stage: 0,
+            reserved: 0,
             p: [0; 128],
             first: [0; 128],
             stride: [0; 128],
@@ -115,6 +145,8 @@ fn self_test_digest_rsa_modulus() -> [u8; 32] {
     let mut h = Sha256::new();
     let q = U1024::from_be_slice(&black_box(SELF_TEST_RSA_Q));
     let request = black_box(RsaModulusRequest {
+        stage: 0,
+        reserved: 0,
         p: SELF_TEST_RSA_P,
         first: SELF_TEST_RSA_Q,
         stride: U1024::from_u64(2).to_be_bytes(),

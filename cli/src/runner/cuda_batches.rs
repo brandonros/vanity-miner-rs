@@ -88,6 +88,8 @@ impl<'a> Engine<'a> {
         count: u32,
     ) -> Result<BatchResult, String> {
         let stream = &state.stream;
+        let threads = state.threads_per_block as u32;
+        let blocks = count.div_ceil(threads);
         let kernel = state.module.get_function(name).map_err(|e| e.to_string())?;
         let host_request = Zeroizing::new([Record(*request)]);
         let mut request_device = SecretBuffer::new(&host_request[..], stream)?;
@@ -101,7 +103,7 @@ impl<'a> Engine<'a> {
         let mut result_device = SecretBuffer::new(&host_results[..], stream)?;
         let operation = (|| {
             unsafe {
-                launch!(kernel<<<count.div_ceil(32), 32, 0, stream>>>(
+                launch!(kernel<<<blocks, threads, 0, stream>>>(
                     request_device.buffer.as_device_ptr(), pattern_device.as_device_ptr(),
                     message_device.as_device_ptr(), message.len(), start, count,
                     result_device.buffer.as_device_ptr()
@@ -133,7 +135,7 @@ impl Engine<'_> {
         start: u64,
         count: u32,
     ) -> Result<BatchResult, String> {
-        if count == 0 || count > 64 {
+        if count == 0 || count > 1_048_576 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
         let state = self.gpu;
@@ -156,7 +158,7 @@ impl Engine<'_> {
         start: u64,
         count: u32,
     ) -> Result<BatchResult, String> {
-        if count == 0 || count > 64 {
+        if count == 0 || count > 1_048_576 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
         let state = self.gpu;
@@ -179,7 +181,7 @@ impl Engine<'_> {
         start: u64,
         count: u32,
     ) -> Result<BatchResult, String> {
-        if count == 0 || count > 64 {
+        if count == 0 || count > 1_048_576 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
         let state = self.gpu;
@@ -202,13 +204,13 @@ impl Engine<'_> {
         start: u64,
         count: u32,
     ) -> Result<BatchResult, String> {
-        if count == 0 || count > 64 {
+        if count == 0 || count > 1_048_576 {
             return Err("invalid CUDA cryptographic batch size".into());
         }
         let state = self.gpu;
         Self::launch(
             state,
-            "kernel_rsa_modulus_vanity",
+            "kernel_rsa_modulus_vanity_v2",
             request,
             pattern,
             message,

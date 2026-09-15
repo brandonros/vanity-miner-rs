@@ -8,7 +8,7 @@ pub fn production_module(kernel: &str) -> &'static str {
         "kernel_p256_public_key_vanity" => "p256_public_key",
         "kernel_p256_signature_vanity" => "p256_signature",
         "kernel_rsa_pss_signature_vanity" => "rsa_pss",
-        "kernel_rsa_modulus_vanity" => "rsa_modulus",
+        "kernel_rsa_modulus_vanity_v2" => "rsa_modulus",
         _ => panic!("unknown production kernel: {kernel}"),
     }
 }
