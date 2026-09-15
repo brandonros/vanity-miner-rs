@@ -358,8 +358,8 @@ fn run(
     Ok(SignatureReport {
         candidates_tested,
         candidate_unit: match config.source {
-            SearchSource::Message { .. } => "messages tested",
-            SearchSource::Ephemeral => "nonces tested",
+            SearchSource::Message { .. } => "messages",
+            SearchSource::Ephemeral => "nonces",
         },
         elapsed,
         found,

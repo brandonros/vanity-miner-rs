@@ -73,7 +73,6 @@ pub mod cpu {
                 println!("[CPU-{thread_id}] Vanity match: wallet = {encoded_private_key_str}");
 
                 data.global_stats.add_matches(1);
-                data.global_stats.print_stats(thread_id, 1);
             }
         }
         Ok(())
@@ -222,7 +221,6 @@ pub mod gpu {
                 println!("[{ordinal}] Vanity match: wallet = {encoded_private_key_str}");
 
                 global_stats.add_matches(found_matches_slice[0] as usize);
-                global_stats.print_stats(ordinal, found_matches_slice[0]);
             }
         }
         Ok(())

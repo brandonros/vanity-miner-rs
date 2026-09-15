@@ -16,9 +16,9 @@ pub mod cpu {
             config.source,
             vanity_miner::rsa_pss_search::PssSource::Salt { .. }
         ) {
-            "salts tested"
+            "salts"
         } else {
-            "messages tested"
+            "messages"
         };
         run_controlled(stats, unit, |control| {
             vanity_miner::rsa_pss_search::run_cpu(&config, control).map(|report| report.found)
@@ -41,9 +41,9 @@ pub mod gpu {
             config.source,
             vanity_miner::rsa_pss_search::PssSource::Salt { .. }
         ) {
-            "salts tested"
+            "salts"
         } else {
-            "messages tested"
+            "messages"
         };
         {
             stats.set_unit(unit);

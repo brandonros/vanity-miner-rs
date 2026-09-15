@@ -144,7 +144,7 @@ impl CumetalRunner {
                     remaining: self.options.batches,
                     exhausted: false,
                 };
-                run_controlled(stats, "keys tested", |control| {
+                run_controlled(stats, "keys", |control| {
                     if engine.remaining == Some(0) {
                         return Ok(false);
                     }
@@ -181,9 +181,9 @@ impl CumetalRunner {
                         config.source,
                         vanity_miner::p256_signature::SearchSource::Message { .. }
                     ) {
-                        "messages tested"
+                        "messages"
                     } else {
-                        "nonces tested"
+                        "nonces"
                     },
                     |control| {
                         if engine.remaining == Some(0) {
@@ -225,9 +225,9 @@ impl CumetalRunner {
                         config.source,
                         vanity_miner::rsa_pss_search::PssSource::Salt { .. }
                     ) {
-                        "salts tested"
+                        "salts"
                     } else {
-                        "messages tested"
+                        "messages"
                     },
                     |control| {
                         if engine.remaining == Some(0) {
@@ -263,7 +263,7 @@ impl CumetalRunner {
                     remaining: self.options.batches,
                     exhausted: false,
                 };
-                run_controlled(stats, "q candidates tested", |control| {
+                run_controlled(stats, "q candidates", |control| {
                     if engine.remaining == Some(0) {
                         return Ok(false);
                     }

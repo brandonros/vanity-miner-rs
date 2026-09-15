@@ -341,9 +341,9 @@ fn run(
     Ok(PssReport {
         candidates_tested,
         candidate_unit: if matches!(config.source, PssSource::Salt { .. }) {
-            "salts tested"
+            "salts"
         } else {
-            "messages tested"
+            "messages"
         },
         elapsed,
         found,

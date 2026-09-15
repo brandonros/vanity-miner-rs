@@ -16,9 +16,9 @@ pub mod cpu {
             config.source,
             vanity_miner::p256_signature::SearchSource::Message { .. }
         ) {
-            "messages tested"
+            "messages"
         } else {
-            "nonces tested"
+            "nonces"
         };
         run_controlled(stats, unit, |control| {
             vanity_miner::p256_signature::run_cpu(&config, control).map(|report| report.found)
@@ -41,9 +41,9 @@ pub mod gpu {
             config.source,
             vanity_miner::p256_signature::SearchSource::Message { .. }
         ) {
-            "messages tested"
+            "messages"
         } else {
-            "nonces tested"
+            "nonces"
         };
         {
             stats.set_unit(unit);

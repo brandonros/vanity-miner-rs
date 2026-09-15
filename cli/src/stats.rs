@@ -52,66 +52,67 @@ impl GlobalStats {
     }
     pub fn print_progress(&self) {
         let (tested, elapsed) = self.statistics();
+        let matches = self.matches_found.load(Ordering::Relaxed);
+        println!("{}", self.format_progress(tested, matches, elapsed));
+    }
+
+    fn format_progress(&self, tested: u64, matches: usize, elapsed: Duration) -> String {
         let unit = *self.unit.lock().unwrap_or_else(|e| e.into_inner());
         let seconds = elapsed.as_secs_f64().max(1e-9);
-        println!(
-            "{tested} {unit} in {seconds:.2}s ({:.2}/s)",
-            tested as f64 / seconds.max(1e-9)
-        );
+        let rate = tested as f64 / seconds;
+        let per_match = if matches == 0 {
+            "n/a".to_string()
+        } else {
+            format!("{:.2}", tested as f64 / matches as f64)
+        };
+        let seconds_per_match = if matches == 0 {
+            "n/a".to_string()
+        } else {
+            format!("{:.6}", seconds / matches as f64)
+        };
+        format!(
+            "GLOBAL STATS: {} prefix, {} suffix | {matches} matches in {seconds:.2}s\n  {rate:.2} {unit}/sec ({:.2}/sec average per device/worker) | {:.6} matches/sec ({seconds_per_match}s/match)\n  {tested} total {unit} | {per_match} {unit}/match",
+            self.vanity_prefix_length,
+            self.vanity_suffix_length,
+            rate / self.num_devices.max(1) as f64,
+            matches as f64 / seconds,
+        )
     }
 
     pub fn add_matches(&self, matches: usize) {
         self.matches_found.fetch_add(matches, Ordering::Relaxed);
-    }
-
-    pub fn print_stats(&self, device_id: usize, matches_this_launch: u32) {
-        let vanity_prefix_length = self.vanity_prefix_length;
-        let vanity_suffix_length = self.vanity_suffix_length;
-        let matches_found = self.matches_found.load(Ordering::Relaxed);
-        let total_operations = self.total_operations.load(Ordering::Relaxed);
-        let elapsed = self.start_time.elapsed();
-        let elapsed_seconds = elapsed.as_secs_f64().max(1e-9);
-        let operations_per_second = total_operations as f64 / elapsed_seconds / 1_000_000.0;
-        let device_operations_per_second = total_operations as f64
-            / elapsed_seconds
-            / self.num_devices.max(1) as f64
-            / 1_000_000.0;
-        let matches_per_second = matches_found as f64 / elapsed_seconds;
-        let match_eta = if matches_per_second > 0.0 {
-            1.0 / matches_per_second
-        } else {
-            0.0
-        };
-        let operations_per_match = if matches_found > 0 {
-            total_operations as f64 / matches_found as f64 / 1_000_000.0
-        } else {
-            0.0
-        };
-        let formatted_total_operations = total_operations as f64 / 1_000_000.0;
-
-        println!("[{device_id}] Found {matches_this_launch} matches this launch");
-        println!(
-            "[{}] GLOBAL STATS: {} prefix, {} suffix | {} matches in {:.2}s",
-            device_id, vanity_prefix_length, vanity_suffix_length, matches_found, elapsed_seconds
-        );
-        println!(
-            "[{}]   {:.2}M ops/sec ({:.4}M/device) | {:.6} matches/sec ({:.6}s/match)",
-            device_id,
-            operations_per_second,
-            device_operations_per_second,
-            matches_per_second,
-            match_eta
-        );
-        println!(
-            "[{}]   {:.2}M total ops | {:.4}M ops/match",
-            device_id, formatted_total_operations, operations_per_match
-        );
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unified_report_uses_real_units_and_defined_match_rates() {
+        let stats = GlobalStats::new(2, 4, 1);
+        for unit in [
+            "candidates",
+            "q candidates",
+            "keys",
+            "salts",
+            "messages",
+            "nonces",
+        ] {
+            stats.set_unit(unit);
+            let report = stats.format_progress(1000, 5, Duration::from_secs(2));
+            assert!(report.contains("4 prefix, 1 suffix | 5 matches in 2.00s"));
+            assert!(report.contains(&format!("500.00 {unit}/sec")));
+            assert!(report.contains("250.00/sec average per device/worker"));
+            assert!(report.contains("2.500000 matches/sec"));
+            assert!(report.contains(&format!("1000 total {unit} | 200.00 {unit}/match")));
+            assert!(report.contains("0.400000s/match"));
+        }
+        let report = stats.format_progress(0, 0, Duration::ZERO);
+        assert!(report.contains("n/a"));
+        assert!(!report.contains("NaN"));
+        assert!(!report.contains("inf"));
+    }
+
     #[test]
     fn bounded_and_legacy_searches_share_the_same_counters() {
         let stats = std::sync::Arc::new(GlobalStats::new(2, 0, 0));

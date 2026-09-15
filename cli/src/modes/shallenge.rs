@@ -83,7 +83,6 @@ pub mod cpu {
                     );
 
                     data.global_stats.add_matches(1);
-                    data.global_stats.print_stats(thread_id, 1);
                 }
             }
         }
@@ -227,7 +226,6 @@ pub mod gpu {
                     );
 
                     global_stats.add_matches(found_matches as usize);
-                    global_stats.print_stats(ordinal, found_matches as u32);
                 }
             }
         }

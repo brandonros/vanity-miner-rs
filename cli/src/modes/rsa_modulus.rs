@@ -15,7 +15,7 @@ pub mod cpu {
         println!(
             "Constructive search restricts every q candidate to the requested modulus pattern."
         );
-        run_controlled(stats, "q candidates tested", |control| {
+        run_controlled(stats, "q candidates", |control| {
             vanity_miner::rsa_modulus::run_cpu(&config, control).map(|report| report.found)
         })
     }
@@ -33,7 +33,7 @@ pub mod gpu {
         let mut engine = crate::runner::cuda_batches::Engine::new(gpu);
         let config = args.config(1)?;
         {
-            stats.set_unit("q candidates tested");
+            stats.set_unit("q candidates");
             vanity_miner::rsa_modulus::run_device(&config, control, &mut |r, p, m, s, c| {
                 engine.rsa_modulus(r, p, m, s, c)
             })

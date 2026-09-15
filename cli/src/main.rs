@@ -48,6 +48,27 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Log what we're doing
     println!("{}", cli.command.description());
 
-    // Run
-    runner.run(&cli.command, stats)
+    // Every search uses one reporter, including searches that have no matches yet.
+    // Self-tests report their own assertions rather than search throughput.
+    #[cfg(feature = "self_test_support")]
+    if matches!(cli.command, args::Command::SelfTest) {
+        return runner.run(&cli.command, stats);
+    }
+    let result = std::thread::scope(|scope| {
+        let (done, finished) = std::sync::mpsc::channel::<()>();
+        let observed = stats.clone();
+        scope.spawn(move || {
+            while matches!(
+                finished.recv_timeout(std::time::Duration::from_secs(2)),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+            ) {
+                observed.print_progress();
+            }
+        });
+        let result = runner.run(&cli.command, stats.clone());
+        let _ = done.send(());
+        result
+    });
+    stats.print_progress();
+    result
 }

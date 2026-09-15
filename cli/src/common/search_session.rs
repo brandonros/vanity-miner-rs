@@ -1,9 +1,4 @@
-use std::{
-    error::Error,
-    sync::{Arc, mpsc},
-    thread,
-    time::Duration,
-};
+use std::{error::Error, sync::Arc};
 use vanity_miner::search_control::SearchControl;
 
 pub(crate) type RunResult = Result<(), Box<dyn Error + Send + Sync>>;
@@ -18,16 +13,6 @@ pub(crate) fn run_controlled(
     let cancellation = control.clone();
     ctrlc::set_handler(move || cancellation.interrupt())
         .map_err(|_| "could not install Ctrl-C handler")?;
-    let observed = stats.clone();
-    let (done, finished) = mpsc::channel();
-    let monitor = thread::spawn(move || {
-        while matches!(
-            finished.recv_timeout(Duration::from_secs(2)),
-            Err(mpsc::RecvTimeoutError::Timeout)
-        ) {
-            observed.print_progress();
-        }
-    });
     let result = (|| -> Result<(), String> {
         while !control.stopped() {
             if !work(control.clone())? {
@@ -40,9 +25,6 @@ pub(crate) fn run_controlled(
         }
         Ok(())
     })();
-    let _ = done.send(());
-    monitor.join().map_err(|_| "statistics worker failed")?;
-    stats.print_progress();
     result?;
     Ok(())
 }

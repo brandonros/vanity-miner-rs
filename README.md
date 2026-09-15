@@ -125,6 +125,16 @@ continues until Ctrl-C or exhaustion of a finite message/salt space.
 
 - **RSA modulus:** constructs a constrained q progression instead of rejecting
   complete random keys. Winners receive primality, factor-distance, and key checks.
+  Prefix and suffix can be combined (for example, `--prefix a3b6 --suffix abcd`).
+  Together they may specify up to 128 bytes (256 hex digits); a suffix alone
+  must be shorter than 128 bytes. Long-prefix experiments may leave only one
+  candidate q per p and can be much slower. The former minimum q-interval size
+  of 2^256 is no longer enforced; these constrained keys have no established
+  security guarantee. CPU and GPU searches handle partial candidate batches.
+  The first hex digit must be `8`–`f` and the last must be odd. Validation rejects
+  patterns whose interval and suffix cannot satisfy the required factor separation
+  `|p - q| > 2^924`, including prefixes of 25 or more consecutive `f` digits.
+  Passing validation does not guarantee suitable primes exist in the remaining space.
 - **RSA-PSS:** uses SHA-256/MGF1-SHA-256 and searches salts by default.
   `--salt-length` defaults to 32, with a maximum of 222. Message-window search
   uses `--search-source message`; see command help for window and fixed-salt options.

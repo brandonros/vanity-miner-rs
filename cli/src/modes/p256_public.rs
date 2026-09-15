@@ -18,7 +18,7 @@ pub mod cpu {
             0
         };
         estimate(config.pattern()?.constrained_bits() - structural);
-        run_controlled(stats, "keys tested", |control| {
+        run_controlled(stats, "keys", |control| {
             vanity_miner::p256_public::run_cpu(&config, control).map(|report| report.found)
         })
     }
@@ -36,7 +36,7 @@ pub mod gpu {
         let mut engine = crate::runner::cuda_batches::Engine::new(gpu);
         let config = args.config(1);
         {
-            stats.set_unit("keys tested");
+            stats.set_unit("keys");
             vanity_miner::p256_public::run_device(&config, control, &mut |r, p, m, s, c| {
                 engine.p256_public(r, p, m, s, c)
             })

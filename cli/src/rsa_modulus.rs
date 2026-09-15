@@ -40,6 +40,19 @@ pub struct QProgression {
     pub count: Zeroizing<BigUint>,
 }
 
+impl QProgression {
+    fn search_budget(&self) -> u64 {
+        if *self.count >= BigUint::from(65536u32) {
+            65536
+        } else {
+            self.count
+                .to_bytes_be()
+                .iter()
+                .fold(0u64, |n, byte| (n << 8) | u64::from(*byte))
+        }
+    }
+}
+
 fn ceil_div(n: &BigUint, d: &BigUint) -> BigUint {
     (n + d - BigUint::from(1u8)) / d
 }
@@ -53,10 +66,10 @@ impl ModulusConstraints {
         pattern
             .constrain_byte(255, 1, 1)
             .map_err(|e| e.to_string())?;
-        // Reserve at least 256 bits of q search entropy; actual intervals are
-        // checked as well because integer division and range intersection narrow them.
-        if (prefix.len() * 4).max(1) + (suffix.len() * 4).max(1) > 767 {
-            return Err("RSA constraints leave insufficient room for 256 bits of secret-factor search entropy".into());
+        // Bound the requested pattern, while permitting tiny q intervals for
+        // experimental long-prefix searches. The device stride is 1024 bits.
+        if prefix.len() + suffix.len() > 256 || suffix.len() >= 256 {
+            return Err("RSA prefix and suffix may constrain at most 128 bytes combined; suffix alone must be shorter than 128 bytes".into());
         }
         let one = BigUint::from(1u8);
         let (lower, upper) = if prefix.is_empty() {
@@ -68,10 +81,23 @@ impl ModulusConstraints {
         };
         let suffix_bits = (suffix.len() * 4).max(1);
         let suffix = if suffix.is_empty() {
-            one
+            one.clone()
         } else {
             BigUint::parse_bytes(suffix.as_bytes(), 16).ok_or("invalid suffix")?
         };
+        // Both factors are odd, at most M = 2^1024 - 1, and must differ
+        // by more than 2^924. Their minimum allowed (even) difference is
+        // 2^924 + 2, so no accepted modulus can exceed M * (M - 2^924 - 2).
+        // This is a necessary feasibility check, not a guarantee of primes.
+        let max_factor = (&one << 1024usize) - &one;
+        let max_modulus = &max_factor * (&max_factor - (&one << 924usize) - BigUint::from(2u8));
+        // Find the smallest value in the prefix interval that also has the
+        // requested suffix (or odd parity when the suffix is unconstrained).
+        let stride = &one << suffix_bits;
+        let first = &lower + ((&suffix + &stride - (&lower % &stride)) % &stride);
+        if first > upper || first > max_modulus {
+            return Err("RSA prefix/suffix cannot satisfy the required factor separation |p - q| > 2^924; shorten or change the pattern".into());
+        }
         Ok(Self {
             pattern,
             lower,
@@ -114,9 +140,6 @@ impl ModulusConstraints {
             return None;
         }
         let count = Zeroizing::new((&*max - &*first) / &stride + &one);
-        if *count < (&one << 256usize) {
-            return None;
-        }
         Some(QProgression {
             first,
             stride,
@@ -156,8 +179,8 @@ fn construct_worker(
         }
         let start = Zeroizing::new(OsRng.gen_biguint_below(&progression.count));
         // Each p gets a securely randomized start and a nonrepeating progression.
-        // The >=2^256 progression is far larger than this per-p search budget.
-        for counter in 0..65536u32 {
+        // Exhaust a small interval once, without retesting the same q.
+        for counter in 0..progression.search_budget() {
             if control.stopped() {
                 return Ok(None);
             }
@@ -211,25 +234,28 @@ fn construct_device(
         let Some(progression) = constraints.progression(&p) else {
             continue;
         };
-        // Choose a start with room for the entire unique 65536-candidate batch.
+        let budget = progression.search_budget();
+        // Choose a start with room for the selected interval, even for one q.
         let start = Zeroizing::new(
-            OsRng.gen_biguint_below(&(&*progression.count - BigUint::from(65535u32))),
+            OsRng.gen_biguint_below(&(&*progression.count - BigUint::from(budget - 1))),
         );
         let first = Zeroizing::new(&*progression.first + &*start * &progression.stride);
-        let upper = Zeroizing::new(&*first + BigUint::from(65535u32) * &progression.stride);
+        let upper = Zeroizing::new(&*first + BigUint::from(budget - 1) * &progression.stride);
         let request = Zeroizing::new(RsaModulusRequest {
             p: *fixed_bytes(&p)?,
             first: *fixed_bytes(&first)?,
             stride: *fixed_bytes(&progression.stride)?,
             upper: *fixed_bytes(&upper)?,
         });
-        for start in (0..65536u64).step_by(64) {
+        for start in (0..budget).step_by(64) {
             if control.stopped() {
                 return Ok(None);
             }
-            let results = Zeroizing::new(device(&request, &constraints.pattern, &[], start, 64)?);
-            let winner = results.winner(64)?;
-            control.add_tested(64);
+            let count = (budget - start).min(64) as u32;
+            let results =
+                Zeroizing::new(device(&request, &constraints.pattern, &[], start, count)?);
+            let winner = results.winner(count)?;
+            control.add_tested(u64::from(count));
             if let Some((lane, result)) = winner {
                 if control.stopped() {
                     return Ok(None);
@@ -449,6 +475,63 @@ mod tests {
             assert!(ModulusConstraints::new(prefix, suffix).is_err());
         }
         assert!(ModulusConstraints::new(&"f".repeat(192), "").is_err());
+    }
+
+    #[test]
+    fn long_prefix_allows_single_candidate_interval() {
+        let one = BigUint::from(1u8);
+        let p = (&one << 1024usize) - BigUint::from(109u8);
+        let q = (&one << 1023usize) + BigUint::from(123u8);
+        let n = &p * &q;
+        let encoded = hex::encode(n.to_bytes_be());
+        let constraints = ModulusConstraints::new(&encoded[..256], "").unwrap();
+        let progression = constraints.progression(&p).unwrap();
+        assert_eq!(*progression.count, one);
+        assert_eq!(*progression.first, q);
+        assert_eq!(progression.search_budget(), 1);
+        assert!(constraints.pattern.matches(&n.to_bytes_be()));
+        assert!(ModulusConstraints::new(&encoded[..258], "").is_err());
+        assert!(ModulusConstraints::new(&encoded[..254], "ab").is_ok());
+        assert!(ModulusConstraints::new(&encoded[..256], "ab").is_err());
+    }
+
+    #[test]
+    fn small_intervals_have_bounded_nonempty_device_batches() {
+        for size in [1u64, 2, 63, 64, 65, 65535, 65536, 65537] {
+            let progression = QProgression {
+                first: Zeroizing::new(BigUint::from(1u8)),
+                stride: BigUint::from(2u8),
+                count: Zeroizing::new(BigUint::from(size)),
+            };
+            let budget = progression.search_budget();
+            assert_eq!(budget, size.min(65536));
+            let start_choices = &*progression.count - BigUint::from(budget - 1);
+            assert!(start_choices >= BigUint::from(1u8));
+            let batches: Vec<_> = (0..budget)
+                .step_by(64)
+                .map(|start| (budget - start).min(64))
+                .collect();
+            assert!(batches.iter().all(|count| (1..=64).contains(count)));
+            assert_eq!(batches.iter().sum::<u64>(), budget);
+        }
+    }
+
+    #[test]
+    fn rejects_patterns_above_factor_separation_bound() {
+        for length in [25, 26, 100] {
+            for suffix in ["", "1", "abcd"] {
+                let error = ModulusConstraints::new(&"f".repeat(length), suffix)
+                    .err()
+                    .expect("impossible all-f prefix must be rejected");
+                assert!(error.contains("factor separation"));
+            }
+        }
+        for suffix in ["", "1", "abcd"] {
+            assert!(ModulusConstraints::new(&"f".repeat(24), suffix).is_ok());
+            // Length alone is not the limit: a nearby lower interval is valid.
+            assert!(ModulusConstraints::new(&format!("{}e", "f".repeat(24)), suffix).is_ok());
+            assert!(ModulusConstraints::new("a3b6", suffix).is_ok());
+        }
     }
 
     #[test]
