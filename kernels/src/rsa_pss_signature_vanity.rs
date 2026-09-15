@@ -1,9 +1,9 @@
 //! CUDA entry point for rsa-pss: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
+    modes::rsa_pss_signature_vanity::{RsaPssRequest, rsa_pss},
     search::candidate_result::{BatchResult, CandidateResult},
     search::hex_pattern::HexPattern,
-    modes::rsa_pss_signature_vanity::{RsaPssRequest, rsa_pss},
 };
 
 /// # Safety
@@ -35,8 +35,8 @@ pub unsafe extern "C" fn kernel_rsa_pss_signature_vanity(
         CandidateResult::ERROR
     };
     match result.status {
-        0 => {}
-        1 => {
+        CandidateResult::STATUS_MISS => {}
+        CandidateResult::STATUS_MATCH => {
             handle_match! {
                 thread_idx: lane,
                 found_matches_ptr: core::ptr::addr_of_mut!((*output).matches),

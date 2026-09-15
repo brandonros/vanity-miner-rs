@@ -1,7 +1,9 @@
 //! p256 public key self-tests: primitives, pipeline stages, and regressions.
-use super::fixtures::*;
+mod fixtures;
+use super::known_answers::*;
 use super::record_candidate;
 use core::hint::black_box;
+use fixtures::*;
 
 pub fn check_p256_public_key_hmac_derivation() -> u32 {
     u32::from((|| {

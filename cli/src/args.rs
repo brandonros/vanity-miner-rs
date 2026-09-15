@@ -137,6 +137,9 @@ impl Command {
                 target_hash,
             } => {
                 crate::common::validate_hex_string(target_hash)?;
+                if target_hash.len() != 64 {
+                    return Err("target hash must contain exactly 32 bytes (64 hex digits)".into());
+                }
                 if username.is_empty() {
                     return Err("username cannot be empty".into());
                 }

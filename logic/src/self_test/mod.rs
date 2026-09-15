@@ -20,7 +20,7 @@ pub mod ethereum;
     feature = "self_test_rsa_pss",
     feature = "self_test_rsa_modulus"
 ))]
-mod fixtures;
+mod known_answers;
 #[cfg(feature = "self_test_p256_public_key")]
 pub mod p256_public_key;
 #[cfg(feature = "self_test_p256_signature")]
@@ -34,11 +34,7 @@ pub mod shallenge;
 #[cfg(feature = "self_test_solana")]
 pub mod solana;
 
-#[cfg(any(
-    feature = "self_test_solana",
-    feature = "self_test_bitcoin",
-    feature = "self_test_ethereum"
-))]
+#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
 pub(super) fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
     let n = expected.len();
     let mut i = 0;

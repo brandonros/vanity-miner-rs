@@ -1,7 +1,9 @@
 //! rsa pss self-tests: primitives, pipeline stages, and regressions.
-use super::fixtures::*;
+mod fixtures;
+use super::known_answers::*;
 use super::record_candidate;
 use core::hint::black_box;
+use fixtures::*;
 
 pub fn check_rsa_pss_sha256() -> u32 {
     u32::from((|| {
@@ -174,8 +176,7 @@ pub fn check_rsa_pss_end_to_end() -> u32 {
     )
 }
 
-/// Write only this mode's stable result slots.
-pub fn run(results: &mut [u32]) {
+fn run_common(results: &mut [u32]) {
     results[135] = check_rsa_pss_sha256();
     results[136] = check_rsa_pss_mgf1_partial_block();
     results[137] = check_rsa_pss_salt32_encoding();
@@ -186,20 +187,16 @@ pub fn run(results: &mut [u32]) {
     results[142] = check_rsa_pss_crt_known_answer();
     results[143] = check_rsa_pss_crt_fault_rejected();
     results[144] = check_rsa_pss_crt_modulus_rejected();
+}
+
+/// CPU execution includes the full candidate pipeline.
+pub fn run(results: &mut [u32]) {
+    run_common(results);
     results[155] = check_rsa_pss_end_to_end();
 }
 
-/// Device build omits the known compiler-expensive end-to-end probe.
+/// Retain the reserved slot while the end-to-end probe's GPU compiler issue remains.
 pub fn run_device(results: &mut [u32]) {
-    results[135] = check_rsa_pss_sha256();
-    results[136] = check_rsa_pss_mgf1_partial_block();
-    results[137] = check_rsa_pss_salt32_encoding();
-    results[138] = check_rsa_pss_empty_salt_encoding();
-    results[139] = check_rsa_pss_maximum_salt_encoding();
-    results[140] = check_rsa_pss_oversized_salt_rejected();
-    results[141] = check_rsa_pss_salt_carry();
-    results[142] = check_rsa_pss_crt_known_answer();
-    results[143] = check_rsa_pss_crt_fault_rejected();
-    results[144] = check_rsa_pss_crt_modulus_rejected();
+    run_common(results);
     results[155] = 2;
 }

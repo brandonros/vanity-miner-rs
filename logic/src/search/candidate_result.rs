@@ -11,12 +11,15 @@ pub struct CandidateResult {
     pub bytes: [u8; 256],
 }
 impl CandidateResult {
+    pub const STATUS_MISS: u32 = 0;
+    pub const STATUS_MATCH: u32 = 1;
+    pub const STATUS_ERROR: u32 = 2;
     pub const MISS: Self = Self {
-        status: 0,
+        status: Self::STATUS_MISS,
         bytes: [0; 256],
     };
     pub const ERROR: Self = Self {
-        status: 2,
+        status: Self::STATUS_ERROR,
         bytes: [0; 256],
     };
     pub fn matched(bytes: &[u8]) -> Self {
@@ -24,7 +27,7 @@ impl CandidateResult {
         if bytes.len() > result.bytes.len() {
             return Self::ERROR;
         }
-        result.status = 1;
+        result.status = Self::STATUS_MATCH;
         result.bytes[..bytes.len()].copy_from_slice(bytes);
         result
     }
@@ -80,7 +83,7 @@ impl BatchResult {
         if self.matches == 0 {
             return Ok(None);
         }
-        if self.lane >= count || self.candidate.status != 1 {
+        if self.lane >= count || self.candidate.status != CandidateResult::STATUS_MATCH {
             return Err("device returned an invalid winner");
         }
         Ok(Some((self.lane, self.candidate)))

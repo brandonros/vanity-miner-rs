@@ -1,5 +1,7 @@
 use crate::common::{GlobalStats, search_session::run_with_launch_limit};
-use crate::runner::cumetal::{CumetalRunner, Error, batch_transport::Engine, driver::Driver};
+use crate::runner::cumetal::{
+    CumetalRunner, Error, batch_transport::CumetalBatchTransport, driver::Driver,
+};
 use std::{rc::Rc, sync::Arc};
 
 pub fn run(
@@ -10,7 +12,7 @@ pub fn run(
 ) -> Result<(), Error> {
     let config = args.config(1)?;
     let module = runner.module(driver, "kernel_rsa_modulus_vanity_v2")?;
-    let mut engine = Engine {
+    let mut engine = CumetalBatchTransport {
         driver,
         module,
         verify: runner.options.verify,

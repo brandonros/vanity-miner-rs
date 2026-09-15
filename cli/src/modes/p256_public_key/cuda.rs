@@ -5,14 +5,12 @@ pub fn run(
     stats: std::sync::Arc<crate::common::GlobalStats>,
     control: std::sync::Arc<vanity_miner::search_control::SearchControl>,
 ) -> RunResult {
-    let mut engine = crate::runner::cuda_transport::Engine::new(gpu);
+    let mut engine = crate::runner::cuda_transport::CudaBatchTransport::new(gpu);
     let config = args.config(1);
-    {
-        stats.set_unit("keys");
-        vanity_miner::search::p256_public_key::run_device(&config, control, &mut |r, p, m, s, c| {
-            engine.evaluate("kernel_p256_public_key_vanity", r, p, m, s, c)
-        })
-        .map(|_| ())
-        .map_err(Into::into)
-    }
+    stats.set_unit("keys");
+    vanity_miner::search::p256_public_key::run_device(&config, control, &mut |r, p, m, s, c| {
+        engine.evaluate("kernel_p256_public_key_vanity", r, p, m, s, c)
+    })
+    .map(|_| ())
+    .map_err(Into::into)
 }

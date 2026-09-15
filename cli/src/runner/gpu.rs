@@ -1,5 +1,5 @@
 #[cfg(feature = "shallenge")]
-use crate::common::SharedBestHash;
+use crate::modes::shallenge::shared_best_hash::SharedBestHash;
 use crate::{
     args::Command,
     common::{GlobalStats, GpuContext},
@@ -71,7 +71,7 @@ impl GpuRunner {
                     modes::rsa_modulus::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
                 #[cfg(feature = "solana")]
-                Command::SolanaVanity { prefix, suffix } => modes::solana::gpu::run(
+                Command::SolanaVanity { prefix, suffix } => modes::solana::cuda::run(
                     ordinal,
                     prefix.clone(),
                     suffix.clone(),
@@ -80,7 +80,7 @@ impl GpuRunner {
                     control.clone(),
                 ),
                 #[cfg(feature = "bitcoin")]
-                Command::BitcoinVanity { prefix, suffix } => modes::bitcoin::gpu::run(
+                Command::BitcoinVanity { prefix, suffix } => modes::bitcoin::cuda::run(
                     ordinal,
                     prefix.clone(),
                     suffix.clone(),
@@ -89,7 +89,7 @@ impl GpuRunner {
                     control.clone(),
                 ),
                 #[cfg(feature = "ethereum")]
-                Command::EthereumVanity { prefix, suffix } => modes::ethereum::gpu::run(
+                Command::EthereumVanity { prefix, suffix } => modes::ethereum::cuda::run(
                     ordinal,
                     prefix.clone(),
                     suffix.clone(),
@@ -98,7 +98,7 @@ impl GpuRunner {
                     control.clone(),
                 ),
                 #[cfg(feature = "shallenge")]
-                Command::Shallenge { username, .. } => modes::shallenge::gpu::run(
+                Command::Shallenge { username, .. } => modes::shallenge::cuda::run(
                     ordinal,
                     username.clone(),
                     shared_best_hash.clone().unwrap(),

@@ -40,6 +40,61 @@ mod tests {
     use super::*;
 
     #[test]
+    fn launch_limit_keeps_last_winner_and_persists_across_rounds() {
+        let control = SearchControl::new();
+        control.set_device_launch_limit(Some(1));
+        let found = find(
+            |_, _| {
+                Ok(BatchResult {
+                    matches: 1,
+                    errors: 0,
+                    lane: 0,
+                    candidate: CandidateResult::matched(&[42]),
+                })
+            },
+            1024,
+            &control,
+            |_, _| Ok(true),
+        )
+        .unwrap();
+        assert!(found.is_some());
+        assert!(control.resume_after_match());
+        assert!(
+            find(
+                |_, _| panic!("launch limit must persist after a match"),
+                1024,
+                &control,
+                |_, _| panic!("no further candidates"),
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert_eq!(control.statistics().0, 64);
+    }
+
+    #[test]
+    fn launch_limit_without_match_is_normal_completion() {
+        let control = SearchControl::new();
+        control.set_device_launch_limit(Some(2));
+        let mut launches = 0;
+        assert!(
+            find(
+                |_, _| {
+                    launches += 1;
+                    Ok(BatchResult::EMPTY)
+                },
+                1024,
+                &control,
+                |_, _| panic!("no match"),
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert_eq!(launches, 2);
+        assert_eq!(control.statistics().0, 128);
+    }
+
+    #[test]
     fn large_batches_cover_the_tail_without_overlap() {
         let control = SearchControl::new();
         control.set_batch_size(4096).unwrap();

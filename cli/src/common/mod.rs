@@ -10,8 +10,6 @@
 mod cpu_workers;
 #[cfg(feature = "gpu")]
 mod gpu_context;
-#[cfg(feature = "shallenge")]
-mod shared_best_hash;
 #[cfg(any(
     feature = "solana",
     feature = "bitcoin",
@@ -32,8 +30,6 @@ mod validation;
 pub use cpu_workers::*;
 #[cfg(feature = "gpu")]
 pub use gpu_context::GpuContext;
-#[cfg(feature = "shallenge")]
-pub use shared_best_hash::*;
 #[cfg(any(
     feature = "solana",
     feature = "bitcoin",

@@ -11,8 +11,8 @@ ethereum = ["dep:k256", "dep:tiny-keccak"]
 shallenge = []
 p256-public-key = ["dep:p256", "dep:hmac", "dep:digest", "dep:zeroize"]
 p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest", "dep:zeroize"]
-rsa-pss = ["dep:hmac", "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
-rsa-modulus = ["dep:hmac", "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
+rsa-pss = [ "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
+rsa-modulus = [ "dep:digest", "dep:zeroize", "dep:crypto-bigint"]
 self_test = [
     "self_test_solana",
     "self_test_bitcoin",

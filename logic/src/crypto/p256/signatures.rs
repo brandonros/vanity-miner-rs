@@ -1,4 +1,3 @@
-
 use crate::search::hex_pattern::HexPattern;
 use ecdsa::hazmat::SignPrimitive;
 use p256::ecdsa::{
@@ -130,7 +129,6 @@ pub fn verify(public: &[u8; 65], message: &[u8], raw: &[u8; 64]) -> bool {
 mod tests {
     use super as signatures;
     use super::super::{candidate_scalar, public_point};
-    use super::*;
     fn test_scalar() -> [u8; 32] {
         // Public test value only; never used by a candidate generator.
         let mut scalar = [0; 32];

@@ -1,9 +1,9 @@
 //! CUDA entry point for p256-public-key: one shared winner per launch.
 use cuda_std::prelude::*;
 use logic::{
+    modes::p256_public_key_vanity::{P256PublicRequest, p256_public},
     search::candidate_result::{BatchResult, CandidateResult},
     search::hex_pattern::HexPattern,
-    modes::p256_public_key_vanity::{P256PublicRequest, p256_public},
 };
 
 /// # Safety
@@ -14,8 +14,8 @@ use logic::{
 pub unsafe extern "C" fn kernel_p256_public_key_vanity(
     request: *const P256PublicRequest,
     pattern: *const HexPattern,
-    message: *const u8,
-    message_len: usize,
+    _message: *const u8,
+    _message_len: usize,
     start: u64,
     count: u32,
     output: *mut BatchResult,
@@ -25,18 +25,13 @@ pub unsafe extern "C" fn kernel_p256_public_key_vanity(
         return;
     }
     let result = if let Some(counter) = start.checked_add(lane as u64) {
-        let _message = if message_len == 0 {
-            &[]
-        } else {
-            unsafe { core::slice::from_raw_parts(message, message_len) }
-        };
         unsafe { p256_public(&*request, counter, &*pattern) }
     } else {
         CandidateResult::ERROR
     };
     match result.status {
-        0 => {}
-        1 => {
+        CandidateResult::STATUS_MISS => {}
+        CandidateResult::STATUS_MATCH => {
             handle_match! {
                 thread_idx: lane,
                 found_matches_ptr: core::ptr::addr_of_mut!((*output).matches),

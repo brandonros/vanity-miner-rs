@@ -4,26 +4,27 @@ use cust::{
     memory::{CopyDestination, DeviceBuffer, DeviceCopy},
     stream::Stream,
 };
+use logic::search::device_record::DeviceRecord;
 use logic::{search::candidate_result::BatchResult, search::hex_pattern::HexPattern};
 use zeroize::{Zeroize, Zeroizing};
 
 #[repr(transparent)]
 #[derive(Clone, Copy)]
 struct Record<T>(T);
-use logic::search::device_record::DeviceRecord as Abi;
-unsafe impl<T: Abi> DeviceCopy for Record<T> {}
+// SAFETY: DeviceRecord guarantees pointer-free, initialized, valid copied bytes.
+unsafe impl<T: DeviceRecord> DeviceCopy for Record<T> {}
 impl<T: Zeroize> Zeroize for Record<T> {
     fn zeroize(&mut self) {
         self.0.zeroize();
     }
 }
 
-struct SecretBuffer<'a, T: Abi + Zeroize> {
+struct SecretBuffer<'a, T: DeviceRecord + Zeroize> {
     buffer: DeviceBuffer<Record<T>>,
     zeros: Zeroizing<Vec<Record<T>>>,
     stream: &'a Stream,
 }
-impl<'a, T: Abi + Zeroize> SecretBuffer<'a, T> {
+impl<'a, T: DeviceRecord + Zeroize> SecretBuffer<'a, T> {
     fn new(values: &[Record<T>], stream: &'a Stream) -> Result<Self, String> {
         let buffer = DeviceBuffer::from_slice(values).map_err(|e| e.to_string())?;
         let mut zeros = Zeroizing::new(values.to_vec());
@@ -43,7 +44,7 @@ impl<'a, T: Abi + Zeroize> SecretBuffer<'a, T> {
             .map_err(|e| e.to_string())
     }
 }
-impl<T: Abi + Zeroize> Drop for SecretBuffer<'_, T> {
+impl<T: DeviceRecord + Zeroize> Drop for SecretBuffer<'_, T> {
     fn drop(&mut self) {
         if self.clear().is_err() {
             eprintln!("CUDA buffer erasure failed; the device context will be released.");
@@ -51,14 +52,14 @@ impl<T: Abi + Zeroize> Drop for SecretBuffer<'_, T> {
     }
 }
 
-pub struct Engine<'a> {
+pub struct CudaBatchTransport<'a> {
     gpu: &'a crate::common::GpuContext,
 }
-impl<'a> Engine<'a> {
+impl<'a> CudaBatchTransport<'a> {
     pub fn new(gpu: &'a crate::common::GpuContext) -> Self {
         Self { gpu }
     }
-    pub fn evaluate<T: Abi + Zeroize>(
+    pub fn evaluate<T: DeviceRecord + Zeroize>(
         &mut self,
         name: &str,
         request: &T,

@@ -13,8 +13,8 @@ pub(crate) fn evaluate(
             .ok_or("test counter overflow")?;
         let result = candidate(counter);
         match result.status {
-            0 => {}
-            1 => {
+            CandidateResult::STATUS_MISS => {}
+            CandidateResult::STATUS_MATCH => {
                 if output.matches == 0 {
                     output.lane = lane;
                     output.candidate = result;

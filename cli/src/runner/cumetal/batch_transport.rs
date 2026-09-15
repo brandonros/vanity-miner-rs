@@ -1,6 +1,6 @@
 //! Transport for the same RSA/P-256 kernels and host verification used by CUDA.
 use super::driver::Buffer;
-use super::{Driver, Error, Module};
+use super::{Driver, Error, driver::Module};
 use logic::search::{
     candidate_result::{BatchResult, CandidateResult},
     hex_pattern::HexPattern,
@@ -8,8 +8,8 @@ use logic::search::{
 use std::rc::Rc;
 use zeroize::Zeroizing;
 
-use logic::search::device_record::DeviceRecord as Abi;
-fn bytes<T: Abi>(value: &T) -> &[u8] {
+use logic::search::device_record::DeviceRecord;
+fn bytes<T: DeviceRecord>(value: &T) -> &[u8] {
     // SAFETY: DeviceRecord guarantees padding-free integer records.
     unsafe { std::slice::from_raw_parts((value as *const T).cast(), std::mem::size_of::<T>()) }
 }
@@ -21,13 +21,13 @@ impl Drop for SecretBuffer {
         }
     }
 }
-pub(crate) struct Engine<'a> {
+pub(crate) struct CumetalBatchTransport<'a> {
     pub(crate) driver: &'a Rc<Driver>,
     pub(crate) module: Module,
     pub(crate) verify: bool,
 }
-impl Engine<'_> {
-    pub(crate) fn evaluate<T: Abi>(
+impl CumetalBatchTransport<'_> {
+    pub(crate) fn evaluate<T: DeviceRecord>(
         &mut self,
         request: &T,
         pattern: &HexPattern,
@@ -70,8 +70,8 @@ impl Engine<'_> {
                 for lane in 0..count {
                     let candidate = Zeroizing::new(reference(start + lane as u64));
                     match candidate.status {
-                        0 => {}
-                        1 => matches += 1,
+                        CandidateResult::STATUS_MISS => {}
+                        CandidateResult::STATUS_MATCH => matches += 1,
                         _ => errors += 1,
                     }
                     if result.matches > 0

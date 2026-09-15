@@ -1,7 +1,9 @@
 //! rsa modulus self-tests: primitives, pipeline stages, and regressions.
-use super::fixtures::*;
+mod fixtures;
+use super::known_answers::*;
 use super::record_candidate;
 use core::hint::black_box;
+use fixtures::*;
 
 pub fn check_rsa_modulus_multiplication_carry() -> u32 {
     u32::from((|| {

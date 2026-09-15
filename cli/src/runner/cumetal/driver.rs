@@ -175,7 +175,7 @@ impl Drop for Buffer {
     }
 }
 pub struct Module {
-    pub(super) temporary: Option<super::TemporaryDirectory>,
+    pub(super) temporary: Option<super::module::TemporaryDirectory>,
     driver: Rc<Driver>,
     handle: Handle,
     function: Handle,
