@@ -13,7 +13,16 @@ CPU-reference-checked positions / 96 independently verified winner hashes).
 [PR #132](https://github.com/Lulzx/cuda-metal/pull/132) implements upstream #129;
 its scoped acceptance passes and upstream integration remains pending.
 Downstream #38 is closed. See the [Shallenge report](cumetal-shallenge-validation.md).
-The other workloads were not rerun at this pin; Shallenge self-test #37 is separate.
+**New [four-group self-test replay](cumetal-four-self-test-validation.md) at
+`4a207e2`: none of #29/#30/#31/#37 can close.** Solana, Bitcoin, Ethereum and
+Shallenge were attempted under both LLVM7 and LLVM21. CPU passes all 147 checks;
+seven GPU attempts fail translation and LLVM21 Ethereum times out at 600 seconds
+in Metal compute-pipeline preparation. All 294 GPU check selections are blocked;
+there are no numerical GPU results or skips. The other eight open workloads
+were not rerun at this pin. The full-sweep tables below remain historical.
+All eight measured failures now have published owners: #76, #130, new #133
+(Ethereum pipeline preparation) and new #134 (Bitcoin narrowing). See the
+[ownership mapping](cumetal-four-self-test-validation.md#published-upstream-ownership).
 
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,

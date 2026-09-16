@@ -10,7 +10,7 @@ llvm21 = ["cuda", "cuda_builder/llvm21"]
 
 [build-dependencies.cuda_builder]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "7c07c618dd7c1c08af4d040a5fc422d9ebf8caff"
+rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50"
 default-features = false
 features = ["rustc_codegen_nvvm"]
 optional = true

@@ -8,7 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 logic = { path = "../../../logic", default-features = false, features = ["self_test_rsa_modulus"] }
-cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "7c07c618dd7c1c08af4d040a5fc422d9ebf8caff" }
+cuda_std = { git = "https://github.com/brandonros/Rust-CUDA.git", rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50" }
 
 # Device compilation is a separate Cargo invocation and target.
 [workspace]

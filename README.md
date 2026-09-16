@@ -68,6 +68,12 @@ nix develop .#v7 --command cargo build -p kernel-bitcoin -p kernel-self-test-bit
 nix develop .#v21 --command cargo build -p kernel-self-test-solana --release --locked --features llvm21
 ```
 
+Cargo builds the pinned compiler backend through `cuda_builder`'s
+`rustc_codegen_nvvm` feature. The kernel packages forward `llvm21` to the builder,
+which forwards it to the backend. `CudaBuilder::new` uses that exact Cargo
+artifact; no backend path, separate build command, or artifact search is needed.
+CPU, CuMetal, and external-PTX runner builds do not compile the backend.
+
 Each kernel package defaults to `cuda` and produces exactly one PTX module.
 `kernel-<mode>` produces `<mode>.ptx`; `kernel-self-test-<mode>` produces
 `self_test_<mode>.ptx` (PTX filenames use underscores).
@@ -396,7 +402,8 @@ Build the same full PTX bundles locally on Linux with Nix (no GPU required):
 ./scripts/build-ptx.sh 7
 ```
 
-The script reuses `target/llvm<version>` for incremental builds and writes
+The script uses Cargo to build the compiler and kernel dependencies. It reuses
+`target/llvm<version>` for incremental builds and writes
 `artifacts/ptx-bundle-llvm<version>.tar.gz`. CI calls this same script.
 Each invocation also creates `artifacts/ptx-timings-llvm<version>-<id>/`
 with `build.log` and one TSV per completed kernel builder (module, wall seconds,
