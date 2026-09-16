@@ -1,270 +1,200 @@
-# CuMetal validation — 2026-09-15
+# CuMetal validation — 2026-09-16
 
 ## Result
 
-Retested **2026-09-15, 18:36:19–18:59:34 UTC**, against CuMetal
-**`e5acf8cc0c658142c704ee80e749f5180911fff4`**, matching `flake.lock` at validation
-time. All eight production modes and all eight self-test groups were attempted.
-The [16-row status table](cumetal-status.md) has **3 true and 13 false**.
+Fresh measurement **2026-09-16, 01:46:07–02:14:38 UTC**:
+**2 of 16 rows pass; 14 fail**. The passing rows are **Shallenge production** and
+**P-256 public-key production**. See the [16-row report](cumetal-status.md).
 
-The lock later advanced to `92a9b8f4de230199eac617fc57feaf7c0849cf01`, then
-`7d12f120a6b80a9956588de2b974db5747b35f57`.
-This report preserves the complete `e5acf8cc0c65` run. The
-[issue ownership matrix](cumetal-issue-matrix.md) records upstream status and
-separately identified targeted research on later revisions.
+- **Production:** 2 modes pass, 4 fail PTX translation, 2 time out. Both search
+  sources of each signature mode were attempted, giving 10 production commands.
+- **GPU self-tests:** all 8 groups attempted; **203 checks blocked before execution**,
+  0 passes, 0 numerical failures, 0 skips, 0 missing outcomes. Six modules fail PTX
+  translation; two emit Metal that Apple rejects.
+- **CPU baseline:** the matching source passes all **203 checks**, with 0 failures
+  or skips. This establishes the CPU fixtures, not GPU correctness.
 
-Production: **2 modes passed, 4 failed translation, 2 timed out**. Both search
-sources were tested for each signature mode, giving ten production commands.
-Self-tests: **8 passed, 152 failed, 0 skipped**; all 152 failed slots were blocked
-by translation in seven modules. No numerical assertion failures were observed.
+The final evidence audit passes: all **18 commands**, **16 PTX inputs** and
+**203 named self-test selections** are accounted for, and source/input/package
+identities match. Audit success means the report is complete and internally
+consistent; it does not turn failed workload rows into passes.
 
-| Production mode | Result | Fresh evidence |
-| --- | --- | --- |
-| Solana | Translation failed | `i32` operand refers to an `i64` value; first diagnostic at PTX line 34070. |
-| Bitcoin | Translation failed | Pointer subtraction requires a pointer minus a 64-bit integer byte offset; PTX line 26556. |
-| Ethereum | Translation failed | Same pointer-subtraction diagnostic; PTX line 22069. |
-| Shallenge | Passed bounded GPU check | Two batches, 64 nonces, two CPU-verified outputs; exit 0. |
-| P-256 public key | Passed bounded GPU check | Two batches, 64 keys, two CPU-verified outputs; exit 0. |
-| P-256 signature | Translation failed | Both message and ephemeral search: `%rd17653` undefined on an incoming edge to `$L__BB0_11`. |
-| RSA modulus | Timed out; execution unverified | All four Metal sources and ABI sidecars emitted. A live stack sample showed `cuCtxSynchronize` waiting in `_MTLCommandBuffer waitUntilCompleted`. No completed cycle or tested factor candidates within 300 seconds. |
-| RSA-PSS signature | Timed out; execution unverified | Both salt and message search emitted identical 24,263,894-byte Metal sources and ABI sidecars. Each was sampled inside Apple's `newLibraryWithSource` compilation and timed out at 300 seconds with no completed candidates. |
+## Production results
 
-“Eight modes” includes eleven production entry points: RSA modulus has generate,
-ranges, search, and advance entries. Emitting their source does not establish that
-all four entries executed successfully. Timeouts are not numerical failures and
-do not establish that compilation or execution could never finish.
+Times below are whole-command wall times, including translation, preparation,
+execution and verification. The limit was 300 seconds, plus process termination.
 
-## What changed from the previous run
+| Mode | Result | Seconds | Fresh evidence |
+| --- | --- | ---: | --- |
+| Solana | PTX translation failed | 5.44 | PTX line 34070: `i32` operand refers to an `i64` value. |
+| Bitcoin | PTX translation failed | 11.22 | Line 26556: pointer subtraction requires a pointer minus a 64-bit integer byte offset. |
+| Ethereum | PTX translation failed | 10.52 | Same diagnostic, line 22069. |
+| Shallenge | **Passed** | 2.03 | Two batches, 64 candidates, two returned outputs; CPU verification and buffer checks pass. |
+| P-256 public key | **Passed** | 192.36 | Two batches, 64 candidates, two returned outputs; CPU verification and buffer checks pass. Samples at 60/180 seconds showed Metal pipeline creation before eventual success. |
+| P-256 signature: message | PTX translation failed | 35.55 | `%rd17653` undefined on an incoming edge to `$L__BB0_11`. |
+| P-256 signature: ephemeral | PTX translation failed | 38.14 | Same diagnostic. |
+| RSA modulus | Timed out | 301.22 | All four Metal sources emitted. The 180-second and late samples showed `newComputePipelineStateWithFunction`, not a completed GPU cycle. |
+| RSA-PSS: salt | Timed out | 301.67 | Emitted 24,263,920-byte Metal source; 180-second and late samples showed `newLibraryWithSource`. No completed candidates. |
+| RSA-PSS: message | Timed out | 301.21 | Same emitted source size; independently sampled in `newLibraryWithSource`. No completed candidates. |
 
-The historical `98cf505` run also had **3 true / 13 false**, but those totals hide
-changes in the failure stages:
+The eight production modes have eleven entry points because RSA modulus uses
+four stages. Translating all four does not establish execution of all four.
+In particular, this fresh RSA modulus observation is a **pipeline-creation wait**;
+the historical sample waiting for GPU command completion is separate evidence.
 
-- **RSA-PSS production advances past translation.** The former pointer-type
-  diagnostic at PTX line 55188 is absent in both fresh production runs. Metal
-  source compilation is now the observed wait; GPU correctness remains unverified.
-- **RSA modulus still times out**, but this run was directly sampled waiting for
-  Metal command completion. The earlier report's compilation-time explanation
-  cannot be carried forward as the explanation of this fresh observation.
-- **RSA-PSS self-test still fails translation, with a different diagnostic:**
-  the first reported location is now PTX line 2377, rather than 358262. This needs
-  investigation; a changed diagnostic alone does not establish its root cause or
-  prove a regression.
-- The other failing modules retain their previous first diagnostics. Shallenge
-  production/self-tests and P-256 public-key production pass again.
+## Self-test results
 
-The unchanged PTX inputs make this a direct before/after test of the CuMetal pin.
-Timing differences are not benchmarks or proof of a compiler speedup: shared
-Metal caches were not cleared, and other compiler work was running on the Mac.
+Each group ran in its own process with `self-test --check MODE.CHECK`, selecting
+every owned name exactly once. Selection runs the containing kernel in full.
+A module preparation error is reported against every selected check in that
+module; **203 blocked checks are eight blocked modules, not 203 numerical bugs**.
 
-## Self-tests
+| Group | Checks blocked | Stage | First observed diagnostic / location | Seconds |
+| --- | ---: | --- | --- | ---: |
+| Solana | 79 | PTX translation | `%rd42` / `$L__BB77_6`, new `solana.candidate_match`. | 77.45 |
+| Bitcoin | 39 | PTX translation | `%r1688` / `$L__BB4_3`, `bitcoin.private_key`; undefined high half packed before a narrower use. | 59.96 |
+| Ethereum | 8 | PTX translation | Pointer-subtraction diagnostic at PTX 17373, new `ethereum.candidate_match`. | 21.22 |
+| Shallenge | 21 | PTX translation | `%rd16` / `$L__BB18_1`, new `shallenge.sha256_streaming_chunks`. | 15.15 |
+| P-256 public key | 13 | Apple Metal compilation | Undeclared `private$39` at MSL 92833; additional pointer address-space errors. | 26.54 |
+| P-256 signature | 13 | PTX translation | `%p243` / `$L__BB8_1`, `p256_signature.low_s`. | 50.02 |
+| RSA modulus | 16 | PTX translation | `%rs907` / `$L__BB16_1`, new `rsa_modulus.range_multiple`. | 95.21 |
+| RSA-PSS | 14 | Apple Metal compilation | MSL 138317: illegal `as_type` from `ulong` to `device uchar*`; later bracketed global expressions cause syntax errors. | 165.95 |
+| **Total** | **203** | **Before GPU execution** | **Every selected check reported once; no numerical results or skips.** | |
 
-Each group ran in its own process, selecting every slot owned by that group with
-repeated `--self-test-slot` arguments. Slot filtering does not reduce the kernel
-body. In the passing Shallenge group, the full kernel executed and the runner
-checked that unrelated result slots retained their sentinel values. The other
-seven modules failed before execution. Group selection prevented one slow module
-from blocking the remaining checks.
+`rsa_pss.end_to_end` is the sole intentional GPU skip (current slot 183). Because
+its module failed first, the skip was not reached. A successful suite under this
+policy would normally report **202 GPU passes and one skip**.
 
-| Self-test group | Passed | Blocked by translation | First diagnostic | Seconds |
-| --- | ---: | ---: | --- | ---: |
-| Solana | 0 | 72 | Trap-call expansion exceeds bounded control-flow size: 11 calls, 1,746 blocks, 274,910 operations. | 13.06 |
-| Bitcoin | 0 | 33 | `ptr<device, i16>` operand refers to an `i64` value; PTX line 53099. | 26.00 |
-| Ethereum | 0 | 5 | Trap-call expansion exceeds bounded control-flow size: 5 calls, 372 blocks, 271,425 operations. | 20.67 |
-| Shallenge | 8 | 0 | All eight owned slots passed. | 1.70 |
-| P-256 public key | 0 | 9 | Trap-call expansion exceeds bounded control-flow size: 8 calls, 1,039 blocks, 274,906 operations. | 14.37 |
-| P-256 signature | 0 | 10 | `%rs506` undefined on an incoming edge to `$L__BB0_1`. | 64.39 |
-| RSA modulus | 0 | 12 | `%rs2233` undefined on an incoming edge to `$L__BB0_1`. | 88.66 |
-| RSA-PSS | 0 | 11 | `ptr<device, i16>` operand refers to an `i64` value; PTX line 2377. | 180.86 |
-| **Total** | **8** | **152** | **All 160 selected slots reported exactly once across the eight runs.** | |
+The additional Metal errors matter independently:
 
-The aggregate excludes the `not selected` skips printed for other groups in each
-process. It contains no missing slots, duplicate outcomes, or observed skips.
-A failed module launch is reported against every slot it owns, so 152 failed
-slots represent seven compiler-blocked modules, not 152 independent algorithm
-failures.
+- **P-256 public key:** emitted helpers reference undeclared `private$39`; another
+  expression casts through `cm_alias_uchar*` without an address-space qualifier.
+  Fixing the missing name alone is not evidence that every diagnostic is fixed.
+- **RSA-PSS:** besides the invalid pointer cast, emitted expressions such as
+  `ulong([private$em])` retain PTX-style brackets. Apple parses these as unsupported
+  lambda syntax. The PTX global is used by the CRT known-answer/fault/modulus
+  helpers. The log contains 1 invalid-cast, 96 lambda and 192 parenthesis errors;
+  those counts do not represent independent root causes.
 
-RSA-PSS slot 155 is configured to skip its disabled end-to-end GPU check when the
-module executes. Here compilation failed first, so it was reported as failed
-with the other ten slots. A future successful enabled suite would normally report
-159 passes and one intentional skip; it must not be described as 160 GPU passes.
+The CLI cleaned up generated Metal after these two failed commands. PTX, compiler
+identity and full diagnostic logs remain in the bundle. Some MSL locations cannot
+be mapped uniquely back to a helper without regenerating the source. No speculative
+root-cause assignment is presented as a completed reduction.
 
-## Why included PRs do not make these workloads pass
+## What changed, and what has not been proved
 
-This run loaded the intended build. The host was rebuilt from a frozen source
-snapshot with the current lock. Every command verified and printed the pinned
-compiler/runtime hashes. The source audit also matched the immutable importer
-and control-flow source files to Git commit `e5acf8cc0c65` and verified relevant
-PR commits are ancestors of that revision.
+The historical full run used CuMetal `e5acf8cc0c65`, producer `a2aba42`, and 160
+checks; it had **3 true / 13 false**. This run uses `9e3e615`, producer `4e0231a`,
+and 203 checks. It is **not a pin-only comparison**.
 
-The remaining gap is implementation and validation scope:
+- **Shallenge self-tests add the fourteenth failing row.** The old eight-check
+  module passed; the expanded 21-check module fails in a newly added streaming
+  check. No downstream issue has yet been opened for this new row.
+- **All eight production PTX modules have identical instructions, registers,
+  control-flow labels and data after an explicit, consistent renaming of declared
+  module symbols/parameters.** All original byte hashes differ. The comparison
+  excludes PTX instruction growth as the explanation of the production timing
+  differences, but does not prove identical generated Metal or cache behavior.
+- **The rewritten self-test inputs expose different first blockers.** Included
+  PRs #117, #121 and #122 retain their demonstrated scope on the original
+  reproductions. They do not establish a pass for these changed modules.
+- **RSA-PSS self-tests now emit Metal.** This changed input getting past PTX
+  translation does not establish that the unimplemented mixed-vector correction
+  in upstream #118 was added or that its original reproduction is fixed.
+- **RSA modulus self-tests stop earlier than the historical Metal allocation
+  failure**, in the new range check. Upstream #124/#127 resource work remains
+  historical follow-up work, not the observed first stage of this fresh input.
 
-| Workload | Included fixes | Remaining gap |
-| --- | --- | --- |
-| Solana, Bitcoin, Ethereum production | [PR #50](https://github.com/Lulzx/cuda-metal/pull/50) fixes conversion source semantics; [#56](https://github.com/Lulzx/cuda-metal/pull/56) supports valid pointer subtraction; [#75](https://github.com/Lulzx/cuda-metal/pull/75) preserves inferred definition types. | Conversion destinations are still initially inferred with the wrong width before SSA, the compiler's representation of values at control-flow joins. Correcting them later does not repair every earlier use. That required inference change is not implemented. |
-| P-256 signature production | [PR #85](https://github.com/Lulzx/cuda-metal/pull/85) and subsequent changes handle bounded constant-predicate paths. | Traversal still stops at empty blocks created by consecutive labels. The needed normalization or traversal extension is not implemented; the control-flow source is unchanged since `98cf505`. |
-| RSA-PSS production | [PR #108](https://github.com/Lulzx/cuda-metal/pull/108), [#110](https://github.com/Lulzx/cuda-metal/pull/110), and [#112](https://github.com/Lulzx/cuda-metal/pull/112) are included. | The fresh full PTX now translates, but neither production variant completes Metal compilation and verified GPU execution within the limit. |
+The [issue matrix](cumetal-issue-matrix.md) separates original upstream owners,
+included scoped fixes, fresh observations, and cases needing further reduction.
+Similar register/type diagnostics alone do not establish duplicate defects.
 
-The inspected PR descriptions do not claim that the exact retained Solana,
-Bitcoin, Ethereum, and P-256 signature artifacts all passed. The descriptions of
-PR #75 and PR #85 explicitly identify remaining scope or workload limitations.
-Issue ownership, a diagnosed cause, an implemented small regression test, full
-PTX translation, and a verified GPU run are separate milestones. A status row is
-marked true only after the recorded GPU validation passes.
+## Scope and limits of the checks
 
-### Current upstream tracking
+Production commands used `--blocks 1 --threads-per-block 32 --batches 2 --seed 1
+--verify`. Address/key patterns were empty; Shallenge used an all-ones target.
+Both signature search sources used retained disposable keys and the 38-byte
+message. Message search used an eight-byte nonce window at offset eight;
+RSA-PSS message search used a fixed 32-byte zero salt. Some crypto preparation
+uses OS randomness, so `--seed 1` does not freeze every candidate.
 
-The unresolved implementation work is explicit in existing upstream
-[#76](https://github.com/Lulzx/cuda-metal/issues/76) (conversion/join types),
-[#83](https://github.com/Lulzx/cuda-metal/issues/83) (empty labels and incomplete
-predicate rewrites), [#35](https://github.com/Lulzx/cuda-metal/issues/35) (masked
-payload demand), and [#46](https://github.com/Lulzx/cuda-metal/issues/46)
-(finite-loop helper reuse). The RSA-PSS compilation-time investigation has its
-own [#115](https://github.com/Lulzx/cuda-metal/issues/115). The narrower PRs #57,
-#62 and #85 reference their expanded issues without automatically closing them.
+For the two passing modes, verification evaluates all 64 candidates on the CPU,
+compares aggregate match/error counts and each returned winner's bytes, checks
+unchanged inputs and buffer guards, and verifies exported results. The compact
+result returns one winner per batch; it does not compare all candidate output
+bytes. Two batches exercise buffer reuse. These are bounded correctness checks,
+not exhaustive pattern, launch-geometry or performance validation.
 
-RSA modulus now has [#119](https://github.com/Lulzx/cuda-metal/issues/119) for its
-GPU completion investigation. Exact-binary disassembly resolves the sampled wait
-to `kernel_rsa_generate`. Fixed public scalar/native CPU fixtures complete with
-matching rejection statuses, but neither the GPU wait's cause nor its correction
-is established. This is distinct from the RSA-PSS compilation wait in #115.
+Every command had a **300-second whole-process limit** and ran sequentially.
+Only its own process group was terminated on timeout. Shared Metal caches were
+not cleared and compiler services can outlive a client. Elapsed times are not
+controlled benchmarks. Stack samples identify observed call sites, not exact
+per-stage durations or root causes. The timing diagnostics in PR #128 are
+**not in this pin**. Module-load success alone is never counted as compilation
+or GPU success.
 
-All 13 downstream issues have status, remaining work, and full-workload completion
-criteria above their preserved historical reports. Later
-[PR #114](https://github.com/Lulzx/cuda-metal/pull/114) reports clearing Bitcoin
-self-test pointer-field errors and reaching the trap-expansion limit. Subsequent
-targeted local research on `92a9b8f4de23` confirms that it **does not clear the
-RSA-PSS self-test's 63 pointer errors**. The missing mixed-vector case now has
-its own [#118](https://github.com/Lulzx/cuda-metal/issues/118). A diagnostic copy
-with that single vector reload split into scalar loads clears those errors and
-reaches a trap-expansion limit; no complete self-test pass is established.
+## Source and artifact identity
 
-Newly published [PR #117](https://github.com/Lulzx/cuda-metal/pull/117) proposes
-preserving guarded helper calls for #116. It reports full PTX translation for
-Bitcoin, Solana, Ethereum, and P-256 public-key self-tests, with Bitcoin still
-waiting in Metal compilation after ten minutes. Those separately reported
-results are outside both this complete run and the targeted `92a9b8` research.
-See the [ownership matrix](cumetal-issue-matrix.md) for current scope and evidence.
+- Hardware: **Apple M5**, macOS **26.6.2**, build `25G83`.
+- Host and PTX producer: **`4e0231aa82b69be146936f53829c95ef3f522832`**.
+  The host was built from a frozen Git archive of that exact Actions commit.
+  Later working-tree edits were not used.
+- PTX: [successful Actions run #35044328837](https://github.com/brandonros/vanity-miner-rs/actions/runs/35044328837),
+  [LLVM 21 job](https://github.com/brandonros/vanity-miner-rs/actions/runs/35044328837/job/104630788363),
+  artifact **`ptx-llvm21` / `10426657549`**. LLVM **21.1.8**, CUDA **13.3**, PTX
+  **9.3**, target **`sm_100`**. No Cargo cache was restored; producer compilation
+  completed in 11m 28s. The uploaded archive digest was verified before extraction.
+- LLVM 7 also built successfully; its companion artifact is retained but **was
+  not used for these CuMetal results**.
+- Rust-CUDA revision: `f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588`;
+  Rust toolchain: `nightly-2026-04-02`.
+- CuMetal: **`9e3e61574b776424a96c686bdbdc04ad1f27fe9f`**, from
+  `https://github.com/brandonros/cuda-metal`, matching the selected `flake.lock`.
+- Paired package: `/nix/store/hh6l39zigklrh3al2w21x7b8ik5jaxcm-vanity-cumetal-9e3e61574b77`.
+- Immutable CuMetal source: `/nix/store/kk52zigih0j1x7dik3fbf9jwjl1ka139-source`.
 
-## What the production checks cover
+| Artifact | SHA-256 |
+| --- | --- |
+| `bin/cumetalc` | `5662a763e6e63539cd9776efb844187c707d23297c35d2950c1e5820eb9ea628` |
+| `lib/libcumetal.dylib` | `2b270e4154b9c16df64ee75f33655a37d7fea843a61055ff180ce3bd515ba549` |
+| CuMetal host executable | `19b4c93129a13841d7434d1c3c6d3616300d88ae41851a7eeb2b2885ecf05072` |
+| Uploaded LLVM 21 artifact ZIP | `a7d8f2ff1f7892cf73f442b7bce5f33f54eb6db7c718105998449417d3d6d144` |
+| Inner LLVM 21 PTX archive | `c2188938132bf7dece2d1704ec48855dfc10a72e8de4db5275d19aedef9e7bc0` |
 
-Every production command requested
-`--blocks 1 --threads-per-block 32 --batches 2 --seed 1 --verify`.
-The address/public-key patterns were empty; Shallenge started with an all-ones
-target. Signature inputs were the retained disposable PKCS#8 P-256 and RSA-2048
-keys and 37-byte message from the historical run. Message search used an
-eight-byte nonce window at offset eight; RSA-PSS message search used a fixed
-32-byte zero salt. Crypto search preparation can also use OS randomness.
+Every command verified and printed the paired package identity and its PTX
+hash. Local CuMetal contribution worktrees and the cancelled preliminary Lima
+build supplied none of the measured PTX/compiler/runtime inputs.
 
-For the two passing modes, `--verify` evaluated all 64 candidates on the CPU,
-compared aggregate match/error counts, and compared each returned winner's bytes.
-The host independently verified exported results. The transport checked unchanged
-inputs and buffer guards. The compact GPU result contains one winner per batch,
-so this does not compare every candidate's output bytes. Two batches exercise
-buffer reuse. These are bounded smoke checks, not exhaustive pattern,
-launch-geometry, or performance validation.
+## Reproduction and retained evidence
 
-Each production command and each self-test group had a **300-second wall-clock
-limit**, including translation, Metal compilation, execution, and verification.
-Commands ran sequentially. On timeout the harness terminated only its own client
-process group; system compiler services can outlive a client and affect subsequent
-timings. No unrelated process was terminated.
-
-## Tested artifacts
-
-- Hardware: Apple M5; macOS 26.6.2.
-- Host source: `55ae44bcd1c1bfa116712212cac22a9598497fbe`, with the working-tree
-  `flake.nix`, `flake.lock`, and README changes captured in an isolated snapshot.
-  Cargo built into a separate target directory, then the executable was copied
-  into the evidence bundle before testing.
-- PTX producer source: `a2aba42c3dbaa876a25cdc3ddd99c2c7ec58d3bb`.
-  All 92 audited kernel/shared-logic/build-input files match that producer, and
-  the GPU build function is unchanged. All 16 retained PTX hashes match both
-  historical manifests. The PTX was reused, not regenerated for this run.
-- Original PTX producer directory:
-  `vanity-nixos:/tmp/vanity-retirement-target/release/ptx/`;
-  LLVM 21.1.8, CUDA 13.3, PTX 9.3, `sm_100`.
-- CuMetal source: `https://github.com/brandonros/cuda-metal`, commit
-  `e5acf8cc0c658142c704ee80e749f5180911fff4`.
-- Source tree: `/nix/store/r7mh28k40g28rl7qf0gi7nnnfk3wcrj0-source`.
-- Paired compiler/runtime package:
-  `/nix/store/39dqnk97w6kbspvh26jha6n90q1rkg72-vanity-cumetal-e5acf8cc0c65`.
-  Compiler: `bin/cumetalc`; runtime: `lib/libcumetal.dylib`.
-- Compiler SHA-256:
-  `edefe1339a26f9b657acd1f1dc08aa1f6f6c13e2bcb8d89cf907d87c0e844f38`.
-- Runtime SHA-256:
-  `09504f3f3332714e777abdbce60dca1b892c47f998532432c9e13afaccd9577d`.
-- Host executable SHA-256:
-  `d1f40ca7dc08d88d570061eb5c1b757792cd26e415f2ce02879675e9c7b48a2b`.
-
-Each command translated its recorded PTX snapshot using
-`--backend=cumetal-ir --ptx-strict --emit=msl`. Local contribution worktrees,
-alternate compiler/runtime binaries, and precompiled Metal inputs did not supply
-these results.
-
-## Commands and local evidence
-
-The isolated source build succeeded:
+From the frozen `source/` directory:
 
 ```sh
-# From the frozen source/ directory in the evidence bundle:
 nix develop path:.#cumetal --command cargo build --offline --release --locked \
   --target-dir ../target -p vanity-miner --no-default-features \
   --features cumetal,self_test,solana,bitcoin,ethereum,shallenge,rsa-modulus,rsa-pss,p256-public-key,p256-signature
 ```
 
-The harness passed the absolute paired package path with `--cumetal-root` and the
-bundle's PTX directory with `--ptx`. `results.json` records all 18 exact commands,
-exit codes, elapsed times, limits, log paths, and hashes of retained timeout
-artifacts. `audit.py` verified coverage of all 16 PTX inputs and 160 selected
-self-test slots, input/source hashes, and the compiler/runtime identity in every
-log.
+`run.py` records each exact command, using the absolute paired `--cumetal-root`
+and extracted `--ptx` directory. `audit.py` verifies complete coverage and hashes.
+Use a new bundle for a rerun; the harness refuses to overwrite existing results.
 
-Local evidence directory (ignored by Git):
-`.cumetal-artifacts/validation-20260915T183226Z/`.
+Local evidence (ignored by Git):
+`.cumetal-artifacts/validation-actions-35044328837-20260916T013211Z/`.
 
-- `metadata.json`, `run-context.json`: machine, source/build identities, timing,
-  build command, and background compiler context.
-- `source/`, `source-working-tree.diff`, `vanity-miner`, `logs/host-build.log`:
-  isolated source, recorded working changes, exact executable, and successful build.
-- `input-hashes.json`, `producer-sha256.txt`, `ptx-provenance.json`, `ptx/`:
-  tested inputs and source compatibility evidence.
-- `run.py`, `results.json`, `logs/`: bounded harness and complete run evidence.
-- `self-test-inventory.json`, `parse_results.py`, `self-test-results.json`:
-  ownership, parsing rules, and observed outcomes for all 160 slots.
-- `audit.py`, `audit.json`: completeness and identity checks.
-- `fix-coverage-audit.json`: included PR commits, exact source comparisons,
-  implementation gaps, and limits of the inspected PR claims.
-- `temporary/`: retained Metal sources and ABI sidecars from timed-out commands;
-  their hashes are in `results.json`.
-- `logs/*-process-sample.txt`: live wait-state evidence for all three timeout commands.
-- `historical/`: previous Markdown reports, preserved before replacement.
-- `fixtures/`: disposable test inputs. Full production logs can contain generated
-  test private keys; they remain local validation artifacts.
+- `metadata.json`, `source/`, `run-context.json`, `vanity-miner`: exact consumer,
+  source hashes, machine/measurement context and binary.
+- `github-run.json`, `github-artifacts.json`, `ptx-provenance.json`, `downloads/`,
+  `ptx/`, `logs/actions-llvm21.log`: producer evidence, verified archives and inputs.
+- `input-hashes.json`, `self-test-inventory*.json`, `cpu-baseline.json`: fixtures,
+  current registry, host inventory cross-check and 203-pass CPU baseline.
+- `run.py`, `results.json`, `logs/`, `temporary/`: 18 exact commands, outcomes,
+  diagnostic/stack logs and retained timeout artifacts.
+- `audit.py`, `audit.json`, `self-test-results.json`: successful final coverage and
+  identity audit, with every blocked check identified.
+- `ptx-structural-comparison.{json,md}`, `fresh-self-test-triage.json`: exact
+  production symbol mappings and qualified locations of fresh self-test blockers.
 
-The complete historical run is retained separately under
-`.cumetal-artifacts/validation-20260915T151954Z/`. Its results describe `98cf505`,
-not the newer tested revision. Earlier host tests are also separate evidence;
-this rerun rebuilt the host and exercised the actual CuMetal backend.
-
-## PTX SHA-256 manifest
-
-Paths are relative to the local evidence directory above.
-
-| Input | SHA-256 |
-| --- | --- |
-| `ptx/bitcoin.ptx` | `9a8a5a73be2df6c18934894f7529ff028dca773dfd987f9f7eae53cd61ee0d86` |
-| `ptx/ethereum.ptx` | `12b02ff8e0046d8909b99c881de0ea80c48e6716297f62a3cddf27b18870f0fa` |
-| `ptx/p256_public_key.ptx` | `18c9562f16d1010194589e56becea53808ec99f2d7ad8f0510cdd3cd7e6c9812` |
-| `ptx/p256_signature.ptx` | `99ad3d9f77cefc08dfa61e39d3530013aa7a8e0bc0b35c06775bfb14c0b6efd2` |
-| `ptx/rsa_modulus.ptx` | `13392fd770156ac337929724d0d5d8ca3f4b17314c0455e6bb8668d7648a9b1a` |
-| `ptx/rsa_pss.ptx` | `ab2b4afb1d9c4d57f165ccef7297a753ac815d126d886534ae95a3330d1018ad` |
-| `ptx/self_test_bitcoin.ptx` | `1f16b59a3719a862d7aa56636f5392ca45837d1ecb1bd5778e31554d766d18a8` |
-| `ptx/self_test_ethereum.ptx` | `b52aeb7e75ef61a25166658644c6cfbc9fc6ef1e7454176677d745503617872d` |
-| `ptx/self_test_p256_public_key.ptx` | `a83bdc53edb56127a79bbbe0f638ef7d3a0d9125c419a775e40477e8b8b5ec19` |
-| `ptx/self_test_p256_signature.ptx` | `8e5d9aba67f58a75ad2e22afd46e7b7bdd8324bd963a6628e79e62ea5edc0235` |
-| `ptx/self_test_rsa_modulus.ptx` | `b0125074920946a820c9c0bd84daf5493b8fe8578a563593522219f71fccbe7b` |
-| `ptx/self_test_rsa_pss.ptx` | `29e163809de5a5027390ad10d6c0f2d7ff75bf87cbaccaafee7f20380009ef33` |
-| `ptx/self_test_shallenge.ptx` | `3dcbe7abd749dc1e87e2150f89e471c4ea914332f85dd55ba5081775861414b7` |
-| `ptx/self_test_solana.ptx` | `e9ef053adf5b4f70d3607dcbae3890ae5886cfe59303b8f436be012ee47bf9e2` |
-| `ptx/shallenge.ptx` | `e39509140aaf2cb8272729c2888790788d6c24edcd2b65489fa19d55b1a042c3` |
-| `ptx/solana.ptx` | `cae885f153fe426c2d99672301bb1cc7ec5e7506a77ab8481297c14d0a45e0db` |
+Historical evidence remains in `.cumetal-artifacts/validation-20260915T183226Z/`;
+its older report is preserved in Git history. No historical result is substituted
+for a fresh result above.

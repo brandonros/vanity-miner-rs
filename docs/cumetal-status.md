@@ -1,43 +1,40 @@
-# CuMetal status — 2026-09-15
+# CuMetal status — 2026-09-16
 
-Retested **2026-09-15, 18:36–18:59 UTC**, using CuMetal **`e5acf8cc0c65`**,
-matching `flake.lock` at validation time. **True = passed GPU validation.**
-**False = failed translation or did not finish within the 300-second limit.**
+Measured **2026-09-16, 01:46–02:14 UTC**, using CuMetal **`9e3e61574b77`**
+and fresh LLVM 21 PTX from [Actions run #35044328837](https://github.com/brandonros/vanity-miner-rs/actions/runs/35044328837),
+producer/host commit **`4e0231a`**. Compiler and runtime hashes were verified.
 
-This is the last complete run, not a result for the later `92a9b8f4de23` or
-`7d12f120a6b8` locks.
-See the [issue ownership matrix](cumetal-issue-matrix.md) for upstream fix status
-and subsequent targeted research.
+**2 true, 14 false.** True means the bounded GPU execution and verification passed.
+False means translation failed, Metal compilation failed, or the command did not
+finish within its **300-second limit**. A timeout does not prove it could never finish.
 
-**3 true, 13 false: 11 translation failures and 2 timed-out production modes.**
+| Module | Works in CuMetal | Observed result | Downstream issue |
+| --- | --- | --- | --- |
+| Solana — production | **False** | PTX conversion/type rejection | [#23](https://github.com/brandonros/vanity-miner-rs/issues/23) |
+| Bitcoin — production | **False** | PTX pointer-subtraction rejection | [#24](https://github.com/brandonros/vanity-miner-rs/issues/24) |
+| Ethereum — production | **False** | PTX pointer-subtraction rejection | [#25](https://github.com/brandonros/vanity-miner-rs/issues/25) |
+| Shallenge — production | **True** | 64 candidates, two verified outputs | — |
+| P-256 public key — production | **True** | 64 candidates, two verified outputs; 192 seconds | — |
+| P-256 signature — production | **False** | Both search sources fail PTX definedness | [#26](https://github.com/brandonros/vanity-miner-rs/issues/26) |
+| RSA modulus — production | **False** | Timeout; late sample in Metal pipeline creation | [#27](https://github.com/brandonros/vanity-miner-rs/issues/27) |
+| RSA-PSS — production | **False** | Both search sources time out; sampled in Metal library compilation | [#28](https://github.com/brandonros/vanity-miner-rs/issues/28) |
+| Solana — self-test | **False** | PTX definedness in `candidate_match` | [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) |
+| Bitcoin — self-test | **False** | PTX definedness in `private_key` | [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) |
+| Ethereum — self-test | **False** | PTX pointer subtraction in `candidate_match` | [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) |
+| Shallenge — self-test | **False** | PTX definedness in new `sha256_streaming_chunks` check | **Untracked: new failing row** |
+| P-256 public key — self-test | **False** | Generated Metal: missing global and address-space errors | [#32](https://github.com/brandonros/vanity-miner-rs/issues/32) |
+| P-256 signature — self-test | **False** | PTX predicate definedness in `low_s` | [#33](https://github.com/brandonros/vanity-miner-rs/issues/33) |
+| RSA modulus — self-test | **False** | PTX definedness in new `range_multiple` check | [#34](https://github.com/brandonros/vanity-miner-rs/issues/34) |
+| RSA-PSS — self-test | **False** | Generated Metal: invalid pointer cast and malformed global expressions | [#35](https://github.com/brandonros/vanity-miner-rs/issues/35) |
 
-| Module | Works in CuMetal | Issue |
-|---|---|---|
-| Solana — production | **False** | [#23](https://github.com/brandonros/vanity-miner-rs/issues/23) |
-| Bitcoin — production | **False** | [#24](https://github.com/brandonros/vanity-miner-rs/issues/24) |
-| Ethereum — production | **False** | [#25](https://github.com/brandonros/vanity-miner-rs/issues/25) |
-| Shallenge — production | **True** | — |
-| P-256 public key — production | **True** | — |
-| P-256 signature — production | **False** | [#26](https://github.com/brandonros/vanity-miner-rs/issues/26) |
-| RSA modulus — production | **False** | [#27](https://github.com/brandonros/vanity-miner-rs/issues/27) |
-| RSA-PSS — production | **False** | [#28](https://github.com/brandonros/vanity-miner-rs/issues/28) |
-| Solana — self-test | **False** | [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) |
-| Bitcoin — self-test | **False** | [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) |
-| Ethereum — self-test | **False** | [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) |
-| Shallenge — self-test | **True** | — |
-| P-256 public key — self-test | **False** | [#32](https://github.com/brandonros/vanity-miner-rs/issues/32) |
-| P-256 signature — self-test | **False** | [#33](https://github.com/brandonros/vanity-miner-rs/issues/33) |
-| RSA modulus — self-test | **False** | [#34](https://github.com/brandonros/vanity-miner-rs/issues/34) |
-| RSA-PSS — self-test | **False** | [#35](https://github.com/brandonros/vanity-miner-rs/issues/35) |
+**CPU self-tests: 203 passed. GPU self-tests: 203 blocked before execution.**
+Six self-test modules fail PTX translation; two emit Metal that Apple rejects.
+No GPU numerical assertion ran. The documented RSA-PSS end-to-end skip was not reached.
 
-RSA modulus and RSA-PSS production timed out. Both RSA-PSS search variants now
-translate to Metal successfully; neither completed GPU validation. RSA modulus
-was sampled waiting for a GPU command to complete. All seven failing self-test
-groups were blocked by translation; together the self-tests reported **8 passed,
-152 failed, 0 skipped**.
+The historical report had **3 true / 13 false** and 160 checks. The rewritten
+suite has 203 checks; Shallenge grew from 8 to 21 and now fails on a newly added
+streaming check. This changed-input result does not establish a pin-only regression.
 
-The previous `98cf505` run also had 3 true / 13 false, but its RSA-PSS production
-failed translation. The unchanged boolean totals hide that progress.
-
-See the [full validation report](cumetal-validation.md) for diagnostics, coverage,
-source revisions, and artifact hashes.
+See the [validation report](cumetal-validation.md) for commands, hashes and exact
+diagnostics, and the [issue matrix](cumetal-issue-matrix.md) for implementation
+scope and remaining ownership gaps.

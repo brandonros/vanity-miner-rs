@@ -377,6 +377,14 @@ Build the same full PTX bundles locally on Linux with Nix (no GPU required):
 
 The script reuses `target/llvm<version>` for incremental builds and writes
 `artifacts/ptx-bundle-llvm<version>.tar.gz`. CI calls this same script.
+Each invocation also creates `artifacts/ptx-timings-llvm<version>-<id>/`
+with `build.log` and one TSV per completed kernel builder (module, wall seconds,
+and `ok`/`failed`). Timings cover `CudaBuilder::build`, including device Cargo
+work, but exclude Nix setup and host build dependencies. A fresh timing directory
+reruns all 16 build scripts while retaining dependency caches; these are not
+clean-build benchmarks. Interrupted builders may have no timing file. Cargo's
+HTML timing report is saved under `target/llvm<version>/cargo-timings/`.
+Set `CARGO_BUILD_JOBS=1` to build serially and reduce contention when measuring.
 From macOS, with this checkout mounted writable in the `vanity-nixos` Lima VM,
 run from the repository root:
 

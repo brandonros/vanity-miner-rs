@@ -1,9 +1,10 @@
 //! Shared implementation included by each kernel's own build script.
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf, time::Instant};
 
 use cuda_builder::{CudaBuilder, NvvmArch};
 
 pub fn build(module: &str, legacy_low_opt: bool) {
+    println!("cargo::rerun-if-env-changed=PTX_TIMING_DIR");
     let package = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
     let root = package.parent().unwrap().parent().unwrap();
     let device = package.join("device");
@@ -53,13 +54,26 @@ pub fn build(module: &str, legacy_low_opt: bool) {
     let artifacts = out.ancestors().nth(3).unwrap().join("ptx");
     fs::create_dir_all(&artifacts).unwrap();
     let ptx = out.join(format!("{module}.ptx"));
-    CudaBuilder::new(&device)
+    let started = Instant::now();
+    let result = CudaBuilder::new(&device)
         .arch(arch)
         .build_args(&args)
         .copy_to(&ptx)
         .final_module_path(out.join(format!("{module}.ll")))
         .emit_llvm_ir(true)
-        .build()
-        .unwrap_or_else(|error| panic!("failed to build {module}: {error:?}"));
+        .build();
+    let seconds = started.elapsed().as_secs_f64();
+    if let Some(dir) = env::var_os("PTX_TIMING_DIR") {
+        let dir = PathBuf::from(dir);
+        fs::create_dir_all(&dir).unwrap();
+        let status = if result.is_ok() { "ok" } else { "failed" };
+        fs::write(
+            dir.join(format!("{module}.tsv")),
+            format!("{module}\t{seconds:.3}\t{status}\n"),
+        )
+        .unwrap();
+        println!("cargo::warning=PTX {module}: {seconds:.3}s ({status})");
+    }
+    result.unwrap_or_else(|error| panic!("failed to build {module}: {error:?}"));
     fs::copy(&ptx, artifacts.join(format!("{module}.ptx"))).unwrap();
 }

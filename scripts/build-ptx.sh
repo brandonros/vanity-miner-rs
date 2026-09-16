@@ -49,8 +49,17 @@ done
 
 # Each package runs its own build.rs without compiling the CLI.
 # The devshell sets CARGO_TARGET_DIR to target/llvm<version>.
+mkdir -p artifacts
+export PTX_TIMING_DIR
+PTX_TIMING_DIR=$(mktemp -d "$repo_root/artifacts/ptx-timings-llvm${llvm}-XXXXXXXX")
+echo "Kernel timings and build log: $PTX_TIMING_DIR"
+# A fresh timing directory reruns each kernel build script while retaining
+# dependency caches. Each TSV records module, wall seconds, and build status.
 nix develop ".#v${llvm}" --command cargo check "${packages[@]}" \
-  --features "$features" --release --locked
+  --features "$features" --release --locked --timings 2>&1 | tee "$PTX_TIMING_DIR/build.log"
+
+printf 'module\tseconds\tstatus\n'
+cat "$PTX_TIMING_DIR"/*.tsv
 
 ptx_dir="target/llvm${llvm}/release/ptx"
 for file in "${ptx_files[@]}"; do
