@@ -280,18 +280,33 @@ pub fn progression(config: &SearchConfig, p_bytes: &[u8; 128]) -> Option<([u8; 1
         return None;
     }
     let p: U2048 = U1024::from_be_slice(p_bytes).resize();
+    let lower = U2048::from_be_slice(&config.lower);
+    let upper = U2048::from_be_slice(&config.upper);
+    if upper < lower {
+        return None;
+    }
+    let width = upper.wrapping_sub(&lower);
     let divisor = Option::<NonZero<U2048>>::from(NonZero::new(p))?;
-    let (quotient, remainder) = U2048::from_be_slice(&config.lower).div_rem(&divisor);
+    let (quotient, remainder) = lower.div_rem(&divisor);
     let ceil = if remainder == U2048::ZERO {
         quotient
     } else {
         quotient.wrapping_add(&U2048::ONE)
     };
     let min = ceil.max(U2048::ONE.shl_vartime(1023));
-    let max = U2048::from_be_slice(&config.upper)
-        .div_rem(&divisor)
-        .0
-        .min(U1024::MAX.resize());
+    let upper_quotient = if width < p {
+        // U = quotient * p + remainder + width. A narrow interval crosses
+        // at most one multiple of p, so reuse the lower-bound division.
+        // Both addends are below the 1024-bit p; their sum fits in U2048.
+        if remainder.wrapping_add(&width) >= p {
+            quotient.wrapping_add(&U2048::ONE)
+        } else {
+            quotient
+        }
+    } else {
+        upper.div_rem(&divisor).0
+    };
+    let max = upper_quotient.min(U1024::MAX.resize());
     if min > max {
         return None;
     }

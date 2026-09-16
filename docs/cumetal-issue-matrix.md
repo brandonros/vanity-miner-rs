@@ -3,7 +3,9 @@
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
-See [the mining design](gpu-search-pipeline.md).
+The new LLVM 21 production PTX currently fails translation at `%rd310` /
+`$L__BB0_6`; no new GPU execution is established. See
+[the mining design and checks](gpu-search-pipeline.md).
 
 ## New split-bundle translation check
 
@@ -82,23 +84,51 @@ one version does not close the other version's failure or the workload issue.
 
 | Published issue | Exact new evidence | Comparison and scope |
 | --- | --- | --- |
-| [#38 — LLVM 7 Shallenge production](https://github.com/brandonros/vanity-miner-rs/issues/38) | `shallenge.ptx`: exit 1 after 0.350 s; line 306, `pointer subtraction requires a pointer minus a 64-bit integer byte offset`. SHA-256 `bfbd79fec26057bfc77293777f3acbcb40cb84c61041274e2c66fe6770639e51`. | LLVM 21 emits MSL in 0.409 s on this bundle. Production is distinct from self-test issue #37. Upstream owner unconfirmed; similar pointer-offset wording alone does not establish #76 ownership. |
-| [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39) | `p256_public_key.ptx`: exit 1 after 9.412 s; `%rd18761` undefined on an incoming edge to `$L__BB5_1`. SHA-256 `dbd5ada9e96613eb7f2da98e97b95310a5a6368744c5f8d1d84b9c184184e0da`. | LLVM 21 emits MSL in 6.906 s on this bundle. Production is distinct from self-test issue #32. Upstream owner unconfirmed; reduce this join before assigning a CFG/predicate issue. |
+| [#38 — LLVM 7 Shallenge production](https://github.com/brandonros/vanity-miner-rs/issues/38) | `shallenge.ptx`: exit 1 after 0.350 s; line 306, `pointer subtraction requires a pointer minus a 64-bit integer byte offset`. SHA-256 `bfbd79fec26057bfc77293777f3acbcb40cb84c61041274e2c66fe6770639e51`. | LLVM 21 emits MSL in 0.409 s on this bundle. Production is distinct from self-test issue #37. [Upstream #129](https://github.com/Lulzx/cuda-metal/issues/129) now tracks proven same-base address cancellation; the failing integer-minus-pointer form is explicitly outside #45/#56 and is not #76 conversion inference. |
+| [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39) | `p256_public_key.ptx`: exit 1 after 9.412 s; `%rd18761` undefined on an incoming edge to `$L__BB5_1`. SHA-256 `dbd5ada9e96613eb7f2da98e97b95310a5a6368744c5f8d1d84b9c184184e0da`. | LLVM 21 emits MSL in 6.906 s on this bundle. Production is distinct from self-test issue #32. [Upstream #130](https://github.com/Lulzx/cuda-metal/issues/130) now tracks the missing scalar zero-marker guard proof; a compact case distinguishes it from #83 empty-label and #120 depth failures. |
 
 Both published issues retain producer `7484a5d` plus the recorded timing
 instrumentation, CuMetal `9e3e615`, the exact compiler and input hashes, and the
 full diagnostic. First require the retained LLVM 7 input to translate, then
 complete Apple compilation and bounded CPU-verified production batches with
 input/buffer guards intact; retain an independent LLVM 21 regression row. A
-compiler correction or reduced reproducer belongs upstream once its scope is
-confirmed, linked back to this downstream workload tracker. No upstream issue
-assignment is established by these new rows.
+compiler correction remains unimplemented: focused research and complete small
+reproducers are published in upstream **#129** and **#130**, linked from the
+downstream issues. These assignments cover the demonstrated first gaps, not
+every possible later failure or full-workload acceptance.
 
 The issue bodies include the producer revision, build/translation commands,
 exact diagnostics and input hashes. Original `.cumetal-artifacts/` snapshots
 remain local evidence, not public attachments; regenerated inputs must have
 their hashes checked before being attributed to this run. Do not substitute
 the older Actions-produced inputs for these locally generated bundles.
+
+### Published LLVM 7 ownership research
+
+[Research details and probe timings](cumetal-llvm7-ownership-research.md) distinguish
+fresh compile-only experiments from the original split-bundle results. Findings
+were attached to [downstream #38](https://github.com/brandonros/vanity-miner-rs/issues/38#issuecomment-5691622619)
+and [#39](https://github.com/brandonros/vanity-miner-rs/issues/39#issuecomment-5691622840).
+
+- **#38 → upstream #129:** LLVM 7 forms `base + (1 - cursor - length) + 30`.
+  The prologue establishes `cursor = base + ((31 - length) & 3)`, so the base
+  cancels and the result is a scalar loop count. A compact input reproduces the
+  rejected intermediate; a diagnostic full-input scalar rewrite emits MSL. The
+  required compiler work is proven address cancellation, not blanket acceptance
+  of integer-minus-pointer or suppression of type verification.
+- **#39 → upstream #130:** a scalar zero marker guards an optional payload.
+  The CFG proof tracks predicate literals but lacks the needed scalar move/zero
+  facts. The compact failure has no empty blocks or deep paths, persists with
+  unsigned equality, and clears with the original predicate. Full-input guard
+  controls clear the first payload demands but expose another undefined register.
+  Do not initialize absent payloads or equate all later failures with this scope.
+
+All four valid small forms tested with NVIDIA CUDA 12.9 ptxas were accepted.
+Observable-undefined controls remain rejected by CuMetal. No compiler code or
+pin was changed, no GPU execution was attempted, and no workload issue was
+closed. Original full-input hashes/results remain unchanged. The upstream issue
+bodies include complete public small reproducers; local full-input controls and
+logs remain in `.cumetal-artifacts/research-38-39/`.
 
 ## Recorded full GPU run
 
@@ -176,8 +206,8 @@ an individual numerical assertion failure.
 | [#34 — RSA modulus self-tests](https://github.com/brandonros/vanity-miner-rs/issues/34) | Original [cuda-metal #35](https://github.com/Lulzx/cuda-metal/issues/35) → [#124](https://github.com/Lulzx/cuda-metal/issues/124), with optimization [#127](https://github.com/Lulzx/cuda-metal/issues/127). Fresh masked-payload error: **#35 scope lead**, coverage unconfirmed. | [#122](https://github.com/Lulzx/cuda-metal/pull/122) clears the original masked-payload SSA. **No resource/PRMT fix PR or demonstrated new-case fix.** | #122 **yes**. | **16 checks blocked by translation:** `%rs907` undefined at `$L__BB16_1` inside new `rsa_modulus.range_multiple`. The comparison is masked by a presence predicate; reduce it before extending #35 acceptance. This run never reaches the original artifact's Metal allocation failure. |
 | [#35 — RSA-PSS self-tests](https://github.com/brandonros/vanity-miner-rs/issues/35) | Original [#118 — mixed pointer lanes](https://github.com/Lulzx/cuda-metal/issues/118) remains open. Fresh pointer-cast error **unassigned**; later raw-global expressions are a [#123](https://github.com/Lulzx/cuda-metal/issues/123)-adjacent **lead**. | **No PR for #118; no demonstrated fix for the fresh Metal errors.** #108/#114/#117 cover other cases. | Related fixes yes; missing work **no**. | **14 checks blocked by Apple Metal compilation:** invalid `as_type<device uchar*>` from `ulong`, then syntax errors from unlowered `[private$em]` expressions. The latter symbol occurs in CRT helpers. Changed PTX reaching Metal does not demonstrate #118 fixed on its original reproducer. |
 | [#37 — Shallenge self-tests](https://github.com/brandonros/vanity-miner-rs/issues/37) | **No confirmed upstream owner.** [#83](https://github.com/Lulzx/cuda-metal/issues/83) predicate/definedness scope is a lead. | **No demonstrated fix PR.** | No identified correction. | **21 checks blocked by translation:** `%rd16` undefined at `$L__BB18_1` inside new `shallenge.sha256_streaming_chunks`. Reduce the empty/nonempty chunk guard and assign ownership. The historical eight-check pass does not cover this expanded module. |
-| [#38 — LLVM 7 Shallenge production](https://github.com/brandonros/vanity-miner-rs/issues/38) | **Unconfirmed**; pointer-offset wording alone does not establish #76 ownership. | No demonstrated correction for this retained input. | No confirmed fix. | **Split-bundle translation:** LLVM 7 fails at line 306 after 0.350 s; LLVM 21 emits MSL in 0.409 s. Reduce the LLVM 7 offset types, then complete Apple compilation and CPU-verified GPU batches for that version. |
-| [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39) | **Unconfirmed**; reduce the CFG join before assigning a predicate/definedness owner. | No demonstrated correction for this retained input. | No confirmed fix. | **Split-bundle translation:** LLVM 7 reports `%rd18761` undefined at `$L__BB5_1` after 9.412 s; LLVM 21 emits MSL in 6.906 s. Preserve distinct version acceptance and complete bounded CPU-verified GPU batches. |
+| [#38 — LLVM 7 Shallenge production](https://github.com/brandonros/vanity-miner-rs/issues/38) | [#129 — proven same-base address cancellation](https://github.com/Lulzx/cuda-metal/issues/129). #45/#56 intentionally exclude the intermediate integer-minus-pointer form; #76 is not the matching mechanism. | **Research/reproducer published; no fix PR.** | No implementation. | **Original split-bundle input:** fails at line 306 after 0.350 s. A small case reproduces it; scalar controls and the full diagnostic scalar rewrite emit MSL (full copy: 0.399 s). This is input-control evidence, not a compiler fix or GPU pass. |
+| [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39) | [#130 — scalar zero-sentinel guard propagation](https://github.com/Lulzx/cuda-metal/issues/130). Distinct compact case from #83 empty labels and #120 depth. | **Research/reproducer published; no fix PR.** | No implementation. | **Original split-bundle input:** `%rd18761` undefined at `$L__BB5_1` after 9.412 s. Signed/unsigned small zero-marker cases fail; direct-predicate control emits. Full-input redundant guard controls advance to `%rd18765`, then `%rd18781`; the full module still fails. |
 
 
 The two passing production rows are in the [status report](cumetal-status.md):

@@ -48,8 +48,11 @@ host retirement table rejects repeated delivery of an already exported task.
 
 ## Arithmetic and verification
 
-The fixed-width range arithmetic is unchanged. Division and inversion modulo a
-power of two construct compatible q values, and compressed indices exclude the
+Division and inversion modulo a power of two construct compatible q values.
+For an interval `[L, U]` with `U - L < p`, the shared range constructor reuses
+`L = a*p + r` to calculate `floor(U/p) = a + (r + U - L >= p)`, avoiding a second
+wide division. Wider intervals retain both divisions. The sum fits in 2048 bits
+because both terms are below the 1024-bit factor. Compressed indices exclude the
 interval violating `|p-q| > 2^924`. The randomized starting cursor traverses each
 finite progression once; counts and cursors remain 1024 bits. There is no
 128-byte pattern cap or 65536-q task cutoff on the GPU.
@@ -82,6 +85,26 @@ one GPU before scaling to eight, and inspect register spills and occupancy.
 The host still overlaps verification with subsequent launches through its bounded
 queue. Memory and output remain bounded even when matches are frequent.
 
+CPU and GPU progress use the shared `GlobalStats` reporter and its RSA details
+extension. The `RSA stages` line shows p attempts/sec (including candidates with
+no usable range), probable p factors, useful nonempty ranges, and q tests/sec.
+CPU totals persist across worker restarts after a match. The main CPU rate remains
+q candidates/sec; use the p rate to see work spent rejecting narrow ranges.
+The p rate also includes an average per selected CPU worker or GPU device, using
+the same denominator as the global rate. An explicit CPU `--threads` value is
+honored. GPU totals update after completed launches; these are averages across
+devices, not individual device measurements or rates per CUDA thread.
+
+A local CPU microbenchmark of 129-byte prefix range construction measured about
+6,733 ranges/sec before the division shortcut and 13,637 after (median of three
+65,536-range samples, release build). This isolates range construction with
+pre-generated factors; it does not measure overall mining or GPU throughput.
+The manual benchmark is available with:
+
+```sh
+cargo test --release --locked --offline -p vanity-miner --no-default-features --features rsa-modulus --test rsa_device_pipeline benchmark_narrow_range_construction -- --ignored --nocapture
+```
+
 ## Validation
 
 Rebuild the host and PTX together: old four-entry PTX cannot run with this host.
@@ -95,6 +118,46 @@ counts, and independent verification of a pair found across two invocations.
 The RSA end-to-end device self-test now exercises the same resumed mining logic.
 Record fresh PTX compilation and GPU results separately from the historical
 implementation checks below.
+
+### Single-entry refactor checks — 2026-09-16
+
+- 82 Rust tests passed: 30 logic tests (including the enabled RSA self-tests),
+  41 CLI tests, and 11 RSA integration tests. The production CPU worker now uses
+  the shared miner; its outputs pass independent key verification and OpenSSL
+  checks. Two translation-script tests cover entry selection and report output.
+- CPU-only, CuMetal, and CUDA host configurations pass `cargo check`.
+- Production and RSA self-test PTX build with both LLVM 7 and LLVM 21. Each
+  production artifact exports exactly `kernel_rsa_modulus_vanity`.
+- CUDA 13.3 `ptxas --gpu-name sm_120 --verbose` assembles the LLVM 21 production
+  kernel: **255 registers/thread, 9328-byte stack frame, 11460 bytes spill stores,
+  13888 bytes spill loads, zero barriers**. These are static compiler resource
+  figures, not bytes transferred per candidate or a throughput measurement.
+  Register pressure and spilling are substantial; thread count alone cannot
+  predict whether this implementation outperforms an eight-core CPU.
+- The locked CuMetal compiler (`9e3e61574b77`) rejects the new LLVM 21 production
+  PTX after 30.93 seconds: `%rd310` is undefined on an incoming edge to
+  `$L__BB0_6`. It does not reach Metal compilation or GPU execution. This is a
+  new-input translation observation, separate from the historical pipeline wait.
+- NVIDIA GPU execution, one/eight-5090 throughput, and GPU numerical validation
+  remain unmeasured. CPU/GPU search code parity does not establish GPU correctness.
+
+Local evidence is in `.cumetal-artifacts/rsa-single-entry-20260916/`:
+`source-and-ptx.json` records the consumer revision, dirty-source hashes and all
+four PTX hashes; `ptxas-sm120.json` records the resource report;
+`cumetal-translation.json` records the verified compiler/runtime paths, hashes,
+command, timing and diagnostic log. These artifacts are intentionally outside
+version control; the existing bundled PTX archives were not overwritten.
+
+Commands used:
+
+```sh
+nix develop .#cumetal --command cargo test -p vanity-miner -p logic --no-default-features --features cumetal,rsa-modulus,self_test_rsa_modulus --release --locked --offline
+python3 -m unittest discover -s scripts/tests
+# In the local Linux VM:
+nix develop .#v7 --command cargo check -p kernel-rsa-modulus -p kernel-self-test-rsa-modulus --release --locked --offline
+nix develop .#v21 --command cargo check -p kernel-rsa-modulus -p kernel-self-test-rsa-modulus --features llvm21 --release --locked --offline
+nix develop .#runner --command cargo check -p vanity-miner --no-default-features --features gpu,rsa-modulus --release --locked --offline
+```
 
 ### Historical four-stage implementation checks — 2026-09-15
 

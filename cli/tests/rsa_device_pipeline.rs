@@ -81,6 +81,68 @@ fn compare(c: &SearchConfig, p: &BigUint) {
 }
 
 #[test]
+fn range_division_boundaries_match_biguint() {
+    let one = BigUint::from(1u8);
+    let zero = BigUint::from(0u8);
+    let p = (&one << 1024) - BigUint::from(109u8);
+    let q_min = &one << 1023;
+    let q_max = (&one << 1024) - &one;
+    for q in [&q_min - &one, q_min.clone(), &q_min + &one, q_max] {
+        for remainder in [zero.clone(), one.clone(), &p - &one] {
+            // Exercise both sides of r + width == p and width == p.
+            for width in [
+                zero.clone(),
+                one.clone(),
+                &p - &remainder - &one,
+                &p - &remainder,
+                &p - &one,
+                p.clone(),
+                &p + &one,
+            ] {
+                for suffix in ["", "1", "3"] {
+                    let mut c = config("", suffix);
+                    let lower = &p * &q + &remainder;
+                    c.lower = bytes(&lower);
+                    c.upper = bytes(&(&lower + &width));
+                    compare(&c, &p);
+                }
+            }
+        }
+    }
+    let mut inverted = config("", "");
+    inverted.lower = inverted.upper;
+    inverted.upper = [0; 256];
+    assert!(pipeline::progression(&inverted, &bytes(&p)).is_none());
+}
+
+#[test]
+#[ignore = "manual range-construction microbenchmark; run with --nocapture"]
+fn benchmark_narrow_range_construction() {
+    let c = config(&format!("80{}", "3132333435363738".repeat(16)), "");
+    let candidates: Vec<_> = (0..4096)
+        .map(|id| pipeline::generate_p(&c, id).unwrap())
+        .collect();
+    for _ in 0..3 {
+        let start = std::time::Instant::now();
+        let mut nonempty = 0usize;
+        for _ in 0..16 {
+            for p in &candidates {
+                nonempty += std::hint::black_box(pipeline::progression(
+                    std::hint::black_box(&c),
+                    std::hint::black_box(p),
+                ))
+                .is_some() as usize;
+            }
+        }
+        eprintln!(
+            "65536 ranges in {:.6}s ({:.2}/sec), {nonempty} nonempty",
+            start.elapsed().as_secs_f64(),
+            65536.0 / start.elapsed().as_secs_f64()
+        );
+    }
+}
+
+#[test]
 fn device_ranges_match_biguint_including_full_width_patterns() {
     let one = BigUint::from(1u8);
     let p = (&one << 1024) - BigUint::from(109u8);

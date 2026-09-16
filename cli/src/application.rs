@@ -42,8 +42,11 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     let details = cli.command.details();
 
     // Create stats
+    let reporting_workers = runner.device_count();
+    #[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+    let reporting_workers = details.cpu_threads.unwrap_or(reporting_workers);
     let stats = Arc::new(GlobalStats::new(
-        runner.device_count(),
+        reporting_workers,
         details.prefix_len,
         details.suffix_len,
     ));

@@ -3,7 +3,9 @@
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
-See [the mining design](gpu-search-pipeline.md).
+The new LLVM 21 production PTX currently fails translation at `%rd310` /
+`$L__BB0_6`; no new GPU execution is established. See
+[the mining design and checks](gpu-search-pipeline.md).
 
 ## Result
 

@@ -110,7 +110,7 @@ pub fn verify_pair(
     ))
 }
 
-/// Per-session RSA stage totals shared by all selected devices.
+/// Per-session RSA stage totals shared by all selected devices or CPU workers.
 #[derive(Default)]
 pub struct StageStats {
     counts: [std::sync::atomic::AtomicU64; 4],
@@ -120,11 +120,12 @@ impl StageStats {
     pub fn attach(progress: &crate::runner::progress::GlobalStats) -> Result<Arc<Self>, String> {
         let stages = Arc::new(Self::default());
         let display = stages.clone();
-        progress.set_details(move |elapsed| display.format(elapsed))?;
+        let workers = progress.worker_count();
+        progress.set_details(move |elapsed| display.format(elapsed, workers))?;
         Ok(stages)
     }
 
-    fn add(&self, p: u64, accepted: u64, ranges: u64, q: u64) {
+    pub(super) fn add(&self, p: u64, accepted: u64, ranges: u64, q: u64) {
         use std::sync::atomic::Ordering;
         for (counter, amount) in self.counts.iter().zip([p, accepted, ranges, q]) {
             let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
@@ -133,7 +134,7 @@ impl StageStats {
         }
     }
 
-    fn format(&self, elapsed: Duration) -> String {
+    fn format(&self, elapsed: Duration, workers: usize) -> String {
         use std::sync::atomic::Ordering;
         let [p, accepted, ranges, q] = self.counts.each_ref().map(|v| v.load(Ordering::Relaxed));
         if p == 0 {
@@ -141,9 +142,34 @@ impl StageStats {
         }
         let seconds = elapsed.as_secs_f64().max(1e-9);
         format!(
-            "  RSA stages: {p} p tested ({:.2}/sec), {accepted} probable p, {ranges} nonempty ranges, {q} q tested ({:.2}/sec)",
+            "  RSA stages: {p} p tested ({:.2}/sec; {:.2}/sec average per device/worker), {accepted} probable p, {ranges} nonempty ranges, {q} q tested ({:.2}/sec)",
             p as f64 / seconds,
+            p as f64 / seconds / workers.max(1) as f64,
             q as f64 / seconds
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rsa_rates_average_shared_totals_over_selected_workers() {
+        let progress = crate::runner::progress::GlobalStats::new(8, 258, 0);
+        let stages = StageStats::attach(&progress).unwrap();
+        for _ in 0..2 {
+            std::thread::scope(|scope| {
+                for _ in 0..8 {
+                    let stages = &stages;
+                    scope.spawn(move || stages.add(1000, 1, 1, 1));
+                }
+            });
+        }
+        let report = stages.format(Duration::from_secs(2), progress.worker_count());
+        assert!(
+            report.contains("16000 p tested (8000.00/sec; 1000.00/sec average per device/worker)")
+        );
+        assert!(report.contains("16 probable p, 16 nonempty ranges, 16 q tested (8.00/sec)"));
     }
 }

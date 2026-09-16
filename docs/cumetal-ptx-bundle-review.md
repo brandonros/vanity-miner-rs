@@ -51,8 +51,12 @@ The compiler correction plan and closure gates are in [the #76 plan](cumetal-76-
   translation, although their LLVM 21 counterparts emit MSL. Published downstream
   issues [#38](https://github.com/brandonros/vanity-miner-rs/issues/38) and
   [#39](https://github.com/brandonros/vanity-miner-rs/issues/39) now track those two
-  production failures with version-specific evidence and acceptance. Upstream
-  owners remain unconfirmed. Comparison comments were published on all other
+  production failures with version-specific evidence and acceptance. Subsequent
+  [focused research](cumetal-llvm7-ownership-research.md) assigned their first
+  gaps to new upstream [#129](https://github.com/Lulzx/cuda-metal/issues/129)
+  (address cancellation) and [#130](https://github.com/Lulzx/cuda-metal/issues/130)
+  (scalar zero-marker guards). Neither has an implemented fix. Comparison
+  comments were published on all other
   14 workload trackers; [the matrix](cumetal-issue-matrix.md#measured-translation-times-by-llvm-version)
   links directly to those comments. Existing full-GPU evidence and open statuses
   are retained.

@@ -52,6 +52,10 @@ impl GlobalStats {
     pub fn matches(&self) -> usize {
         self.matches_found.load(Ordering::Relaxed)
     }
+    /// Selected GPU devices or CPU worker threads, for average throughput.
+    pub fn worker_count(&self) -> usize {
+        self.num_devices.max(1)
+    }
     pub fn set_unit(&self, unit: &'static str) {
         *self.unit.lock().unwrap_or_else(|e| e.into_inner()) = unit;
     }
@@ -95,7 +99,7 @@ impl GlobalStats {
             "GLOBAL STATS: {} prefix, {} suffix | {matches} matches in {seconds:.2}s\n  {rate:.2} {unit}/sec ({:.2}/sec average per device/worker) | {:.6} matches/sec ({seconds_per_match}s/match)\n  {tested} total {unit} | {per_match} {unit}/match",
             self.vanity_prefix_length,
             self.vanity_suffix_length,
-            rate / self.num_devices.max(1) as f64,
+            rate / self.worker_count() as f64,
             matches as f64 / seconds,
         )
     }

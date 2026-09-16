@@ -117,7 +117,7 @@ narrow patterns reject empty ranges before testing p's primality. Each thread
 returns at most one pair per launch, erases that task, and starts fresh work on its
 next launch. The host independently verifies completed pairs and exports keys.
 
-`rsa-modulus --steps-per-launch 64` sets the per-thread work budget on both CPU and
+`rsa-modulus-vanity --steps-per-launch 64` sets the per-thread work budget on both CPU and
 GPU (default 64, range 1–1024). Each step either prepares one p candidate or tests one q. Increasing
 the budget amortizes launches but delays results and cancellation; it does not
 truncate unfinished ranges. `BATCH_SIZE` controls the number of persistent task

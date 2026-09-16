@@ -59,6 +59,7 @@ pub fn run_cpu(
         config,
         control,
         logic::modes::rsa_modulus::DEFAULT_STEPS_PER_LAUNCH,
+        &pipeline::StageStats::default(),
     )
 }
 
@@ -66,6 +67,7 @@ pub(super) fn run_cpu_with_steps(
     config: &ModulusSearch,
     control: Arc<SearchControl>,
     steps: u32,
+    stages: &pipeline::StageStats,
 ) -> Result<ModulusReport, String> {
     use rand::RngCore;
     logic::modes::rsa_modulus::launch_work(1, steps)?;
@@ -79,7 +81,13 @@ pub(super) fn run_cpu_with_steps(
         let mut handles = Vec::new();
         for _ in 0..config.workers {
             handles.push(scope.spawn(|| {
-                cpu::construct_worker(&mining_config, &constraints.pattern, &control, steps)
+                cpu::construct_worker(
+                    &mining_config,
+                    &constraints.pattern,
+                    &control,
+                    steps,
+                    stages,
+                )
             }));
         }
         crate::runner::workers::join(handles, &control, "RSA modulus worker panicked")
