@@ -1,16 +1,103 @@
 # CuMetal issue ownership and fix status
 
-The #76 implementation is proposed in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131),
-commit `c4e5fac`, with evidence in the
-[implementation and validation report](cumetal-76-implementation.md). It is
-published for review and is not in the miner's CuMetal pin. Fresh Solana, Bitcoin and
-Ethereum production inputs now emit Metal source under both LLVM versions.
-Complete comparisons improve fresh translation from **5/32 to 10/32** and
-historical translation from **11/38 to 16/38**, retaining every baseline MSL
-pass. Focused compiler and numerical GPU tests pass; remaining provenance/range
-proofs and full workload GPU acceptance keep #76 open. The pinned-compiler
-measurements below keep their original artifact identities and are not results
-for that patch.
+**Publication status:** compiler commit `0242f22` is pushed to
+[draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131). The miner pin and
+these documentation updates are local. On 2026-09-16, the approved bodies were
+published to downstream #23–25, upstream #76 and PR #131; #23–25 were closed as
+completed. Readback confirmed all five bodies, the three closures, #76 open and
+#131 still a draft at `0242f22`.
+
+## Current result: all three production modes verified on both LLVM versions
+
+The local miner pin selects **`0242f22df09f62486e38d4c0c18a10e9098e92bd`**,
+the #131 follow-up for [upstream #76](https://github.com/Lulzx/cuda-metal/issues/76).
+The normal miner was rebuilt against the matched Nix compiler/runtime package.
+
+**Solana, Bitcoin and Ethereum all pass CPU-verified GPU execution with both
+LLVM7 and LLVM21 PTX. #23–25 are closed for this bounded acceptance.**
+Upstream #76 and the separate self-test issues retain their independent
+acceptance gates.
+
+The [three-mode report](cumetal-three-mode-validation.md) records **24 passing
+invocations, 48 GPU batches and 1,536 verified candidate positions**. Each
+mode/version passed selective patterns with seeds 1 and 2, no-match and all-match
+patterns, two batches each. No run reached its 600-second deadline.
+
+LLVM7 first-run times were **16.614 / 346.865 / 315.645 seconds** for
+Solana/Bitcoin/Ethereum; LLVM21 times were **18.027 / 116.779 / 112.674 seconds**.
+Samples place the long Bitcoin/Ethereum waits in Metal pipeline creation.
+The GPU command-buffer intervals themselves were about **5.3–26.2 ms per batch**.
+Compilation is slow, but all six workloads completed and verified.
+
+The qualifier regression is corrected: byte-address intermediates no longer
+copy an unresolved pointer result type, and the Metal IR verifier rejects
+unresolved nested pointer spaces. Generic byte loads, 64-bit loads and stores
+fail on `c4e5fac` and pass numerical GPU checks with the fix. See the
+[implementation report](cumetal-76-implementation.md) for the exact coverage.
+
+## Stage matrix: measured revisions are explicit
+
+Inputs: miner **`afe80210`**, [Actions run 35055622652](https://github.com/brandonros/vanity-miner-rs/actions/runs/35055622652).
+**Only the first three rows were rerun at `0242f22`.** Their cells include actual
+Apple compilation and CPU-verified GPU execution for both versions. The other
+13 rows retain their last **`c4e5fac` translation** results; their preparation/GPU
+stages were not rerun at `0242f22`. A PR number alone does not identify a tested build.
+
+The earlier full translation sweep measured LLVM7 **3/16** and LLVM21 **7/16**
+at `c4e5fac`. Those totals are historical; no current-pin 16-workload total is claimed.
+
+| Workload / downstream tracker | Translation revision | LLVM7 PTX → Metal | LLVM21 PTX → Metal | Preparation on `0242f22` | GPU + CPU on `0242f22` |
+| --- | --- | --- | --- | --- | --- |
+| Solana production ([#23](https://github.com/brandonros/vanity-miner-rs/issues/23)) | `0242f22` | **Pass at `0242f22`** | **Pass at `0242f22`** | **Both versions passed** | **Both versions passed all four profiles** |
+| Bitcoin production ([#24](https://github.com/brandonros/vanity-miner-rs/issues/24)) | `0242f22` | **Pass at `0242f22`** | **Pass at `0242f22`** | **Both versions passed** | **Both versions passed all four profiles** |
+| Ethereum production ([#25](https://github.com/brandonros/vanity-miner-rs/issues/25)) | `0242f22` | **Pass at `0242f22`** | **Pass at `0242f22`** | **Both versions passed** | **Both versions passed all four profiles** |
+| Shallenge production ([#38 (LLVM7)](https://github.com/brandonros/vanity-miner-rs/issues/38)) | `c4e5fac` (historical) | Rejected: address cancellation | **MSL emitted** | Not rerun | Not rerun |
+| P-256 public-key production ([#39 (LLVM7)](https://github.com/brandonros/vanity-miner-rs/issues/39)) | `c4e5fac` (historical) | Rejected: undefined edge | **MSL emitted** | Not rerun | Not rerun |
+| P-256 signature production ([#26](https://github.com/brandonros/vanity-miner-rs/issues/26)) | `c4e5fac` (historical) | Rejected: bitwise-address join | Rejected: undefined edge | Not rerun | Not rerun |
+| RSA modulus production ([#27](https://github.com/brandonros/vanity-miner-rs/issues/27)) | `c4e5fac` (historical) | Rejected: undefined edge | Rejected: `clz.b64` unsupported | Not rerun | Not rerun |
+| RSA-PSS production ([#28](https://github.com/brandonros/vanity-miner-rs/issues/28)) | `c4e5fac` (historical) | Rejected: vector parameter transfer | Rejected: `clz.b64` unsupported | Not rerun | Not rerun |
+| Solana self-tests ([#29](https://github.com/brandonros/vanity-miner-rs/issues/29)) | `c4e5fac` (historical) | Rejected: bitwise-address join | Rejected: undefined edge | Not rerun | Not rerun |
+| Bitcoin self-tests ([#30](https://github.com/brandonros/vanity-miner-rs/issues/30)) | `c4e5fac` (historical) | Rejected: undefined edge | Rejected: undefined edge | Not rerun | Not rerun |
+| Ethereum self-tests ([#31](https://github.com/brandonros/vanity-miner-rs/issues/31)) | `c4e5fac` (historical) | Rejected: undefined edge | **MSL emitted** | Not rerun | Not rerun |
+| Shallenge self-tests ([#37](https://github.com/brandonros/vanity-miner-rs/issues/37)) | `c4e5fac` (historical) | Rejected: memory-range proof | Rejected: memory-range proof | Not rerun | Not rerun |
+| P-256 public-key self-tests ([#32](https://github.com/brandonros/vanity-miner-rs/issues/32)) | `c4e5fac` (historical) | Rejected: bitwise-address join | **MSL emitted** | Not rerun | Not rerun |
+| P-256 signature self-tests ([#33](https://github.com/brandonros/vanity-miner-rs/issues/33)) | `c4e5fac` (historical) | Rejected: bitwise-address join | Rejected: undefined edge | Not rerun | Not rerun |
+| RSA modulus self-tests ([#34](https://github.com/brandonros/vanity-miner-rs/issues/34)) | `c4e5fac` (historical) | Rejected: undefined edge | Rejected: `clz.b64` unsupported | Not rerun | Not rerun |
+| RSA-PSS self-tests ([#35](https://github.com/brandonros/vanity-miner-rs/issues/35)) | `c4e5fac` (historical) | Rejected: bitwise-address join | Rejected: `clz.b64` unsupported | Not rerun | Not rerun |
+
+## Next work and closure
+
+1. **Completed: published the measured result and closed downstream #23–25.**
+   Their production acceptance passes both versions. Their separate self-test
+   trackers and upstream #76 remain open for their own acceptance criteria.
+2. **Continue the remaining #76 proof cases separately.** The last `c4e5fac`
+   sweep records five LLVM7 bitwise-address joins (#26/#29/#32/#33/#35) and both
+   Shallenge self-test memory-proof failures (#37). Reproduce them on `0242f22`
+   before assigning the next implementation; these rows were not retested here.
+3. **For faster startup, measure #127's optimization.**
+   [#127](https://github.com/Lulzx/cuda-metal/issues/127) concerns constant byte
+   shuffles; [PR #128](https://github.com/Lulzx/cuda-metal/pull/128) adds diagnostics.
+   Neither a short timeout nor static source size proves which Apple pass dominates.
+   The current three production modes require no additional correctness fix for
+   this measured acceptance.
+
+The last `c4e5fac` LLVM21 RSA #27/#28/#34/#35 attempts stopped at unsupported
+`clz.b64`; that owner remains unassigned here. Ethereum self-tests (#31) emitted
+LLVM21 MSL on `c4e5fac` without a fresh GPU numerical result. None of these
+observations is a `0242f22` rerun or a resolution of the historical RSA resource cases.
+
+**Three workload issues are closed: #23–25.** The other 13 workload trackers and
+broader #16/#19 remain outside this production acceptance. Those 13 workloads
+were not rerun on `0242f22`; this is not a claim that they all still fail.
+Historical Shallenge/P-256-public-key GPU passes must not be combined with these
+three into a current 16-row score. Other upstream defects need their own scope
+and acceptance review before closure; a later downstream blocker does not erase
+a verified fix to an earlier, narrower defect.
+
+The following audit and full-GPU measurements are historical unless an entry
+names an exact newer commit. PR #131 contains both `c4e5fac` and `0242f22`; its
+number alone does not identify a measured build. Use the stage table above and
+the three-mode report for current results.
 
 The [64-issue consolidation audit](cumetal-issue-duplicate-audit.md) and
 [executed follow-up](cumetal-consolidation-followup.md) now have published GitHub
@@ -29,11 +116,12 @@ The follow-up links the published evidence and records exact inputs and limits.
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
-The new LLVM 21 production PTX currently fails translation at `%rd310` /
-`$L__BB0_6`; no new GPU execution is established. See
+The latest `afe80210` LLVM21 production PTX rejects unsupported `clz.b64` under
+both the baseline and `c4e5fac`; the earlier `%rd310` / `$L__BB0_6` report describes
+an older input. No new RSA GPU execution is established. See
 [the mining design and checks](gpu-search-pipeline.md).
 
-## New split-bundle translation check
+## Historical split-bundle translation check (`7484a5d`)
 
 The [16-row, two-version comparison](cumetal-ptx-bundle-review.md) checks the new
 `7484a5d` PTX bundles against CuMetal `9e3e615`: **LLVM 7 emits Metal for 2/16
@@ -92,7 +180,8 @@ four-entry RSA modulus file: 32 file attempts are **not** 38-entry coverage.
 Published on **2026-09-16**: [#38 — LLVM 7 Shallenge production](https://github.com/brandonros/vanity-miner-rs/issues/38)
 and [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39).
 Both issues were read back and verified open. Together with **#23–35 and #37**,
-there are now **16 open workload trackers**, one for each logical module.
+there were **16 open workload trackers at that translation-only measurement**,
+one for each logical module. The subsequent production validation closed #23–25.
 LLVM 7/21 comparison comments were published and read back on all **14 existing
 trackers (#23–35 and #37)**. The timing table links directly to each verified
 comment; previous issue bodies and full-GPU histories are preserved. No workload
@@ -167,7 +256,7 @@ The subsequent LLVM 7 production trackers **#38/#39** bring the current total to
 **16**; they do not change the earlier full-GPU measurements.
 This tracking update adds no new measurements.
 
-## Tested source and pin
+## Source and pin for the historical full-GPU run
 
 - **CuMetal:** `9e3e61574b776424a96c686bdbdc04ad1f27fe9f` from `flake.lock`,
   the head of [PR #122](https://github.com/Lulzx/cuda-metal/pull/122).
@@ -211,22 +300,25 @@ this comparison does not establish identical compilation time or GPU behavior.
 
 ## Downstream-to-upstream matrix
 
-**Evidence is from the recorded full GPU run unless marked split-bundle.** Existing upstream owners retain their
+**Unless a row names a newer commit, GPU evidence below belongs to historical
+`9e3e615`. Split-bundle results and the `c4e5fac` translation sweep are separate
+measurements. The inclusion column refers only to historical `9e3e615`.**
+Existing upstream owners retain their
 original reproducer scope. Newly observed diagnostics are assigned only where
 supported; research leads are labeled explicitly. No blocked self-test row is
 an individual numerical assertion failure.
 
-| Vanity-miner issue | Upstream ownership | Published implementation | Included in `9e3e615`? | Fresh result and next work |
+| Vanity-miner issue | Upstream ownership | Published implementation | Included in `9e3e615`? | Recorded result and latest next work |
 | --- | --- | --- | --- | --- |
-| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 — conversion/join types](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). #50/#56/#75 cover earlier narrower cases. | Earlier PRs only. | **Recorded pinned run:** translation fails with the first `i32`/`i64` disagreement at line 34070. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
-| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). Shared patch with #23/#25. | Earlier PRs only. | **Recorded pinned run:** pointer subtraction fails at line 26556. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
-| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). Shared patch with #23/#24. | Earlier PRs only. | **Recorded pinned run:** pointer subtraction fails at line 22069. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
+| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 / #131](https://github.com/Lulzx/cuda-metal/issues/76); [#113](https://github.com/Lulzx/cuda-metal/issues/113) pointer-load acceptance | **Implemented in `0242f22`; both LLVM versions CPU/GPU verified.** [Measured report](cumetal-three-mode-validation.md). | Earlier PRs only; #131 was not in historical `9e3e615`. | **`0242f22`:** eight invocations / 16 GPU batches across both versions pass CPU counts/payload, guards and independent-address checks. **Closed as completed on 2026-09-16** after publishing and verifying this evidence. |
+| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76 / #131](https://github.com/Lulzx/cuda-metal/issues/76); [#113](https://github.com/Lulzx/cuda-metal/issues/113) pointer-load acceptance | **Implemented in `0242f22`; both LLVM versions CPU/GPU verified.** [Measured report](cumetal-three-mode-validation.md). | Earlier PRs only; #131 was not in historical `9e3e615`. | **`0242f22`:** eight invocations / 16 GPU batches across both versions pass CPU counts/payload, guards and independent-address checks. **Closed as completed on 2026-09-16** after publishing and verifying this evidence. |
+| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76 / #131](https://github.com/Lulzx/cuda-metal/issues/76); [#113](https://github.com/Lulzx/cuda-metal/issues/113) pointer-load acceptance | **Implemented in `0242f22`; both LLVM versions CPU/GPU verified.** [Measured report](cumetal-three-mode-validation.md). | Earlier PRs only; #131 was not in historical `9e3e615`. | **`0242f22`:** eight invocations / 16 GPU batches across both versions pass CPU counts/payload, guards and independent-address checks. **Closed as completed on 2026-09-16** after publishing and verifying this evidence. |
 | [#26 — P-256 signature production](https://github.com/brandonros/vanity-miner-rs/issues/26) | [#83 — empty labels/predicate facts](https://github.com/Lulzx/cuda-metal/issues/83) | #85 covers original predicate cases; **no empty-label follow-up PR**. | #85 and #121 included; #121 addresses a different depth case. | **Both sources fail PTX translation:** `%rd17653` undefined at `$L__BB0_11`. Preserve facts across empty blocks and validate message/ephemeral search. |
 | [#27 — RSA modulus production](https://github.com/brandonros/vanity-miner-rs/issues/27) | [#119](https://github.com/Lulzx/cuda-metal/issues/119) owns the **historical GPU-completion wait**. Fresh pipeline-preparation wait: **owner unconfirmed**. | **No completion/performance fix PR.** | No corresponding fix. | **Times out:** fresh samples at about 180 s and near the deadline are inside **Metal pipeline creation**, before verified execution. This is not the historical device-synchronization sample. Attribute the preparation cost and confirm an owner; then complete verified four-stage cycles. |
 | [#28 — RSA-PSS production](https://github.com/brandonros/vanity-miner-rs/issues/28) | Earlier #96/#109/#111 → [#115 — Metal compilation time](https://github.com/Lulzx/cuda-metal/issues/115) | #108/#110/#112 clear translation; [#128](https://github.com/Lulzx/cuda-metal/pull/128) adds **diagnostics only**. **No performance fix PR.** | Translation fixes yes; #128 **no**. | **Salt and message searches time out** while sampled in Metal source-library compilation. Both emit source; neither verifies candidates. Diagnose and reduce compilation cost, then validate both sources. |
 | [#29 — Solana self-tests](https://github.com/brandonros/vanity-miner-rs/issues/29) | Original [#46](https://github.com/Lulzx/cuda-metal/issues/46)/[#116](https://github.com/Lulzx/cuda-metal/issues/116); fresh CFG error **unassigned**, [#83](https://github.com/Lulzx/cuda-metal/issues/83)/[#35](https://github.com/Lulzx/cuda-metal/issues/35) are leads. | [#117](https://github.com/Lulzx/cuda-metal/pull/117) clears the original trap-helper blocker. **No demonstrated fix for this new case.** | #117 **yes**. | **79 checks blocked by translation:** `%rd42` undefined at `$L__BB77_6` inside new `solana.candidate_match`. Reduce the guarded-use path; do not label this the old trap-expansion failure. |
 | [#30 — Bitcoin self-tests](https://github.com/brandonros/vanity-miner-rs/issues/30) | Original [#113](https://github.com/Lulzx/cuda-metal/issues/113)/[#116](https://github.com/Lulzx/cuda-metal/issues/116); fresh error **unassigned**, [#51](https://github.com/Lulzx/cuda-metal/issues/51)/[#70](https://github.com/Lulzx/cuda-metal/pull/70) discarded-half scope is a lead. | [#114](https://github.com/Lulzx/cuda-metal/pull/114), [#117](https://github.com/Lulzx/cuda-metal/pull/117). **No demonstrated fix for the fresh case.** | **Yes**, existing scoped fixes. | **39 checks blocked by translation:** `%r1688` undefined at `$L__BB4_3`, in outlined `bitcoin.private_key`. It supplies a packed high half later narrowed to low 16 bits. Confirm unused-bit normalization before assigning ownership; the older Metal wait is not this run's first failure. |
-| [#31 — Ethereum self-tests](https://github.com/brandonros/vanity-miner-rs/issues/31) | Original [#46](https://github.com/Lulzx/cuda-metal/issues/46)/[#116](https://github.com/Lulzx/cuda-metal/issues/116); fresh [#76](https://github.com/Lulzx/cuda-metal/issues/76) type-provenance scope is a **lead**. | [#117](https://github.com/Lulzx/cuda-metal/pull/117). **No demonstrated correction for this new case.** | #117 **yes**. | **8 checks blocked by translation:** pointer subtraction at line 17373 inside new `ethereum.candidate_match`. Reduce the suffix-offset types; matching the production diagnostic alone does not prove the same cause. |
+| [#31 — Ethereum self-tests](https://github.com/brandonros/vanity-miner-rs/issues/31) | Original [#116](https://github.com/Lulzx/cuda-metal/issues/116); [#76](https://github.com/Lulzx/cuda-metal/issues/76)/[#131](https://github.com/Lulzx/cuda-metal/pull/131) clear the measured LLVM21 translation stage. | #117 covers the original trap helper; **draft #131 now emits LLVM21 MSL for this module**. | #117 yes; **#131 no**. | **Historical run:** eight checks blocked by pointer subtraction. **`c4e5fac` / producer `afe80210`:** LLVM21 emits MSL; LLVM7 still rejects an undefined edge. Apple preparation and GPU/CPU checks were not run. Keep #31 open. |
 | [#32 — P-256 public-key self-tests](https://github.com/brandonros/vanity-miner-rs/issues/32) | Original [#116](https://github.com/Lulzx/cuda-metal/issues/116); fresh helper-global scope [#123](https://github.com/Lulzx/cuda-metal/issues/123) is a **lead**; additional address-space error **unassigned**. | [#117](https://github.com/Lulzx/cuda-metal/pull/117); #123 has unpublished WIP. | #117 **yes**; #123 **no**. | **13 checks blocked by Apple Metal compilation:** undeclared `private$39`, plus a pointer cast missing an explicit address space. PTX references the global in HMAC/scalar/end-to-end helpers. Test both error families; registration issue #125 is not established by these compilation errors. |
 | [#33 — P-256 signature self-tests](https://github.com/brandonros/vanity-miner-rs/issues/33) | Original [#120](https://github.com/Lulzx/cuda-metal/issues/120); fresh CFG error **unassigned**, [#83](https://github.com/Lulzx/cuda-metal/issues/83)/#120 are leads. | [#121](https://github.com/Lulzx/cuda-metal/pull/121) clears the original eight-block-depth case. **No demonstrated fresh-case fix.** | #121 **yes**. | **13 checks blocked by translation:** `%p243` undefined at `$L__BB8_1` inside outlined `p256_signature.low_s`. Reduce the new validity-guard path; this is not proof the original `%rs506` correction regressed. |
 | [#34 — RSA modulus self-tests](https://github.com/brandonros/vanity-miner-rs/issues/34) | Original [cuda-metal #35](https://github.com/Lulzx/cuda-metal/issues/35) → [#124](https://github.com/Lulzx/cuda-metal/issues/124), with optimization [#127](https://github.com/Lulzx/cuda-metal/issues/127). Fresh masked-payload error: **#35 scope lead**, coverage unconfirmed. | [#122](https://github.com/Lulzx/cuda-metal/pull/122) clears the original masked-payload SSA. **No resource/PRMT fix PR or demonstrated new-case fix.** | #122 **yes**. | **16 checks blocked by translation:** `%rs907` undefined at `$L__BB16_1` inside new `rsa_modulus.range_multiple`. The comparison is masked by a presence predicate; reduce it before extending #35 acceptance. This run never reaches the original artifact's Metal allocation failure. |
@@ -236,7 +328,7 @@ an individual numerical assertion failure.
 | [#39 — LLVM 7 P-256 public-key production](https://github.com/brandonros/vanity-miner-rs/issues/39) | [#130 — scalar zero-sentinel guard propagation](https://github.com/Lulzx/cuda-metal/issues/130). Distinct compact case from #83 empty labels and #120 depth. | **Research/reproducer published; no fix PR.** | No implementation. | **Original split-bundle input:** `%rd18761` undefined at `$L__BB5_1` after 9.412 s. Signed/unsigned small zero-marker cases fail; direct-predicate control emits. Full-input redundant guard controls advance to `%rd18765`, then `%rd18781`; the full module still fails. |
 
 
-The two passing production rows are in the [status report](cumetal-status.md):
+The two historically passing production rows are in the [status report](cumetal-status.md):
 Shallenge completes in **2.03 s** and P-256 public key in **192.36 s**, each with
 64 candidates and two CPU-verified outputs. These are bounded validation results,
 not performance benchmarks or exhaustive mode coverage.
@@ -261,36 +353,39 @@ not performance benchmarks or exhaustive mode coverage.
 | [#115 / tracing PR #128](https://github.com/Lulzx/cuda-metal/pull/128) | **Diagnostic implementation proposed; outside pin.** Performance remains unresolved. | Adds opt-in compilation spans; an end record means scope exit, including failure. New tests pass, but wider Release/selected Debug failures are documented. It neither supplies #126 nor fixes #124. |
 | [#126 — explicit function preparation](https://github.com/Lulzx/cuda-metal/issues/126) | **Missing APIs; no fix PR.** | Add `cuFuncLoad`/`cuFuncIsLoaded` with shared preparation, readiness, errors and lifecycle tests. Preparation success remains separate from GPU results and hidden-buffer correctness. |
 
-## Serial priority: LLVM 21 Solana, Bitcoin and Ethereum production
+## Production acceptance complete; remaining work is separate
 
-The [#76 implementation plan](cumetal-76-plan.md) specifies the coordinated
-result-type, normalized-definition and join/loop changes, plus the tests required
-to close that compiler defect. Full production GPU acceptance remains a separate
-gate for each downstream issue.
+The [three-mode validation](cumetal-three-mode-validation.md) now verifies all
+six production module/version combinations at `0242f22`. #131's nested-pointer
+regression is corrected and numerically tested. The longer limit allowed all
+first invocations to complete; startup optimization remains worthwhile but is
+not an outstanding correctness requirement for this measured acceptance.
 
-For the new LLVM 7 inputs, Bitcoin and Ethereum can proceed directly to Apple
-compilation and GPU acceptance; their translation successes are recorded in the
-split-bundle comparison above. They do not establish the LLVM 21 workloads pass.
+Continue the separately tracked self-test/proof cases, or profile
+[#127](https://github.com/Lulzx/cuda-metal/issues/127) for faster startup. The
+static inventory below remains useful because the PTX inputs are unchanged;
+it does not establish byte shuffles as Apple's dominant compilation cost.
 
-1. **Upstream [#76](https://github.com/Lulzx/cuda-metal/issues/76):** infer correct
-   conversion result types before SSA, preserve instruction-specific types through
-   CFG copies/rewrites, and resolve incoming join/loop types. Replay all three
-   retained production PTX inputs after each #76 change; retain focused compiler
-   regression tests. No published PR implements the remaining shared correction.
-2. **Production [#23 — Solana](https://github.com/brandonros/vanity-miner-rs/issues/23)
-   → [#24 — Bitcoin](https://github.com/brandonros/vanity-miner-rs/issues/24)
-   → [#25 — Ethereum](https://github.com/brandonros/vanity-miner-rs/issues/25):**
-   finish each workload through Metal compilation, GPU completion and the
-   acceptance checks below. Insert each newly demonstrated production blocker
-   when it is found, before proceeding to the next workload. The complete upstream
-   issue sequence beyond #76 is unknown until these inputs reach later stages.
-3. **Self-tests [#29 — Solana](https://github.com/brandonros/vanity-miner-rs/issues/29)
-   → [#30 — Bitcoin](https://github.com/brandonros/vanity-miner-rs/issues/30)
-   → [#31 — Ethereum](https://github.com/brandonros/vanity-miner-rs/issues/31):**
-   complete all 79, 39 and 8 checks respectively as additional correctness
-   coverage. These self-test passes are not established prerequisites for the
-   production passes. Replaying #31 alongside #76 can test the suspected overlap;
-   the shared cause remains unconfirmed.
+### Why #127 is a concrete candidate
+
+Static inspection of the exact fresh PTX hashes finds immediate-selector byte
+shuffles in all six production inputs:
+
+| Production module | LLVM21 immediate / total `prmt.b32` | LLVM7 immediate / total `prmt.b32` |
+| --- | ---: | ---: |
+| Solana | 105 / 105 | 64 / 112 |
+| Bitcoin | 168 / 168 | 105 / 131 |
+| Ethereum | 116 / 116 | 42 / 58 |
+
+[Exact-input inventory](../../upstream-issue-breakdown/issue-76-implementation/issue127-production-prmt-inventory.json).
+These are static PTX counts, not emitted clone counts or measured speedups. The historical `c4e5fac`
+LLVM21 outputs are 4,364,342 / 8,464,826 / 7,552,387 bytes respectively; size alone
+neither proves the timeout cause nor predicts a successful optimization.
+
+[#126 — explicit function preparation](https://github.com/Lulzx/cuda-metal/issues/126)
+remains useful API work, but adding `cuFuncLoad` does not by itself reduce the
+compilation cost of the preparation already triggered here. Keep #126 separate
+from the performance investigation.
 
 **Production acceptance:** empty address patterns are insufficient because these
 three kernels return only the private key for a matching candidate. Require
@@ -298,16 +393,18 @@ selective nonempty prefix/suffix fixtures with known matching and nonmatching
 candidates, CPU-verified match/error counts and returned winners, and independent
 CPU reconstruction of each winner's address. Check unchanged inputs and buffer
 guards across at least two batches to exercise reuse. Record the selected source,
-paired compiler/runtime and PTX identities with each result. The existing empty-
-pattern measurements do not establish this acceptance gate.
+paired compiler/runtime and PTX identities with each result. The new three-mode
+run at `0242f22` satisfies these bounded gates for both LLVM7 and LLVM21.
 
 No RSA, P-256 or Shallenge issue is currently a demonstrated dependency for these
 three production workloads.
 
 ## Shared fixes and next assignments
 
-- **Confirmed shared work:** production #23–25 share #76. Coordinate its importer
-  result-type edits with #118's per-lane pointer work.
+- **Production #23–25 verified at `0242f22`:** #131's core type correction and
+  qualifier follow-up now pass both LLVM versions through actual CPU/GPU acceptance.
+  Keep #76's remaining proof cases and broader #118 per-lane pointer work separately
+  tracked; these production passes do not establish their completion.
 - **Research before assigning fresh duplicates:** new undefined-value errors in
   Solana, Bitcoin, Shallenge, P-256 signatures and RSA modulus need separate small
   reductions. Existing CFG/unused-bit owners are leads, not five confirmed copies
@@ -317,12 +414,15 @@ three production workloads.
   Independently reduce the new Metal pointer-cast errors.
 - **Resource investigations:** keep RSA-PSS library compilation (#115), historical
   RSA self-test allocation failure (#124), historical RSA GPU completion (#119),
-  and fresh RSA pipeline-creation timeout separate until shared causes are proved.
+  and the recorded RSA pipeline-creation timeout separate until shared causes are
+  proved. #131 Bitcoin/Ethereum completed under the longer limit; their historical
+  90-second cutoffs are not unresolved hangs. #127 is an optimization candidate;
+  #128 supplies diagnostic spans.
 - **One integration owner:** control the pin, compiler/runtime pairing, PTX
   identities and serialized GPU measurements. A proposed patch must state which
   exact reproducer clears and which next stage remains.
 
-Fresh local evidence is retained in
+Historical full-sweep evidence is retained in
 `.cumetal-artifacts/validation-actions-35044328837-20260916T013211Z/`:
 `results.json`, `metadata.json`, `cpu-baseline.json`,
 `fresh-self-test-triage.json`, `ptx-structural-comparison.json`, and command logs.

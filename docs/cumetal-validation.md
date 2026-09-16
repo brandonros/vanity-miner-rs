@@ -1,19 +1,26 @@
 # CuMetal validation — 2026-09-16
 
+**Historical full 16-workload sweep below: CuMetal `9e3e615`.** The current
+[three-mode run on `0242f22`](cumetal-three-mode-validation.md) passes Solana,
+Bitcoin and Ethereum production with **both LLVM7 and LLVM21 PTX**: 24 invocations,
+48 GPU batches, 1,536 CPU-verified candidate positions. #23–25 were closed as
+completed on 2026-09-16 after publishing this evidence. No fresh
+full-sweep total is claimed. See the [issue matrix](cumetal-issue-matrix.md).
+
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
-The new LLVM 21 production PTX currently fails translation at `%rd310` /
-`$L__BB0_6`; no new GPU execution is established. See
+The newer `afe80210` LLVM21 RSA PTX first fails at unsupported `clz.b64`
+on measured `c4e5fac`; RSA was not rerun on `0242f22`. See
 [the mining design and checks](gpu-search-pipeline.md).
 
-## Result
+## Historical results (`9e3e615`)
 
-Fresh measurement **2026-09-16, 01:46:07–02:14:38 UTC**:
+Recorded measurement **2026-09-16, 01:46:07–02:14:38 UTC**:
 **2 of 16 rows pass; 14 fail**. The passing rows are **Shallenge production** and
 **P-256 public-key production**. See the [16-row report](cumetal-status.md).
 
-The failures are tracked by **14 open workload issues (#23–35 plus #37)**.
+At this measurement, the failures had **14 open workload issues (#23–35 plus #37)**.
 Adding [#37 — Shallenge self-tests](https://github.com/brandonros/vanity-miner-rs/issues/37)
 updates tracking only; no new measurements were made.
 
@@ -142,7 +149,7 @@ Only its own process group was terminated on timeout. Shared Metal caches were
 not cleared and compiler services can outlive a client. Elapsed times are not
 controlled benchmarks. Stack samples identify observed call sites, not exact
 per-stage durations or root causes. The timing diagnostics in PR #128 are
-**not in this pin**. Module-load success alone is never counted as compilation
+**not in the measured `9e3e615` pin**. Module-load success alone is never counted as compilation
 or GPU success.
 
 ## Source and artifact identity
@@ -161,7 +168,7 @@ or GPU success.
 - Rust-CUDA revision: `f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588`;
   Rust toolchain: `nightly-2026-04-02`.
 - CuMetal: **`9e3e61574b776424a96c686bdbdc04ad1f27fe9f`**, from
-  `https://github.com/brandonros/cuda-metal`, matching the selected `flake.lock`.
+  `https://github.com/brandonros/cuda-metal`, matching `flake.lock` at that measurement.
 - Paired package: `/nix/store/hh6l39zigklrh3al2w21x7b8ik5jaxcm-vanity-cumetal-9e3e61574b77`.
 - Immutable CuMetal source: `/nix/store/kk52zigih0j1x7dik3fbf9jwjl1ka139-source`.
 

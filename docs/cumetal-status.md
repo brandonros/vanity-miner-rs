@@ -1,11 +1,20 @@
 # CuMetal status — 2026-09-16
 
+**Historical full 16-workload sweep below: CuMetal `9e3e615`.** The current
+[three-mode run on `0242f22`](cumetal-three-mode-validation.md) passes Solana,
+Bitcoin and Ethereum production with **both LLVM7 and LLVM21 PTX**: 24 invocations,
+48 GPU batches, 1,536 CPU-verified candidate positions. #23–25 were closed as
+completed on 2026-09-16 after publishing this evidence. No fresh
+full-sweep total is claimed. See the [issue matrix](cumetal-issue-matrix.md).
+
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
-The new LLVM 21 production PTX currently fails translation at `%rd310` /
-`$L__BB0_6`; no new GPU execution is established. See
+The newer `afe80210` LLVM21 RSA PTX first fails at unsupported `clz.b64`
+on measured `c4e5fac`; RSA was not rerun on `0242f22`. See
 [the mining design and checks](gpu-search-pipeline.md).
+
+## Historical results (`9e3e615`)
 
 Measured **2026-09-16, 01:46–02:14 UTC**, using CuMetal **`9e3e61574b77`**
 and fresh LLVM 21 PTX from [Actions run #35044328837](https://github.com/brandonros/vanity-miner-rs/actions/runs/35044328837),
@@ -15,8 +24,8 @@ producer/host commit **`4e0231a`**. Compiler and runtime hashes were verified.
 False means translation failed, Metal compilation failed, or the command did not
 finish within its **300-second limit**. A timeout does not prove it could never finish.
 
-All failing rows have trackers: **14 open workload issues (#23–35 plus #37)**.
-The tracking update adds no new measurements; **2 of 16 rows still pass**.
+All failing rows had trackers: **14 workload issues (#23–35 plus #37) were open
+at this measurement**. The table records that run, not today's pin or issue states.
 
 | Module | Works in CuMetal | Observed result | Downstream issue |
 | --- | --- | --- | --- |

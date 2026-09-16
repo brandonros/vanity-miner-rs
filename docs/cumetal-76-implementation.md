@@ -1,11 +1,64 @@
 # CuMetal #76 implementation and validation
 
 **The typing correction is published in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131). Final issue acceptance remains open.**
-The final snapshot passes its selected compiler and numerical GPU regression
-suites. Solana, Bitcoin and Ethereum from the fresh miner build emit Metal
-source under both LLVM versions. This is not a claim of full workload GPU success.
+The `0242f22` follow-up passes Solana, Bitcoin and Ethereum production with
+both LLVM7 and LLVM21 PTX through the normal pinned miner's CPU/GPU checks.
+See the [current measured report](cumetal-three-mode-validation.md). The original
+`c4e5fac` correction cleared translation but exposed the LLVM7 nested-pointer
+regression; its development evidence is retained as historical below.
 
-## Implementation identity
+## Published follow-up: LLVM7 nested pointer qualifiers
+
+Commit [`0242f22df09f62486e38d4c0c18a10e9098e92bd`](https://github.com/brandonros/cuda-metal/commit/0242f22df09f62486e38d4c0c18a10e9098e92bd)
+is pushed on the same branch and included in draft PR #131.
+
+The importer now represents memory-address intermediates as byte pointers in
+their actual storage address space. Loads and stores keep their independent
+value types; Metal emission forms the final typed dereference after those types
+resolve. This prevents an earlier address cast from retaining an unresolved
+nested pointer after its loaded field has acquired a concrete qualifier. The
+Metal IR verifier recursively rejects unresolved nested pointer address spaces.
+Concrete nested pointer types remain supported; the existing pointer-provenance
+and memory-proof limits are unchanged.
+
+| Selected check | Release, shim OFF | Debug, shim ON |
+| --- | --- | --- |
+| Selected unit tests | **44 passed** | **47 passed** |
+| Pointer-record numerical GPU regression | **Four cases passed**, 65 lanes each; three required rejections passed | **Four cases passed**, 65 lanes each; three required rejections passed |
+| PTX functional groups, including the revised pointer-record test | **49 passed, one skipped** | **49 passed, one skipped** |
+| Typed CUDA projects | **Six passed, one skipped** | **Six passed, one skipped** |
+| Standalone typed atomics | **Four skipped**: unavailable offline Metal toolchain | **Four skipped**: unavailable offline Metal toolchain |
+
+The PTX total combines 48 passing existing tests with the separately run
+pointer-record test. The new generic-load/store regression cases fail against
+the immutable published `c4e5fac` compiler/runtime package and pass with this
+correction. Selected unit runs exclude `unit_cumetal_cli`; these are selected
+checks, not a claim that every repository test passed. Exact commands, results,
+and artifact identities are in the
+[selected validation record](../../upstream-issue-breakdown/issue-76-llvm7-pointer-qualifiers/after-fix/selected-validation.json)
+and [baseline/fixed pointer-record comparison](../../upstream-issue-breakdown/issue-76-llvm7-pointer-qualifiers/after-fix/final-v2-pointer-record-results.json).
+The [final development manifest](../../upstream-issue-breakdown/issue-76-llvm7-pointer-qualifiers/after-fix/final-development-manifest.json)
+records the committed source/test hashes; the earlier selected-validation diff
+hash describes its precommit snapshot, not the complete final patch.
+
+All six production inputs—Solana, Bitcoin and Ethereum under LLVM7 and
+LLVM21—[emit Metal source](../../upstream-issue-breakdown/issue-76-llvm7-pointer-qualifiers/after-fix/production-translation/results.json).
+**The normal miner replay at `0242f22` now passes all three modes under both
+LLVM versions:** 24 invocations, 48 GPU batches and 1,536 CPU-verified candidate
+positions. The matched Nix package, input identities and result checks pass the
+final audit. See the [current production report](cumetal-three-mode-validation.md).
+This closes the measured production blocker, not #76’s remaining proof cases or
+the separate self-test workload issues.
+
+The code commit and approved GitHub evidence are published. On 2026-09-16,
+downstream #23–25 were closed as completed; upstream #76 remains open and
+PR #131 remains a draft. The five updated bodies and resulting states were
+read back and verified.
+
+## Historical implementation identity (`c4e5fac`)
+
+The remaining sections describe the original candidate 12 measurements and
+their limitations, not validation of the follow-up commit.
 
 - Worktree: `../../.worktrees/cuda-metal-issue-76`.
 - Branch: `upstream/ptx-ssa-type-contract`.
@@ -26,9 +79,10 @@ The contribution is committed and pushed to `brandonros/cuda-metal`, branch
 `upstream/ptx-ssa-type-contract`, and proposed upstream as draft PR #131. Issue #76
 links the PR and explicitly retains its open acceptance gates. The PR depends
 on #122 and its existing stack; its body links the single new commit separately.
-The miner's CuMetal pin has not been changed. These are compiler-development
-measurements using the explicitly identified compiler/runtime pair; they do not
-claim that a pinned miner CLI was rebuilt or bypass its package-identity checks.
+The miner pin was unchanged during these compiler-development measurements.
+The later [three-mode run](cumetal-three-mode-validation.md) deliberately updates
+it to this published commit and rebuilds the paired Nix package and CLI. Its
+artifact hashes/results are separate from this development pair.
 
 The PR contains a self-contained public validation summary. Paths into the local
 evidence directory below refer to retained workspace artifacts, not public
