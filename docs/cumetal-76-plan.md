@@ -1,8 +1,8 @@
 # CuMetal #76: implementation and acceptance plan
 
-Status: **implemented locally; acceptance remains open**. The correction is in
-`../.worktrees/cuda-metal-issue-76`, branch `upstream/ptx-ssa-type-contract`.
-The final candidate passes the focused Debug/Release and PTX functional checks;
+Status: **published as [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open**. Commit `c4e5fac44e92ffdd6dae19c1ac62755c814e36b8`
+is in `../../.worktrees/cuda-metal-issue-76`, branch `upstream/ptx-ssa-type-contract`.
+A measured candidate passes the focused Debug/Release and PTX functional checks;
 Solana, Bitcoin and Ethereum emit MSL under both LLVM versions. This does not
 establish downstream GPU correctness. See the
 [implementation report](cumetal-76-implementation.md) for exact identities,
@@ -313,31 +313,43 @@ commit or disappearing first error cannot be summarized as "the kernels work."
 
 ## Completion checklist
 
-- [ ] Enumerate and review every affected type/evidence writer and reader, both
-  import paths, and every normalization definition-creation site.
-- [ ] Implement one authoritative result contract using actual reaching values;
+- [x] Enumerate and review every affected type/evidence writer and reader, both
+  import paths, and every normalization definition-creation site. See the
+  [type/evidence audit](../../upstream-issue-breakdown/issue-76-implementation/type-site-audit.md).
+- [x] Implement one authoritative result contract using actual reaching values;
   remove register-summary/default-type authority from SSA definitions and joins.
-- [ ] Preserve clone identity, invalidate context-dependent facts and validate
+- [x] Preserve clone identity, invalidate context-dependent facts and validate
   destination count/order after rewrites.
 - [ ] Specify and test convergent propagation, loop cycles, explicit conflicts,
   null proofs, address-space constraints and resource-limit diagnostics.
-- [ ] Enforce the import/materialization boundary and checked later transforms;
+  The selected solver/loop/conflict suites pass; a dedicated resource-limit
+  exhaustion test is not established by the recorded checks.
+- [x] Enforce the import/materialization boundary and checked later transforms;
   retain all strict definedness, ABI and invalid-operation rejection behavior.
 - [ ] Make focused regressions fail on the unchanged baseline and pass on the
   candidate; run the named and generated coverage matrix and numerical GPU gates.
-- [ ] Replay all 32 frozen PTX inputs with all 38 entries explicitly selected,
+  Typed-importer structural and numerical suites pass; the legacy joined-ReLU
+  CFG cells remain explicitly `NOT_TESTED` and keep this combined gate open.
+- [x] Replay all 32 frozen PTX inputs with all 38 entries explicitly selected,
   retaining baseline passes, exact hashes and per-stage evidence. Missing or
   blocked checks remain visible; they cannot be counted as passing gates.
-- [ ] Also rebuild and freeze the current miner's production/self-test corpus
+- [x] Also rebuild and freeze the current miner's production/self-test corpus
   for both LLVM versions, verify its complete entry inventory, and compare the
-  baseline and candidate compiler on those same new bytes. Use the matching host
-  for GPU acceptance; do not mix old four-entry RSA artifacts with the new ABI.
+  baseline and candidate compiler on those same new bytes. Actions run
+  `35055622652`, producer `afe80210`, supplies 32 verified inputs/entries; both
+  complete comparisons and exact identities are in the implementation report.
+- [ ] Use the matching host for GPU acceptance; do not mix old four-entry RSA
+  artifacts with the new ABI. Production translation and reducer GPU checks
+  do not satisfy this full-workload gate.
 - [ ] Clear every demonstrated remaining failure within the #76 contract. Link
   independent downstream blockers with their evidence and keep the associated
   workload issues open until full GPU acceptance.
-- [ ] Review and publish one coordinated correction with its complete acceptance
-  table; intermediate commits remain partial implementation until these gates
-  establish the claimed scope.
+  The fresh residual review retains five bitwise-address proof/legalization
+  gaps and two local-memory range/alias-proof gaps as open acceptance work.
+- [x] Review and publish one coordinated correction with its complete acceptance
+  table: draft PR #131 links open issue #76 and records all pending gates.
+  Publication does not establish completion; the draft remains partial until
+  the required acceptance checks pass.
 
 Here, exhaustive means coverage of the supported result-rule families, their
 relevant interactions and every boundary that creates or propagates a value's

@@ -1,5 +1,17 @@
 # CuMetal issue ownership and fix status
 
+The #76 implementation is proposed in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131),
+commit `c4e5fac`, with evidence in the
+[implementation and validation report](cumetal-76-implementation.md). It is
+published for review and is not in the miner's CuMetal pin. Fresh Solana, Bitcoin and
+Ethereum production inputs now emit Metal source under both LLVM versions.
+Complete comparisons improve fresh translation from **5/32 to 10/32** and
+historical translation from **11/38 to 16/38**, retaining every baseline MSL
+pass. Focused compiler and numerical GPU tests pass; remaining provenance/range
+proofs and full workload GPU acceptance keep #76 open. The pinned-compiler
+measurements below keep their original artifact identities and are not results
+for that patch.
+
 The [64-issue consolidation audit](cumetal-issue-duplicate-audit.md) and
 [executed follow-up](cumetal-consolidation-followup.md) now have published GitHub
 results: upstream #46 is **closed as superseded** after transferring acceptance
@@ -206,9 +218,9 @@ an individual numerical assertion failure.
 
 | Vanity-miner issue | Upstream ownership | Published implementation | Included in `9e3e615`? | Fresh result and next work |
 | --- | --- | --- | --- | --- |
-| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 — conversion/join types](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for the remaining destination/normalized-definition/join work.** #50/#56/#75 cover narrower cases. | Earlier PRs only. | **PTX translation fails:** first `i32`/`i64` disagreement at line 34070. Implement type inference/propagation, then retest verified batches. |
-| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for the remaining gap.** Shared work with #23/#25. | Earlier PRs only. | **PTX translation fails:** pointer subtraction at line 26556. Same first diagnostic as the historical artifact; separate downstream verification remains required. |
-| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for the remaining gap.** Shared work with #23/#24. | Earlier PRs only. | **PTX translation fails:** pointer subtraction at line 22069. Implement the shared correction and verify this workload independently. |
+| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 — conversion/join types](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). #50/#56/#75 cover earlier narrower cases. | Earlier PRs only. | **Recorded pinned run:** translation fails with the first `i32`/`i64` disagreement at line 34070. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
+| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). Shared patch with #23/#25. | Earlier PRs only. | **Recorded pinned run:** pointer subtraction fails at line 26556. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
+| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **Partial implementation in [draft PR #131](https://github.com/Lulzx/cuda-metal/pull/131); acceptance remains open.** [Measured report](cumetal-76-implementation.md). Shared patch with #23/#24. | Earlier PRs only. | **Recorded pinned run:** pointer subtraction fails at line 22069. **Draft #131 candidate:** both fresh LLVM versions emit MSL; full GPU/CPU acceptance remains open. |
 | [#26 — P-256 signature production](https://github.com/brandonros/vanity-miner-rs/issues/26) | [#83 — empty labels/predicate facts](https://github.com/Lulzx/cuda-metal/issues/83) | #85 covers original predicate cases; **no empty-label follow-up PR**. | #85 and #121 included; #121 addresses a different depth case. | **Both sources fail PTX translation:** `%rd17653` undefined at `$L__BB0_11`. Preserve facts across empty blocks and validate message/ephemeral search. |
 | [#27 — RSA modulus production](https://github.com/brandonros/vanity-miner-rs/issues/27) | [#119](https://github.com/Lulzx/cuda-metal/issues/119) owns the **historical GPU-completion wait**. Fresh pipeline-preparation wait: **owner unconfirmed**. | **No completion/performance fix PR.** | No corresponding fix. | **Times out:** fresh samples at about 180 s and near the deadline are inside **Metal pipeline creation**, before verified execution. This is not the historical device-synchronization sample. Attribute the preparation cost and confirm an owner; then complete verified four-stage cycles. |
 | [#28 — RSA-PSS production](https://github.com/brandonros/vanity-miner-rs/issues/28) | Earlier #96/#109/#111 → [#115 — Metal compilation time](https://github.com/Lulzx/cuda-metal/issues/115) | #108/#110/#112 clear translation; [#128](https://github.com/Lulzx/cuda-metal/pull/128) adds **diagnostics only**. **No performance fix PR.** | Translation fixes yes; #128 **no**. | **Salt and message searches time out** while sampled in Metal source-library compilation. Both emit source; neither verifies candidates. Diagnose and reduce compilation cost, then validate both sources. |
