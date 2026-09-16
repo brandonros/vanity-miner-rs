@@ -1,15 +1,15 @@
 use crate::runner::cumetal::{CumetalRunner, Error, driver::Driver};
 use std::rc::Rc;
 
-pub(crate) fn run(runner: &CumetalRunner, driver: &Rc<Driver>) -> Result<(), Error> {
-    use crate::modes::self_test::{self, Outcome};
+pub(crate) fn run(
+    runner: &CumetalRunner,
+    driver: &Rc<Driver>,
+    args: &super::args::SelfTestArgs,
+) -> Result<(), Error> {
+    use crate::modes::self_test;
+    let cases = args.selected()?;
     let mut cache = self_test::DeviceResults::default();
-    self_test::run("CuMetal", |case| {
-        if !runner.options.self_test_slot.is_empty()
-            && !runner.options.self_test_slot.contains(&(case.slot as u32))
-        {
-            return Ok(Outcome::Skipped("not selected"));
-        }
+    self_test::run("CuMetal", &cases, |case| {
         cache.check(case, || {
             let operation = (|| -> Result<Vec<u32>, Error> {
                 let module = runner.module(driver, case.kernel)?;

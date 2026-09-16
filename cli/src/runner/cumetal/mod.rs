@@ -87,7 +87,7 @@ impl Runner for CumetalRunner {
                 crate::modes::shallenge::cumetal::run(self, username, target_hash, &driver, stats)
             }
             #[cfg(feature = "self_test_support")]
-            Command::SelfTest => crate::modes::self_test::cumetal::run(self, &driver),
+            Command::SelfTest(args) => crate::modes::self_test::cumetal::run(self, &driver, args),
         }
     }
 }

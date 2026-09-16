@@ -1,5 +1,6 @@
 //! Concrete secp256k1 probes used by this mode's device self-test.
 use super::*;
+use core::hint::black_box;
 
 // Slot 73: `SecretKey::from_bytes` for the smallest valid scalar (=1).
 // Tests just the validation/wrap step (range check + GenericArray copy).
@@ -8,36 +9,42 @@ use super::*;
 // Wrapped in ManuallyDrop because SecretKey zeroizes on Drop and
 // cuda-oxide does not yet emit device-side drop_in_place (same pattern
 // as logic/src/secp256k1.rs).
-#[inline(never)]
-pub fn check_k256_secret_from_bytes_one() -> u32 {
-    use core::mem::ManuallyDrop;
-    use k256::SecretKey;
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 1;
-    let result = SecretKey::from_bytes((&priv_bytes).into());
-    match result {
-        Ok(sk) => {
-            let _sk = ManuallyDrop::new(sk);
-            1
+register_self_test! {
+    /// k256 SecretKey::from_bytes(1)
+    fn k256_secret_from_bytes_one() -> u32 {
+        use core::mem::ManuallyDrop;
+        use k256::SecretKey;
+        let mut priv_bytes = [0u8; 32];
+        priv_bytes[31] = 1;
+        let result = SecretKey::from_bytes((&priv_bytes).into());
+        match result {
+            Ok(sk) => {
+                let _sk = ManuallyDrop::new(sk);
+                1
+            }
+            Err(_) => 0,
         }
-        Err(_) => 0,
     }
 }
 
-#[inline(never)]
-pub fn check_k256_derive_scalar_one() -> u32 {
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 1;
-    let pub_key = secp256k1_derive_public_key(&priv_bytes);
-    (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
+register_self_test! {
+    /// k256 derive scalar=1 == generator
+    fn k256_derive_scalar_one() -> u32 {
+        let mut priv_bytes = [0u8; 32];
+        priv_bytes[31] = 1;
+        let pub_key = secp256k1_derive_public_key(&priv_bytes);
+        (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_k256_derive_scalar_two() -> u32 {
-    let mut priv_bytes = [0u8; 32];
-    priv_bytes[31] = 2;
-    let pub_key = secp256k1_derive_public_key(&priv_bytes);
-    (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
+register_self_test! {
+    /// k256 derive scalar=2 == 2G
+    fn k256_derive_scalar_two() -> u32 {
+        let mut priv_bytes = [0u8; 32];
+        priv_bytes[31] = 2;
+        let pub_key = secp256k1_derive_public_key(&priv_bytes);
+        (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
+    }
 }
 
 // Slot 78: encode the secp256k1 generator point directly — no scalar mult,
@@ -45,20 +52,22 @@ pub fn check_k256_derive_scalar_two() -> u32 {
 // chain in isolation. ProjectivePoint::GENERATOR has z=1, so the affine
 // conversion's field inversion is trivial; this primarily exercises the
 // FieldElement→bytes serialization + parity-bit pack.
-#[inline(never)]
-pub fn check_k256_encode_generator() -> u32 {
-    use k256::ProjectivePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g = ProjectivePoint::GENERATOR;
-    let affine = g.to_affine();
-    let encoded = affine.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
+register_self_test! {
+    /// k256 encode generator (no mul)
+    fn k256_encode_generator() -> u32 {
+        use k256::ProjectivePoint;
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let g = ProjectivePoint::GENERATOR;
+        let affine = g.to_affine();
+        let encoded = affine.to_encoded_point(true);
+        let bytes = encoded.as_bytes();
+        if bytes.len() != 33 {
+            return 0;
+        }
+        let mut out = [0u8; 33];
+        out.copy_from_slice(bytes);
+        (out == SECP256K1_GENERATOR_COMPRESSED) as u32
     }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
 // Slot 79: `ProjectivePoint::double()` on the generator + encode. One
@@ -66,20 +75,22 @@ pub fn check_k256_encode_generator() -> u32 {
 // point with z != 1, so the subsequent `to_affine()` requires a real
 // field inversion. 78 PASS + 79 FAIL = doubling formula or non-trivial
 // field inversion broken (5-wide variant of Bug C suspect).
-#[inline(never)]
-pub fn check_k256_double_generator() -> u32 {
-    use k256::ProjectivePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g2 = ProjectivePoint::GENERATOR.double();
-    let affine = g2.to_affine();
-    let encoded = affine.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
+register_self_test! {
+    /// k256 double generator + encode
+    fn k256_double_generator() -> u32 {
+        use k256::ProjectivePoint;
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let g2 = ProjectivePoint::GENERATOR.double();
+        let affine = g2.to_affine();
+        let encoded = affine.to_encoded_point(true);
+        let bytes = encoded.as_bytes();
+        if bytes.len() != 33 {
+            return 0;
+        }
+        let mut out = [0u8; 33];
+        out.copy_from_slice(bytes);
+        (out == SECP256K1_TWO_G_COMPRESSED) as u32
     }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_TWO_G_COMPRESSED) as u32
 }
 
 // Slot 80: k256 `Scalar::ONE` round-trip via the PrimeField trait. Mirror
@@ -87,19 +98,21 @@ pub fn check_k256_double_generator() -> u32 {
 // crypto-bigint (different layout than dalek's `Scalar52([u64; 5])`),
 // so this distinguishes Bug A (dalek-specific newtype shape) from a
 // broader Bug A' (any static-resident scalar repr).
-#[inline(never)]
-pub fn check_k256_scalar_one_round_trip() -> u32 {
-    use k256::Scalar;
-    use k256::elliptic_curve::PrimeField;
-    let s = Scalar::ONE;
-    let repr = s.to_repr();
-    let s2_opt = Scalar::from_repr(repr);
-    let recovered: bool = s2_opt.is_some().into();
-    if !recovered {
-        return 0;
+register_self_test! {
+    /// k256 Scalar::ONE round-trip
+    fn k256_scalar_one_round_trip() -> u32 {
+        use k256::Scalar;
+        use k256::elliptic_curve::PrimeField;
+        let s = Scalar::ONE;
+        let repr = s.to_repr();
+        let s2_opt = Scalar::from_repr(repr);
+        let recovered: bool = s2_opt.is_some().into();
+        if !recovered {
+            return 0;
+        }
+        let s2 = s2_opt.unwrap();
+        (s2 == s) as u32
     }
-    let s2 = s2_opt.unwrap();
-    (s2 == s) as u32
 }
 
 // Slot 93: k256 `AffinePoint::GENERATOR.to_encoded_point(true)`. Skips
@@ -107,35 +120,65 @@ pub fn check_k256_scalar_one_round_trip() -> u32 {
 // inversion). Tests cross-crate const access for AffinePoint::GENERATOR
 // + the encoded_point serialization chain. If 93 PASSes and 78 FAILs,
 // the bug in 78 is specifically in `to_affine()` (the field inversion).
-#[inline(never)]
-pub fn check_k256_affine_generator_encode() -> u32 {
-    use k256::AffinePoint;
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let g = AffinePoint::GENERATOR;
-    let encoded = g.to_encoded_point(true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
+register_self_test! {
+    /// k256 AffinePoint::GENERATOR.to_encoded_point()
+    fn k256_affine_generator_encode() -> u32 {
+        use k256::AffinePoint;
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let g = AffinePoint::GENERATOR;
+        let encoded = g.to_encoded_point(true);
+        let bytes = encoded.as_bytes();
+        if bytes.len() != 33 {
+            return 0;
+        }
+        let mut out = [0u8; 33];
+        out.copy_from_slice(bytes);
+        (out == SECP256K1_GENERATOR_COMPRESSED) as u32
     }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
 }
 
-#[inline(never)]
-pub fn check_k256_encoded_point_from_affine_coords() -> u32 {
-    use k256::EncodedPoint;
-    use k256::elliptic_curve::FieldBytes;
-    let x_bytes = core::hint::black_box(SECP256K1_GX_BYTES);
-    let y_bytes = core::hint::black_box(SECP256K1_GY_BYTES);
-    let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
-    let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
-    let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
-    let bytes = encoded.as_bytes();
-    if bytes.len() != 33 {
-        return 0;
+register_self_test! {
+    /// k256 EncodedPoint::from_affine_coordinates(GX, GY)
+    fn k256_encoded_point_from_affine_coords() -> u32 {
+        use k256::EncodedPoint;
+        use k256::elliptic_curve::FieldBytes;
+        let x_bytes = core::hint::black_box(SECP256K1_GX_BYTES);
+        let y_bytes = core::hint::black_box(SECP256K1_GY_BYTES);
+        let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
+        let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
+        let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
+        let bytes = encoded.as_bytes();
+        if bytes.len() != 33 {
+            return 0;
+        }
+        let mut out = [0u8; 33];
+        out.copy_from_slice(bytes);
+        (out == SECP256K1_GENERATOR_COMPRESSED) as u32
     }
-    let mut out = [0u8; 33];
-    out.copy_from_slice(bytes);
-    (out == SECP256K1_GENERATOR_COMPRESSED) as u32
+}
+
+register_self_test! {
+    /// k256 scalar order boundaries
+    fn k256_scalar_order_boundaries() -> u32 {
+        use k256::{Scalar, elliptic_curve::PrimeField};
+        // secp256k1 group order, big-endian. Exercise parsing without a panicking key API.
+        let order = [
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c, 0xd0, 0x36,
+            0x41, 0x41,
+        ];
+        let mut below = order;
+        below[31] -= 1;
+        let mut above = order;
+        above[31] += 1;
+        let parsed: Option<Scalar> = Scalar::from_repr(black_box(below).into()).into();
+        let Some(parsed) = parsed else {
+            return 0;
+        };
+        u32::from(
+            parsed.to_bytes().as_slice() == below
+                && bool::from(Scalar::from_repr(black_box(order).into()).is_none())
+                && bool::from(Scalar::from_repr(black_box(above).into()).is_none()),
+        )
+    }
 }

@@ -17,6 +17,18 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Validate inputs
     cli.command.validate()?;
 
+    #[cfg(feature = "self_test_support")]
+    match &cli.command {
+        crate::args::Command::SelfTest(args) if args.list => {
+            for case in args.selected()? {
+                println!("{}\t{}", case.name, case.label);
+            }
+            return Ok(());
+        }
+        #[allow(unreachable_patterns)]
+        _ => {}
+    }
+
     // Create runner based on compile-time feature
     #[cfg(feature = "gpu")]
     let runner = GpuRunner::new()?;
@@ -42,7 +54,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Every search uses one reporter, including searches that have no matches yet.
     // Self-tests report their own assertions rather than search throughput.
     #[cfg(feature = "self_test_support")]
-    if matches!(cli.command, crate::args::Command::SelfTest) {
+    if matches!(cli.command, crate::args::Command::SelfTest(_)) {
         return runner.run(&cli.command, stats);
     }
     let result = std::thread::scope(|scope| {

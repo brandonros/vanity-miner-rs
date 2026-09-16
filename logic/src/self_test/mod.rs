@@ -2,18 +2,18 @@
 //! primitive against externally-validated expected values, writing
 //! pass(1)/fail(0) per check into the results buffer.
 //!
-//! Each slot has a dedicated `check_*` function. GPU mode runs eight mode-specific
-//! kernels, preserving individual result slots. CPU mode calls all checks in sequence.
+//! Each slot has a dedicated `register_self_test!` function. GPU mode runs eight mode-specific
+//! kernels, using generated result indices. CPU mode calls all checks in sequence.
 //!
 //! Keep known-answer inputs opaque before the operation under test. A barrier
 //! around the final boolean is too late: the operation can already be folded.
 //! `black_box` is best effort; inspect emitted PTX to verify the computation
 //! survives optimization.
 
-#[cfg(feature = "self_test_bitcoin")]
-pub mod bitcoin;
-#[cfg(feature = "self_test_ethereum")]
-pub mod ethereum;
+#[macro_use]
+mod registration;
+include!("registry.rs");
+
 #[cfg(any(
     feature = "self_test_p256_public_key",
     feature = "self_test_p256_signature",
@@ -21,18 +21,6 @@ pub mod ethereum;
     feature = "self_test_rsa_modulus"
 ))]
 mod known_answers;
-#[cfg(feature = "self_test_p256_public_key")]
-pub mod p256_public_key;
-#[cfg(feature = "self_test_p256_signature")]
-pub mod p256_signature;
-#[cfg(feature = "self_test_rsa_modulus")]
-pub mod rsa_modulus;
-#[cfg(feature = "self_test_rsa_pss")]
-pub mod rsa_pss;
-#[cfg(feature = "self_test_shallenge")]
-pub mod shallenge;
-#[cfg(feature = "self_test_solana")]
-pub mod solana;
 
 #[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
 pub(super) fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
@@ -78,43 +66,26 @@ impl core::ops::IndexMut<usize> for IdxProbe {
     }
 }
 
-pub const SELF_TEST_NUM_CHECKS: usize = 160;
-
-pub mod metadata;
-pub const SELF_TEST_LABELS: [&str; SELF_TEST_NUM_CHECKS] = metadata::labels();
-
-pub fn run_self_test(results: &mut [u32]) {
-    #[cfg(feature = "self_test_solana")]
-    solana::run(results);
-    #[cfg(feature = "self_test_bitcoin")]
-    bitcoin::run(results);
-    #[cfg(feature = "self_test_ethereum")]
-    ethereum::run(results);
-    #[cfg(feature = "self_test_shallenge")]
-    shallenge::run(results);
-    #[cfg(feature = "self_test_p256_public_key")]
-    p256_public_key::run(results);
-    #[cfg(feature = "self_test_p256_signature")]
-    p256_signature::run(results);
-    #[cfg(feature = "self_test_rsa_pss")]
-    rsa_pss::run(results);
-    #[cfg(feature = "self_test_rsa_modulus")]
-    rsa_modulus::run(results);
-}
-
-#[cfg(all(test, feature = "self_test"))]
+#[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn all_self_test_checks_pass_on_cpu() {
-        let mut results = [0u32; SELF_TEST_NUM_CHECKS];
+    fn enabled_self_test_checks_pass_on_cpu_and_disabled_slots_are_untouched() {
+        const UNWRITTEN: u32 = 0xa5a5a5a5;
+        let mut results = [UNWRITTEN; SELF_TEST_NUM_CHECKS];
         run_self_test(&mut results);
         for (i, &r) in results.iter().enumerate() {
             assert_eq!(
-                r, 1,
+                r,
+                if metadata::CASES[i].enabled {
+                    1
+                } else {
+                    UNWRITTEN
+                },
                 "self-test check {} ({}) failed",
-                i, SELF_TEST_LABELS[i]
+                i,
+                metadata::CASES[i].name
             );
         }
     }

@@ -226,7 +226,7 @@ cargo build -p vanity-miner --release --locked --no-default-features --features 
 `self_test_solana`, `self_test_bitcoin`, `self_test_ethereum`, `self_test_shallenge`,
 `self_test_p256_public_key`, `self_test_p256_signature`, `self_test_rsa_pss`, or
 `self_test_rsa_modulus`. These enable only their matching logic dependencies,
-not the search commands. Selected checks retain their original slot numbers.
+not the search commands. Names and indices are independent of feature selection.
 
 For example, compile and run only RSA-PSS tests on the CPU:
 
@@ -238,27 +238,70 @@ Add `gpu,llvm21` in the v21 shell for CUDA. Multiple self-test features still
 produce separate PTX files. The same `self-test` command runs the selected groups
 on the backend chosen at build time.
 
-The `logic/src/self_test/` folder has one directory per mode. Each owns its
-primitive, pipeline, boundary, and regression checks, with slot definitions in
-`cases.rs` and mode-specific inputs in `fixtures.rs`. Shared RSA/P-256 constants
-live in `known_answers.rs`. `metadata.rs` aggregates the 160 slot labels, and
-`mod.rs` owns the CPU dispatcher. Eight
-`kernels/src/self_test/<mode>.rs` kernels each run once and write their checks to
-the same numbered slots. Each mode is compiled separately into its own PTX file;
-the CLI embeds the selected modules and loads the appropriate one for each group.
-Each kernel feature enables only its matching logic self-tests and mode dependencies.
-The standalone nonce reproduction uses the kernel-only `repro_nonce_sequence`
-feature; it is not included in mode self-tests.
-Shared primitives and compiler regressions have one
-owner; checks are not duplicated across modes. With all groups enabled, CPU runs report 160 passes with no skips.
+Select by stable name on any backend (repeat `--check` for multiple names):
 
-GPU slot 155 (RSA-PSS end-to-end candidate pipeline) is temporarily disabled and
-reported as SKIP. Its isolated LLVM 21 build took 429 seconds, peaked near 7.1 GiB,
-and produced about 30 MiB of PTX; the combined RSA-PSS self-test could run out of
-memory. These measurements predate the SHA-256 replacement. Slots 135–144 still
-exercise SHA-256, PSS and CRT on GPU; the full slot 155 fixture still runs on CPU.
-With all other checks passing, GPU runs report 156 passes and one skip. Restore
-its kernel call once the compile-time blow-up is resolved.
+```sh
+./target/release/vanity-miner self-test --list
+./target/release/vanity-miner self-test --check p256_public_key.order_minus_one
+```
+
+`--list` prints enabled names and descriptions without initializing a device.
+Unknown or disabled names are errors. Numeric selectors and `--self-test-slot`
+have been removed. CPU execution runs only selected checks; GPU execution runs
+their containing mode kernels and reports the selected checks.
+
+Define each check with `register_self_test!` in its mode's implementation files:
+
+```rust
+register_self_test! {
+    /// p256 order minus one produces negative generator
+    fn order_minus_one() -> u32 {
+        let mut scalar = super::CRYPTO_FIXTURE_P256_ORDER;
+        scalar[31] -= 1;
+        u32::from(
+            crate::crypto::p256::public_point(&black_box(scalar))
+                == Some(super::scalar_fixtures::NEGATIVE_GENERATOR),
+        )
+    }
+}
+```
+
+The macro applies `#[inline(never)]` and uses the doc comment as the description.
+Keep inputs opaque with `black_box` inside the check. The function name supplies
+the final component of its CLI selector; renaming it changes that selector.
+
+`logic/src/self_test/registry.rs` lists each function path once, grouped by mode:
+
+```rust
+p256_public_key ("self_test_p256_public_key", "p256_public_key/mod.rs") {
+    scalar_probes::order_minus_one;
+}
+```
+
+This produces the name `p256_public_key.order_minus_one`. The explicit list owns
+ordering and kernel membership; there is no automatic source-file discovery.
+`registration.rs` generates the `Slot` enum, count, metadata, CPU dispatcher,
+and direct-call runners. Each mode owns its implementations and fixtures;
+shared RSA/P-256 constants live in `known_answers.rs`. Verify generated reference
+fixtures with `python3 scripts/self-test-fixtures.py --check`.
+
+Indices are assigned from the complete registry before feature selection, so
+separately compiled mode kernels agree with the host. Rebuild both host and
+self-test PTX after changing registry order or contents; older externally supplied
+PTX is incompatible. Numeric references in historical validation reports and
+regression comments describe the previous registry.
+
+Eight `kernels/src/self_test/<mode>.rs` kernels write their group's results.
+Each mode is compiled into its own PTX file. Shared primitive checks have one
+owner. The kernel-only `repro_nonce_sequence` feature is outside the registry.
+
+All enabled checks run on CPU. `rsa_pss.end_to_end` is temporarily skipped on GPU;
+its definition carries `#[gpu_skip = "reason"]`, which makes the macro omit its
+device call. Its historical isolated LLVM 21 build took 429 seconds, peaked near
+7.1 GiB, and produced about
+30 MiB of PTX. These measurements predate the SHA-256 replacement. Isolated
+SHA-256, PSS and CRT checks still run. An all-mode GPU run should pass every
+check except this one documented skip. Remove `gpu_skip` once compilation is resolved.
 
 Standalone GPU artifacts are written to `target/llvm21/release/ptx/` (or
 `target/llvm7/release/ptx/`). The selected `self_test_<mode>.ptx` files hold the
@@ -268,16 +311,6 @@ self-tests. Production files are `solana.ptx`, `bitcoin.ptx`, `ethereum.ptx`,
 one feature and contains one kernel entry. There is no combined production PTX.
 To override the embedded self-tests, set `PTX_PATH` to this directory and leave
 `CUBIN_PATH` unset. CuMetal accepts the same directory through `--ptx`.
-
-| Slots | Coverage |
-| --- | --- |
-| 0–117 | Original primitives, pipelines, and compiler regressions |
-| 118–125 | P-256 key derivation, points, encoding, invalid scalars |
-| 126–134 | P-256 signing, RFC 6979, nonce validity, S forms, message carry |
-| 135–144 | SHA-256, MGF1, PSS salt boundaries, CRT and rejection |
-| 145–152 | RSA multiplication, progression, primality, boundaries |
-| 153–156 | Full RSA/P-256 candidate pipelines against fixed CPU references |
-| 157–159 | RSA device range construction, cursor retirement, and factor derivation |
 
 These kernels test candidate logic, not production CUDA argument passing or batch
 buffer layouts. CPU passes and successful CUDA compilation do not establish GPU
@@ -295,4 +328,4 @@ numerical correctness.
 
 Imports follow the folders, for example `logic::modes::p256_public_key_vanity`
 and `logic::search::hex_pattern::HexPattern`. Root compatibility exports are
-removed. Feature selection and self-test slot numbering are unchanged.
+removed. Feature selection is unchanged; self-tests use the named registry described above.

@@ -93,7 +93,7 @@ impl Runner for CpuRunner {
                 )
             }
             #[cfg(feature = "self_test_support")]
-            Command::SelfTest => modes::self_test::cpu::run(),
+            Command::SelfTest(args) => modes::self_test::cpu::run(args),
         }
     }
 }

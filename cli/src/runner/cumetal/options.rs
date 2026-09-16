@@ -22,8 +22,4 @@ pub struct CumetalOptions {
     /// Compare every candidate and the match count with the CPU reference.
     #[arg(long, global = true)]
     pub verify: bool,
-    #[cfg(feature = "self_test_support")]
-    /// Report selected self-test slots; each containing mode kernel still runs in full.
-    #[arg(long, global=true, value_parser=clap::value_parser!(u32).range(0..logic::self_test::SELF_TEST_NUM_CHECKS as i64))]
-    pub self_test_slot: Vec<u32>,
 }

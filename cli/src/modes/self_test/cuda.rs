@@ -5,9 +5,14 @@ use cust::{
     memory::{CopyDestination, DeviceBuffer},
 };
 use std::error::Error;
-pub fn run(ordinal: usize, gpu: &GpuContext) -> Result<(), Box<dyn Error + Send + Sync>> {
+pub fn run(
+    ordinal: usize,
+    gpu: &GpuContext,
+    args: &super::args::SelfTestArgs,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    let cases = args.selected()?;
     let mut cache = self_test::DeviceResults::default();
-    self_test::run(&format!("CUDA {ordinal}"), |case| {
+    self_test::run(&format!("CUDA {ordinal}"), &cases, |case| {
         cache.check(case, || {
             let stream = &gpu.stream;
             let mut results = [self_test::SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];

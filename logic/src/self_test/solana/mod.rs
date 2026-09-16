@@ -1,4 +1,7 @@
 //! solana self-tests: primitives, pipeline stages, and regressions.
+pub(super) mod batch_seed_probes;
+pub(super) mod candidate_probes;
+mod scalar_fixtures;
 use super::IdxProbe;
 use super::bytes_eq_prefix;
 use crate::crypto::ed25519::ed25519_derive_public_key;
@@ -13,7 +16,7 @@ use crate::search::xoroshiro::generate_random_private_key;
 // === Solana per-primitive bisect (slots 0-3) ===
 // The `solana priv` slot ran the *whole* pipeline before checking the priv
 // bytes; if that kernel faulted we couldn't tell which primitive triggered
-// it. These four `check_primitive_*` functions exercise each stage in
+// it. These four `primitive_*` functions exercise each stage in
 // isolation against externally-validated intermediates, so GPU mode can
 // localize a fault to xoroshiro / sha512 / ed25519 / base58.
 
@@ -34,30 +37,38 @@ const SOLANA_PRIMITIVE_PUB: [u8; 32] = [
     0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30, 0x16, 0xbb,
 ];
 
-#[inline(never)]
-pub fn check_primitive_xoroshiro() -> u32 {
-    let priv_key = generate_random_private_key(3, 583437459223573146);
-    (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
+register_self_test! {
+    /// xoroshiro priv
+    fn primitive_xoroshiro() -> u32 {
+        let priv_key = generate_random_private_key(core::hint::black_box(3), core::hint::black_box(583437459223573146));
+        (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_primitive_sha512() -> u32 {
-    let hashed = sha512_32bytes_from_bytes(&SOLANA_PRIMITIVE_PRIV);
-    (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
+register_self_test! {
+    /// sha512 of priv
+    fn primitive_sha512() -> u32 {
+        let hashed = sha512_32bytes_from_bytes(&core::hint::black_box(SOLANA_PRIMITIVE_PRIV));
+        (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_primitive_ed25519() -> u32 {
-    let pub_key = ed25519_derive_public_key(&SOLANA_PRIMITIVE_HASHED_PRIV);
-    (pub_key == SOLANA_PRIMITIVE_PUB) as u32
+register_self_test! {
+    /// ed25519 derive
+    fn primitive_ed25519() -> u32 {
+        let pub_key = ed25519_derive_public_key(&core::hint::black_box(SOLANA_PRIMITIVE_HASHED_PRIV));
+        (pub_key == SOLANA_PRIMITIVE_PUB) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_primitive_base58() -> u32 {
-    let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
-    let mut out = [0u8; 64];
-    let n = base58_encode_32(&SOLANA_PRIMITIVE_PUB, &mut out);
-    (n == expected.len() && bytes_eq_prefix(&out, expected)) as u32
+register_self_test! {
+    /// base58 encode pub
+    fn primitive_base58() -> u32 {
+        let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
+        let mut out = [0u8; 64];
+        let n = base58_encode_32(&core::hint::black_box(SOLANA_PRIMITIVE_PUB), &mut out);
+        (n == expected.len() && bytes_eq_prefix(&out, expected)) as u32
+    }
 }
 
 // === Solana (rng_seed=583437459223573146, thread_idx=3) ===
@@ -69,34 +80,40 @@ fn solana_test() -> SolanaVanityKeyResult {
         thread_idx: 3,
         rng_seed: 583437459223573146,
     };
-    generate_and_check_solana_vanity_key(&req)
+    generate_and_check_solana_vanity_key(&core::hint::black_box(req))
 }
 
-#[inline(never)]
-pub fn check_solana_priv() -> u32 {
-    let expected: [u8; 32] = [
-        0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48, 0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2,
-        0xc4, 0x43, 0xd5, 0x96, 0x56, 0x5f, 0xa0, 0x52, 0x14, 0xb0, 0xff, 0x7c, 0x5a, 0xb5, 0xe7,
-        0x95, 0x6b,
-    ];
-    (solana_test().private_key == expected) as u32
+register_self_test! {
+    /// solana priv
+    fn private_key() -> u32 {
+        let expected: [u8; 32] = [
+            0xfa, 0x9c, 0xe9, 0xb0, 0x2d, 0xc2, 0x8a, 0x48, 0xf7, 0xe9, 0xd1, 0x55, 0x06, 0xd3, 0xd2,
+            0xc4, 0x43, 0xd5, 0x96, 0x56, 0x5f, 0xa0, 0x52, 0x14, 0xb0, 0xff, 0x7c, 0x5a, 0xb5, 0xe7,
+            0x95, 0x6b,
+        ];
+        (solana_test().private_key == expected) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_solana_pub() -> u32 {
-    let expected: [u8; 32] = [
-        0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d, 0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0,
-        0x28, 0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30,
-        0x16, 0xbb,
-    ];
-    (solana_test().public_key == expected) as u32
+register_self_test! {
+    /// solana pub
+    fn public_key() -> u32 {
+        let expected: [u8; 32] = [
+            0x08, 0x9a, 0x23, 0xff, 0xc4, 0x22, 0xf5, 0x3d, 0x11, 0x45, 0x87, 0x01, 0x2b, 0xb2, 0xc0,
+            0x28, 0x49, 0x2f, 0xab, 0xda, 0xbe, 0x12, 0x66, 0xbc, 0x9a, 0xd6, 0x69, 0x8a, 0xc4, 0x30,
+            0x16, 0xbb,
+        ];
+        (solana_test().public_key == expected) as u32
+    }
 }
 
-#[inline(never)]
-pub fn check_solana_encoded() -> u32 {
-    let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
-    let sol = solana_test();
-    (sol.encoded_len == expected.len() && bytes_eq_prefix(&sol.encoded_public_key, expected)) as u32
+register_self_test! {
+    /// solana encoded
+    fn encoded() -> u32 {
+        let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
+        let sol = solana_test();
+        (sol.encoded_len == expected.len() && bytes_eq_prefix(&sol.encoded_public_key, expected)) as u32
+    }
 }
 
 // === Arithmetic primitive bisect (slots 31-40) ===
@@ -106,7 +123,7 @@ pub fn check_solana_encoded() -> u32 {
 // These slots pin down exactly which PTX op is broken so the alpha-compiler
 // regression can be reported against a one-line repro.
 //
-// Pattern: each `check_arith_*` baselines the expected value via a `const`
+// Pattern: each `arith_*` baselines the expected value via a `const`
 // evaluated by the *host* rustc (correct, well-tested code), then runs the
 // same expression at runtime with both operands hidden behind `black_box`
 // so the GPU codegen can't constant-fold. Mismatch on GPU + match on CPU =
@@ -242,90 +259,10 @@ fn make_wrap_named(input: [u8; 32]) -> WrapNamed {
     WrapNamed { bytes }
 }
 
-/// Write only this mode's stable result slots.
-pub fn run(results: &mut [u32]) {
-    results[0] = check_primitive_xoroshiro();
-    results[1] = check_primitive_sha512();
-    results[2] = check_primitive_ed25519();
-    results[3] = check_primitive_base58();
-    results[10] = check_solana_priv();
-    results[11] = check_solana_pub();
-    results[12] = check_solana_encoded();
-    results[31] = check_arith_u32_div_var();
-    results[32] = check_arith_u32_div_const();
-    results[33] = check_arith_u64_div_var();
-    results[34] = check_arith_u64_div_const();
-    results[35] = check_arith_u32_rem_var();
-    results[36] = check_arith_u64_rem_var();
-    results[37] = check_arith_u32_mul_lo();
-    results[38] = check_arith_u64_mul_lo();
-    results[39] = check_arith_u64_mul_hi();
-    results[40] = check_arith_u128_mul();
-    results[41] = check_base58_var_len();
-    results[43] = check_base58_all_zeros();
-    results[46] = check_arith_overflowing_add();
-    results[47] = check_arith_overflowing_sub();
-    results[48] = check_arith_carry_chain_3limb();
-    results[49] = check_arith_widening_mul_pair();
-    results[50] = check_arith_mad_lo_u64();
-    results[51] = check_arith_mad_hi_u64();
-    results[52] = check_arith_mul_wide_u32();
-    results[53] = check_arith_mask_blend_true();
-    results[54] = check_arith_mask_blend_false();
-    results[55] = check_arith_var_shr_u64();
-    results[56] = check_arith_var_shl_u64();
-    results[57] = check_arith_blackbox_identity_u64();
-    results[58] = check_arith_blackbox_identity_u32();
-    results[59] = check_base58_div_by_58();
-    results[60] = check_iter_static_table_lookup();
-    results[61] = check_iter_mut_slice_partial();
-    results[62] = check_iter_mut_alphabet_lookup();
-    results[63] = check_iter_static_slice_lookup();
-    results[64] = check_arith_divrem_by_58_pow_5();
-    results[65] = check_arith_i128_chain_add();
-    results[66] = check_base58_limb_divrem();
-    results[67] = check_dynamic_index_write();
-    results[68] = check_arith_widening_mul_chain_3term();
-    results[69] = check_base58_inner_mutate_phase();
-    results[70] = check_dalek_clamp_integer();
-    results[71] = check_dalek_scalar_round_trip_one();
-    results[72] = check_dalek_mul_base_scalar_one();
-    results[81] = check_arith_u128_imm_shr_52();
-    results[82] = check_static_depth4_newtype_nesting();
-    results[83] = check_reverse_range_write();
-    results[84] = check_dalek_scalar52_from_bytes();
-    results[85] = check_dalek_scalar52_montgomery_reduce_r();
-    results[86] = check_dalek_scalar52_mul_internal_then_reduce_one_r();
-    results[87] = check_dalek_scalar52_as_bytes_one();
-    results[88] = check_dalek_scalar52_sub_no_underflow();
-    results[89] = check_dalek_scalar52_sub_with_underflow();
-    results[90] = check_dalek_scalar52_montgomery_reduce_with_sub();
-    results[91] = check_index_trait_dispatch();
-    results[92] = check_dalek_scalar_one_to_bytes_direct();
-    results[102] = check_dalek_scalar_round_trip_zero();
-    results[103] = check_dalek_scalar_from_bytes_wide_zero();
-    results[105] = check_base58_min_nonzero();
-    results[106] = check_named_field_struct_return();
-    results[107] = check_base58_handrolled_no_seq();
-    results[108] = check_slice_reverse_partial();
-    results[109] = check_dalek_scalar_eq_zero();
-    results[111] = check_dalek_zero_eq_zero();
-    results[112] = check_dalek_from_canonical_zero();
-    results[113] = check_dalek_scalar52_from_bytes_zero();
-    results[114] = check_dalek_scalar52_mul_internal_zero();
-    results[115] = check_dalek_scalar52_montgomery_reduce_zero();
-    results[116] = check_dalek_scalar52_as_bytes_zero();
-    results[117] = check_dalek_reduce_pipeline_zero();
-}
+pub(super) mod base58_probes;
 
-mod base58_probes;
-use base58_probes::*;
+pub(super) mod ed25519_probes;
 
-mod ed25519_probes;
-use ed25519_probes::*;
+pub(super) mod layout_probes;
 
-mod layout_probes;
-use layout_probes::*;
-
-mod arithmetic;
-use arithmetic::*;
+pub(super) mod arithmetic;

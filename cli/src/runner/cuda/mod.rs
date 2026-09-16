@@ -64,7 +64,7 @@ impl GpuRunner {
             control.clone(),
             |ordinal| match command {
                 #[cfg(feature = "self_test_support")]
-                Command::SelfTest => GpuContext::without_module(ordinal),
+                Command::SelfTest(_) => GpuContext::without_module(ordinal),
                 #[allow(unreachable_patterns)]
                 _ => GpuContext::new(
                     ordinal,
@@ -136,7 +136,7 @@ impl GpuRunner {
                     control.clone(),
                 ),
                 #[cfg(feature = "self_test_support")]
-                Command::SelfTest => modes::self_test::cuda::run(ordinal, &gpu),
+                Command::SelfTest(args) => modes::self_test::cuda::run(ordinal, &gpu, args),
             },
         )
     }

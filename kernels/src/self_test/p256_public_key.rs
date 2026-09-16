@@ -1,4 +1,4 @@
-//! p256 public key checks; result slot numbers are stable across backends.
+//! p256 public key checks; result indices come from the shared registry.
 use cuda_std::prelude::*;
 
 #[kernel]
@@ -7,5 +7,5 @@ pub unsafe extern "C" fn kernel_self_test_p256_public_key(results_ptr: *mut u32)
     let results = unsafe {
         core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS)
     };
-    logic::self_test::p256_public_key::run(results);
+    logic::self_test::runners::p256_public_key::run_device(results);
 }

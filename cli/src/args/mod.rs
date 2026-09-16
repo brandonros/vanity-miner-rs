@@ -48,9 +48,9 @@ pub enum Command {
     /// Find better shallenge nonce
     #[cfg(feature = "shallenge")]
     Shallenge(crate::modes::shallenge::args::ShallengeArgs),
-    /// Run on-device self-test (validates PTX codegen against CPU expectations)
+    /// Run known-answer self-tests on the selected backend
     #[cfg(feature = "self_test_support")]
-    SelfTest,
+    SelfTest(crate::modes::self_test::args::SelfTestArgs),
 }
 
 impl Command {
@@ -73,7 +73,7 @@ impl Command {
             #[cfg(feature = "shallenge")]
             Self::Shallenge(args) => args.validate(),
             #[cfg(feature = "self_test_support")]
-            Self::SelfTest => Ok(()),
+            Self::SelfTest(args) => args.selected().map(|_| ()).map_err(Into::into),
         }
     }
 }
@@ -196,12 +196,12 @@ impl Command {
             #[cfg(feature = "shallenge")]
             Self::Shallenge(args) => args.details(),
             #[cfg(feature = "self_test_support")]
-            Self::SelfTest => CommandDetails {
+            Self::SelfTest(_) => CommandDetails {
                 prefix_len: 0,
                 suffix_len: 0,
                 cpu_threads: None,
                 cuda_module: None,
-                description: "Running on-device self-test".into(),
+                description: "Running self-tests".into(),
             },
         }
     }

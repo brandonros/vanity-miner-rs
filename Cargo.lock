@@ -812,6 +812,7 @@ dependencies = [
  "hmac",
  "k256",
  "p256",
+ "paste",
  "rand_core 0.9.3",
  "rand_xoshiro",
  "seq-macro",
