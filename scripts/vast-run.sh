@@ -23,14 +23,14 @@ LLVM_VARIANT (llvm21), LOCAL_BINARY, LOCAL_PTX_DIR, GITHUB_ASSET,
 BATCH_SIZE (optional CUDA candidate count per launch), THREADS_PER_BLOCK (256),
 STACK_SIZE (defaults to 16384 bytes for Bitcoin/Ethereum; other commands use
 the application's per-thread stack limit). Explicit STACK_SIZE overrides win.
-Default local paths: <repo>/target/<LLVM_VARIANT>/release/{vanity-miner,ptx}.
+Default local binary: <repo>/target/runner/release/vanity-miner.
+Default local PTX: <repo>/target/<LLVM_VARIANT>/release/ptx.
 Explicit relative paths are resolved from your current directory.
-GITHUB_ASSET overrides vanity-miner-<remote architecture>-<LLVM_VARIANT>
-(for older releases, e.g. GITHUB_ASSET=vanity-miner-x86_64).
+GITHUB_ASSET overrides vanity-miner-<remote architecture>.
 Rsync uploads both the Linux binary and PTX; they must have matching interfaces.
 Actions mode requires local gh authentication (gh auth login) and rsync.
-It downloads the selected run's artifact for the remote CPU and LLVM_VARIANT,
-uploads its binary, and uses embedded PTX. The artifact must still be available.
+It downloads the selected run's runner for the remote CPU and PTX bundle for
+LLVM_VARIANT, then uploads both. Both artifacts must still be available.
 LLVM 21 PTX targets sm_100 and requires a compatible GPU and driver.
 HELP
 }
@@ -80,7 +80,7 @@ HOST=${HOST:-ssh2.vast.ai}
 REMOTE_USER=${REMOTE_USER:-root}
 LLVM_VARIANT=${LLVM_VARIANT:-llvm21}
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-LOCAL_BINARY=${2:-${LOCAL_BINARY:-$REPO_ROOT/target/$LLVM_VARIANT/release/vanity-miner}}
+LOCAL_BINARY=${2:-${LOCAL_BINARY:-$REPO_ROOT/target/runner/release/vanity-miner}}
 LOCAL_PTX_DIR=${3:-${LOCAL_PTX_DIR:-$REPO_ROOT/target/$LLVM_VARIANT/release/ptx}}
 SSH=(ssh -p "$PORT" "$REMOTE_USER@$HOST")
 VERSION=""
@@ -102,19 +102,24 @@ if [ "$MODE" = actions ]; then
         x86_64|aarch64) ;;
         *) echo "ERROR: unsupported remote architecture: $REMOTE_ARCH" >&2; exit 1 ;;
     esac
-    ACTIONS_ARTIFACT="vanity-miner-$REMOTE_ARCH-$LLVM_VARIANT"
+    ACTIONS_ARTIFACT="vanity-miner-$REMOTE_ARCH"
     DOWNLOAD_DIR=$(mktemp -d)
     trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
     echo "DOWNLOAD :: Actions run $RUN_ID / $ACTIONS_ARTIFACT"
     gh run download "$RUN_ID" --repo brandonros/vanity-miner-rs \
         --name "$ACTIONS_ARTIFACT" --dir "$DOWNLOAD_DIR"
     LOCAL_BINARY="$DOWNLOAD_DIR/$ACTIONS_ARTIFACT"
+    LOCAL_PTX_DIR="$DOWNLOAD_DIR/ptx"
+    gh run download "$RUN_ID" --repo brandonros/vanity-miner-rs \
+        --name "ptx-$LLVM_VARIANT" --dir "$LOCAL_PTX_DIR"
+    tar -C "$LOCAL_PTX_DIR" -xzf "$LOCAL_PTX_DIR/ptx-bundle-$LLVM_VARIANT.tar.gz"
+    rm -- "$LOCAL_PTX_DIR/ptx-bundle-$LLVM_VARIANT.tar.gz"
 fi
 
 if [ "$MODE" != github ]; then
     command -v rsync >/dev/null
     [ -f "$LOCAL_BINARY" ] || { echo "ERROR: binary not found: $LOCAL_BINARY" >&2; exit 1; }
-    if [ "$MODE" = rsync ]; then
+    if [ "$MODE" != github ]; then
         if [ "$PTX_MODULE" = self_test ]; then
             shopt -s nullglob
             PTX_FILES=("$LOCAL_PTX_DIR"/self_test_*.ptx)
@@ -177,7 +182,7 @@ if [ "$MODE" != github ]; then
     banner_local "UPLOAD :: binary via rsync"
     rsync -avz -e "ssh -p $PORT" -- "$LOCAL_BINARY" "$REMOTE_USER@$HOST:vanity-miner.next"
 fi
-if [ "$MODE" = rsync ]; then
+if [ "$MODE" != github ]; then
     banner_local "UPLOAD :: PTX via rsync"
     rsync -avz -e "ssh -p $PORT" -- "$LOCAL_PTX_DIR/" "$REMOTE_USER@$HOST:ptx/"
 fi
@@ -207,9 +212,13 @@ banner() {
 
 if [ "$MODE" = github ]; then
     ARCH=$(uname -m)
-    ASSET=${ASSET:-vanity-miner-$ARCH-$LLVM_VARIANT}
+    ASSET=${ASSET:-vanity-miner-$ARCH}
     banner "DOWNLOAD :: $VERSION / $ASSET"
     curl -fL -o vanity-miner.next "https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/$ASSET"
+    curl -fL -o ptx-bundle.tar.gz "https://github.com/brandonros/vanity-miner-rs/releases/download/$VERSION/ptx-bundle-$LLVM_VARIANT.tar.gz"
+    mkdir -p ptx
+    tar -C ptx -xzf ptx-bundle.tar.gz
+    rm -- ptx-bundle.tar.gz
 fi
 
 banner "PREPARE :: binary"
@@ -230,12 +239,10 @@ killall vanity-miner || true
 mv -f vanity-miner.next vanity-miner
 ls -lh vanity-miner
 
-# Release and Actions binaries use embedded PTX; local mode supplies standalone modules.
-unset CUBIN_PATH PTX_PATH
-if [ "$MODE" = rsync ]; then
-    export PTX_PATH="$HOME/ptx"
-    echo "PTX_PATH=$PTX_PATH"
-fi
+# All deployment modes supply standalone modules matching the runner revision.
+unset CUBIN_PATH
+export PTX_PATH="$HOME/ptx"
+echo "PTX_PATH=$PTX_PATH"
 
 banner "GPU INFO :: nvidia-smi"
 echo "The CUDA Version in nvidia-smi is driver capability, not the installed toolkit."
@@ -253,20 +260,14 @@ fi
 
 banner "BUILD CUDA TOOLKIT + PTX REQUIREMENTS"
 echo "Deployment mode: $MODE; selected variant: $LLVM_VARIANT"
-if [ "$MODE" = rsync ]; then
-    if [ "$PTX_MODULE" = self_test ] || [ -z "$PTX_MODULE" ]; then
-        shopt -s nullglob
-        PTX_INPUTS=("$PTX_PATH"/"${PTX_MODULE}"*.ptx)
-    else
-        PTX_INPUTS=("$PTX_PATH/$PTX_MODULE.ptx")
-    fi
-    echo "Inspecting standalone PTX for ${MINER_ARGS[0]}"
+if [ "$PTX_MODULE" = self_test ] || [ -z "$PTX_MODULE" ]; then
+    shopt -s nullglob
+    PTX_INPUTS=("$PTX_PATH"/"${PTX_MODULE}"*.ptx)
 else
-    PTX_INPUTS=(vanity-miner)
-    echo "Inspecting embedded PTX headers across all modules in the binary."
+    PTX_INPUTS=("$PTX_PATH/$PTX_MODULE.ptx")
 fi
-# Read the actual artifact's compiler headers, including older release builds.
-# -a handles embedded text in ELF; -o prints only matching printable metadata.
+echo "Inspecting standalone PTX for ${MINER_ARGS[0]}"
+# Read the selected modules' compiler headers.
 if [ "${#PTX_INPUTS[@]}" -eq 0 ] || ! LC_ALL=C grep -ahoE 'Cuda compilation tools, release [0-9.]+, V[0-9.]+|\.version[[:blank:]]+[0-9.]+|\.target[[:blank:]]+sm_[0-9]+[a-z]?' "${PTX_INPUTS[@]}" | LC_ALL=C sort -u; then
     echo "No readable PTX metadata found; build toolkit/PTX requirements could not be determined."
 fi

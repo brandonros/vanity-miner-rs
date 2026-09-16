@@ -1,87 +1,94 @@
 # CuMetal issue ownership and fix status
 
-Updated **2026-09-15**. This maps all **13 unresolved vanity-miner issues** to
-their upstream CuMetal work. An implemented compiler fix does not establish that
-the complete downstream workload passes.
+GitHub and commit ancestry audited **2026-09-16, 01:24 UTC**.
+All 13 downstream issues below remain open. This is a map of implementation
+scope and evidence; workload results belong in the [16-row status report](cumetal-status.md)
+and [validation report](cumetal-validation.md).
 
-The last complete [16-row validation](cumetal-status.md) tested CuMetal
-`e5acf8cc0c658142c704ee80e749f5180911fff4`: **3 true / 13 false**. Targeted
-research below tested `92a9b8f4de230199eac617fc57feaf7c0849cf01` (PR #114).
-At the final lock check on **2026-09-15, 20:47 UTC**, the lock had advanced again
-to `7d12f120a6b80a9956588de2b974db5747b35f57` (PR #117). Neither lock advance
-constitutes a new complete local validation run. PR #117's separately reported
-results are attributed explicitly below.
+## Current pin and validation boundary
 
-## What the statuses mean
+- **Consumer pin:** `9e3e61574b776424a96c686bdbdc04ad1f27fe9f` in `flake.lock`
+  ([PR #122](https://github.com/Lulzx/cuda-metal/pull/122)). Git ancestry confirms
+  it includes #114, #117, #121 and their prerequisite stack.
+- **Not in this pin:** [tracing PR #128](https://github.com/Lulzx/cuda-metal/pull/128),
+  head `6b70a1b618c4ab1d80e094991941aa56970aff39`. It is a standalone change on
+  upstream `main`, not a descendant included by #122. Uncommitted #123 work is
+  also outside the locked source.
+- **Last complete measurement, historical:** `e5acf8cc0c65` on 2026-09-15,
+  18:36–18:59 UTC: **3 true / 13 false**. Later targeted translations and
+  compiler-resource investigations do not replace that complete run.
+- **Fresh measurement at `9e3e615`: pending.** Source, PTX and host identities
+  must accompany the new results. The self-tests have since been reorganized;
+  historical group/slot counts are not the current inventory. Changed PTX must
+  be identified separately from the retained original reproductions.
 
-**PR publication, implementation coverage, and complete GPU validation are
-separate facts.** The earlier labels “required fix not implemented” and “partial”
-did not tell you whether anyone had started coding.
+## Read the statuses separately
 
-| Explicit status | Meaning | What it does not establish |
-| --- | --- | --- |
-| **No published fix PR** | No upstream patch implementing this remaining case was identified. | That nobody has started. Research or local code may already exist. |
-| **Active local implementation; no PR yet** | Work is underway, supported by an agent's report or inspected changes. | That the patch is complete, reviewed, or tested successfully. |
-| **Earlier PR covers narrower cases** | The earlier patch implements a real correction, while this newly identified case is outside its coverage. | That the earlier work did nothing, or that the remaining case already has a follow-up patch. |
-| **Fix proposed in a PR** | A published implementation exists. Its exact test evidence determines what it establishes. | That merging the PR makes every dependent workload pass. |
-| **Identified blocker cleared; later blocker remains** | The relevant artifact passes that stage and reaches another failure. | That the first fix is incomplete merely because a different defect remains. |
-| **Complete workload verified** | The unchanged workload executes and passes its required GPU/CPU checks on an identified build. | Exhaustive correctness outside that recorded coverage. |
+| Status | What it establishes |
+| --- | --- |
+| **No published fix PR** | The live issue/PR audit found no patch for that remaining case. It does not establish that nobody has started locally. |
+| **Local WIP; no PR** | An explicitly reported unpublished implementation exists. It is outside the pin unless committed and selected. |
+| **PR proposed / included** | Code exists in a published PR; the separate inclusion column says whether this build contains it. Neither means the full workload passes. |
+| **Blocker cleared; next failure remains** | An identified artifact passes the fixed stage and reaches another failure. Preserve the first fix's scope and name the next owner. |
+| **Workload verified** | The identified workload completes GPU execution and its required result/guard/CPU checks. Emitted Metal or successful module-handle creation is insufficient. |
 
-“No published fix PR” is an audit of public work, not an assertion that no local
-branch exists. “Not started” should be used only when the assigned owner confirms
-that. None of the 13 downstream workloads has a complete passing result in the
-recorded evidence.
+All PRs named as current fixes below are open drafts at this audit. “Included”
+means present in the locked contribution stack, not merged into upstream `main`.
+Do not label a workload “solved” merely because its original error disappeared.
 
-## Matrix
+## Downstream-to-upstream matrix
 
-**GitHub checked 2026-09-15, 21:12 UTC:** 69 issues and 51 PRs, including open and
-closed entries. The newest published PR was #117. Agent activity below is
-explicitly attributed to the user's report; no implementation work was launched
-by this status audit.
+The evidence column summarizes **previously recorded, identified artifacts**;
+it is not the pending fresh measurement. Completion requires each current
+production mode's verification or every enabled self-test belonging to its group,
+with intentional skips reported separately.
 
-| Vanity-miner issue | CuMetal owner | Published PR coverage | Work state / remaining gap | Downstream completion still required |
+| Vanity-miner issue | Upstream owner(s) | Published implementation | Included in `9e3e615`? | Latest evidence and remaining work |
 | --- | --- | --- | --- | --- |
-| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 — conversion/join types](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for the remaining conversion-destination fix.** Related #50/#56/#75 cover narrower cases. | Diagnosed; coding start for this remaining case is not established. #76 already includes the expanded acceptance. | Correct destination inference before SSA, translate unchanged PTX, and complete CPU-verified GPU batches. |
-| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for this remaining gap.** Same shared work as #23. | One upstream implementation task, with separate downstream validation. | Retest this exact artifact and complete verified GPU batches. |
-| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for this remaining gap.** Same shared work as #23. | One upstream implementation task, with separate downstream validation. | Retest this exact artifact and complete verified GPU batches. |
-| [#26 — P-256 signature production](https://github.com/brandonros/vanity-miner-rs/issues/26) | [#83 — predicate threading](https://github.com/Lulzx/cuda-metal/issues/83) | [PR #85](https://github.com/Lulzx/cuda-metal/pull/85) covers original cases; **no published empty-label follow-up**. | Expanded scope remains uncovered. Coordinate with the active CFG owner; do not assume its depth-cap change also fixes consecutive labels. | Preserve predicate facts across empty label blocks and validate both search sources. |
-| [#27 — RSA modulus production](https://github.com/brandonros/vanity-miner-rs/issues/27) | [#119 — generation completion](https://github.com/Lulzx/cuda-metal/issues/119) | **No fix PR.** | Research established the active generation stage; the GPU wait's cause and corrective patch remain unproved. | Diagnose the wait, then complete the four-stage pipeline and verified cycles. |
-| [#28 — RSA-PSS production](https://github.com/brandonros/vanity-miner-rs/issues/28) | Earlier [#96](https://github.com/Lulzx/cuda-metal/issues/96)/[#109](https://github.com/Lulzx/cuda-metal/issues/109)/[#111](https://github.com/Lulzx/cuda-metal/issues/111) → [#115 — Metal compilation time](https://github.com/Lulzx/cuda-metal/issues/115) | #108/#110/#112 clear earlier translation blockers. **No fix PR for #115.** | Earlier scoped fixes work on the tested full PTX; the later compilation problem needs research and a correction. | Complete Metal compilation, GPU execution and CPU verification for salt and message search. |
-| [#29 — Solana self-tests](https://github.com/brandonros/vanity-miner-rs/issues/29) | [#46](https://github.com/Lulzx/cuda-metal/issues/46), [#116 — trap-call expansion](https://github.com/Lulzx/cuda-metal/issues/116) | Earlier #62; current [draft PR #117](https://github.com/Lulzx/cuda-metal/pull/117). | Published implementation. PR #117 reports full PTX translation; full GPU checks are not established. | Validate the proposed stack through all 72 checks. |
-| [#30 — Bitcoin self-tests](https://github.com/brandonros/vanity-miner-rs/issues/30) | [#113 — pointer fields](https://github.com/Lulzx/cuda-metal/issues/113) → [#116](https://github.com/Lulzx/cuda-metal/issues/116) | [#114](https://github.com/Lulzx/cuda-metal/pull/114) clears pointer errors; [#117](https://github.com/Lulzx/cuda-metal/pull/117) clears expansion. **No fix PR for the subsequent Metal compilation wait.** | PR #117 reports full PTX translation and a compilation wait exceeding ten minutes. This later problem needs diagnosis/ownership; shared symptoms do not prove it is #115's cause. | Complete compilation and all 33 checks; assign the later failure explicitly before treating the workload as resolved. |
-| [#31 — Ethereum self-tests](https://github.com/brandonros/vanity-miner-rs/issues/31) | [#46](https://github.com/Lulzx/cuda-metal/issues/46), [#116](https://github.com/Lulzx/cuda-metal/issues/116) | [Draft PR #117](https://github.com/Lulzx/cuda-metal/pull/117). | Published implementation; full PTX translation reported, GPU checks pending. | Validate all five checks. |
-| [#32 — P-256 public-key self-tests](https://github.com/brandonros/vanity-miner-rs/issues/32) | [#46](https://github.com/Lulzx/cuda-metal/issues/46), [#116](https://github.com/Lulzx/cuda-metal/issues/116) | [Draft PR #117](https://github.com/Lulzx/cuda-metal/pull/117). | Published implementation; full PTX translation reported, GPU checks pending. | Validate all nine checks. |
-| [#33 — P-256 signature self-tests](https://github.com/brandonros/vanity-miner-rs/issues/33) | Broad [#83](https://github.com/Lulzx/cuda-metal/issues/83); specific [#120 — eight-block guard limit](https://github.com/Lulzx/cuda-metal/issues/120) | Earlier [#85](https://github.com/Lulzx/cuda-metal/pull/85); **no published #120 PR yet**. | **Active local implementation by the user's other agent.** New #120 documents the depth-cap case. Do not assign a second competing CFG patch. | Verify the final patch against unchanged PTX, retain genuine-undefined-path rejection, and execute all ten checks. |
-| [#34 — RSA modulus self-tests](https://github.com/brandonros/vanity-miner-rs/issues/34) | Earlier [cuda-metal #35](https://github.com/Lulzx/cuda-metal/issues/35); active shared investigation [#120](https://github.com/Lulzx/cuda-metal/issues/120) | Earlier [#57](https://github.com/Lulzx/cuda-metal/pull/57); **no published follow-up PR yet**. | Other agent reports the same depth cap clears the undefined-register stage. Confirm on the final unchanged artifact before treating the older masked-payload proposal as a separate required patch. | Resolve any subsequent type failures and execute all 12 checks. |
-| [#35 — RSA-PSS self-tests](https://github.com/brandonros/vanity-miner-rs/issues/35) | [#118 — mixed local-vector pointers](https://github.com/Lulzx/cuda-metal/issues/118) → related [#116](https://github.com/Lulzx/cuda-metal/issues/116) | **No fix PR for #118.** #108/#114 implement different pointer cases; #117 addresses subsequent trap work. | First defect isolated and ready for implementation. A diagnostic scalar reload removes 63 errors and exposes a later expansion failure; test the combined fixes rather than assuming #117 covers that case. | Translate unchanged full PTX, execute ten enabled checks and report the intentional skip. |
+| [#23 — Solana production](https://github.com/brandonros/vanity-miner-rs/issues/23) | [#76 — conversion/join types](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for the remaining destination/normalized-definition/join work.** #50/#56/#75 cover narrower cases. | Earlier PRs only. | Historical `e5acf8` type failure. Implement destination inference before SSA and preserve definition/join types; then translate and CPU-verify batches. |
+| [#24 — Bitcoin production](https://github.com/brandonros/vanity-miner-rs/issues/24) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for this remaining gap.** Shared implementation with #23/#25. | Earlier PRs only. | Historical widened-offset/pointer-subtraction failure. Retest this artifact separately after the shared type correction. |
+| [#25 — Ethereum production](https://github.com/brandonros/vanity-miner-rs/issues/25) | [#76](https://github.com/Lulzx/cuda-metal/issues/76) | **No PR for this remaining gap.** Shared implementation with #23/#24. | Earlier PRs only. | Same historical diagnostic class as Bitcoin; needs its own verified GPU batches. |
+| [#26 — P-256 signature production](https://github.com/brandonros/vanity-miner-rs/issues/26) | [#83 — empty labels/predicate facts](https://github.com/Lulzx/cuda-metal/issues/83) | #85 implements original predicate cases; **no empty-label follow-up PR**. | #85 and #121 included; #121 changes a different depth case. | Historical consecutive-label failure. Preserve facts through empty blocks and validate both message and ephemeral searches; do not count #121 as this fix. |
+| [#27 — RSA modulus production](https://github.com/brandonros/vanity-miner-rs/issues/27) | [#119 — generation completion](https://github.com/Lulzx/cuda-metal/issues/119) | **No fix PR.** | No completion fix. | Historical host generation launch waits during device synchronization after pipeline creation. Actual pending-command identity/cause is unproved. Diagnose it and complete verified four-stage cycles. |
+| [#28 — RSA-PSS production](https://github.com/brandonros/vanity-miner-rs/issues/28) | Earlier #96/#109/#111 → [#115 — Metal compilation time](https://github.com/Lulzx/cuda-metal/issues/115) | #108/#110/#112 clear translation; [#128](https://github.com/Lulzx/cuda-metal/pull/128) adds **diagnostics only**. **No performance fix PR.** | Translation fixes yes; #128 **no**. | Historical full PTX emits MSL; salt/message searches time out while sampled in Metal compilation. Establish and correct the resource bottleneck, then verify both searches. |
+| [#29 — Solana self-tests](https://github.com/brandonros/vanity-miner-rs/issues/29) | [#46](https://github.com/Lulzx/cuda-metal/issues/46) / [#116 — trap helpers](https://github.com/Lulzx/cuda-metal/issues/116) | [#117](https://github.com/Lulzx/cuda-metal/pull/117) preserves trap-capable helper calls. | **Yes.** | PR #117 reports retained full-module translation. Current group preparation/execution/results still require the fresh run. |
+| [#30 — Bitcoin self-tests](https://github.com/brandonros/vanity-miner-rs/issues/30) | [#113 — pointer fields](https://github.com/Lulzx/cuda-metal/issues/113) → [#116](https://github.com/Lulzx/cuda-metal/issues/116); later compile wait **unassigned** | [#114](https://github.com/Lulzx/cuda-metal/pull/114), then [#117](https://github.com/Lulzx/cuda-metal/pull/117). **No correction for the subsequent wait.** | **Yes**, both scoped fixes. | #117 reports translation, followed by >10 minutes in Metal compilation. Compare with #115/#124 without assuming the same cause; assign a demonstrated later defect and execute the group. |
+| [#31 — Ethereum self-tests](https://github.com/brandonros/vanity-miner-rs/issues/31) | [#46](https://github.com/Lulzx/cuda-metal/issues/46) / [#116](https://github.com/Lulzx/cuda-metal/issues/116) | [#117](https://github.com/Lulzx/cuda-metal/pull/117). | **Yes.** | Retained full-module translation reported by #117; current complete GPU validation pending. |
+| [#32 — P-256 public-key self-tests](https://github.com/brandonros/vanity-miner-rs/issues/32) | [#46](https://github.com/Lulzx/cuda-metal/issues/46) / [#116](https://github.com/Lulzx/cuda-metal/issues/116) | [#117](https://github.com/Lulzx/cuda-metal/pull/117). | **Yes.** | Retained full-module translation reported by #117; current complete GPU validation pending. |
+| [#33 — P-256 signature self-tests](https://github.com/brandonros/vanity-miner-rs/issues/33) | [#120 — guard depth](https://github.com/Lulzx/cuda-metal/issues/120), within [#83](https://github.com/Lulzx/cuda-metal/issues/83)'s broader scope; later types **unassigned** | [#121](https://github.com/Lulzx/cuda-metal/pull/121) removes the redundant eight-block cap. | **Yes.** | #121 reports `%rs506` cleared, then independent type-provenance diagnostics. Capture/reduce the next error before assigning it to #76/#118 or another issue. No full numerical pass. |
+| [#34 — RSA modulus self-tests](https://github.com/brandonros/vanity-miner-rs/issues/34) | [cuda-metal #35 — masked payloads](https://github.com/Lulzx/cuda-metal/issues/35) → [#124 — Metal allocation failure](https://github.com/Lulzx/cuda-metal/issues/124); proposed optimization [#127](https://github.com/Lulzx/cuda-metal/issues/127). Changed outlined input: [#123](https://github.com/Lulzx/cuda-metal/issues/123)/[#125](https://github.com/Lulzx/cuda-metal/issues/125). | [#122](https://github.com/Lulzx/cuda-metal/pull/122) clears masked-payload SSA. **No resource/PRMT fix PR.** #123 is unpublished local WIP. | #122 **yes**; later work **no**. | Original PTX translates to 53.6 MB MSL, then Apple compilation aborts. Outlining changes PTX and exposes helper-global defects; it is not an original-input fix. Measure #127 and verify the current group separately. |
+| [#35 — RSA-PSS self-tests](https://github.com/brandonros/vanity-miner-rs/issues/35) | [#118 — mixed local-vector pointer lanes](https://github.com/Lulzx/cuda-metal/issues/118); subsequent trap work related to [#116](https://github.com/Lulzx/cuda-metal/issues/116) | **No PR for #118.** #108/#114 cover other pointer cases; #117 covers trap helpers. | Related PRs yes; mixed-lane correction **no**. | Historical unchanged PTX has 63 pointer diagnostics. A modified scalar-load probe clears them and exposes expansion; unchanged input plus combined fixes and complete enabled-check validation remain required. |
 
-## Scope changes and agent assignment
+## Additional upstream work and boundaries
 
-- **Already expanded:** #76, #83 and upstream #35 explicitly include remaining
-  cases beyond earlier PRs. Their presence does not mean those earlier PRs
-  promised or implemented the added cases.
-- **Separate later blockers:** #115, #118 and #119 have their own owners. #120
-  now provides a more specific owner for active guard-depth work. The Bitcoin
-  Metal-compilation wait still needs a confirmed owner or a justified extension
-  of an existing investigation.
-- **Resolve overlap before assigning:** #46/#116 describe related trap work now
-  addressed by PR #117. #83/upstream #35/#120 may overlap on the active CFG fix.
-  Keep that work with the existing agent until its exact artifact results define
-  what remains; do not launch one competing implementation per issue number.
+| Upstream issue | State at audit | Why it matters / what remains |
+| --- | --- | --- |
+| [#123 — helper global arguments](https://github.com/Lulzx/cuda-metal/issues/123) | **Local WIP; no commit/PR.** Public handoff records code and focused tests outside the pin. | Changed, outlined RSA input needs globals threaded through helper signatures/calls. Exact source translation clears the symbol error, but later Apple allocation aborts remain; full baseline gates and publication are pending. |
+| [#125 — helper-only registration globals](https://github.com/Lulzx/cuda-metal/issues/125) | **No fix PR.** | Separate metadata traversal defect: reachable helper-only globals miss initialization/persistence. The #123 small GPU fixture retains a direct entry reference to bypass this gap. |
+| [#124 — Metal allocation failure](https://github.com/Lulzx/cuda-metal/issues/124) | **Research; no demonstrated fix.** | Original monolithic and changed outlined artifacts must retain separate results. A successful `cuModuleLoad` does not prove either source compiled. |
+| [#127 — constant byte-shuffle specialization](https://github.com/Lulzx/cuda-metal/issues/127) | **Optimization not implemented; no PR.** | First concrete experiment for #124: immediate `prmt.b32` currently creates 66 values per shuffle. Its sequences occupy 35.55% of the retained RSA entry's source bytes; neither speedup nor crash correction is established. |
+| [#115 / tracing PR #128](https://github.com/Lulzx/cuda-metal/pull/128) | **Diagnostic implementation proposed; outside pin.** Performance remains unresolved. | Adds opt-in compilation spans; an end record means scope exit, including failure. New tests pass, but wider Release/selected Debug failures are documented. It neither supplies #126 nor fixes #124. |
+| [#126 — explicit function preparation](https://github.com/Lulzx/cuda-metal/issues/126) | **Missing APIs; no fix PR.** | Add `cuFuncLoad`/`cuFuncIsLoaded` with shared preparation, readiness, errors and lifecycle tests. Preparation success remains separate from GPU results and hidden-buffer correctness. |
 
-For a future swarm, assign one owner each to conversion types (#76), mixed-vector
-pointer recovery (#118), RSA-PSS compilation research (#115), RSA generation
-research (#119), and the existing CFG work (#120 and related cases). A single
-integration owner should manage the consumer pin, combined builds and serialized
-GPU validation. Workers should exchange exact commits, PTX hashes, confirmed
-scope, next blockers and test outcomes. The two compilation waits can be compared
-without prematurely declaring one root cause.
+## Shared fixes and next assignments
 
-PR #117's results in this matrix are its author's reports, outside the complete
-`e5acf8` run and targeted `92a9b8` research. The current consumer pin contains
-#117, but pinning alone does not supply a complete passing validation result.
+- **One type-inference owner:** downstream #23–25 share #76. Coordinate its
+  importer result-type edits with #118's per-lane pointer work.
+- **One CFG owner:** #121 and #122 are separate implemented fixes, not duplicate
+  repairs. Remaining #83 empty-label work must preserve both sets of regressions.
+- **One helper-call owner:** #117 serves #29–32; #123/#125 are subsequent
+  compiler/registration work on helpers with globals.
+- **Separate resource investigations:** #115 (RSA-PSS compilation), #124 (RSA
+  self-test allocation failure), and #119 (production command completion) have
+  different observed stages. Similar symptoms alone do not establish duplicates.
+- **One integration owner:** control the pin, pair compiler/runtime artifacts,
+  preserve PTX identities and serialize GPU measurements. A fresh result should
+  name the next failure stage without rewriting a scoped fix as a workload pass.
 
-## Targeted research: RSA modulus production (#27)
+The research below preserves earlier evidence. It is not a new execution result
+on the current source or a current slot inventory.
+
+## Historical research: RSA modulus production (#27)
 
 [Upstream #119](https://github.com/Lulzx/cuda-metal/issues/119) owns the execution
 investigation. Disassembly of the exact retained host executable identifies
@@ -115,7 +122,7 @@ Completion still requires the original four-stage pipeline and verified cycles.
 - Generation MSL SHA-256: `5de9a0b3bf2a349523f5ff2bb5695cb58134f9fb06f23821514841f83caad1e8`.
 - Local evidence: `.cumetal-artifacts/ownership-research-20260915/issue-27/`.
 
-## Targeted research: RSA-PSS self-tests (#35)
+## Historical research: RSA-PSS self-tests (#35)
 
 On **2026-09-15**, the unchanged full PTX was translated with the immutable
 `92a9b8f4de23` compiler. It failed with the same **63 diagnostics** as `e5acf8cc0c65`,
@@ -133,8 +140,8 @@ trap call expansion exceeds bounded CFG size (calls=1, blocks=11836, operations=
 
 This is strong evidence for the first defect and evidence of a subsequent
 blocker. The changed-input diagnostic is not a compiler fix or a GPU pass.
-The later PR #117 must be tested against this RSA-PSS case after pointer recovery
-is corrected. [Upstream #118](https://github.com/Lulzx/cuda-metal/issues/118)
+PR #117 is now included in the consumer pin, but must still be tested against
+this RSA-PSS case after pointer recovery is corrected. [Upstream #118](https://github.com/Lulzx/cuda-metal/issues/118)
 contains the public reproducer, controlled comparisons, implementation scope,
 and acceptance criteria.
 

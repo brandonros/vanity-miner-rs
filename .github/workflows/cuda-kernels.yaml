@@ -1,0 +1,71 @@
+name: cuda-kernels
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  ptx:
+    name: PTX LLVM ${{ matrix.llvm }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - llvm: 7
+            extra-features: ""
+          - llvm: 21
+            extra-features: ",llvm21"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+        with:
+          use-flakehub: false
+
+      - name: Restore Cargo cache
+        id: cargo-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: miner-ptx-llvm${{ matrix.llvm }}-v1-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            miner-ptx-llvm${{ matrix.llvm }}-v1-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
+
+      - name: Compile PTX with nix devshell
+        env:
+          BUILD_FEATURES: cuda-kernels,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature${{ matrix.extra-features }}
+        run: |
+          # cargo check runs build.rs (including kernel compilation) without
+          # linking an unused host executable. Runners load these modules at runtime.
+          nix develop .#v${{ matrix.llvm }} --command cargo check -p vanity-miner --features "$BUILD_FEATURES" --release --locked
+
+          mkdir -p artifacts
+          tar -C target/llvm${{ matrix.llvm }}/release/ptx -czf artifacts/ptx-bundle-llvm${{ matrix.llvm }}.tar.gz .
+
+      - name: Upload PTX bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptx-llvm${{ matrix.llvm }}
+          path: artifacts/ptx-bundle-llvm${{ matrix.llvm }}.tar.gz
+          if-no-files-found: error
+
+      - name: Save Cargo cache even after compilation failures
+        if: ${{ !cancelled() && steps.cargo-cache.outcome == 'success' && steps.cargo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ steps.cargo-cache.outputs.cache-primary-key }}

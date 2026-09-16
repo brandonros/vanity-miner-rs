@@ -39,11 +39,20 @@ nix develop .#v21 --command cargo build -p vanity-miner --release --locked --no-
 ./target/llvm21/release/vanity-miner solana-vanity --prefix aaa
 
 # LLVM 7, compute_89
-nix develop .#v7 --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,solana,self_test
+nix develop .#v7 --command cargo build -p vanity-miner --release --locked --no-default-features --features cuda-kernels,solana,self_test
 ./target/llvm7/release/vanity-miner self-test
 ```
 
-The default Nix shell is `v21`. PTX is compiled and embedded during the build.
+The default Nix shell is `v21`. `cuda-kernels` compiles and embeds PTX;
+`llvm21` enables it automatically. `gpu` alone builds a runner without kernels:
+
+```sh
+nix develop .#runner --command cargo build -p vanity-miner --release --locked --features gpu,solana,self_test
+PTX_PATH=/path/to/extracted/ptx ./target/runner/release/vanity-miner self-test
+```
+
+The runner works with either LLVM bundle; select PTX for your GPU and use the
+same source revision for runner and kernels.
 For build profiling, set `NVVM_TIMING_DIR` to an absolute log directory and add
 `--timings -vv` to the Cargo command. Rust-CUDA writes live phase logs and rustc
 self-profiles there; Cargo saves HTML timing reports under each target directory's
@@ -64,8 +73,7 @@ the block count, with excess lanes exiting immediately.
 `BATCH_SIZE` overrides the candidate count per launch (1–1048576);
 finite ranges use partial final batches. `vast-run.sh` forwards this setting.
 The default stack is 64 KiB; `STACK_SIZE` overrides it. Multi-GPU throughput and
-the new scheduling behavior still require hardware validation. CI builds LLVM 7 and 21 for both
-Linux host architectures.
+the new scheduling behavior still require hardware validation. CI builds one runner per Linux host architecture and one PTX bundle per LLVM version.
 
 RSA modulus search generates p candidates, constructs constrained q ranges,
 tests factors, and advances persistent tasks on the GPU. Short ranges from many
@@ -311,6 +319,14 @@ self-tests. Production files are `solana.ptx`, `bitcoin.ptx`, `ethereum.ptx`,
 one feature and contains one kernel entry. There is no combined production PTX.
 To override the embedded self-tests, set `PTX_PATH` to this directory and leave
 `CUBIN_PATH` unset. CuMetal accepts the same directory through `--ptx`.
+
+Two independent CI workflows run on pull requests, pushes to `main`/`master`,
+and manual dispatches. `cuda-runners.yaml` builds two runners (x86_64 and aarch64)
+without kernel compilation or embedded PTX. `cuda-kernels.yaml` builds two
+CPU-independent PTX bundles (LLVM 7 and LLVM 21). Each workflow uploads its own
+Actions artifacts; neither calls the other or publishes a release. Download a
+runner and kernel bundle built from the same source revision, extract the bundle,
+and set `PTX_PATH` to its directory at runtime.
 
 These kernels test candidate logic, not production CUDA argument passing or batch
 buffer layouts. CPU passes and successful CUDA compilation do not establish GPU

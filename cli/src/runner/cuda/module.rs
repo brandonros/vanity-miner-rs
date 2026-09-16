@@ -1,11 +1,17 @@
 use cust::module::Module;
 use cust_raw::driver_sys;
 use std::error::Error;
-use std::ffi::{CStr, CString, c_void};
+use std::ffi::{c_void, CStr, CString};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
+#[cfg(feature = "cuda-kernels")]
 include!(concat!(env!("OUT_DIR"), "/kernel_ptx.rs"));
+
+#[cfg(not(feature = "cuda-kernels"))]
+fn embedded_ptx(_name: &str) -> Option<&'static str> {
+    None
+}
 
 pub(crate) fn load_module(
     ordinal: usize,
@@ -41,7 +47,8 @@ pub(crate) fn load_module(
             std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
         &ptx_owned
     } else {
-        embedded_ptx(name).ok_or("production PTX module not enabled")?
+        embedded_ptx(name)
+            .ok_or("PTX module unavailable; set PTX_PATH to the matching extracted kernel bundle")?
     };
     let module = load_ptx_with_log(ordinal, ptx)?;
     println!("[{ordinal}] Module loaded");
@@ -72,7 +79,9 @@ pub(crate) fn load_self_test_module(
         owned = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
         &owned
     } else {
-        embedded_ptx(name).ok_or("unknown self-test module")?
+        embedded_ptx(name).ok_or(
+            "self-test PTX unavailable; set PTX_PATH to the matching extracted kernel bundle",
+        )?
     };
     load_ptx_with_log(ordinal, ptx)
 }

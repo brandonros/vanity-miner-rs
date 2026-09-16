@@ -1,7 +1,13 @@
 fn main() {
+    // On Windows, nanorand's entropy uses SystemFunction036 (RtlGenRandom) from advapi32.
+    // Explicitly link it so the MSVC linker resolves the symbol (avoids LNK2019 when
+    // mixing CRTs or with certain link orders).
+    #[cfg(all(feature = "gpu", target_os = "windows"))]
+    println!("cargo:rustc-link-lib=advapi32");
+
     println!("cargo::rerun-if-changed=build.rs");
 
-    #[cfg(feature = "gpu")]
+    #[cfg(feature = "cuda-kernels")]
     build_gpu();
 
     #[cfg(feature = "cumetal")]
@@ -30,18 +36,12 @@ fn pin_cumetal() {
     );
 }
 
-#[cfg(feature = "gpu")]
+#[cfg(feature = "cuda-kernels")]
 fn build_gpu() {
     use std::env;
     use std::path::PathBuf;
 
     use cuda_builder::{CudaBuilder, NvvmArch};
-
-    // On Windows, nanorand's entropy uses SystemFunction036 (RtlGenRandom) from advapi32.
-    // Explicitly link it so the MSVC linker resolves the symbol (avoids LNK2019 when
-    // mixing CRTs or with certain link orders).
-    #[cfg(target_os = "windows")]
-    println!("cargo:rustc-link-lib=advapi32");
 
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let workspace_dir = manifest_dir.parent().unwrap();

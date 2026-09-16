@@ -24,6 +24,31 @@
       };
       cumetalPackage = darwinPkgs.callPackage ./nix/cumetal.nix { source = cumetal; };
 
+      # Host runners link the CUDA driver API but never build Rust-CUDA codegen.
+      mkRunnerShell = system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+            overlays = [ rust-overlay.overlays.default ];
+          };
+          compatPkgs = import nixpkgs-llvm7 { inherit system; };
+          cudaRoot = pkgs.cudaPackages_12_9.cudatoolkit;
+          toolchain = pkgs.rust-bin.fromRustupToolchain {
+            inherit ((builtins.fromTOML (builtins.readFile ./rust-toolchain.toml)).toolchain) channel;
+            profile = "minimal";
+          };
+        in compatPkgs.mkShell {
+          nativeBuildInputs = [ toolchain pkgs.patchelf compatPkgs.llvmPackages.clang ];
+          # cust_raw uses bindgen for CUDA driver headers; no NVVM backend needed.
+          LIBCLANG_PATH = "${compatPkgs.lib.getLib compatPkgs.llvmPackages.libclang}/lib";
+          CUDA_PATH = "${cudaRoot}";
+          CUDA_LIBRARY_PATH = "${cudaRoot}/lib:${cudaRoot}/lib64:${cudaRoot}/lib/stubs:${cudaRoot}/lib64/stubs";
+          shellHook = ''
+            export CARGO_TARGET_DIR="$PWD/target/runner"
+          '';
+        };
+
       mkDevShell = system: version:
         let
           # allowUnfree is required because CUDA is unfree.
@@ -128,6 +153,7 @@
     {
       packages.aarch64-darwin.cumetal = cumetalPackage;
       devShells = (forAllSystems (system: {
+        runner = mkRunnerShell system;
         default = mkDevShell system 21;
         v7 = mkDevShell system 7;
         v21 = mkDevShell system 21;
