@@ -9,7 +9,7 @@
     # Cumulative contribution series; flake.lock selects the exact tested commit.
     # Include the VF64 submodule in the immutable source closure.
     cumetal = {
-      url = "git+https://github.com/brandonros/cuda-metal?ref=upstream/ptx-ssa-type-contract&submodules=1";
+      url = "git+https://github.com/brandonros/cuda-metal?ref=upstream/ptx-same-base-address-cancellation&submodules=1";
       flake = false;
     };
   };

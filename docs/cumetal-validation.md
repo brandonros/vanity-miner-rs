@@ -1,17 +1,25 @@
 # CuMetal validation — 2026-09-16
 
-**Historical full 16-workload sweep below: CuMetal `9e3e615`.** The current
+**Historical full 16-workload sweep below: CuMetal `9e3e615`.** The earlier
 [three-mode run on `0242f22`](cumetal-three-mode-validation.md) passes Solana,
 Bitcoin and Ethereum production with **both LLVM7 and LLVM21 PTX**: 24 invocations,
 48 GPU batches, 1,536 CPU-verified candidate positions. #23–25 were closed as
 completed on 2026-09-16 after publishing this evidence. No fresh
 full-sweep total is claimed. See the [issue matrix](cumetal-issue-matrix.md).
 
+**Current-pin Shallenge production follow-up on `4a207e2`: both LLVM7 and LLVM21
+pass all 33 profiles per version** (66 invocations / 132 GPU batches / 4,224
+CPU-reference-checked positions / 96 independently verified winner hashes).
+[PR #132](https://github.com/Lulzx/cuda-metal/pull/132) implements upstream #129;
+its scoped acceptance passes and upstream integration remains pending.
+Downstream #38 is closed. See the [Shallenge report](cumetal-shallenge-validation.md).
+The other workloads were not rerun at this pin; Shallenge self-test #37 is separate.
+
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
 The newer `afe80210` LLVM21 RSA PTX first fails at unsupported `clz.b64`
-on measured `c4e5fac`; RSA was not rerun on `0242f22`. See
+on measured `c4e5fac`; RSA was not rerun on `4a207e2`. See
 [the mining design and checks](gpu-search-pipeline.md).
 
 ## Historical results (`9e3e615`)
