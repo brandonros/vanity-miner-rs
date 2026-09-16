@@ -51,6 +51,38 @@ nix develop .#runner --command cargo build -p vanity-miner --release --locked --
 PTX_PATH=/path/to/extracted/ptx ./target/runner/release/vanity-miner self-test
 ```
 
+Each PTX module owns its build under `kernels/<module>/`: `build.rs` compiles the
+nested `device/` crate, and `src/lib.rs` exposes the resulting PTX to the CLI.
+Production and self-tests are separate sibling packages, such as
+`kernels/bitcoin/` and `kernels/self-test-bitcoin/`.
+Kernel packages can also be built independently, without compiling the CLI:
+
+```sh
+# Solana production PTX only, LLVM 21
+nix develop .#v21 --command cargo build -p kernel-solana --release --locked --features llvm21
+
+# Bitcoin production and self-test PTX, LLVM 7
+nix develop .#v7 --command cargo build -p kernel-bitcoin -p kernel-self-test-bitcoin --release --locked
+
+# Solana self-test PTX only, LLVM 21
+nix develop .#v21 --command cargo build -p kernel-self-test-solana --release --locked --features llvm21
+```
+
+Each kernel package defaults to `cuda` and produces exactly one PTX module.
+`kernel-<mode>` produces `<mode>.ptx`; `kernel-self-test-<mode>` produces
+`self_test_<mode>.ptx` (PTX filenames use underscores).
+The CLI disables that default and enables compilation
+only with `cuda-kernels` or `llvm21`, so CPU and external-PTX runners do not
+compile device code. Plain workspace commands default to `cli` and `logic`;
+`--workspace` also selects the CUDA kernel packages.
+
+Each kernel build watches its own device sources and shared inputs. Editing
+another mode's device code does not invalidate it; editing shared `logic`,
+compiler settings, or lockfiles can invalidate multiple modes. The build scripts
+share settings through `kernels/build_support.rs`. Nested CUDA builds currently
+share Rust-CUDA's target-directory lock, so separate packages do not guarantee
+parallel GPU compilation.
+
 The runner works with either LLVM bundle; select PTX for your GPU and use the
 same source revision for runner and kernels.
 For build profiling, set `NVVM_TIMING_DIR` to an absolute log directory and add
@@ -299,9 +331,16 @@ self-test PTX after changing registry order or contents; older externally suppli
 PTX is incompatible. Numeric references in historical validation reports and
 regression comments describe the previous registry.
 
-Eight `kernels/src/self_test/<mode>.rs` kernels write their group's results.
+Eight `kernels/self-test-<mode>/device/src/lib.rs` kernels write their group's results.
 Each mode is compiled into its own PTX file. Shared primitive checks have one
-owner. The kernel-only `repro_nonce_sequence` feature is outside the registry.
+owner. The standalone `kernel-repro-nonce-sequence` package is outside the registry
+and the normal PTX bundle; build it like any other kernel package.
+
+The device entry points can also be tested on the host without compiling PTX:
+
+```sh
+cargo test --manifest-path kernels/self-test-solana/device/Cargo.toml --locked
+```
 
 All enabled checks run on CPU. `rsa_pss.end_to_end` is temporarily skipped on GPU;
 its definition carries `#[gpu_skip = "reason"]`, which makes the macro omit its
@@ -315,8 +354,9 @@ Standalone GPU artifacts are written to `target/llvm21/release/ptx/` (or
 `target/llvm7/release/ptx/`). The selected `self_test_<mode>.ptx` files hold the
 self-tests. Production files are `solana.ptx`, `bitcoin.ptx`, `ethereum.ptx`,
 `shallenge.ptx`, `p256_public_key.ptx`, `p256_signature.ptx`, `rsa_pss.ptx`, and
-`rsa_modulus.ptx`, for the selected features. Each file is built separately with
-one feature and contains one kernel entry. There is no combined production PTX.
+`rsa_modulus.ptx`, for the selected features. Each file is built separately;
+RSA modulus contains four related entry points, while other production modules
+contain one. There is no combined production PTX.
 To override the embedded self-tests, set `PTX_PATH` to this directory and leave
 `CUBIN_PATH` unset. CuMetal accepts the same directory through `--ptx`.
 
@@ -327,6 +367,22 @@ CPU-independent PTX bundles (LLVM 7 and LLVM 21). Each workflow uploads its own
 Actions artifacts; neither calls the other or publishes a release. Download a
 runner and kernel bundle built from the same source revision, extract the bundle,
 and set `PTX_PATH` to its directory at runtime.
+
+Build the same full PTX bundles locally on Linux with Nix (no GPU required):
+
+```sh
+./scripts/build-ptx.sh 21 # default when no argument is given
+./scripts/build-ptx.sh 7
+```
+
+The script reuses `target/llvm<version>` for incremental builds and writes
+`artifacts/ptx-bundle-llvm<version>.tar.gz`. CI calls this same script.
+From macOS, with this checkout mounted writable in the `vanity-nixos` Lima VM,
+run from the repository root:
+
+```sh
+limactl shell vanity-nixos -- bash "$PWD/scripts/build-ptx.sh" 21
+```
 
 These kernels test candidate logic, not production CUDA argument passing or batch
 buffer layouts. CPU passes and successful CUDA compilation do not establish GPU

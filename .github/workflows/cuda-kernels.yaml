@@ -13,11 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - llvm: 7
-            extra-features: ""
-          - llvm: 21
-            extra-features: ",llvm21"
+        llvm: [7, 21]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,15 +39,7 @@ jobs:
             miner-ptx-llvm${{ matrix.llvm }}-v1-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
 
       - name: Compile PTX with nix devshell
-        env:
-          BUILD_FEATURES: cuda-kernels,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature${{ matrix.extra-features }}
-        run: |
-          # cargo check runs build.rs (including kernel compilation) without
-          # linking an unused host executable. Runners load these modules at runtime.
-          nix develop .#v${{ matrix.llvm }} --command cargo check -p vanity-miner --features "$BUILD_FEATURES" --release --locked
-
-          mkdir -p artifacts
-          tar -C target/llvm${{ matrix.llvm }}/release/ptx -czf artifacts/ptx-bundle-llvm${{ matrix.llvm }}.tar.gz .
+        run: ./scripts/build-ptx.sh ${{ matrix.llvm }}
 
       - name: Upload PTX bundle
         uses: actions/upload-artifact@v4

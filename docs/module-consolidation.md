@@ -1,5 +1,11 @@
 # Rust module consolidation
 
+This records the earlier source consolidation. Kernel builds have since moved
+to self-contained `kernels/<mode>/` and `kernels/self-test-<mode>/` packages,
+with GPU sources under `device/src/`
+and a build script in each package. The file disposition table below preserves
+the historical moves; see the README for current kernel build commands.
+
 ## Ownership rules
 
 - `cli/src/modes/<mode>` owns arguments, search state, algorithms, verification, output, and backend-specific kernel sequences.
@@ -17,7 +23,7 @@
 - `modes/<mode>/`: one implementation tree. CPU entry points and algorithms share `cpu.rs`; setup lives with mode state. `device.rs` contains the host search shared by CUDA and CuMetal. `cuda.rs` owns that mode's CUDA kernel sequence.
 - `modes/rsa_keys.rs`: shared host RSA key validation/encoding. `modes/self_test/`: the production self-test command. `modes/tests.rs`: test-only mode helpers.
 - `runner/`: sessions, batches, progress, workers, CUDA and CuMetal resources. RSA stage statistics are owned by the RSA modulus pipeline; progress accepts its formatter.
-- `logic/modes/` and kernel source files use the same eight mode names as the CLI. Kernel self-test entry points are grouped under `kernels/src/self_test/`.
+- `logic/modes/` and kernel packages use the same eight modes as the CLI. Kernel self-test entry points live under `kernels/self-test-<mode>/device/src/lib.rs`.
 
 The original 188 Rust files are accounted for below. Consolidation leaves 177 Rust source files. The nested host `search/` trees, `common/`, and transitional root helper modules are removed.
 

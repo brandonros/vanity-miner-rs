@@ -2,9 +2,45 @@
 resolver = "3"
 members = [
   "cli",
-  "logic"
+  "logic",
+  "kernels/solana",
+  "kernels/bitcoin",
+  "kernels/ethereum",
+  "kernels/shallenge",
+  "kernels/p256-public-key",
+  "kernels/p256-signature",
+  "kernels/rsa-pss",
+  "kernels/rsa-modulus",
+  "kernels/self-test-solana",
+  "kernels/self-test-bitcoin",
+  "kernels/self-test-ethereum",
+  "kernels/self-test-shallenge",
+  "kernels/self-test-p256-public-key",
+  "kernels/self-test-p256-signature",
+  "kernels/self-test-rsa-pss",
+  "kernels/self-test-rsa-modulus",
+  "kernels/repro-nonce-sequence",
 ]
-exclude = ["kernels"]
+default-members = ["cli", "logic"]
+exclude = [
+  "kernels/solana/device",
+  "kernels/bitcoin/device",
+  "kernels/ethereum/device",
+  "kernels/shallenge/device",
+  "kernels/p256-public-key/device",
+  "kernels/p256-signature/device",
+  "kernels/rsa-pss/device",
+  "kernels/rsa-modulus/device",
+  "kernels/self-test-solana/device",
+  "kernels/self-test-bitcoin/device",
+  "kernels/self-test-ethereum/device",
+  "kernels/self-test-shallenge/device",
+  "kernels/self-test-p256-public-key/device",
+  "kernels/self-test-p256-signature/device",
+  "kernels/self-test-rsa-pss/device",
+  "kernels/self-test-rsa-modulus/device",
+  "kernels/repro-nonce-sequence/device",
+]
 
 [patch.crates-io]
 # put compiler_fence behind a feature flag that is disabled by default

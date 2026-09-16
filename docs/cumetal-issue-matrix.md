@@ -17,10 +17,12 @@ and [validation report](cumetal-validation.md).
 - **Last complete measurement, historical:** `e5acf8cc0c65` on 2026-09-15,
   18:36–18:59 UTC: **3 true / 13 false**. Later targeted translations and
   compiler-resource investigations do not replace that complete run.
-- **Fresh measurement at `9e3e615`: pending.** Source, PTX and host identities
-  must accompany the new results. The self-tests have since been reorganized;
-  historical group/slot counts are not the current inventory. Changed PTX must
-  be identified separately from the retained original reproductions.
+- **Fresh measurement at `9e3e615`: awaiting Actions PTX.** The selected
+  [kernel build](https://github.com/brandonros/vanity-miner-rs/actions/runs/35044328837)
+  produces PTX from `4e0231aa82b69be146936f53829c95ef3f522832`. Its matching
+  CuMetal host is built; all **203 CPU self-tests pass**. GPU results are pending.
+  The rewritten registry has 203 checks, including one intentional GPU skip;
+  historical group/slot counts and PTX must remain separately identified.
 
 ## Read the statuses separately
 

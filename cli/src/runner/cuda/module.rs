@@ -1,12 +1,48 @@
 use cust::module::Module;
 use cust_raw::driver_sys;
 use std::error::Error;
-use std::ffi::{c_void, CStr, CString};
+use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
 #[cfg(feature = "cuda-kernels")]
-include!(concat!(env!("OUT_DIR"), "/kernel_ptx.rs"));
+fn embedded_ptx(name: &str) -> Option<&'static str> {
+    match name {
+        #[cfg(feature = "solana")]
+        "solana" => Some(kernel_solana::PTX),
+        #[cfg(feature = "self_test_solana")]
+        "self_test_solana" => Some(kernel_self_test_solana::PTX),
+        #[cfg(feature = "bitcoin")]
+        "bitcoin" => Some(kernel_bitcoin::PTX),
+        #[cfg(feature = "self_test_bitcoin")]
+        "self_test_bitcoin" => Some(kernel_self_test_bitcoin::PTX),
+        #[cfg(feature = "ethereum")]
+        "ethereum" => Some(kernel_ethereum::PTX),
+        #[cfg(feature = "self_test_ethereum")]
+        "self_test_ethereum" => Some(kernel_self_test_ethereum::PTX),
+        #[cfg(feature = "shallenge")]
+        "shallenge" => Some(kernel_shallenge::PTX),
+        #[cfg(feature = "self_test_shallenge")]
+        "self_test_shallenge" => Some(kernel_self_test_shallenge::PTX),
+        #[cfg(feature = "p256-public-key")]
+        "p256_public_key" => Some(kernel_p256_public_key::PTX),
+        #[cfg(feature = "self_test_p256_public_key")]
+        "self_test_p256_public_key" => Some(kernel_self_test_p256_public_key::PTX),
+        #[cfg(feature = "p256-signature")]
+        "p256_signature" => Some(kernel_p256_signature::PTX),
+        #[cfg(feature = "self_test_p256_signature")]
+        "self_test_p256_signature" => Some(kernel_self_test_p256_signature::PTX),
+        #[cfg(feature = "rsa-pss")]
+        "rsa_pss" => Some(kernel_rsa_pss::PTX),
+        #[cfg(feature = "self_test_rsa_pss")]
+        "self_test_rsa_pss" => Some(kernel_self_test_rsa_pss::PTX),
+        #[cfg(feature = "rsa-modulus")]
+        "rsa_modulus" => Some(kernel_rsa_modulus::PTX),
+        #[cfg(feature = "self_test_rsa_modulus")]
+        "self_test_rsa_modulus" => Some(kernel_self_test_rsa_modulus::PTX),
+        _ => None,
+    }
+}
 
 #[cfg(not(feature = "cuda-kernels"))]
 fn embedded_ptx(_name: &str) -> Option<&'static str> {

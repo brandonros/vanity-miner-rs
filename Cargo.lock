@@ -734,6 +734,125 @@ dependencies = [
 ]
 
 [[package]]
+name = "kernel-bitcoin"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-ethereum"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-p256-public-key"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-p256-signature"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-repro-nonce-sequence"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-rsa-modulus"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-rsa-pss"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-bitcoin"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-ethereum"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-p256-public-key"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-p256-signature"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-rsa-modulus"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-rsa-pss"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-shallenge"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-self-test-solana"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-shallenge"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
+name = "kernel-solana"
+version = "0.1.0"
+dependencies = [
+ "cuda_builder",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1661,10 +1780,25 @@ dependencies = [
  "backtrace",
  "clap",
  "ctrlc",
- "cuda_builder",
  "cust",
  "cust_raw",
  "hex",
+ "kernel-bitcoin",
+ "kernel-ethereum",
+ "kernel-p256-public-key",
+ "kernel-p256-signature",
+ "kernel-rsa-modulus",
+ "kernel-rsa-pss",
+ "kernel-self-test-bitcoin",
+ "kernel-self-test-ethereum",
+ "kernel-self-test-p256-public-key",
+ "kernel-self-test-p256-signature",
+ "kernel-self-test-rsa-modulus",
+ "kernel-self-test-rsa-pss",
+ "kernel-self-test-shallenge",
+ "kernel-self-test-solana",
+ "kernel-shallenge",
+ "kernel-solana",
  "libloading",
  "logic",
  "num-bigint-dig",

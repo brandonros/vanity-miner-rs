@@ -1,0 +1,16 @@
+[package]
+name = "kernel-self-test-rsa-modulus"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["cuda"]
+cuda = ["dep:cuda_builder"]
+llvm21 = ["cuda", "cuda_builder/llvm21"]
+
+[build-dependencies.cuda_builder]
+git = "https://github.com/brandonros/Rust-CUDA.git"
+rev = "f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
+default-features = false
+features = ["rustc_codegen_nvvm"]
+optional = true
