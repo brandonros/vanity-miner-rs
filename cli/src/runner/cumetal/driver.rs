@@ -186,6 +186,28 @@ impl Buffer {
     pub fn pointer(&self) -> u64 {
         self.base + 16
     }
+    /// Inspect boundaries without transferring a persistent workspace to the host.
+    pub fn check_guards(&self) -> Result<(), Error> {
+        let mut guards = [0u8; 32];
+        unsafe {
+            check(
+                (self.driver.to_host)(guards.as_mut_ptr().cast(), self.base, 16),
+                "cuMemcpyDtoH",
+            )?;
+            check(
+                (self.driver.to_host)(
+                    guards.as_mut_ptr().add(16).cast(),
+                    self.pointer() + self.size as u64,
+                    16,
+                ),
+                "cuMemcpyDtoH",
+            )?;
+        }
+        if guards.iter().any(|byte| *byte != 0xa5) {
+            return Err("GPU buffer guard overwritten".into());
+        }
+        Ok(())
+    }
     pub fn read(&self) -> Result<Vec<u8>, Error> {
         let mut bytes = Zeroizing::new(vec![0; self.size + 32]);
         unsafe {

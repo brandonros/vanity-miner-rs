@@ -263,6 +263,7 @@ fn pipeline_host_reserves_unique_tasks_and_rejects_invalid_counts() {
         &search,
         &control,
         &host::StageStats::default(),
+        4,
         |config, _, start, capacity| {
             if let Some(previous) = seed {
                 assert_eq!(config.seed, previous);
@@ -280,7 +281,7 @@ fn pipeline_host_reserves_unique_tasks_and_rejects_invalid_counts() {
         },
     )
     .unwrap();
-    assert_eq!(launches, [0, 17, 34]);
+    assert_eq!(launches, [0, 68, 136]);
     assert_eq!(control.statistics().0, 51);
 
     let control = SearchControl::new();
@@ -288,10 +289,11 @@ fn pipeline_host_reserves_unique_tasks_and_rejects_invalid_counts() {
         &search,
         &control,
         &host::StageStats::default(),
+        4,
         |_, _, _, capacity| {
             Ok((
                 pipeline::Counts {
-                    q_tested: capacity + 1,
+                    q_tested: capacity * 4 + 1,
                     ..Default::default()
                 },
                 zeroize::Zeroizing::new(Vec::new()),
@@ -323,6 +325,35 @@ fn completed_pairs_are_independently_verified_before_export() {
         id: 9,
     };
     let pattern = logic::search::hex_pattern::HexPattern::new(&n, "", 256).unwrap();
+    // One step prepares p; the next launch must resume it without generating p again.
+    let mut task = Task::EMPTY;
+    let (prepared, found) = pipeline::mine(&c, &pattern, &mut task, 9, 1, 1);
+    assert!(found.is_none());
+    assert_eq!(
+        (
+            prepared.p_tested,
+            prepared.p_accepted,
+            prepared.ranges,
+            prepared.q_tested
+        ),
+        (1, 1, 1, 0)
+    );
+    assert_eq!(task.id, 9);
+    let (searched, found) = pipeline::mine(&c, &pattern, &mut task, 10, 1, 64);
+    assert_eq!(
+        (searched.p_tested, searched.q_tested, searched.matches),
+        (0, 1, 1)
+    );
+    assert!(found == Some(pair));
+    assert!(task == Task::EMPTY);
+    // Even a large budget stops after one match, bounding the output per lane.
+    let (combined, found) = pipeline::mine(&c, &pattern, &mut task, 11, 1, 1024);
+    assert_eq!(
+        (combined.p_tested, combined.q_tested, combined.matches),
+        (1, 1, 1)
+    );
+    assert_eq!(found.unwrap().id, 11);
+    assert!(task == Task::EMPTY);
     let output = zeroize::Zeroizing::new(verify_pair(&c, &pattern, &pair).unwrap());
     let encoded = output
         .lines()
@@ -339,4 +370,159 @@ fn completed_pairs_are_independently_verified_before_export() {
     let mut corrupt = pair;
     corrupt.q[127] &= 0xfe;
     assert!(verify_pair(&c, &pattern, &corrupt).is_err());
+}
+
+#[test]
+fn mining_launches_resume_without_repeating_or_skipping_q_values() {
+    let c = config("", "");
+    let pattern = logic::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+    let first = (BigUint::from(1u8) << 1023) + BigUint::from(1u8);
+    let mut task = Task {
+        // An undersized p ensures every q misses before primality testing.
+        state: 2,
+        id: 7,
+        first: bytes(&first),
+        count: bytes(&BigUint::from(9u8)),
+        remaining: bytes(&BigUint::from(9u8)),
+        cursor: bytes(&BigUint::from(7u8)),
+        ..Task::EMPTY
+    };
+    let mut seen = std::collections::BTreeSet::new();
+    let mut used = 0u32;
+    for steps in [3, 2, 4] {
+        // Independent expected progression across the wrap and launch boundaries.
+        for offset in 0..steps {
+            let expected = &first + BigUint::from((7 + used + offset) % 9) * 2u8;
+            let actual = pipeline::q_at(&c, &task, offset).unwrap();
+            assert_eq!(BigUint::from_bytes_be(&actual), expected);
+            assert!(seen.insert(actual));
+        }
+        let (counts, found) =
+            pipeline::mine(&c, &pattern, &mut task, 100 + u64::from(used), 1, steps);
+        assert!(found.is_none());
+        assert_eq!(
+            (
+                counts.p_tested,
+                counts.q_tested,
+                counts.active,
+                counts.errors
+            ),
+            (0, steps, 1, 0)
+        );
+        used += steps;
+        if used < 9 {
+            assert_eq!(task.id, 7);
+            assert_eq!(
+                BigUint::from_bytes_be(&task.cursor),
+                BigUint::from((7 + used) % 9)
+            );
+            assert_eq!(
+                BigUint::from_bytes_be(&task.remaining),
+                BigUint::from(9 - used)
+            );
+        }
+    }
+    assert_eq!(seen.len(), 9);
+    assert!(task == Task::EMPTY);
+
+    let mut refill_config = c;
+    // Composite p divisible by 3: refills are guaranteed to miss deterministically.
+    refill_config.p_min = bytes(&first);
+    refill_config.p_count = bytes(&BigUint::from(1u8));
+    let (counts, found) = pipeline::mine(&refill_config, &pattern, &mut task, 500, 17, 4);
+    assert_eq!(
+        (
+            counts.p_tested,
+            counts.p_accepted,
+            counts.q_tested,
+            counts.errors
+        ),
+        (4, 0, 0, 0)
+    );
+    assert!(found.is_none());
+    assert!(task == Task::EMPTY);
+
+    // The mining loop also retains full-width cursors, not only finish_tile itself.
+    let count = BigUint::from(1u8) << 1000;
+    let mut task = Task {
+        state: 2,
+        first: bytes(&first),
+        count: bytes(&count),
+        remaining: bytes(&count),
+        cursor: bytes(&(&count - BigUint::from(2u8))),
+        ..Task::EMPTY
+    };
+    let (counts, _) = pipeline::mine(&c, &pattern, &mut task, 0, 1, 7);
+    assert_eq!((counts.q_tested, counts.errors), (7, 0));
+    assert_eq!(BigUint::from_bytes_be(&task.cursor), BigUint::from(5u8));
+    assert_eq!(
+        BigUint::from_bytes_be(&task.remaining),
+        count - BigUint::from(7u8)
+    );
+}
+
+#[test]
+fn mining_rejects_invalid_work_and_counter_overflow() {
+    let c = config("", "");
+    let pattern = logic::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+    for (start, stride, steps) in [
+        (0, 0, 1),
+        (0, 1, 0),
+        (0, 1, 1025),
+        (u64::MAX, 1, 2),
+        (u64::MAX - 5, 3, 3),
+    ] {
+        let mut task = Task::EMPTY;
+        let (counts, pair) = pipeline::mine(&c, &pattern, &mut task, start, stride, steps);
+        assert!(task == Task::EMPTY);
+        assert_eq!(counts.errors, 1);
+        assert!(pair.is_none());
+    }
+    assert!(pipeline::launch_work(pipeline::MAX_CAPACITY, pipeline::MAX_STEPS_PER_LAUNCH).is_ok());
+    assert!(pipeline::launch_work(pipeline::MAX_CAPACITY + 1, 1).is_err());
+    let invalid = pipeline::Counts {
+        p_tested: 64,
+        q_tested: 64,
+        ..Default::default()
+    };
+    assert!(invalid.validate(1, 64).is_err());
+}
+
+#[test]
+fn eight_workers_reserve_disjoint_mining_ids() {
+    use std::sync::{Arc, Barrier};
+    use vanity_miner::runner::session::SearchControl;
+    let control = Arc::new(SearchControl::new());
+    let barrier = Arc::new(Barrier::new(8));
+    let capacity = 17;
+    let steps = 4;
+    let work = pipeline::launch_work(capacity, steps).unwrap();
+    let workers: Vec<_> = (0..8)
+        .map(|_| {
+            let control = control.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                let mut ids = Vec::new();
+                for _ in 0..3 {
+                    let range = control.reserve_batch(u64::from(work)).unwrap();
+                    for lane in 0..capacity {
+                        for step in 0..steps {
+                            let id = range.start + u64::from(step * capacity + lane);
+                            assert!(range.contains(&id));
+                            assert_eq!(id % u64::from(capacity), u64::from(lane));
+                            ids.push(id);
+                        }
+                    }
+                }
+                ids
+            })
+        })
+        .collect();
+    let mut ids: Vec<_> = workers
+        .into_iter()
+        .flat_map(|worker| worker.join().unwrap())
+        .collect();
+    ids.sort_unstable();
+    assert_eq!(ids, (0..8 * 3 * u64::from(work)).collect::<Vec<_>>());
 }

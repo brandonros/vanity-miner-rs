@@ -11,6 +11,11 @@ pub struct RsaModulusArgs {
     pub public_exponent: u32,
     #[arg(long, default_value = "constructive", value_parser = ["constructive"])]
     pub strategy: String,
+    /// Mining steps per thread per invocation; each step prepares a p or tests a q.
+    /// Unfinished ranges resume on the next invocation, on CPU and GPU alike.
+    #[arg(long, default_value_t = logic::modes::rsa_modulus::DEFAULT_STEPS_PER_LAUNCH,
+        value_parser = clap::value_parser!(u32).range(1..=1024))]
+    pub steps_per_launch: u32,
 }
 
 impl RsaModulusArgs {

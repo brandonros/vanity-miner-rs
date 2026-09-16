@@ -7,6 +7,7 @@ pub fn run(
     search: &ModulusSearch,
     control: &SearchControl,
     stages: &StageStats,
+    steps: u32,
     mut cycle: impl FnMut(
         &SearchConfig,
         &HexPattern,
@@ -21,31 +22,23 @@ pub fn run(
         .map_err(|_| "OS cryptographic entropy unavailable")?;
     let config = Zeroizing::new(constraints.device_config(*seed, 0)?);
     let capacity = control.batch_size();
-    // A task identifier encodes its workspace slot: every reservation is a
-    // capacity-sized block. This bounded table rejects repeated result delivery
-    // without retaining every private factor or every previously exported key.
+    let work = device_logic::launch_work(capacity, steps)?;
+    // IDs are start + step * capacity + lane, so id % capacity identifies the
+    // owning slot. Track retirement without retaining exported private factors.
     let mut retired = vec![None; capacity as usize];
     crate::runner::batches::pump(
         control,
         || {
-            let Some(ids) = control.reserve_batch(u64::from(capacity)) else {
+            let Some(ids) = control.reserve_batch(u64::from(work)) else {
                 return Ok(None);
             };
             if !control.reserve_device_launch() {
                 return Ok(None);
             }
             let (counts, pairs) = cycle(&config, &constraints.pattern, ids.start, capacity)?;
-            if counts.errors != 0
-                || counts.p_tested > capacity
-                || counts.p_accepted > counts.p_tested
-                || counts.ranges > counts.p_accepted
-                || counts.active > capacity
-                || counts.q_tested > capacity
-                || counts.matches > counts.q_tested
-                || counts.matches > counts.active
-                || pairs.len() != counts.matches as usize
-            {
-                return Err("RSA pipeline returned invalid stage counts".into());
+            counts.validate(capacity, steps)?;
+            if pairs.len() != counts.matches as usize {
+                return Err("RSA miner returned invalid result count".into());
             }
             if pairs.iter().any(|pair| pair.id >= ids.end) {
                 return Err("RSA pipeline returned an unassigned task identifier".into());

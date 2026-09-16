@@ -1,8 +1,23 @@
-//! Device-resident RSA searches. A slot owns one independent factor and a
-//! nonrepeating q progression. Launch boundaries publish changes between stages.
+//! Resumable RSA mining. Each thread exclusively owns one factor task and its
+//! nonrepeating q progression; no other thread reads or advances that task.
 use crate::search::candidate_derivation::{CandidateDeriver, CandidateDomain};
 use crypto_bigint::{Encoding, NonZero, U1024, U2048};
 use zeroize::{Zeroize, Zeroizing};
+
+pub const ENTRY: &str = "kernel_rsa_modulus_vanity";
+pub const DEFAULT_STEPS_PER_LAUNCH: u32 = 64;
+pub const MAX_STEPS_PER_LAUNCH: u32 = 1024;
+pub const MAX_CAPACITY: u32 = 1_048_576;
+
+/// Bounds both the candidate-ID reservation and every u32 device counter.
+pub fn launch_work(capacity: u32, steps: u32) -> Result<u32, &'static str> {
+    if capacity == 0 || capacity > MAX_CAPACITY || steps == 0 || steps > MAX_STEPS_PER_LAUNCH {
+        return Err("invalid RSA mining capacity or step budget");
+    }
+    capacity
+        .checked_mul(steps)
+        .ok_or("RSA mining work overflow")
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -19,7 +34,7 @@ pub struct SearchConfig {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Task {
     pub p: [u8; 128],
     pub first: [u8; 128],
@@ -30,10 +45,9 @@ pub struct Task {
     pub skip_start: [u8; 128],
     pub skip_count: [u8; 128],
     pub id: u64,
-    /// 0 = empty, 1 = probable p awaiting a range, 2 = active,
-    /// 3 = unchecked p awaiting a range before expensive primality testing.
+    /// 0 = empty, 2 = active. Range construction is local to the owning thread.
     pub state: u32,
-    /// Copied from the separate atomic winner buffer after the q stage completes.
+    /// Set by the owning thread before retiring a successful task.
     pub winner: u32,
 }
 impl Task {
@@ -52,7 +66,7 @@ impl Task {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pair {
     pub p: [u8; 128],
     pub q: [u8; 128],
@@ -67,7 +81,7 @@ impl Pair {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
 pub struct Counts {
     pub p_tested: u32,
     pub p_accepted: u32,
@@ -75,6 +89,7 @@ pub struct Counts {
     pub q_tested: u32,
     pub matches: u32,
     pub errors: u32,
+    /// Threads that evaluated at least one q during this launch.
     pub active: u32,
     pub reserved: u32,
 }
@@ -92,6 +107,110 @@ record!(SearchConfig; lower, upper, p_min, p_count, suffix, seed, worker, suffix
 record!(Task; p, first, count, cursor, remaining, skip_start, skip_count, id, state, winner);
 record!(Pair; p, q, id);
 record!(Counts; p_tested, p_accepted, ranges, q_tested, matches, errors, active, reserved);
+
+impl Counts {
+    pub fn validate(&self, capacity: u32, steps: u32) -> Result<(), &'static str> {
+        let work = launch_work(capacity, steps)?;
+        if self.errors != 0
+            || self.reserved != 0
+            || self.p_tested > work
+            || self.p_accepted > self.p_tested
+            || self.ranges > self.p_accepted
+            || self.active > capacity
+            || self.active > self.q_tested
+            || self.q_tested > work
+            || u64::from(self.p_tested) + u64::from(self.q_tested) > u64::from(work)
+            || self.matches > self.active
+        {
+            return Err("RSA miner returned invalid counters");
+        }
+        Ok(())
+    }
+}
+
+/// Mine one exclusively owned slot. A step tests a new p (including range
+/// preparation), or one q of an existing task. A match ends this lane's launch:
+/// at most one Pair per lane can be published, with no result queue overflow.
+///
+/// `start` is the launch reservation plus the lane index; `stride` is capacity.
+/// Unused IDs are deliberately skipped. Retained tasks keep their original ID.
+pub fn mine(
+    config: &SearchConfig,
+    pattern: &crate::search::hex_pattern::HexPattern,
+    task: &mut Task,
+    start: u64,
+    stride: u32,
+    steps: u32,
+) -> (Counts, Option<Pair>) {
+    let mut counts = Counts::default();
+    if launch_work(stride, steps).is_err()
+        || start
+            .checked_add(u64::from(stride) * u64::from(steps - 1))
+            .is_none()
+        || (task.state != 0 && task.state != 2)
+    {
+        task.zeroize();
+        counts.errors = 1;
+        return (counts, None);
+    }
+    for step in 0..steps {
+        if task.state == 0 {
+            let id = start + u64::from(step) * u64::from(stride);
+            counts.p_tested += 1;
+            let Some(p) = generate_p(config, id) else {
+                counts.errors = 1;
+                task.zeroize();
+                break;
+            };
+            let ranges_first = range_first(config);
+            if !ranges_first && !probable_p(&p) {
+                continue;
+            }
+            if !ranges_first {
+                counts.p_accepted += 1;
+            }
+            task.p = p;
+            task.id = id;
+            match prepare_range(config, task) {
+                Ok(false) => continue,
+                Err(_) => {
+                    counts.errors = 1;
+                    task.zeroize();
+                    break;
+                }
+                Ok(true) => {}
+            }
+            if ranges_first {
+                if !probable_p(&task.p) {
+                    task.zeroize();
+                    continue;
+                }
+                counts.p_accepted += 1;
+            }
+            counts.ranges += 1;
+        } else {
+            let Some(q) = q_at(config, task, 0) else {
+                counts.errors = 1;
+                task.zeroize();
+                break;
+            };
+            counts.active = 1;
+            counts.q_tested += 1;
+            if eligible_pair(&task.p, &q, pattern) {
+                let pair = Pair {
+                    p: task.p,
+                    q,
+                    id: task.id,
+                };
+                task.zeroize();
+                counts.matches = 1;
+                return (counts, Some(pair));
+            }
+            finish_tile(task, 1);
+        }
+    }
+    (counts, None)
+}
 
 /// Exact rejection sampling. Four disjoint PRF inputs supply the 1024 bits;
 /// neither factor generation nor q-range starts reduce random bytes modulo n.
@@ -253,8 +372,8 @@ pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, &'s
     Ok(true)
 }
 
-/// A launch interleaves q work across the compact list of active factors.
-/// Return None for the unused tail of a short range without evaluating it.
+/// Return the q at an offset from this task's cursor, or None past its remaining
+/// range. The owning mining thread normally evaluates offset zero and advances.
 pub fn q_at(config: &SearchConfig, task: &Task, offset: u32) -> Option<[u8; 128]> {
     if task.state != 2 {
         return None;

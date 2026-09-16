@@ -229,7 +229,7 @@ Paths below are relative to the repository. The left column records the source l
   stop after verification; continuous device sessions overlap launches and verification.
 - CUDA and CuMetal share structured candidate results for addresses, nonces, P-256,
   and RSA-PSS. Address/nonce output is reconstructed on the CPU before publication.
-- RSA modulus uses the same persistent four-stage pipeline on both device backends.
+- RSA modulus uses the same single-entry, resumable per-thread miner on both device backends.
   The old batch request, host device constructor, and versioned entry points are removed.
   CPU modulus construction and independent arithmetic references remain.
 - Both LLVM 7 and LLVM 21 build configurations remain supported.

@@ -109,32 +109,10 @@ fn long_prefix_allows_single_candidate_interval() {
     let progression = constraints.progression(&p).unwrap();
     assert_eq!(*progression.count, one);
     assert_eq!(*progression.first, q);
-    assert_eq!(progression.search_budget(), 1);
     assert!(constraints.pattern.matches(&n.to_bytes_be()));
     assert!(ModulusConstraints::new(&encoded[..258], "").is_ok());
     assert!(ModulusConstraints::new(&encoded[..254], "ab").is_ok());
     assert!(ModulusConstraints::new(&encoded[..256], "ab").is_ok());
-}
-
-#[test]
-fn small_intervals_have_bounded_nonempty_cpu_batches() {
-    for size in [1u64, 2, 63, 64, 65, 65535, 65536, 65537] {
-        let progression = QProgression {
-            first: Zeroizing::new(BigUint::from(1u8)),
-            stride: BigUint::from(2u8),
-            count: Zeroizing::new(BigUint::from(size)),
-        };
-        let budget = progression.search_budget();
-        assert_eq!(budget, size.min(65536));
-        let start_choices = &*progression.count - BigUint::from(budget - 1);
-        assert!(start_choices >= BigUint::from(1u8));
-        let batches: Vec<_> = (0..budget)
-            .step_by(64)
-            .map(|start| (budget - start).min(64))
-            .collect();
-        assert!(batches.iter().all(|count| (1..=64).contains(count)));
-        assert_eq!(batches.iter().sum::<u64>(), budget);
-    }
 }
 
 #[test]

@@ -15,19 +15,6 @@ pub struct QProgression {
     pub count: Zeroizing<BigUint>,
 }
 
-impl QProgression {
-    pub(super) fn search_budget(&self) -> u64 {
-        if *self.count >= BigUint::from(65536u32) {
-            65536
-        } else {
-            self.count
-                .to_bytes_be()
-                .iter()
-                .fold(0u64, |n, byte| (n << 8) | u64::from(*byte))
-        }
-    }
-}
-
 pub(super) fn ceil_div(n: &BigUint, d: &BigUint) -> BigUint {
     (n + d - BigUint::from(1u8)) / d
 }
@@ -82,6 +69,7 @@ impl ModulusConstraints {
 
     /// Select uniformly from feasible odd 1024-bit p values. Conditioning p on
     /// a nonempty q interval avoids expensive retries for prefixes near ff... .
+    #[cfg(test)]
     pub(super) fn random_p_candidate(&self) -> BigUint {
         let one = BigUint::from(1u8);
         let max = (&one << 1024usize) - &one;

@@ -1,4 +1,4 @@
-//! rsa modulus self-tests: primitives, pipeline stages, and regressions.
+//! rsa modulus self-tests: primitives, resumable mining, and regressions.
 mod fixtures;
 pub(super) mod range_probes;
 use super::known_answers::*;
@@ -103,35 +103,24 @@ register_self_test! {
 }
 
 register_self_test! {
-    /// end-to-end rsa modulus candidate pipeline
+    /// end-to-end rsa modulus miner, including resume and factor retirement
     fn end_to_end() -> u32 {
-        use crate::modes::rsa_modulus::{self as pipeline, Task};
+        use crate::modes::rsa_modulus::{self as mining, Task};
         let config = black_box(device_config());
         let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
-        let Some(p) = pipeline::generate_p(&config, black_box(9)) else {
-            return 0;
-        };
-        if p != SELF_TEST_RSA_P || !pipeline::probable_p(&p) {
-            return 0;
-        }
-        let mut task = Task {
-            p,
-            id: 9,
-            state: 1,
-            ..Task::EMPTY
-        };
-        if pipeline::prepare_range(&config, &mut task) != Ok(true) {
+        let mut task = Task::EMPTY;
+        let (prepared, pair) = mining::mine(&config, &pattern, &mut task, black_box(9), 1, black_box(1));
+        if pair.is_some() || prepared.errors != 0 || prepared.p_accepted != 1
+            || prepared.ranges != 1 || prepared.q_tested != 0 || task.state != 2 {
             return 0;
         }
-        let Some(q) = pipeline::q_at(&config, &task, black_box(0)) else {
-            return 0;
-        };
-        if q != SELF_TEST_RSA_Q || !pipeline::eligible_pair(&p, &q, &pattern) {
-            return 0;
-        }
-        task.winner = 1;
-        pipeline::finish_tile(&mut task, 1);
-        u32::from(task.state == 0 && task.p == [0; 128])
+        let (searched, pair) = mining::mine(&config, &pattern, &mut task, black_box(10), 1, black_box(8));
+        let Some(pair) = pair else { return 0; };
+        u32::from(
+            searched.errors == 0 && searched.p_tested == 0 && searched.q_tested == 1
+                && searched.matches == 1 && pair.id == 9 && pair.p == SELF_TEST_RSA_P
+                && pair.q == SELF_TEST_RSA_Q && task == Task::EMPTY
+        )
     }
 }
 

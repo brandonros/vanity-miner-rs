@@ -9,7 +9,7 @@ pub struct CumetalOptions {
     /// Rust-CUDA PTX file, or a directory of separately compiled PTX modules.
     #[arg(long, global = true)]
     pub ptx: Option<PathBuf>,
-    /// Stop after this many batches (four kernel stages per RSA modulus batch); omitted means keep searching.
+    /// Stop after this many kernel launches; omitted means keep searching.
     #[arg(long, global=true, value_parser=clap::value_parser!(u64).range(1..))]
     pub batches: Option<u64>,
     #[arg(long, global=true, default_value_t=32, value_parser=clap::value_parser!(u32).range(1..=1024))]

@@ -8,76 +8,95 @@ reconstructs and verifies them, and prints complete records under the stdout loc
 The GPU can process subsequent batches while verification runs. When verification
 or output is slower than an easy search, the queue applies backpressure.
 
-## RSA modulus stages
+## RSA modulus mining
 
-One `rsa_modulus.ptx` contains four pipeline entries, launched in order in a single
-stream. Their working records remain on the device:
+The complete mining loop lives in `logic/src/modes/rsa_modulus.rs`, a `no_std`
+module compiled for CPU and GPU. The production CPU worker invokes the same
+`mine` function as the thin GPU entry wrapper; only scheduling, buffers and
+result publication differ. The old CPU-only BigUint search loop and its 65536-q
+cutoff have been removed. BigUint remains for independent host validation and
+reference arithmetic tests.
 
-1. **Generate:** vacant task slots derive independent odd p candidates using
-   HMAC-SHA256 and rejection sampling. Search-wide bounds and entropy are uploaded
-   once. Candidate IDs never restart after a match.
-2. **Construct ranges:** fixed-width division and inversion modulo a power of two
-   produce the eligible q progression. Empty ranges are retired. The contiguous
-   interval violating `|p-q| > 2^924` is removed from the progression. A compressed
-   index skips that interval without spending candidate evaluations on it.
-3. **Search:** active slots are compacted into an index list. Lanes interleave
-   across that list, distributing multiple q candidates to large ranges and
-   combining independent small ranges. Only actually evaluated q values are
-   counted. Atomic counters retain one result per factor task; the output has
-   enough slots for every active task, so there is no truncated result queue.
-4. **Advance:** after the search kernel completes, each task advances by its
-   assigned work. A randomized cursor wraps once through its finite progression.
-   Counters remain 1024 bits on-device; large ranges are not truncated to u64.
-   Exhausted and successful factor tasks are erased and replaced on later cycles.
+`rsa_modulus.ptx` exports only `kernel_rsa_modulus_vanity`. CUDA and CuMetal use
+one launch per batch. Every lane exclusively owns a persistent `Task`; lanes do
+not exchange factors or need barriers. This replaces the four-stage pipeline.
 
-For broad patterns, p is primality-filtered before constructing its range. At
-roughly 128 constrained bytes and beyond, the order reverses: an empty range can
-reject a p without expensive primality tests. The order is a scheduling heuristic;
-both paths require the same factor and pattern checks.
+Within one launch, each lane repeats up to `--steps-per-launch` work steps:
 
-The CPU never picks a p or prepares an individual q range in this pipeline. It
-independently reconstructs p and validates completed key pairs, including fresh
-random primality bases, factor separation, key consistency, and a blinded
-sign/verify check. Output retires the factor task instead of exporting multiple
-keys that deliberately share p.
+1. An empty slot derives an odd p candidate from the secret seed and its reserved
+   candidate ID. It prepares the eligible q progression and checks p's primality.
+   Broad patterns check primality first; narrow patterns check the range first.
+2. An active slot tests one q, advances its cursor, and retains its factor/range.
+   Exhaustion erases the slot; a later step can start a new factor candidate.
+3. A match publishes one pair and erases the slot immediately. That lane exits
+   until the next launch, bounding output to one pair per lane even for easy
+   patterns. It does not deliberately produce multiple keys sharing a factor.
 
-## Bounds and measurements
+The work budget defaults to 64 steps per thread, with an allowed range of 1–1024,
+on both CPU and GPU.
+Each step is either a p attempt or a q evaluation. It bounds work rather than
+wall time: primality tests and range preparation have different costs. Raising
+it reduces launch frequency but increases result/cancellation latency. A launch
+boundary never discards a good p or cuts off its remaining q progression.
 
-`BATCH_SIZE` sets both RSA workspace capacity and q-lane budget per cycle.
-`THREADS_PER_BLOCK` controls every stage's launch geometry. These settings bound
-memory/work per cycle, not prefix difficulty. There is no 128-byte pattern cap or
-65536-q task cutoff in the CUDA pipeline. Syntax, contradictory overlap, modulus
-width/parity, and the necessary factor-separation bound are still checked.
+Each GPU launch reserves `capacity * steps` unique IDs through the shared session
+counter. A new p uses `start + step * capacity + lane`; unused IDs are skipped.
+An active task keeps its old ID across launches. CPU workers reserve `steps` IDs
+per invocation and each retain one task with stride one. All GPUs reserve from that same
+counter and maintain independent allocations and seeds. The existing bounded
+host retirement table rejects repeated delivery of an already exported task.
 
-Progress reports distinguish generated p candidates, probable p factors, useful
-ranges, q candidates, and independently verified outputs. Compare **verified keys
-per second** under the same constraints. Counting generated p and q together is
-not evidence of a speedup, and an empty range is not a tested q candidate.
+## Arithmetic and verification
 
-Device memory is bounded by workspace capacity, approximately 1184 bytes per slot
-plus fixed inputs. The host retains a bounded result queue and one retirement ID
-per slot. GPU launch boundaries establish visibility between producers and
-consumers; no cross-block spin loops or CPU per-factor handoffs are needed.
+The fixed-width range arithmetic is unchanged. Division and inversion modulo a
+power of two construct compatible q values, and compressed indices exclude the
+interval violating `|p-q| > 2^924`. The randomized starting cursor traverses each
+finite progression once; counts and cursors remain 1024 bits. There is no
+128-byte pattern cap or 65536-q task cutoff on the GPU.
+
+The host uploads search-wide constraints and entropy once. It never constructs
+individual device q ranges. It reconstructs p for every returned pair, repeats
+key validation and primality checks with fresh random bases, checks the requested
+modulus pattern, and performs a blinded sign/verify before export.
+
+CuMetal `--verify` additionally replays the complete mining invocation on the CPU
+and compares every counter, returned pair and saved task. Normal execution keeps
+tasks on the GPU; guard checks transfer only the allocation boundaries.
+
+## Resources and performance
+
+`BATCH_SIZE` is the number of persistent task slots; `THREADS_PER_BLOCK` selects
+CUDA launch geometry. CuMetal capacity is `--blocks * --threads-per-block`.
+Workspace is approximately 1176 bytes per slot (912-byte task and 264-byte output)
+plus fixed inputs and counters. Shared statistics use atomics once per lane at
+completion, outside the mining loop. No compact active list, per-task atomic
+winner array, or global scheduling queue remains.
+
+This intentionally gives up distributing one p's q work across many threads.
+Independent lanes simplify ownership and resumption, but may diverge during
+primality testing and require more simultaneously prepared factors. Neither
+longer launches nor the refactor itself demonstrates a performance improvement.
+Measure verified keys per second under identical prefix/suffix constraints on
+one GPU before scaling to eight, and inspect register spills and occupancy.
+
+The host still overlaps verification with subsequent launches through its bounded
+queue. Memory and output remain bounded even when matches are frequent.
 
 ## Validation
 
-Host tests compare device-compatible arithmetic against independent `BigUint`
-division/inversion, including full-width patterns, empty ranges, separation holes,
-large cursors, wrapping, and retirement. Queue tests cover overlapping production
-and verification, cancellation, failure, and independent worker completion.
-RSA self-test slots 157–159 exercise the new range, cursor, and PRF primitives
-inside the separately compiled RSA self-test module.
+Rebuild the host and PTX together: old four-entry PTX cannot run with this host.
+Existing PTX bundles and CuMetal GPU measurements describe the prior pipeline;
+they do not validate the new entry. The updated translation script requires the
+expected single entry and rejects stale bundles before translation.
 
-CUDA compilation and CPU reference tests do not establish device numerical
-correctness, memory safety under concurrent execution, or multi-GPU scaling.
-Before throughput claims, run the rebuilt self-tests and bounded production
-searches on NVIDIA hardware, then compare one and multiple GPUs. Register spills,
-per-thread large-integer costs, and divergence still require measurement.
+Host tests cover full-width range arithmetic against independent BigUint
+calculations, cursor wrap/resumption, retirement, work/ID overflow, bounded result
+counts, and independent verification of a pair found across two invocations.
+The RSA end-to-end device self-test now exercises the same resumed mining logic.
+Record fresh PTX compilation and GPU results separately from the historical
+implementation checks below.
 
-CuMetal executes the same four RSA stages and persistent task records. CUDA and
-CuMetal require a matching host binary and rebuilt PTX/Metal artifacts.
-
-### Implementation checks — 2026-09-15
+### Historical four-stage implementation checks — 2026-09-15
 
 - 48 CLI unit/integration tests passed with the four crypto modes and
   `self_test_rsa_modulus` enabled, including independent RSA key verification,

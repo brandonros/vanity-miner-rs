@@ -107,22 +107,27 @@ finite ranges use partial final batches. `vast-run.sh` forwards this setting.
 The default stack is 64 KiB; `STACK_SIZE` overrides it. Multi-GPU throughput and
 the new scheduling behavior still require hardware validation. CI builds one runner per Linux host architecture and one PTX bundle per LLVM version.
 
-RSA modulus search generates p candidates, constructs constrained q ranges,
-tests factors, and advances persistent tasks on the GPU. Short ranges from many
-factors share a launch; large ranges continue across launches without a 65536-q
-cutoff. Range construction removes the interval forbidden by factor separation.
-For narrow patterns it checks for an eligible range before testing p's primality.
-Each factor task exports at most one pair and is then retired. The host supplies
-search-wide bounds and entropy, independently verifies completed pairs, and exports
-keys. Statistics show p candidates, probable p factors, nonempty ranges, and q
-candidates separately, alongside verified matches. See [GPU search design](docs/gpu-search-pipeline.md).
+RSA modulus search uses the same `no_std` mining loop on CPU and GPU, with one
+thin GPU kernel entry. Each CPU worker or GPU thread owns a p
+factor and its constrained q range, and loops independently through preparation
+and primality testing. Good factors and full-width range cursors stay on the GPU
+between launches. No cross-thread work queue or block barriers are required.
+Range construction still removes the interval forbidden by factor separation;
+narrow patterns reject empty ranges before testing p's primality. Each thread
+returns at most one pair per launch, erases that task, and starts fresh work on its
+next launch. The host independently verifies completed pairs and exports keys.
 
-Rebuild the host binary and RSA PTX together. CUDA now requires
-`kernel_rsa_generate`, `kernel_rsa_ranges`, `kernel_rsa_search`, and
-`kernel_rsa_advance` in `rsa_modulus.ptx`; older overrides fail symbol lookup.
-CuMetal uses these same four stages and persistent task records. Address and nonce
-kernels also use structured batch results; rebuild their PTX and Metal sidecars.
-An existing GitHub Actions artifact does not include local changes.
+`rsa-modulus --steps-per-launch 64` sets the per-thread work budget on both CPU and
+GPU (default 64, range 1–1024). Each step either prepares one p candidate or tests one q. Increasing
+the budget amortizes launches but delays results and cancellation; it does not
+truncate unfinished ranges. `BATCH_SIZE` controls the number of persistent task
+slots. Shared candidate-ID reservations keep device work disjoint across GPUs.
+See [GPU search design](docs/gpu-search-pipeline.md) for validation and tradeoffs.
+
+Rebuild the host binary and RSA PTX together. CUDA and CuMetal now require
+`kernel_rsa_modulus_vanity` as the only entry in `rsa_modulus.ptx`; old four-stage
+PTX overrides are incompatible. An existing GitHub Actions artifact does not
+include local changes. Rebuild Metal sidecars and PTX/CUBIN overrides as well.
 
 Address modes, P-256, and RSA-PSS retain their atomic count and single-result
 protocol per launch. The RSA pipeline retains multiple factor results. Winning
@@ -130,6 +135,22 @@ lanes depend on GPU scheduling. All device-exported results are independently
 verified on the host. Rebuild PTX/CUBIN overrides after kernel interface changes.
 
 ### Apple Silicon
+
+To attempt PTX-to-Metal-source translation for all 16 modules in both built
+bundles, with per-module timing and logs, run on macOS:
+
+```sh
+nix build .#cumetal --out-link .cumetal-artifacts/toolchain
+python3 scripts/compile-ptx-cumetal.py
+```
+
+The script verifies the package revision and hashes against its manifest and
+`flake.lock`, snapshots the bundle inputs, and records results under
+`.cumetal-artifacts/ptx-compile-<id>/`. See `report.md`, `timings.tsv`, and
+`metadata.json` there. Attempts run serially and continue after failures;
+`--timeout SECONDS` changes the default 300-second limit per module. A nonzero
+exit indicates at least one failure or timeout. This checks translation only;
+it does not compile Metal binaries or execute GPU kernels.
 
 The `cumetal` Nix shell builds the compiler and runtime together from the exact
 fork revision in `flake.lock`, including its pinned submodule. Build the host
@@ -146,10 +167,10 @@ nix develop .#cumetal --command cargo run --release --locked -p vanity-miner \
 All eight search commands and the numbered self-tests have CuMetal host dispatch.
 `--ptx DIR` accepts separately compiled PTX modules; `--ptx FILE` accepts one
 selected mode's module. Translation uses the pinned compiler's typed backend.
-P-256 and RSA-PSS use structured candidate batches; RSA modulus uses the persistent
-four-stage pipeline. Batch capacity is `--blocks` times `--threads-per-block`.
-`--batches N` bounds batches (four launches per RSA modulus cycle); `--verify`
-additionally checks candidates against CPU logic. Wiring and compilation alone
+P-256 and RSA-PSS use structured candidate batches; RSA modulus uses one resumable
+mining entry. Batch capacity is `--blocks` times `--threads-per-block`.
+`--batches N` bounds kernel launches; `--verify` additionally checks candidates
+against CPU logic, including RSA counters, results and saved task state. Wiring and compilation alone
 do not establish GPU numerical correctness; validate the selected mode on your hardware.
 
 The CLI embeds the locked CuMetal revision at build time and checks the package's

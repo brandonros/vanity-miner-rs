@@ -1,10 +1,19 @@
 # CuMetal validation — 2026-09-16
 
+RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
+entry. The RSA GPU measurements below concern the historical four-stage PTX,
+not this refactor; the updated RSA self-test also needs fresh GPU validation.
+See [the mining design](gpu-search-pipeline.md).
+
 ## Result
 
 Fresh measurement **2026-09-16, 01:46:07–02:14:38 UTC**:
 **2 of 16 rows pass; 14 fail**. The passing rows are **Shallenge production** and
 **P-256 public-key production**. See the [16-row report](cumetal-status.md).
+
+The failures are tracked by **14 open workload issues (#23–35 plus #37)**.
+Adding [#37 — Shallenge self-tests](https://github.com/brandonros/vanity-miner-rs/issues/37)
+updates tracking only; no new measurements were made.
 
 - **Production:** 2 modes pass, 4 fail PTX translation, 2 time out. Both search
   sources of each signature mode were attempted, giving 10 production commands.
@@ -37,8 +46,8 @@ execution and verification. The limit was 300 seconds, plus process termination.
 | RSA-PSS: salt | Timed out | 301.67 | Emitted 24,263,920-byte Metal source; 180-second and late samples showed `newLibraryWithSource`. No completed candidates. |
 | RSA-PSS: message | Timed out | 301.21 | Same emitted source size; independently sampled in `newLibraryWithSource`. No completed candidates. |
 
-The eight production modes have eleven entry points because RSA modulus uses
-four stages. Translating all four does not establish execution of all four.
+The measured eight production modules had eleven entry points because that RSA
+modulus artifact used four stages. Rebuilt sources now have eight production entries. Translating all four does not establish execution of all four.
 In particular, this fresh RSA modulus observation is a **pipeline-creation wait**;
 the historical sample waiting for GPU command completion is separate evidence.
 
@@ -89,7 +98,8 @@ and 203 checks. It is **not a pin-only comparison**.
 
 - **Shallenge self-tests add the fourteenth failing row.** The old eight-check
   module passed; the expanded 21-check module fails in a newly added streaming
-  check. No downstream issue has yet been opened for this new row.
+  check. [Downstream #37](https://github.com/brandonros/vanity-miner-rs/issues/37)
+  now tracks this new row; its upstream owner remains unconfirmed.
 - **All eight production PTX modules have identical instructions, registers,
   control-flow labels and data after an explicit, consistent renaming of declared
   module symbols/parameters.** All original byte hashes differ. The comparison
