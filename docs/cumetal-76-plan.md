@@ -1,7 +1,14 @@
 # CuMetal #76: implementation and acceptance plan
 
-Status: **proposed implementation; no compiler correction made by this audit**.
-Source inspected: CuMetal `9e3e61574b776424a96c686bdbdc04ad1f27fe9f`.
+Status: **implemented locally; acceptance remains open**. The correction is in
+`../.worktrees/cuda-metal-issue-76`, branch `upstream/ptx-ssa-type-contract`.
+The final candidate passes the focused Debug/Release and PTX functional checks;
+Solana, Bitcoin and Ethereum emit MSL under both LLVM versions. This does not
+establish downstream GPU correctness. See the
+[implementation report](cumetal-76-implementation.md) for exact identities,
+measured stages and remaining gates.
+
+Implementation base: CuMetal `9e3e61574b776424a96c686bdbdc04ad1f27fe9f`.
 Owner: [cuda-metal #76](https://github.com/Lulzx/cuda-metal/issues/76).
 
 ## What must change
@@ -11,7 +18,7 @@ A PTX register name can be assigned several different values. An offset held in
 type. The later pointer must not change the type of an earlier offset carried
 through a branch or loop.
 
-The current importer violates that contract in three connected places:
+The pinned baseline importer violates that contract in three connected places:
 
 1. **Result inference:** `cvt.u64.u32` is initially inferred as a 32-bit result
    because the generic opcode scanner sees the source width. Translation later

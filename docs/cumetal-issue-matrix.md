@@ -1,5 +1,19 @@
 # CuMetal issue ownership and fix status
 
+The [64-issue consolidation audit](cumetal-issue-duplicate-audit.md) and
+[executed follow-up](cumetal-consolidation-followup.md) now have published GitHub
+results: upstream #46 is **closed as superseded** after transferring acceptance
+to #116/#117. #83's historical depth subcase is assigned to #120/#121; its
+empty-label work remains open. This leaves 63 of the audited trackers open;
+51 have open PRs explicitly claiming fixes, not 51 verified or merged repairs.
+
+Fresh CPU translation controls isolate #80's missing generic-to-global helper
+pointer recovery; no implementation or GPU pass is claimed. Comparing the
+retained #115/#124 sources confirms shared constant-PRMT expansion and diagnostic
+source reductions of 13.21%/31.87%, making #127 a shared optimization target.
+Their Metal timeout/allocation causes remain unresolved and separately tracked.
+The follow-up links the published evidence and records exact inputs and limits.
+
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.

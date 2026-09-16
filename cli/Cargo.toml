@@ -108,12 +108,12 @@ paste = "1.0"
 
 [dependencies.cust]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
+rev = "7c07c618dd7c1c08af4d040a5fc422d9ebf8caff"
 optional = true
 
 [dependencies.cust_raw]
 git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "f554f74a78a1ee30b2668f0ec2e5b1fd54b7b588"
+rev = "7c07c618dd7c1c08af4d040a5fc422d9ebf8caff"
 optional = true
 
 [dependencies.backtrace]
