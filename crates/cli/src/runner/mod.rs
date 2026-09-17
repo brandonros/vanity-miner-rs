@@ -3,12 +3,12 @@ pub(crate) mod cumetal;
 #[cfg(feature = "cumetal")]
 pub use cumetal::{CumetalOptions, CumetalRunner};
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
 mod cpu;
 #[cfg(feature = "gpu")]
 pub(crate) mod cuda;
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
 pub use cpu::CpuRunner;
 #[cfg(feature = "gpu")]
 pub use cuda::GpuRunner;
@@ -34,3 +34,6 @@ pub mod modules;
 pub mod progress;
 pub mod session;
 pub mod workers;
+
+#[cfg(feature = "metal")]
+pub mod metal;

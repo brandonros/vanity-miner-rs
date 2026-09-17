@@ -25,6 +25,7 @@ cuda-kernels = [
     "kernel-rsa-modulus?/cuda",
     "kernel-self-test-rsa-modulus?/cuda",
 ]
+metal = ["shallenge", "dep:llvm-metal-runtime", "dep:llvm-metal-abi", "dep:serde_json", "dep:sha2"]
 cumetal = ["dep:libloading", "dep:serde", "dep:serde_json"]
 llvm21 = [
     "cuda-kernels",
@@ -76,6 +77,9 @@ self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss", "dep:kernel
 self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus", "dep:kernel-self-test-rsa-modulus"]
 
 [dependencies]
+llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "e5cea07dd6a0512d4fb33894646f1dddf03ab1a0", optional = true }
+llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "e5cea07dd6a0512d4fb33894646f1dddf03ab1a0", optional = true }
+sha2 = { version = "0.10", optional = true }
 kernel-solana = { path = "../kernels/solana", default-features = false, optional = true }
 kernel-self-test-solana = { path = "../kernels/self-test-solana", default-features = false, optional = true }
 kernel-bitcoin = { path = "../kernels/bitcoin", default-features = false, optional = true }
@@ -123,3 +127,7 @@ optional = true
 [build-dependencies.serde_json]
 version = "1"
 optional = true
+
+[[example]]
+name = "metal_bench"
+required-features = ["metal"]

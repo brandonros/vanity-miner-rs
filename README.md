@@ -1,7 +1,7 @@
 # vanity-miner-rs
 
 Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-and CuMetal on Apple Silicon.
+CuMetal, and a direct Metal backend for Shallenge on Apple Silicon.
 
 ## Modes
 
@@ -48,6 +48,22 @@ Build the 8 production and 8 self-test PTX modules separately:
 
 Bundles land in `artifacts/ptx-bundle-llvm<version>.tar.gz`. Use runner and PTX
 artifacts from the same source revision. `PTX_PATH` selects an external bundle.
+
+## Metal Shallenge · macOS
+
+Build and run through the pinned stock Rust → LLVM → AIR pipeline:
+
+```sh
+./scripts/run-metal-shallenge.sh --batches 4 --batch-size 33 --seed 12345 --verify \
+  shallenge --username brandonros \
+  --target-hash ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+```
+
+This builds matching device/host artifacts using `nix develop .#metal` (stable
+Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
+`--verify` compares every lane with the CPU; winners are always CPU-verified.
+The legacy CUDA/CuMetal paths still use their existing toolchains. Backend
+features `metal`, `gpu` and `cumetal` are mutually exclusive.
 
 ## CuMetal · macOS
 
