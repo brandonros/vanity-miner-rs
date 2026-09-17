@@ -1,15 +1,19 @@
-# CuMetal status — 2026-09-16
+# CuMetal status — 2026-09-17
 
-**Latest issue audit:** the consumer pin is `f7ceeef`. Five production workload
-issues (#23–25, #38 and #39) are closed on recorded CPU/GPU acceptance under both
-LLVM versions; three production issues and all eight self-test issues remain
-open. Thus 10 of 32 workload/version combinations have named-revision acceptance,
-and 22 remain without complete acceptance. This is not a current-pin full sweep.
-See the [maintained issue matrix](cumetal-issue-matrix.md) for the latest stages.
-The [#130 consumer report](cumetal-130-validation.md) adds P-256 production
-acceptance and later self-test results; [#134](cumetal-134-validation.md) records
-the current-pin Bitcoin LLVM21 translation rejection. No further workload issue
-can close on these measurements.
+**Current pin: `fb3644a`. Five workload issues closed, 11 open.** The closed
+production modes remain Solana, Bitcoin, Ethereum, Shallenge and P-256 public
+key, accepted under both LLVM versions at their recorded revisions. Three
+production modes and all eight self-test groups remain open: 22 of 32 combinations
+without complete acceptance. This is not a current-pin full sweep.
+
+The [#76 scaling report](cumetal-76-scaling-validation.md) records 53 matching
+CPU passes and fresh normal-consumer LLVM7 Bitcoin/RSA-PSS attempts. Both clear
+their prior #76 proof-budget gates, then fail translation at **#136 helper-write
+proof (94.244s)** and **#141 direct CLZ (80.859s)** respectively. No full-module
+GPU launch occurs and no further workload ticket closes. [PR #142](https://github.com/Lulzx/cuda-metal/pull/142)
+is pushed with exact-head GitGuardian success; native legacy acceptance and
+upstream integration remain separate. The [matrix](cumetal-issue-matrix.md)
+records each measured revision and the next sequence: #118,#140,#136,#141,#133.
 
 ## Earlier measurements
 
