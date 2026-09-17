@@ -1,48 +1,83 @@
 use k256::SecretKey;
-use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::elliptic_curve::{point::AffineCoordinates, sec1::ToEncodedPoint};
+
+/// Derive a compressed SEC1 public key, rejecting zero and out-of-range scalars.
+pub fn try_secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> Option<[u8; 33]> {
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).ok()?;
+    let public_key = secret_key.public_key();
+    let point = public_key.as_affine();
+    let mut result = [0u8; 33];
+    // SecretKey validation excludes the identity. Fixed SEC1 serialization avoids
+    // the variable-length EncodedPoint identity/tag path on device compilers.
+    result[0] = 2 | (point.y_is_odd().unwrap_u8() & 1);
+    result[1..].copy_from_slice(&point.x());
+    Some(result)
+}
+
+/// Derive an uncompressed SEC1 public key, rejecting invalid scalars.
+pub fn try_secp256k1_derive_public_key_uncompressed(
+    private_key_bytes: &[u8; 32],
+) -> Option<[u8; 65]> {
+    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).ok()?;
+    let public_key = secret_key.public_key();
+    let encoded = public_key.to_encoded_point(false);
+    encoded.as_bytes().try_into().ok()
+}
 
 pub fn secp256k1_derive_public_key(private_key_bytes: &[u8; 32]) -> [u8; 33] {
-    // Create secret key from bytes (validates it's in valid range)
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
-
-    // Derive public key
-    let public_key = secret_key.public_key();
-
-    // Get compressed point (33 bytes: 0x02/0x03 prefix + 32 bytes x-coordinate)
-    let encoded_point = public_key.to_encoded_point(true); // true = compressed
-    let compressed_bytes = encoded_point.as_bytes();
-
-    // Convert to fixed-size array
-    let mut result = [0u8; 33];
-    result.copy_from_slice(compressed_bytes);
-
-    result
+    try_secp256k1_derive_public_key(private_key_bytes).expect("invalid secp256k1 private key")
 }
 
 pub fn secp256k1_derive_public_key_uncompressed(private_key_bytes: &[u8; 32]) -> [u8; 65] {
-    // Create secret key from bytes
-    let secret_key = SecretKey::from_bytes(private_key_bytes.into()).unwrap(); // TODO: handle error
-
-    // Derive public key
-    let public_key = secret_key.public_key();
-
-    // Get uncompressed point (65 bytes: 0x04 prefix + 32 bytes x + 32 bytes y)
-    let encoded_point = public_key.to_encoded_point(false); // false = uncompressed
-    let uncompressed_bytes = encoded_point.as_bytes();
-
-    // Convert to fixed-size array
-    let mut result = [0u8; 65];
-    result.copy_from_slice(uncompressed_bytes);
-
-    result
+    try_secp256k1_derive_public_key_uncompressed(private_key_bytes)
+        .expect("invalid secp256k1 private key")
 }
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         crypto::secp256k1::secp256k1_derive_public_key,
         crypto::secp256k1::secp256k1_derive_public_key_uncompressed,
     };
+
+    #[test]
+    fn checked_encodings_match_k256_and_reject_invalid_scalars() {
+        for invalid in [
+            [0u8; 32],
+            [0xff; 32],
+            hex::decode("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
+                .unwrap()
+                .try_into()
+                .unwrap(),
+        ] {
+            assert_eq!(try_secp256k1_derive_public_key(&invalid), None);
+            assert_eq!(try_secp256k1_derive_public_key_uncompressed(&invalid), None);
+        }
+        let mut state = 0x123456789abcdef0u64;
+        for _ in 0..32 {
+            let mut input = [0u8; 32];
+            for word in input.chunks_exact_mut(8) {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                word.copy_from_slice(&state.to_be_bytes());
+            }
+            let key = k256::SecretKey::from_bytes((&input).into())
+                .unwrap()
+                .public_key();
+            assert_eq!(
+                try_secp256k1_derive_public_key(&input).unwrap().as_slice(),
+                key.to_encoded_point(true).as_bytes()
+            );
+            assert_eq!(
+                try_secp256k1_derive_public_key_uncompressed(&input)
+                    .unwrap()
+                    .as_slice(),
+                key.to_encoded_point(false).as_bytes()
+            );
+        }
+    }
 
     #[test]
     fn should_derive_compressed_public_key_correctly() {
