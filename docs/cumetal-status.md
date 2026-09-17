@@ -1,5 +1,18 @@
 # CuMetal status — 2026-09-16
 
+**Latest issue audit:** the consumer pin is `f7ceeef`. Five production workload
+issues (#23–25, #38 and #39) are closed on recorded CPU/GPU acceptance under both
+LLVM versions; three production issues and all eight self-test issues remain
+open. Thus 10 of 32 workload/version combinations have named-revision acceptance,
+and 22 remain without complete acceptance. This is not a current-pin full sweep.
+See the [maintained issue matrix](cumetal-issue-matrix.md) for the latest stages.
+The [#130 consumer report](cumetal-130-validation.md) adds P-256 production
+acceptance and later self-test results; [#134](cumetal-134-validation.md) records
+the current-pin Bitcoin LLVM21 translation rejection. No further workload issue
+can close on these measurements.
+
+## Earlier measurements
+
 **Historical full 16-workload sweep below: CuMetal `9e3e615`.** The earlier
 [three-mode run on `0242f22`](cumetal-three-mode-validation.md) passes Solana,
 Bitcoin and Ethereum production with **both LLVM7 and LLVM21 PTX**: 24 invocations,
@@ -7,21 +20,22 @@ Bitcoin and Ethereum production with **both LLVM7 and LLVM21 PTX**: 24 invocatio
 completed on 2026-09-16 after publishing this evidence. No fresh
 full-sweep total is claimed. See the [issue matrix](cumetal-issue-matrix.md).
 
-**Current-pin Shallenge production follow-up on `4a207e2`: both LLVM7 and LLVM21
+**Shallenge production follow-up measured on `4a207e2`: both LLVM7 and LLVM21
 pass all 33 profiles per version** (66 invocations / 132 GPU batches / 4,224
 CPU-reference-checked positions / 96 independently verified winner hashes).
 [PR #132](https://github.com/Lulzx/cuda-metal/pull/132) implements upstream #129;
 its scoped acceptance passes and upstream integration remains pending.
 Downstream #38 is closed. See the [Shallenge report](cumetal-shallenge-validation.md).
-**New [four-group self-test replay](cumetal-four-self-test-validation.md) at
+**Earlier [four-group self-test replay](cumetal-four-self-test-validation.md) at
 `4a207e2`: none of #29/#30/#31/#37 can close.** Solana, Bitcoin, Ethereum and
 Shallenge were attempted under both LLVM7 and LLVM21. CPU passes all 147 checks;
 seven GPU attempts fail translation and LLVM21 Ethereum times out at 600 seconds
 in Metal compute-pipeline preparation. All 294 GPU check selections are blocked;
-there are no numerical GPU results or skips. The other eight open workloads
-were not rerun at this pin. The full-sweep tables below remain historical.
-All eight measured failures now have published owners: #76, #130, new #133
-(Ethereum pipeline preparation) and new #134 (Bitcoin narrowing). See the
+there are no numerical GPU results or skips in that replay. At that measurement,
+eight other workload trackers were open and were not rerun; subsequent P-256
+production acceptance closed #39. The full-sweep tables below remain historical.
+All eight failures from that replay were assigned published owners: #76, #130, #133
+(Ethereum pipeline preparation) and #134 (Bitcoin narrowing). See the
 [ownership mapping](cumetal-four-self-test-validation.md#published-upstream-ownership).
 
 RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
