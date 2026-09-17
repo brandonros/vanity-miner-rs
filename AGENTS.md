@@ -38,3 +38,20 @@ results must be labeled historical when the tested dependency revision changes.
   user has authorized GitHub updates, rather than creating another Markdown file.
 - After work is published, remove completed worktrees that have no unique work
   or active user. Preserve unpublished changes, branches, and commits.
+
+## README maintenance
+
+- Keep `README.md` a short entry point: purpose, supported modes, and essential
+  setup, build, run, and self-test commands. Keep it under 100 lines unless the
+  user explicitly requests a longer guide; do not cram paragraphs onto long lines.
+- Edit it only when essential user-facing instructions change or become wrong.
+  Completing an internal change or investigation is not a reason to add a section.
+- Correct or replace existing instructions instead of appending updates. Use
+  plain, direct wording; omit promotional language and repeated explanations.
+- Do not add implementation narratives, debugging history, validation reports,
+  timings, hashes, artifact inventories, agent handoffs, or migration chronicles.
+- Use `--help` for exhaustive CLI options and the issue matrix for CuMetal status.
+  Do not duplicate those details in the README or create extra Markdown files to
+  hold material removed from it. Follow the documentation policy above.
+- Before finishing a README edit, review the whole file for stale instructions,
+  duplication, and unnecessary detail. Preserve the commands needed to get started.
