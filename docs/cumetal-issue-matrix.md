@@ -40,10 +40,10 @@ implementation PRs remain unmerged. #155/#156/#158/#159/#160/#161 are included. 
 | [#136](https://github.com/Lulzx/cuda-metal/issues/136) | Implemented in [#153](https://github.com/Lulzx/cuda-metal/pull/153); disjoint helper writes pass GPU controls. Original Solana/Bitcoin call barriers clear; later direct-store ranges remain unresolved. |
 | [#141](https://github.com/Lulzx/cuda-metal/issues/141) | CLZ in [#150](https://github.com/Lulzx/cuda-metal/pull/150); trap-capable helper support in [#159](https://github.com/Lulzx/cuda-metal/pull/159). Current LLVM21 RSA-PSS production/self-test modules emit MSL. |
 | [#127](https://github.com/Lulzx/cuda-metal/issues/127) | Immediate PRMT implemented in [#154](https://github.com/Lulzx/cuda-metal/pull/154): at most 21 operations versus 66. Immediate and exhaustive runtime-selector GPU checks pass. Apple time/memory benefit unmeasured. |
-| [#133](https://github.com/Lulzx/cuda-metal/issues/133) | Pipeline cost unresolved. LLVM21 Ethereum emits 11.4 MB of MSL at `075e963`; preparation was not rerun. Measure #127's effect separately. |
+| [#133](https://github.com/Lulzx/cuda-metal/issues/133) | Fresh `70294ed` LLVM21 Ethereum times out at 600.008 s in pipeline creation; CPU8/8 pass, no GPU results. A separate size-mode probe on unchanged MSL also times out at 600.012 s; Apple service sampled in LLVM function-pass execution. No performance fix or runtime option added. |
 | [#151](https://github.com/Lulzx/cuda-metal/issues/151) | POPC implemented in [#156](https://github.com/Lulzx/cuda-metal/pull/156). Shared CLZ/POPC numerical tests verify 6,150 output words. RSA modulus advances to undefined incoming-register failures. |
 | [#152](https://github.com/Lulzx/cuda-metal/issues/152) | Implemented in [#158](https://github.com/Lulzx/cuda-metal/pull/158), completed for the measured Shallenge case by [#161](https://github.com/Lulzx/cuda-metal/pull/161): recompute zero facts after CFG pruning. Both versions pass all21 GPU checks at `70294ed`. PR integration pending; correlated helper records remain separate. |
-| [#157](https://github.com/Lulzx/cuda-metal/issues/157) | Generic-store stale cell types fixed in [#160](https://github.com/Lulzx/cuda-metal/pull/160); scalar/vector numerical and refusal checks pass. This clears LLVM7 Shallenge’s pointer/scalar join; the combined `70294ed` stack passes all21 checks on both GPUs. PR integration pending; general #137 escape activation is separate. |
+| [#157](https://github.com/Lulzx/cuda-metal/issues/157) | Generic-store stale cell types fixed in [#160](https://github.com/Lulzx/cuda-metal/pull/160); scalar/vector numerical and refusal checks pass. This clears LLVM7 Shallenge’s pointer/scalar join; the combined `70294ed` stack passes all21 GPU checks under both LLVM versions. PR integration pending; general #137 escape activation is separate. |
 
 ## Latest recorded workload results
 
@@ -63,7 +63,7 @@ compiler, rather than the normal paired Nix consumer. This is not a fresh 32-run
 | RSA-PSS production [#28](https://github.com/brandonros/vanity-miner-rs/issues/28) | Vector parameter rejection `c4e5fac` | MSL emitted, dev `0dbdb4b`, 65.502 s | Apple preparation / GPU validation; historical #115 |
 | Solana self-tests [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) | Direct-store range rejection `075e963`, 6.215 s | Helper-field type refusal at line50529, dev `70e2ab0`, 3.936 s | Reduce LLVM7 ranges / #140 empty-record context |
 | Bitcoin self-tests [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) | Direct-store range rejection `075e963`, 10.850 s | Pointer-type rejection `f7ceeef`, not rerun | Reduce ranges; #118/#152 leads for LLVM21 |
-| Ethereum self-tests [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) | Pipeline timeout `0f98856` | Metal emitted, dev `075e963`, 4.812 s; preparation not rerun | #133 |
+| Ethereum self-tests [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) | Store-range rejection `70294ed`, 5.974 s | Pipeline timeout `70294ed`, 600.008 s; no GPU results | #76 range reduction / #133 preparation cost; CPU8/8 pass |
 | Shallenge self-tests [#37](https://github.com/brandonros/vanity-miner-rs/issues/37), closed | **21/21 pass `70294ed`, 34.701 s** | **21/21 pass `70294ed`, 23.756 s** | #152/#157 accepted; PRs unmerged |
 | P-256 public-key self-tests [#32](https://github.com/brandonros/vanity-miner-rs/issues/32) | Undefined value `0f98856` | Metal emitted; GPU unverified `c4e5fac` | Reduce / validate |
 | P-256 signature self-tests [#33](https://github.com/brandonros/vanity-miner-rs/issues/33) | Undefined value `0f98856` | Undefined value `c4e5fac` | Reduce |
@@ -80,7 +80,8 @@ Consumer `67950b7` contains the same logic and kernel entries after the crate mo
 1. Reduce the remaining direct-store ranges and #140 empty-record context; retain the
    original #118 artifact as a separate acceptance input.
 2. Advance the now-translating LLVM21 RSA-PSS inputs through Apple preparation and numerical checks.
-3. Measure #127 against #133 with separate library/pipeline timings. Smaller source alone is insufficient.
+3. Reduce #133's costly generated functions using active compiler-service samples.
+   Current PRMT output and the size-mode experiment still time out; the hot pass remains unidentified.
 
 No confirmed issue draft remains unpublished. This does not assign every remaining
 P-256/RSA diagnostic or prove that the named fixes will close all 10 workloads.
