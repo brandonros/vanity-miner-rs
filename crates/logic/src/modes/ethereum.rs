@@ -18,6 +18,17 @@ pub struct EthereumVanityKeyResult {
     pub matches: bool,
 }
 
+/// Derive the public key and raw Ethereum address, rejecting invalid scalars.
+pub fn try_derive_ethereum_address(private_key: &[u8; 32]) -> Option<([u8; 64], [u8; 20])> {
+    let full = secp256k1::try_secp256k1_derive_public_key_uncompressed(private_key)?;
+    let mut public_key = [0u8; 64];
+    public_key.copy_from_slice(&full[1..]);
+    let hash = keccak256::keccak256_64bytes(&public_key);
+    let mut address = [0u8; 20];
+    address.copy_from_slice(&hash[12..]);
+    Some((public_key, address))
+}
+
 /// Pure function - no side effects, easily testable
 pub fn generate_and_check_ethereum_vanity_key(
     request: &EthereumVanityKeyRequest,
@@ -25,17 +36,8 @@ pub fn generate_and_check_ethereum_vanity_key(
     // Generate private key
     let private_key = xoroshiro::generate_random_private_key(request.thread_idx, request.rng_seed);
 
-    // Derive uncompressed public key (65 bytes total, but we skip the 0x04 prefix)
-    let full_public_key = secp256k1::secp256k1_derive_public_key_uncompressed(&private_key);
-
-    // Extract the 64-byte public key (skip 0x04 prefix)
-    let mut public_key = [0u8; 64];
-    public_key.copy_from_slice(&full_public_key[1..]);
-
-    // Calculate Ethereum address: keccak256(public_key)[12..]
-    let public_key_hash = keccak256::keccak256_64bytes(&public_key);
-    let mut address = [0u8; 20];
-    address.copy_from_slice(&public_key_hash[12..]);
+    let (public_key, address) =
+        try_derive_ethereum_address(&private_key).expect("invalid secp256k1 private key");
 
     // Check if matches vanity criteria (no hex encoding needed!)
     let matches = vanity::check_vanity_match(&address, request.prefix, request.suffix);
