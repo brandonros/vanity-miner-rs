@@ -128,7 +128,6 @@ GPU (default 64, range 1–1024). Each step either prepares one p candidate or t
 the budget amortizes launches but delays results and cancellation; it does not
 truncate unfinished ranges. `BATCH_SIZE` controls the number of persistent task
 slots. Shared candidate-ID reservations keep device work disjoint across GPUs.
-See [GPU search design](docs/gpu-search-pipeline.md) for validation and tradeoffs.
 
 Rebuild the host binary and RSA PTX together. CUDA and CuMetal now require
 `kernel_rsa_modulus_vanity` as the only entry in `rsa_modulus.ptx`; old four-stage
@@ -194,19 +193,10 @@ its PTX with that compiler. To advance the contribution revision, update the
 CuMetal input ref if needed, run `nix flake update cumetal`, review the locked
 commit, and rebuild the host in the shell. See [validation provenance rules](AGENTS.md).
 
-Validation on 2026-09-15 of CuMetal `e5acf8cc0c65` on Apple M5 passed two
-32-candidate batches each for Shallenge and P-256 public-key search with `--verify`.
-Four production modes failed translation; RSA modulus and both RSA-PSS search
-variants emitted Metal but timed out before completing a batch. All eight
-self-test groups were attempted: 8 checks passed and 152 were blocked by
-translation. The [16-row status](docs/cumetal-status.md) remains 3 true / 13 false,
-but RSA-PSS production now gets past its earlier translation failure. See the
-[complete report](docs/cumetal-validation.md) for fresh diagnostics, fix coverage,
-validation limits, and exact artifact identities.
-The [issue ownership matrix](docs/cumetal-issue-matrix.md) maps all 13 unresolved
-workloads to upstream defects and distinguishes partial fixes from completed
-validation. The full run above predates the later `92a9b8f4de23` and
-`7d12f120a6b8` locks.
+The [CuMetal issue matrix](docs/cumetal-issue-matrix.md) records the current pin,
+published fixes, remaining owners, and the latest measured LLVM7/LLVM21 result
+for each workload. Detailed reproduction and validation evidence lives on the
+linked GitHub issues and PRs.
 
 `gpu` and `cumetal` are mutually exclusive; do not use `--all-features`.
 
