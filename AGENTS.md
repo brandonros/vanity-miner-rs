@@ -25,3 +25,16 @@ pinned VF64 submodule. Local contribution worktrees are not build inputs.
 
 Keep validation claims scoped to the recorded source and artifacts. Historical
 results must be labeled historical when the tested dependency revision changes.
+
+## Documentation
+
+- Keep `docs/cumetal-issue-matrix.md` as the single concise CuMetal status summary.
+  Update current rows; do not append historical reports or repeated evidence.
+- Do not create per-task, per-artifact, planning, validation, or handoff Markdown
+  files unless the user explicitly requests one. These reports are disposable
+  and can be regenerated when needed.
+- Keep raw logs, commands, hashes, and structured results in ignored artifact
+  directories. Put durable technical context on existing issues/PRs when the
+  user has authorized GitHub updates, rather than creating another Markdown file.
+- After work is published, remove completed worktrees that have no unique work
+  or active user. Preserve unpublished changes, branches, and commits.
