@@ -23,6 +23,7 @@ members = [
 ]
 default-members = ["crates/cli", "crates/logic"]
 exclude = [
+  "crates/kernels/bitcoin/metal",
   "crates/kernels/ethereum/metal",
   "crates/kernels/shallenge/metal",
   "crates/kernels/solana/device",

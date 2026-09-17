@@ -1,4 +1,4 @@
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
 pub(crate) mod cpu;
 #[cfg(feature = "gpu")]
 pub(crate) mod cuda;
@@ -7,6 +7,12 @@ pub(crate) mod cumetal;
 
 pub(crate) mod args;
 
-#[cfg(any(feature = "gpu", feature = "cumetal", test))]
-#[cfg_attr(not(any(feature = "gpu", feature = "cumetal")), allow(dead_code))]
+#[cfg(any(feature = "gpu", feature = "cumetal", feature = "metal", test))]
+#[cfg_attr(
+    not(any(feature = "gpu", feature = "cumetal", feature = "metal")),
+    allow(dead_code)
+)]
 mod device;
+
+#[cfg(feature = "metal")]
+pub(crate) mod metal;

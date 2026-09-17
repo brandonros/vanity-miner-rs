@@ -59,6 +59,19 @@ impl Contract for Ethereum {
 #[cfg(feature = "ethereum")]
 pub type EthereumTransport = Transport<Ethereum>;
 
+#[cfg(feature = "bitcoin")]
+pub struct Bitcoin;
+#[cfg(feature = "bitcoin")]
+impl Contract for Bitcoin {
+    type Launch = super::bitcoin_contract::Launch;
+    const INTERFACE: &'static str = super::bitcoin_contract::INTERFACE;
+    fn candidate(launch: &Self::Launch, lane: u32) -> CandidateResult {
+        super::bitcoin_contract::candidate(launch, lane)
+    }
+}
+#[cfg(feature = "bitcoin")]
+pub type BitcoinTransport = Transport<Bitcoin>;
+
 pub struct Transport<C: Contract> {
     contract: std::marker::PhantomData<C>,
     kernel: PreparedKernel,
@@ -279,6 +292,30 @@ impl Transport<Ethereum> {
             return Err("invalid Metal candidate range".into());
         }
         let launch = super::ethereum_contract::Launch {
+            seed: *seed,
+            pattern: *pattern,
+            start,
+            count,
+            audit: u32::from(self.audit),
+        };
+        self.evaluate_launch(&launch, count)
+    }
+}
+
+#[cfg(feature = "bitcoin")]
+impl Transport<Bitcoin> {
+    pub fn evaluate(
+        &mut self,
+        seed: &BatchSeed,
+        pattern: &logic::search::vanity::BytePattern,
+        start: u64,
+        count: u32,
+    ) -> Result<BatchResult, String> {
+        if count == 0 || count > self.capacity || start.checked_add(u64::from(count) - 1).is_none()
+        {
+            return Err("invalid Metal candidate range".into());
+        }
+        let launch = super::bitcoin_contract::Launch {
             seed: *seed,
             pattern: *pattern,
             start,

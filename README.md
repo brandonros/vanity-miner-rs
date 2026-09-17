@@ -1,7 +1,7 @@
 # vanity-miner-rs
 
 Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-CuMetal, and a direct Metal backend for Shallenge on Apple Silicon.
+CuMetal, and direct Metal for Shallenge, Ethereum and Bitcoin on Apple Silicon.
 
 ## Modes
 
@@ -51,8 +51,6 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 
 ## Metal · macOS
 
-Build and run through the pinned stock Rust → LLVM → AIR pipeline:
-
 ```sh
 ./scripts/run-metal-shallenge.sh --batches 4 --batch-size 33 --seed 12345 --verify \
   shallenge --username brandonros \
@@ -62,12 +60,15 @@ Build and run through the pinned stock Rust → LLVM → AIR pipeline:
 This builds matching device/host artifacts using `nix develop .#metal` (stable
 Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
 `--verify` compares every lane with the CPU; winners are always CPU-verified.
-Ethereum currently needs the newer local llvm-metal checkout:
+Ethereum and Bitcoin P2WPKH (`bc1q…`) need the newer local llvm-metal checkout:
 
 ```sh
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode ethereum \
   --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
   ethereum-vanity --prefix 55 --suffix 02
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode bitcoin \
+  --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
+  bitcoin-vanity --prefix bc1qg --suffix 6m
 ```
 
 The legacy CUDA/CuMetal paths still use their existing toolchains. Backend
