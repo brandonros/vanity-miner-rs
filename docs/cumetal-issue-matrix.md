@@ -3,7 +3,7 @@
 Updated 2026-09-17. **Pin: `70294edc23f1bc06bd211bd055cb7bd275148a3d`
 ([PR #161](https://github.com/Lulzx/cuda-metal/pull/161)).** The normal all-mode
 miner was rebuilt against the matched Nix compiler/runtime package. The cumulative
-implementation PRs remain unmerged. #155/#156/#158/#159/#160/#161 are included. Unpublished #123 and diagnostic PR #128 remain outside this pin.
+implementation PRs remain unmerged. #155/#156/#158/#159/#160/#161 are included. Unpublished #123, diagnostic PR #128, and range-proof PRs [#162](https://github.com/Lulzx/cuda-metal/pull/162)/[#163](https://github.com/Lulzx/cuda-metal/pull/163) remain outside this pin.
 
 ## Counts and measured progress
 
@@ -32,7 +32,7 @@ implementation PRs remain unmerged. #155/#156/#158/#159/#160/#161 are included. 
 
 | CuMetal owner | Implementation / remaining work |
 | --- | --- |
-| [#76](https://github.com/Lulzx/cuda-metal/issues/76) | Prior #131/#135/#142 corrections plus demand scaling in [#158](https://github.com/Lulzx/cuda-metal/pull/158). Original #118 input clears the budget stage at `0dbdb4b`, then rejects an unresolved store offset (line134556, cell64); reduction remains. |
+| [#76](https://github.com/Lulzx/cuda-metal/issues/76) | Captured origins, bounded shifts and conditional increments in [#162](https://github.com/Lulzx/cuda-metal/pull/162)/[#163](https://github.com/Lulzx/cuda-metal/pull/163), dev `806abdc`. Current LLVM7 Solana/Bitcoin/Ethereum clear their recorded range failures; empty-pattern fields remain. 13 Release suites pass; 23 numerical range fixtures ×65 inputs and 42 refusals. Original #118 still exhausts the scalar range budget at store133056/cell64 (102.689 s, importer only). |
 | [#130](https://github.com/Lulzx/cuda-metal/issues/130) | Implemented in #138; P-256 public-key production accepted, downstream #39 closed. |
 | [#134](https://github.com/Lulzx/cuda-metal/issues/134) | Implemented in #139; original packed-value blocker cleared. Later pointer proofs remain. |
 | [#118](https://github.com/Lulzx/cuda-metal/issues/118) | Per-lane correction in [#145](https://github.com/Lulzx/cuda-metal/pull/145); 17 mixed-lane GPU fixtures pass in the latest group. Original full artifact now reaches a later store-range proof; current LLVM21 RSA-PSS self-tests emit MSL. Neither is a full GPU acceptance claim. |
@@ -61,9 +61,9 @@ compiler, rather than the normal paired Nix consumer. This is not a fresh 32-run
 | P-256 signature production [#26](https://github.com/brandonros/vanity-miner-rs/issues/26) | Vector parameter rejection `13efc29` | Undefined value `c4e5fac` | Reduce; #41 is a lead |
 | RSA modulus production [#27](https://github.com/brandonros/vanity-miner-rs/issues/27) | Undefined value `c4e5fac` | Undefined `%rd205`, dev `400a8bb`, 9.175 s | Reduce undefined edge; LLVM7 unresolved |
 | RSA-PSS production [#28](https://github.com/brandonros/vanity-miner-rs/issues/28) | Vector parameter rejection `c4e5fac` | MSL emitted, dev `0dbdb4b`, 65.502 s | Apple preparation / GPU validation; historical #115 |
-| Solana self-tests [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) | Direct-store range rejection `075e963`, 6.215 s | Helper-field type refusal at line50529, dev `70e2ab0`, 3.936 s | Reduce LLVM7 ranges / #140 empty-record context |
-| Bitcoin self-tests [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) | Direct-store range rejection `075e963`, 10.850 s | Pointer-type rejection `f7ceeef`, not rerun | Reduce ranges; #118/#152 leads for LLVM21 |
-| Ethereum self-tests [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) | Store-range rejection `70294ed`, 5.974 s | Pipeline timeout `70294ed`, 600.008 s; no GPU results | #76 range reduction / #133 preparation cost; CPU8/8 pass |
+| Solana self-tests [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) | Empty-pattern field rejection at line48114, dev `806abdc`, 4.543 s | Helper-field type refusal at line50529, dev `70e2ab0`, 3.936 s | Reduce local empty-pattern proof / #140 helper context |
+| Bitcoin self-tests [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) | Empty-suffix field rejection at line34536, dev `806abdc`, 7.287 s | Pointer-type rejection `f7ceeef`, not rerun | Reduce local empty-pattern proof; #118/#152 leads for LLVM21 |
+| Ethereum self-tests [#31](https://github.com/brandonros/vanity-miner-rs/issues/31) | Empty-pattern field rejection at line25916, dev `806abdc`, 5.200 s | Pipeline timeout `70294ed`, 600.008 s; no GPU results | Empty-record proof investigation / #133 preparation cost; CPU8/8 pass |
 | Shallenge self-tests [#37](https://github.com/brandonros/vanity-miner-rs/issues/37), closed | **21/21 pass `70294ed`, 34.701 s** | **21/21 pass `70294ed`, 23.756 s** | #152/#157 accepted; PRs unmerged |
 | P-256 public-key self-tests [#32](https://github.com/brandonros/vanity-miner-rs/issues/32) | Undefined value `0f98856` | Metal emitted; GPU unverified `c4e5fac` | Reduce / validate |
 | P-256 signature self-tests [#33](https://github.com/brandonros/vanity-miner-rs/issues/33) | Undefined value `0f98856` | Undefined value `c4e5fac` | Reduce |
@@ -77,8 +77,10 @@ Consumer `67950b7` contains the same logic and kernel entries after the crate mo
 
 ## Next work
 
-1. Reduce the remaining direct-store ranges and #140 empty-record context; retain the
-   original #118 artifact as a separate acceptance input.
+1. Reduce the current LLVM7 local empty-pattern field proofs and fix #140 helper
+   context. Small private/empty/mixed helper controls are published on #140; the
+   local cases are not yet proven to share that cause. Keep the historical #118
+   budget failure as a separate acceptance input.
 2. Advance the now-translating LLVM21 RSA-PSS inputs through Apple preparation and numerical checks.
 3. Reduce #133's costly generated functions using active compiler-service samples.
    Current PRMT output and the size-mode experiment still time out; the hot pass remains unidentified.
