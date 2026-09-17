@@ -15,7 +15,7 @@ pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) 
     )));
     let options = &runner.options;
     let mut engine = ShallengeTransport::load(
-        &options.metal_artifacts,
+        &runner.artifacts("shallenge"),
         options.batch_size,
         options.threads_per_group as usize,
         options.verify,

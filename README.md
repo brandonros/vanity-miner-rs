@@ -49,7 +49,7 @@ Build the 8 production and 8 self-test PTX modules separately:
 Bundles land in `artifacts/ptx-bundle-llvm<version>.tar.gz`. Use runner and PTX
 artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 
-## Metal Shallenge · macOS
+## Metal · macOS
 
 Build and run through the pinned stock Rust → LLVM → AIR pipeline:
 
@@ -62,6 +62,14 @@ Build and run through the pinned stock Rust → LLVM → AIR pipeline:
 This builds matching device/host artifacts using `nix develop .#metal` (stable
 Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
 `--verify` compares every lane with the CPU; winners are always CPU-verified.
+Ethereum currently needs the newer local llvm-metal checkout:
+
+```sh
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode ethereum \
+  --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
+  ethereum-vanity --prefix 55 --suffix 02
+```
+
 The legacy CUDA/CuMetal paths still use their existing toolchains. Backend
 features `metal`, `gpu` and `cumetal` are mutually exclusive.
 

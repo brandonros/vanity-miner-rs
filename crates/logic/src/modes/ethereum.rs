@@ -33,21 +33,27 @@ pub fn try_derive_ethereum_address(private_key: &[u8; 32]) -> Option<([u8; 64], 
 pub fn generate_and_check_ethereum_vanity_key(
     request: &EthereumVanityKeyRequest,
 ) -> EthereumVanityKeyResult {
+    try_generate_and_check_ethereum_vanity_key(request).expect("invalid secp256k1 private key")
+}
+
+/// Checked candidate evaluation for device code without a panic runtime.
+pub fn try_generate_and_check_ethereum_vanity_key(
+    request: &EthereumVanityKeyRequest,
+) -> Option<EthereumVanityKeyResult> {
     // Generate private key
     let private_key = xoroshiro::generate_random_private_key(request.thread_idx, request.rng_seed);
 
-    let (public_key, address) =
-        try_derive_ethereum_address(&private_key).expect("invalid secp256k1 private key");
+    let (public_key, address) = try_derive_ethereum_address(&private_key)?;
 
     // Check if matches vanity criteria (no hex encoding needed!)
     let matches = vanity::check_vanity_match(&address, request.prefix, request.suffix);
 
-    EthereumVanityKeyResult {
+    Some(EthereumVanityKeyResult {
         private_key,
         public_key,
         address,
         matches,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -113,12 +119,14 @@ pub fn candidate(
     let Some((prefix, suffix)) = pattern.parts() else {
         return CandidateResult::ERROR;
     };
-    let result = generate_and_check_ethereum_vanity_key(&EthereumVanityKeyRequest {
+    let Some(result) = try_generate_and_check_ethereum_vanity_key(&EthereumVanityKeyRequest {
         prefix,
         suffix,
         thread_idx,
         rng_seed,
-    });
+    }) else {
+        return CandidateResult::ERROR;
+    };
     if result.matches {
         CandidateResult::matched(&result.private_key)
     } else {
