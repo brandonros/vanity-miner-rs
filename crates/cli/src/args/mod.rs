@@ -13,6 +13,9 @@ use std::error::Error;
 #[command(name = "vanity-miner")]
 #[command(about = "GPU-accelerated vanity address generator for multiple blockchains")]
 pub struct Cli {
+    #[cfg(feature = "metal")]
+    #[command(flatten)]
+    pub metal: crate::runner::metal::MetalOptions,
     #[cfg(feature = "cumetal")]
     #[command(flatten)]
     pub cumetal: crate::runner::CumetalOptions,
@@ -170,7 +173,10 @@ pub struct CommandDetails {
     pub prefix_len: usize,
     pub suffix_len: usize,
     pub description: String,
-    #[cfg_attr(any(feature = "gpu", feature = "cumetal"), allow(dead_code))]
+    #[cfg_attr(
+        any(feature = "gpu", feature = "cumetal", feature = "metal"),
+        allow(dead_code)
+    )]
     pub cpu_threads: Option<usize>,
     #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
     pub cuda_module: Option<&'static str>,

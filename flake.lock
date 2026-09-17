@@ -19,6 +19,44 @@
         "url": "https://github.com/brandonros/cuda-metal"
       }
     },
+    "llvm-downgrade": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1780992850,
+        "narHash": "sha256-1dSnxXWdqyE2XDBtBP1XJmDFPVFffNBhRuCYNJK9rYk=",
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "49459235028889ea741f2aee3e7f346d53f68f5d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "49459235028889ea741f2aee3e7f346d53f68f5d",
+        "type": "github"
+      }
+    },
+    "llvm-metal": {
+      "inputs": {
+        "llvm-downgrade": "llvm-downgrade",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1789676570,
+        "narHash": "sha256-Jt1HI0ScAyg20Hxm2audpgPD3KVZLJD2TvKKmOlaS3M=",
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "e5cea07dd6a0512d4fb33894646f1dddf03ab1a0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "e5cea07dd6a0512d4fb33894646f1dddf03ab1a0",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1789264731,
@@ -51,15 +89,54 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "locked": {
+        "lastModified": 1789264731,
+        "narHash": "sha256-llGJbC0CcU8DfROr6mZjRJgMLQd/SKwfpzxJH/2lHO4=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "02f5696b0e6097e589076d886b317b83ff0437d7",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "cumetal": "cumetal",
-        "nixpkgs": "nixpkgs",
+        "llvm-metal": "llvm-metal",
+        "nixpkgs": "nixpkgs_2",
         "nixpkgs-llvm7": "nixpkgs-llvm7",
-        "rust-overlay": "rust-overlay"
+        "rust-overlay": "rust-overlay_2"
       }
     },
     "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "llvm-metal",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1776136407,
+        "narHash": "sha256-Cp8XrVLGruSDBTRs8L4LmvaEcd76tHHU9esLk7Ysa4E=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "753568957a87312ed599cba5699e67126eded6c0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "753568957a87312ed599cba5699e67126eded6c0",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
       "inputs": {
         "nixpkgs": [
           "nixpkgs"

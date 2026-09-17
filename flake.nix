@@ -1,5 +1,6 @@
 {
   inputs = {
+    llvm-metal.url = "github:brandonros/llvm-metal/e5cea07dd6a0512d4fb33894646f1dddf03ab1a0";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     # LLVM 7 is no longer carried by nixpkgs-unstable. Pin a second nixpkgs just
     # for `llvmPackages_7` so someone else's compat patches do the hard work.
@@ -14,7 +15,7 @@
     };
   };
 
-  outputs = { nixpkgs, nixpkgs-llvm7, rust-overlay, cumetal, ... }:
+  outputs = { nixpkgs, nixpkgs-llvm7, rust-overlay, cumetal, llvm-metal, ... }:
     let
       systems = [ "aarch64-linux" "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -217,6 +218,9 @@
         v7 = mkDevShell system 7;
         v21 = mkDevShell system 21;
       })) // {
+        aarch64-darwin.metal = llvm-metal.devShells.aarch64-darwin.rust-fixtures.overrideAttrs (_: {
+          VANITY_LLVM_METAL_SOURCE = "${llvm-metal}";
+        });
         aarch64-darwin.cumetal = darwinPkgs.mkShell {
           packages = [
             (darwinPkgs.rust-bin.fromRustupToolchain {

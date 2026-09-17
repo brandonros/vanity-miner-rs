@@ -1,0 +1,15 @@
+[package]
+name = "kernel-shallenge-metal"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+logic = { path = "../../../logic", default-features = false, features = ["shallenge"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
