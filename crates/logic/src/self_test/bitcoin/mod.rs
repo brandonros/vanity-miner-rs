@@ -16,7 +16,7 @@ use crate::modes::bitcoin::private_key_to_wif;
 // === Non-solana primitive bisect (slots 4-9) ===
 // Same idea as slots 0-3, but for the primitives consumed by the bitcoin /
 // ethereum / shallenge / WIF pipelines. Each KAT pair is taken from the
-// per-module unit tests in the corresponding `logic/src/*.rs` file, so a
+// per-module unit tests in the corresponding `crates/logic/src/*.rs` file, so a
 // fault here means the primitive itself is broken on the device — separate
 // from a fault in a composed pipeline kernel that just inlines it.
 

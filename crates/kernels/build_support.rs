@@ -6,14 +6,14 @@ use cuda_builder::{CudaBuilder, NvvmArch};
 pub fn build(module: &str, legacy_low_opt: bool) {
     println!("cargo::rerun-if-env-changed=PTX_TIMING_DIR");
     let package = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let root = package.parent().unwrap().parent().unwrap();
+    let root = package.ancestors().nth(3).unwrap();
     let device = package.join("device");
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     // Watch this mode and its shared inputs, never sibling kernel directories.
     for input in [
-        "kernels/build_support.rs",
-        "logic",
+        "crates/kernels/build_support.rs",
+        "crates/logic",
         "Cargo.toml",
         "Cargo.lock",
         "rust-toolchain.toml",
@@ -30,7 +30,7 @@ pub fn build(module: &str, legacy_low_opt: bool) {
     {
         println!(
             "cargo::rerun-if-changed={}",
-            root.join("kernels/common/match_handler.rs").display()
+            root.join("crates/kernels/common/match_handler.rs").display()
         );
     }
 

@@ -8,7 +8,7 @@ use core::hint::black_box;
 //
 // Wrapped in ManuallyDrop because SecretKey zeroizes on Drop and
 // cuda-oxide does not yet emit device-side drop_in_place (same pattern
-// as logic/src/secp256k1.rs).
+// as crates/logic/src/secp256k1.rs).
 register_self_test! {
     /// k256 SecretKey::from_bytes(1)
     fn k256_secret_from_bytes_one() -> u32 {

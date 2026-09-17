@@ -17,5 +17,5 @@ k256 (e.g. solana = xoroshiro + ed25519/dalek + base58) fit in the 1 KiB
 default. The original 118-slot self-test ran clean at 16 KiB; RSA/P-256 checks use the larger host-configured stack.
 
 These measurements predate the current pipeline. The CLI's current default is
-64 KiB in `cli/src/runner/cuda/context.rs`; override with `STACK_SIZE=N`.
+64 KiB in `crates/cli/src/runner/cuda/context.rs`; override with `STACK_SIZE=N`.
 Validate stack requirements again when composing deeper GPU pipelines.

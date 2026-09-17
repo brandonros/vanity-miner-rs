@@ -44,7 +44,7 @@ register_self_test! {
     /// base58 div by 58
     fn base58_div_by_58() -> u32 {
         // Exact divmod-by-58 pattern from base58_encode_32's digit-extraction
-        // loop (logic/src/base58.rs:73-82), in isolation. The constant-divisor
+        // loop (crates/logic/src/base58.rs:73-82), in isolation. The constant-divisor
         // `/ 58^k` and `% 58` lowerings emit `mul.hi.u64` magic-multiply ops
         // in PTX — the smoking-gun op from earlier inspection. No alphabet
         // lookup, no output[] writes, no leading-zero pad, no dynamic loops —

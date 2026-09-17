@@ -13,7 +13,7 @@ fn main() {
 
 #[cfg(feature = "cumetal")]
 fn pin_cumetal() {
-    let lock_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../flake.lock");
+    let lock_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../flake.lock");
     println!("cargo::rerun-if-changed={}", lock_path.display());
     println!("cargo::rerun-if-env-changed=VANITY_CUMETAL_ROOT");
     let lock: serde_json::Value =
