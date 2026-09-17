@@ -26,6 +26,19 @@ pinned VF64 submodule. Local contribution worktrees are not build inputs.
 Keep validation claims scoped to the recorded source and artifacts. Historical
 results must be labeled historical when the tested dependency revision changes.
 
+## Development loop
+
+- Iterate on small reproducers, refusal cases, and focused CPU/GPU tests. Replay
+  an affected full module after its small tests pass; batch shared regression
+  checks and the matched Nix integration build after a coherent group of fixes.
+- Give one integrator control of the active checkout, build directory, pin, and
+  GPU runs. Parallelize independent research or edits to separately owned files.
+  Reuse incremental builds; relink affected test executables before running them.
+- Measure PTX translation, Metal compilation, pipeline creation, and GPU execution
+  separately. A faster rejection or smaller source is not a workload pass.
+- Keep acceptance runs fresh and record any cache use explicitly. Never attribute
+  a cached result to a different compiler, input, entry, or set of options.
+
 ## Documentation
 
 - Keep `docs/cumetal-issue-matrix.md` as the single concise CuMetal status summary.
