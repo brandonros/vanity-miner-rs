@@ -42,7 +42,9 @@ RSA source update: production now uses one resumable `kernel_rsa_modulus_vanity`
 entry. The RSA GPU measurements below concern the historical four-stage PTX,
 not this refactor; the updated RSA self-test also needs fresh GPU validation.
 The newer `afe80210` LLVM21 RSA PTX first fails at unsupported `clz.b64`
-on measured `c4e5fac`; RSA was not rerun on `4a207e2`. See
+on measured `c4e5fac`; RSA was not rerun on `4a207e2`. Dedicated upstream
+[#141](https://github.com/Lulzx/cuda-metal/issues/141) now owns that opcode gap;
+publication adds no implementation or GPU result. See
 [the mining design and checks](gpu-search-pipeline.md).
 
 ## Historical results (`9e3e615`)
