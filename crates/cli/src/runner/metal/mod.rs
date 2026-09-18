@@ -87,6 +87,8 @@ impl Runner for MetalRunner {
             Command::RsaPssSignatureVanity(args) => {
                 crate::modes::rsa_pss::metal::run(self, args, stats)
             }
+            #[cfg(feature = "self_test_support")]
+            Command::SelfTest(args) => crate::modes::self_test::metal::run(self, args),
             #[allow(unreachable_patterns)]
             _ => Err("command is unavailable in this Metal build".into()),
         }

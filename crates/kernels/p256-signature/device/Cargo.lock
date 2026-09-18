@@ -282,6 +282,7 @@ dependencies = [
  "p256",
  "rand_core 0.9.5",
  "rand_xoshiro",
+ "rfc6979",
  "seq-macro",
  "zeroize",
 ]
