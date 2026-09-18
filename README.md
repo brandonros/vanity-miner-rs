@@ -1,7 +1,7 @@
 # vanity-miner-rs
 
 Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-CuMetal, and direct Metal for Shallenge, Ethereum, Bitcoin and Solana on Apple Silicon.
+CuMetal, and direct Metal for Shallenge, Ethereum, Bitcoin, Solana and RSA modulus.
 
 ## Modes
 
@@ -60,22 +60,22 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 This builds matching device/host artifacts using `nix develop .#metal` (stable
 Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
 `--verify` compares every lane with the CPU; winners are always CPU-verified.
-Ethereum, Bitcoin P2WPKH (`bc1q…`) and Solana need a newer local llvm-metal checkout:
+The other Metal modes require a newer local llvm-metal checkout:
 
 ```sh
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode ethereum \
-  --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
-  ethereum-vanity --prefix 55 --suffix 02
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode bitcoin \
   --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
   bitcoin-vanity --prefix bc1qg --suffix 6m
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode rsa-modulus \
+  --batches 2 --batch-size 1 --threads-per-group 1 --verify \
+  rsa-modulus-vanity --prefix ab --steps-per-launch 1
 ```
 
-The legacy CUDA/CuMetal paths still use their existing toolchains. Backend
-features `metal`, `gpu` and `cumetal` are mutually exclusive.
+RSA uses OS cryptographic entropy and rejects `--seed`; start with small batches.
+Backend features `metal`, `gpu` and `cumetal` are mutually exclusive.
 
 ## CuMetal · macOS
 

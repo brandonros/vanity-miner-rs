@@ -29,11 +29,18 @@ def post_inline(source, output, *, timeout=None):
         'sroa,instcombine,simplifycfg),default<O3>,globaldce,strip-dead-prototypes,verify',
         '-unroll-threshold=1000', '-vectorize-slp=false', '-vectorize-loops=false',
         source, '-o', output, timeout=timeout)
+    # Large inlined hash blocks exceed GVN's default backward scan budget.
+    # Bounded cleanup exposes stored SHA buffer lengths/domain tags before the
+    # unresolved-runtime check. Never replace panic calls or assume their guards.
+    cleanup = ",".join(["sroa,early-cse<memssa>,gvn,instcombine<verify-fixpoint;max-iterations=4>,simplifycfg"] * 3)
+    run("opt", f"-passes=function({cleanup}),globaldce,strip-dead-prototypes,verify",
+        "-memdep-block-scan-limit=10000", output, "-o", output, timeout=timeout)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--llvm-metal', type=Path, default=Path(os.environ.get('VANITY_LLVM_METAL_SOURCE', ROOT.parent / 'llvm-metal')))
-    parser.add_argument('--mode', choices=['shallenge', 'ethereum', 'bitcoin', 'solana'], default='shallenge')
+    parser.add_argument('--mode', choices=['shallenge', 'ethereum', 'bitcoin', 'solana', 'rsa-modulus'], default='shallenge')
     parser.add_argument('--output', type=Path)
     options = parser.parse_args()
     compiler = options.llvm_metal.resolve()
@@ -99,7 +106,8 @@ def main():
             raise
         lowering_seconds = time.perf_counter() - start
         sources = [device / 'Cargo.toml', device / 'Cargo.lock', device / 'kernel.interface.json', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock',
-                   *sorted((device / 'src').rglob('*.rs')), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
+                   *sorted((device / 'src').rglob('*.rs')),
+                   *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
         names = ['kernel.bc', 'kernel.ll', 'kernel.air.ll', 'kernel.air.bc', 'kernel.bindings.json', 'kernel.metallib']
         report = dict(schema=1, rustc=rust, source_revision=run('git', 'rev-parse', 'HEAD', capture=True).strip(),
                       compiler_source=str(compiler), compiler_flake_lock_sha256=digest(compiler / 'flake.lock'),

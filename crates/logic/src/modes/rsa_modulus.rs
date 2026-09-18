@@ -85,6 +85,7 @@ pub fn rsa_modulus(config: &SearchConfig, counter: u64, pattern: &HexPattern) ->
 
 /// Exact rejection sampling. Four disjoint PRF inputs supply the 1024 bits;
 /// neither factor generation nor q-range starts reduce random bytes modulo n.
+#[inline(always)]
 fn sample(config: &SearchConfig, id: u64, domain: CandidateDomain, bound: &U1024) -> Option<U1024> {
     if *bound == U1024::ZERO {
         return None;
@@ -204,13 +205,20 @@ pub fn progression(config: &SearchConfig, p_bytes: &[u8; 128]) -> Option<([u8; 1
     ))
 }
 
+/// Device-side errors contain no host string pointers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RangeError {
+    SamplingExhausted,
+    FactorOutOfBounds,
+}
+
 /// Construct the exact range, exclude insufficiently separated factors, then
 /// select one q by unbiased, domain-separated rejection sampling for this ID.
 pub fn generate_q(
     config: &SearchConfig,
     p_bytes: &[u8; 128],
     id: u64,
-) -> Result<Option<[u8; 128]>, &'static str> {
+) -> Result<Option<[u8; 128]>, RangeError> {
     let Some((first, count)) = progression(config, p_bytes) else {
         return Ok(None);
     };
@@ -250,7 +258,7 @@ pub fn generate_q(
         return Ok(None);
     }
     let cursor = sample(config, id, CandidateDomain::RsaRangeStart, &eligible)
-        .ok_or("RSA range sampling failed")?;
+        .ok_or(RangeError::SamplingExhausted)?;
     let mut index: U2048 = cursor.resize();
     if index >= skip_start {
         index = index.wrapping_add(&skip_count);
@@ -262,7 +270,7 @@ pub fn generate_q(
     };
     let q = first_wide.wrapping_add(&delta);
     if q.bits_vartime() != 1024 {
-        return Err("RSA sampled factor outside bounds");
+        return Err(RangeError::FactorOutOfBounds);
     }
     Ok(Some(q.resize::<{ U1024::LIMBS }>().to_be_bytes()))
 }

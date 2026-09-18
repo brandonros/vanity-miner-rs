@@ -39,7 +39,7 @@ pub(super) fn construct_worker(
     Ok(None)
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
 pub fn run(
     args: &crate::modes::rsa_modulus::args::RsaModulusArgs,
     workers: usize,

@@ -16,18 +16,26 @@ pub fn probable_prime(n: &U1024) -> bool {
     if *n < U1024::from_u8(2) {
         return false;
     }
+    // State the Montgomery modulus precondition directly. The sieve below also
+    // rejects even composites, but that implication crosses a division loop.
+    if n.as_limbs()[0].0 & 1 == 0 {
+        return *n == U1024::from_u8(2);
+    }
     for prime in BASES {
         let small = U1024::from_u32(prime);
         if *n == small {
             return true;
         }
-        let divisor = NonZero::new(small).unwrap();
+        let Some(prime) = core::num::NonZeroU32::new(prime) else {
+            return false;
+        };
+        let divisor = NonZero::<U1024>::from_u32(prime);
         if n.rem(&divisor) == U1024::ZERO {
             return false;
         }
     }
     let minus_one = n.wrapping_sub(&U1024::ONE);
-    let e = NonZero::new(U1024::from_u32(65537)).unwrap();
+    let e = NonZero::from_uint(U1024::from_u32(65537));
     if minus_one.rem(&e) == U1024::ZERO {
         return false;
     }

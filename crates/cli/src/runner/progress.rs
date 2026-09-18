@@ -159,7 +159,7 @@ mod tests {
 }
 
 #[cfg(feature = "crypto-cli")]
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
 pub(crate) fn estimate(bits: u32) {
     println!(
         "Approximate generic random-candidate work: 16^{:.2}",
