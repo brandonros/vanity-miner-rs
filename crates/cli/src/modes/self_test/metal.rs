@@ -3,14 +3,57 @@ use crate::runner::{
     RunResult,
     metal::{MetalRunner, transport::load_artifact},
 };
-use llvm_metal_runtime::Buffer;
+use llvm_metal_runtime::{Buffer, DispatchTimings, LoadTimings};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 const GUARD: usize = 256;
+
+#[derive(Default)]
+struct Timings {
+    load: LoadTimings,
+    pipelines: usize,
+    dispatch_wall: Duration,
+    gpu: Duration,
+    launches: usize,
+    gpu_samples: usize,
+}
+
+impl Timings {
+    fn record_dispatch(&mut self, timing: DispatchTimings) {
+        self.dispatch_wall += timing.wall;
+        self.launches += 1;
+        if let Some(gpu) = timing.gpu {
+            self.gpu += gpu;
+            self.gpu_samples += 1;
+        }
+    }
+
+    fn gpu_report(&self) -> String {
+        let value = if self.gpu_samples == 0 {
+            "unavailable".into()
+        } else {
+            format!(
+                "{}{:.3} ms",
+                if self.gpu_samples < self.launches {
+                    "partial sum "
+                } else {
+                    ""
+                },
+                self.gpu.as_secs_f64() * 1000.
+            )
+        };
+        format!(
+            "{value} ({}/{} launches timed)",
+            self.gpu_samples, self.launches
+        )
+    }
+}
+
 fn interface(kernel: &str) -> Result<&'static str, String> {
     match kernel {
         "kernel_self_test_solana" => Ok(include_str!(
@@ -70,6 +113,7 @@ fn launch(
     kernel_name: &str,
     selected: Option<&[usize]>,
     case_entry: Option<&str>,
+    timings: &mut Timings,
 ) -> Result<Vec<u32>, String> {
     let json = interface(kernel_name)?;
     let mut declared: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
@@ -81,6 +125,10 @@ fn launch(
         return Err("Metal self-test interface differs from the registry size".into());
     }
     let (kernel, _) = load_artifact(directory, &json)?;
+    let load = kernel.load_timings();
+    timings.load.library += load.library;
+    timings.load.pipeline += load.pipeline;
+    timings.pipelines += 1;
     let mut buffers = [
         guarded(4),
         guarded(logic::self_test::SELF_TEST_NUM_CHECKS * 4),
@@ -96,9 +144,17 @@ fn launch(
         let expected_input = buffers[0].bytes.clone();
         // SAFETY: hash/ABI checked single-invocation kernel; disjoint initialized
         // selector and full registry storage, with guards outside both bindings.
-        unsafe {
-            kernel.run(&mut buffers, 1, 1)?;
-        }
+        let timing = unsafe { kernel.run(&mut buffers, 1, 1)? };
+        timings.record_dispatch(timing);
+        let gpu = timing.gpu.map_or_else(
+            || "unavailable".into(),
+            |time| format!("{:.3} ms", time.as_secs_f64() * 1000.),
+        );
+        eprintln!(
+            "[Metal] dispatch {} selector={selector}: GPU {gpu}; dispatch wall {:.3} ms",
+            case_entry.unwrap_or(kernel_name),
+            timing.wall.as_secs_f64() * 1000.
+        );
         if buffers[0].bytes != expected_input {
             return Err("Metal self-test changed selector input or its guards".into());
         }
@@ -226,7 +282,8 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
     let cases = args.selected()?;
     let mut legacy_cache = super::DeviceResults::default();
     let mut groups = std::collections::HashMap::<&str, Result<(), String>>::new();
-    super::run("Metal", &cases, |case| {
+    let mut timings = Timings::default();
+    let result = super::run("Metal", &cases, |case| {
         let group_dir = directory(runner, case.kernel);
         if group_dir.join("self-tests.pending.json").exists() {
             return Err("Metal self-test group build is incomplete; rerun the builder".into());
@@ -256,6 +313,7 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
                 case.kernel,
                 Some(&[case.slot]),
                 Some(case.metal_entry),
+                &mut timings,
             )?;
             // A fresh per-case cache preserves original outcome validation while
             // allowing each result/error to be reported before the next load.
@@ -272,16 +330,51 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
                     case.kernel,
                     (!args.checks.is_empty()).then_some(slots.as_slice()),
                     None,
+                    &mut timings,
                 )
             })
         }
-    })
-    .map_err(Into::into)
+    });
+    // These are completed load/dispatch measurements, not whole-process time.
+    // Dispatch wall time includes GPU execution; the fields are not additive.
+    eprintln!(
+        "[Metal] self-test timings: library load {:.3} ms; pipeline creation {:.3} ms; dispatch wall {:.3} ms; GPU {}; {} pipelines loaded",
+        timings.load.library.as_secs_f64() * 1000.,
+        timings.load.pipeline.as_secs_f64() * 1000.,
+        timings.dispatch_wall.as_secs_f64() * 1000.,
+        timings.gpu_report(),
+        timings.pipelines,
+    );
+    result.map_err(Into::into)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn gpu_timings_keep_missing_samples_distinct_from_zero_and_wall_time() {
+        let mut timings = Timings::default();
+        assert_eq!(timings.gpu_report(), "unavailable (0/0 launches timed)");
+        timings.record_dispatch(DispatchTimings {
+            wall: Duration::from_millis(10),
+            gpu: Some(Duration::from_millis(2)),
+            ..Default::default()
+        });
+        assert_eq!(timings.gpu_report(), "2.000 ms (1/1 launches timed)");
+        timings.record_dispatch(DispatchTimings {
+            wall: Duration::from_millis(20),
+            gpu: None,
+            ..Default::default()
+        });
+        assert_eq!(timings.dispatch_wall, Duration::from_millis(30));
+        assert_eq!(
+            timings.gpu_report(),
+            "partial sum 2.000 ms (1/2 launches timed)"
+        );
+        let mut missing = Timings::default();
+        missing.record_dispatch(DispatchTimings::default());
+        assert_eq!(missing.gpu_report(), "unavailable (0/1 launches timed)");
+    }
     #[test]
     fn all_registered_groups_have_matching_interfaces() {
         for case in logic::self_test::metadata::CASES {

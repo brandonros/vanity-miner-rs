@@ -81,3 +81,63 @@ fn list_and_invalid_selection_do_not_require_artifacts() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown self-test"));
 }
+
+#[cfg(feature = "self_test_shallenge")]
+#[test]
+#[ignore = "build the Shallenge self-test Metal bundle first; requires Apple GPU"]
+fn named_checks_report_load_pipeline_and_gpu_timings() {
+    let checks = [
+        "shallenge.primitive_sha256_variable",
+        "shallenge.sha256_padding_55",
+    ];
+    let output = command()
+        .args(["--check", checks[0], "--check", checks[1]])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    eprintln!("{stderr}");
+    assert!(output.status.success(), "{stdout}\n{stderr}");
+    for check in checks {
+        assert!(stdout.contains(&format!("[Metal] PASS {check}")));
+    }
+    assert!(stdout.contains("2 passed, 0 failed, 0 skipped"));
+    let loads: Vec<_> = stderr
+        .lines()
+        .filter(|line| line.starts_with("Metal device:"))
+        .collect();
+    assert_eq!(loads.len(), 2, "{stderr}");
+    for load in loads {
+        assert!(
+            load.contains("library load ") && load.contains("pipeline creation "),
+            "{load}"
+        );
+    }
+    let dispatches: Vec<_> = stderr
+        .lines()
+        .filter(|line| line.starts_with("[Metal] dispatch "))
+        .collect();
+    assert_eq!(dispatches.len(), 2, "{stderr}");
+    for dispatch in dispatches {
+        assert!(
+            dispatch.contains(": GPU ") && dispatch.contains("dispatch wall "),
+            "{dispatch}"
+        );
+    }
+    let summaries: Vec<_> = stderr
+        .lines()
+        .filter(|line| line.starts_with("[Metal] self-test timings:"))
+        .collect();
+    assert_eq!(summaries.len(), 1, "{stderr}");
+    let summary = summaries[0];
+    for field in [
+        "library load ",
+        "pipeline creation ",
+        "dispatch wall ",
+        "GPU ",
+        "/2 launches timed)",
+        "2 pipelines loaded",
+    ] {
+        assert!(summary.contains(field), "{summary}");
+    }
+}

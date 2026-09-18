@@ -363,9 +363,13 @@ pub(crate) fn load_artifact(
     let start = Instant::now();
     let kernel = Kernel::load(&directory.join("kernel.metallib"), &bindings)?;
     let load_time = start.elapsed();
+    let stages = kernel.load_timings();
     eprintln!(
-        "Metal device: {}; library/pipeline load {:.3} ms",
+        "Metal device: {}; entry {}; library load {:.3} ms; pipeline creation {:.3} ms; total load {:.3} ms",
         kernel.device_name(),
+        bindings.entry,
+        stages.library.as_secs_f64() * 1000.,
+        stages.pipeline.as_secs_f64() * 1000.,
         load_time.as_secs_f64() * 1000.
     );
     Ok((kernel, load_time))
