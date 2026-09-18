@@ -22,6 +22,7 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - name: Test CPU references
         run: |
+          nix develop --command python3 scripts/test_gpu_runner.py
           nix develop --command cargo test --locked --release --workspace --no-default-features --features solana,bitcoin,ethereum,shallenge,p256-public-key,p256-signature,rsa-modulus,rsa-pss,self_test
           nix develop --command cargo run --locked --release -p vanity-miner --no-default-features --features self_test -- self-test
 
@@ -34,6 +35,7 @@ jobs:
         run: |
           nix develop --command cargo fmt --all --check
           nix develop --command cargo test --locked --release --workspace --all-features
+          ./scripts/test-gpu.sh --list
 
   kernels:
     runs-on: ubuntu-24.04
@@ -72,5 +74,5 @@ jobs:
           pattern: metal-*
           path: target/metal
           merge-multiple: true
-      - name: Execute GPU integration tests, including all self-tests
-        run: nix develop --command cargo test --locked --release -p vanity-miner --all-features --test metal --test metal_bitcoin --test metal_ethereum --test metal_solana --test metal_p256_public --test metal_p256_signature --test metal_rsa --test metal_rsa_pss --test metal_self_test -- --ignored --test-threads=1
+      - name: Execute the complete GPU coverage inventory
+        run: ./scripts/test-gpu.sh --skip-build

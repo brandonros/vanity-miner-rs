@@ -1,5 +1,5 @@
 #![cfg(all(feature = "metal", feature = "rsa-pss", target_os = "macos"))]
-#[path = "support/rsa_factors.rs"]
+#[path = "../support/rsa_factors.rs"]
 mod factors;
 use logic::{modes::rsa_pss::RsaPssRequest, search::hex_pattern::HexPattern};
 use rsa::{
@@ -8,15 +8,11 @@ use rsa::{
     traits::PrivateKeyParts,
 };
 use sha2::{Digest, Sha256};
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use vanity_miner::runner::metal::rsa_pss::RsaPssTransport;
 
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_RSA_PSS_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal/rsa-pss")
-        })
+    super::support::artifacts("VANITY_METAL_RSA_PSS_ARTIFACTS", "rsa-pss")
 }
 fn key() -> RsaPrivateKey {
     let mut key = RsaPrivateKey::from_primes(
@@ -231,7 +227,7 @@ fn cli_both_sources_verify_exported_signatures_and_reject_seed() {
     .unwrap();
     std::fs::write(&message, b"header0000footer").unwrap();
     for source in ["salt", "message"] {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_vanity-miner"));
+        let mut command = super::support::command(&artifacts());
         command
             .args(["--metal-artifacts"])
             .arg(artifacts())

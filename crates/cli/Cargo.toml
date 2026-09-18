@@ -59,3 +59,6 @@ required-features = ["metal"]
 [[example]]
 name = "metal_solana_bench"
 required-features = ["metal", "solana"]
+
+[dev-dependencies]
+logic = { path = "../logic", default-features = false, features = ["test-vectors"] }

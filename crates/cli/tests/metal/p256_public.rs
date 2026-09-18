@@ -4,15 +4,11 @@ use logic::{
     modes::p256_public_key::{P256PublicRequest, p256_public},
     search::hex_pattern::HexPattern,
 };
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use vanity_miner::runner::metal::p256::P256PublicTransport;
 
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_P256_PUBLIC_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal/p256-public-key")
-        })
+    super::support::artifacts("VANITY_METAL_P256_PUBLIC_ARTIFACTS", "p256-public-key")
 }
 fn request(target: u32) -> P256PublicRequest {
     // Public test seed only; production CLI always obtains OS entropy.
@@ -124,10 +120,8 @@ fn targets_multilane_winners_misses_and_errors_match_cpu() {
 fn bounded_cli_exports_verified_keys_for_every_target() {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     for target in ["x", "y", "xy", "uncompressed"] {
-        let result = Command::new(env!("CARGO_BIN_EXE_vanity-miner"))
+        let result = super::support::command(&artifacts())
             .args([
-                "--metal-artifacts",
-                artifacts().to_str().unwrap(),
                 "--batches",
                 "2",
                 "--batch-size",
@@ -164,7 +158,7 @@ fn bounded_cli_exports_verified_keys_for_every_target() {
             assert_eq!(key.public_key().to_encoded_point(false).as_bytes(), public);
         }
     }
-    let rejected = Command::new(env!("CARGO_BIN_EXE_vanity-miner"))
+    let rejected = super::support::command(&artifacts())
         .args(["--seed", "1", "--batches", "1", "p256-public-key-vanity"])
         .output()
         .unwrap();

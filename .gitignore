@@ -4,3 +4,4 @@ build
 .direnv
 
 /artifacts/
+__pycache__/

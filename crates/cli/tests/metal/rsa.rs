@@ -1,16 +1,12 @@
 #![cfg(all(feature = "metal", feature = "rsa-modulus", target_os = "macos"))]
-#[path = "support/rsa_factors.rs"]
+#[path = "../support/rsa_factors.rs"]
 mod factors;
 use logic::{modes::rsa_modulus::SearchConfig, search::hex_pattern::HexPattern};
 use num_bigint_dig::BigUint;
 use std::{path::PathBuf, process::Command};
 use vanity_miner::{modes::rsa_modulus::pipeline::verify_pair, runner::metal::rsa::RsaTransport};
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_RSA_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal/rsa-modulus")
-        })
+    super::support::artifacts("VANITY_METAL_RSA_ARTIFACTS", "rsa-modulus")
 }
 fn fixed<const N: usize>(n: &BigUint) -> [u8; N] {
     let raw = n.to_bytes_be();
