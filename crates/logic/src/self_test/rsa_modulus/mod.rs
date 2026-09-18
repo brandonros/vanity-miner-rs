@@ -1,4 +1,4 @@
-//! rsa modulus self-tests: primitives, resumable mining, and regressions.
+//! rsa modulus self-tests: primitives, independent candidates, and regressions.
 mod fixtures;
 pub(super) mod range_probes;
 use super::known_answers::*;
@@ -52,26 +52,22 @@ register_self_test! {
 }
 
 register_self_test! {
-    /// rsa modulus empty task rejected
-    fn empty_task_rejected() -> u32 {
-        use crate::modes::rsa_modulus::{self as pipeline, Task};
-        u32::from(pipeline::q_at(&black_box(device_config()), &black_box(Task::EMPTY), 0).is_none())
+    /// rsa modulus zero factor count rejected
+    fn zero_count_rejected() -> u32 {
+        let mut config = black_box(device_config());
+        config.p_count = [0; 128];
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
+        u32::from(crate::modes::rsa_modulus::rsa_modulus(&config, 9, &pattern).status == 2)
     }
 }
 
 register_self_test! {
-    /// rsa modulus upper bound rejected
+    /// rsa modulus inverted interval rejected
     fn upper_bound_rejected() -> u32 {
-        use crate::modes::rsa_modulus::{self as pipeline, Task};
-        let config = black_box(device_config());
-        let mut task = black_box(Task {
-            p: SELF_TEST_RSA_P,
-            state: 1,
-            ..Task::EMPTY
-        });
+        let mut config = black_box(device_config());
+        config.upper = [0; 256];
         u32::from(
-            pipeline::prepare_range(&config, &mut task) == Ok(true)
-                && pipeline::q_at(&config, &task, 1).is_none(),
+            crate::modes::rsa_modulus::generate_q(&config, &black_box(SELF_TEST_RSA_P), 9) == Ok(None),
         )
     }
 }
@@ -103,23 +99,15 @@ register_self_test! {
 }
 
 register_self_test! {
-    /// end-to-end rsa modulus miner, including resume and factor retirement
+    /// end-to-end independent rsa modulus candidate
     fn end_to_end() -> u32 {
-        use crate::modes::rsa_modulus::{self as mining, Task};
         let config = black_box(device_config());
         let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
-        let mut task = Task::EMPTY;
-        let (prepared, pair) = mining::mine(&config, &pattern, &mut task, black_box(9), 1, black_box(1));
-        if pair.is_some() || prepared.errors != 0 || prepared.p_accepted != 1
-            || prepared.ranges != 1 || prepared.q_tested != 0 || task.state != 2 {
-            return 0;
-        }
-        let (searched, pair) = mining::mine(&config, &pattern, &mut task, black_box(10), 1, black_box(8));
-        let Some(pair) = pair else { return 0; };
+        let result = crate::modes::rsa_modulus::rsa_modulus(&config, black_box(9), &pattern);
         u32::from(
-            searched.errors == 0 && searched.p_tested == 0 && searched.q_tested == 1
-                && searched.matches == 1 && pair.id == 9 && pair.p == SELF_TEST_RSA_P
-                && pair.q == SELF_TEST_RSA_Q && task == Task::EMPTY
+            result.status == 1
+                && result.bytes[..128] == SELF_TEST_RSA_P
+                && result.bytes[128..] == SELF_TEST_RSA_Q,
         )
     }
 }
@@ -142,55 +130,33 @@ fn device_config() -> crate::modes::rsa_modulus::SearchConfig {
 }
 
 register_self_test! {
-    /// rsa device full-width range construction
+    /// rsa device full-width range sampling
     fn device_range() -> u32 {
-        use crate::modes::rsa_modulus::{self as pipeline, Task};
-        let config = black_box(device_config());
-        let mut task = black_box(Task {
-            p: SELF_TEST_RSA_P,
-            state: 1,
-            id: 9,
-            ..Task::EMPTY
-        });
         u32::from(
-            pipeline::prepare_range(&config, &mut task) == Ok(true)
-                && pipeline::q_at(&config, &task, black_box(0)) == Some(SELF_TEST_RSA_Q)
-                && pipeline::q_at(&config, &task, black_box(1)).is_none(),
+            crate::modes::rsa_modulus::generate_q(
+                &black_box(device_config()),
+                &black_box(SELF_TEST_RSA_P),
+                black_box(9),
+            ) == Ok(Some(SELF_TEST_RSA_Q)),
         )
     }
 }
 
 register_self_test! {
-    /// rsa device range cursor wrap and retirement
-    fn device_cursor() -> u32 {
-        use crate::modes::rsa_modulus::{self as pipeline, Task};
-        use crypto_bigint::{Encoding, U1024};
-        let mut config = black_box(device_config());
-        config.suffix_bits = 1;
-        let first = black_box(U1024::ONE.shl_vartime(1023).wrapping_add(&U1024::ONE));
-        let mut task = black_box(Task {
-            state: 2,
-            first: first.to_be_bytes(),
-            count: U1024::from_u32(5).to_be_bytes(),
-            cursor: U1024::from_u32(4).to_be_bytes(),
-            remaining: U1024::from_u32(5).to_be_bytes(),
-            ..Task::EMPTY
-        });
-        for (offset, delta) in [8, 0, 2, 4, 6].into_iter().enumerate() {
-            if pipeline::q_at(&config, &task, black_box(offset as u32))
-                != Some(first.wrapping_add(&U1024::from_u32(delta)).to_be_bytes())
-            {
-                return 0;
-            }
-        }
-        pipeline::finish_tile(&mut task, black_box(2));
-        if task.remaining != U1024::from_u32(3).to_be_bytes() || task.cursor != U1024::ONE.to_be_bytes()
-        {
-            return 0;
-        }
-        task.winner = black_box(1);
-        pipeline::finish_tile(&mut task, black_box(3));
-        u32::from(task.state == 0 && task.p == [0; 128] && task.remaining == [0; 128])
+    /// rsa candidate evaluation is independent of intervening IDs
+    fn candidate_repeatability() -> u32 {
+        let config = black_box(device_config());
+        let p = black_box(SELF_TEST_RSA_P);
+        let first = crate::modes::rsa_modulus::generate_q(&config, &p, black_box(9));
+        let _ = black_box(crate::modes::rsa_modulus::generate_q(
+            &config,
+            &p,
+            black_box(123),
+        ));
+        u32::from(
+            first == Ok(Some(SELF_TEST_RSA_Q))
+                && first == crate::modes::rsa_modulus::generate_q(&config, &p, black_box(9)),
+        )
     }
 }
 

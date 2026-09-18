@@ -10,48 +10,34 @@ pub fn run(
     args: &super::args::RsaModulusArgs,
     stats: Arc<GlobalStats>,
 ) -> RunResult {
-    if runner.options.seed.is_some() {
+    let options = &runner.options;
+    if options.seed.is_some() {
         return Err("RSA uses OS cryptographic entropy; --seed is not supported".into());
     }
     let config = args.config(1)?;
-    let stages = super::pipeline::StageStats::attach(&stats)?;
-    let mut engine = None;
+    let mut engine = RsaTransport::load(
+        &runner.artifacts("rsa-modulus"),
+        options.batch_size,
+        options.threads_per_group as usize,
+        options.verify,
+    )?;
     let result = run_device_session(
         stats,
-        "factor candidates (p + q)",
-        runner.options.batches,
-        runner.options.batch_size,
+        "candidates",
+        options.batches,
+        options.batch_size,
         |control| {
-            super::pipeline::run(
-                &config,
-                &control,
-                &stages,
-                args.steps_per_launch,
-                |r, p, start, capacity| {
-                    if engine.is_none() {
-                        engine = Some(RsaTransport::load(
-                            &runner.artifacts("rsa-modulus"),
-                            r,
-                            p,
-                            capacity,
-                            args.steps_per_launch,
-                            runner.options.threads_per_group as usize,
-                            runner.options.verify,
-                        )?);
-                    }
-                    engine.as_mut().unwrap().cycle(r, p, start)
-                },
-            )
+            super::pipeline::run(&config, &control, |r, p, start, count| {
+                engine.evaluate(r, p, &[], start, count)
+            })
         },
     );
-    if let Some(engine) = engine {
-        eprintln!(
-            "Metal RSA: {} launches; load {:.3} ms; dispatch {:.3} ms; validation {:.3} ms",
-            engine.launches,
-            engine.load_time.as_secs_f64() * 1000.,
-            engine.dispatch_time.as_secs_f64() * 1000.,
-            engine.verification_time.as_secs_f64() * 1000.
-        );
-    }
+    eprintln!(
+        "Metal RSA: {} launches; load {:.3} ms; dispatch/transfer {:.3} ms; validation {:.3} ms",
+        engine.launches,
+        engine.load_time.as_secs_f64() * 1000.,
+        engine.dispatch_time.as_secs_f64() * 1000.,
+        engine.verification_time.as_secs_f64() * 1000.
+    );
     result
 }

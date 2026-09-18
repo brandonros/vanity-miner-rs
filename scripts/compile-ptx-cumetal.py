@@ -23,7 +23,7 @@ PRODUCTION_ENTRIES = {
     "bitcoin": "kernel_bitcoin_vanity",
     "ethereum": "kernel_ethereum_vanity",
     "shallenge": "kernel_shallenge",
-    "rsa_modulus": "kernel_rsa_modulus_vanity",
+    "rsa_modulus": "kernel_rsa_modulus_candidate",
     "rsa_pss": "kernel_rsa_pss_signature_vanity",
     "p256_public_key": "kernel_p256_public_key_vanity",
     "p256_signature": "kernel_p256_signature_vanity",

@@ -1,36 +1,39 @@
 //! CPU workers invoke the same no_std mining function as the GPU wrapper.
 use super::*;
-use logic::modes::rsa_modulus::{self as mining, SearchConfig, Task};
+use logic::modes::rsa_modulus::{self as mining, SearchConfig};
 
 pub(super) fn construct_worker(
     config: &SearchConfig,
     pattern: &HexPattern,
     control: &SearchControl,
-    steps: u32,
-    stages: &pipeline::StageStats,
 ) -> Result<Option<String>, String> {
     let _stop_peers = control.cancel_on_exit();
-    let mut task = Zeroizing::new(Task::EMPTY);
     while !control.stopped() {
-        let Some(ids) = control.reserve_batch(u64::from(steps)) else {
+        let Some(ids) = control.reserve_batch(u64::from(control.batch_size())) else {
             break;
         };
-        let (counts, pair) = mining::mine(config, pattern, &mut task, ids.start, 1, steps);
-        counts.validate(1, steps)?;
-        control.add_tested(u64::from(counts.q_tested));
-        stages.add(
-            u64::from(counts.p_tested),
-            u64::from(counts.p_accepted),
-            u64::from(counts.ranges),
-            u64::from(counts.q_tested),
-        );
-        if let Some(pair) = pair {
-            let pair = Zeroizing::new(pair);
-            let output = pipeline::verify_pair(config, pattern, &pair)?;
-            if control.claim_verified_winner() {
-                return Ok(Some(output));
+        for id in ids {
+            if control.stopped() {
+                break;
             }
-            return Ok(None);
+            let result = Zeroizing::new(mining::rsa_modulus(config, id, pattern));
+            control.add_tested(1);
+            match result.status {
+                0 => (),
+                1 => {
+                    let pair = Zeroizing::new(mining::Pair {
+                        p: result.bytes[..128].try_into().unwrap(),
+                        q: result.bytes[128..].try_into().unwrap(),
+                        id,
+                    });
+                    let output = pipeline::verify_pair(config, pattern, &pair)?;
+                    if control.claim_verified_winner() {
+                        return Ok(Some(output));
+                    }
+                    return Ok(None);
+                }
+                _ => return Err("RSA candidate evaluation failed".into()),
+            }
         }
     }
     Ok(None)
@@ -46,15 +49,41 @@ pub fn run(
     let config = args.config(workers)?;
     estimate(config.validate()?.pattern.constrained_bits() - 2);
     println!("Constructive search restricts every q candidate to the requested modulus pattern.");
-    // Attach once per session, retaining totals when a match restarts the workers.
-    let stages = pipeline::StageStats::attach(&stats)?;
-    run_controlled(stats, "q candidates", |control| {
-        crate::modes::rsa_modulus::run_cpu_with_steps(
-            &config,
-            control,
-            args.steps_per_launch,
-            &stages,
-        )
-        .map(|report| report.found)
+    run_controlled(stats, "candidates", |control| {
+        super::run_cpu(&config, control).map(|report| report.found)
     })
+}
+
+#[cfg(test)]
+#[path = "../../../tests/support/rsa_factors.rs"]
+mod test_factors;
+
+#[cfg(test)]
+mod tests {
+    use super::test_factors as factors;
+    use super::*;
+    #[test]
+    fn worker_completes_one_candidate_and_obeys_cancellation() {
+        let n = BigUint::from_bytes_be(&factors::P) * BigUint::from_bytes_be(&factors::Q);
+        let constraints = ModulusConstraints::new(&hex::encode(n.to_bytes_be()), "").unwrap();
+        let mut config = constraints.device_config([42; 32], 0).unwrap();
+        config.p_min = factors::P;
+        config.p_count[127] = 1;
+        config.p_count[..127].fill(0);
+        let control = SearchControl::new();
+        assert!(
+            construct_worker(&config, &constraints.pattern, &control)
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(control.statistics().0, 1);
+        let control = SearchControl::new();
+        control.cancel();
+        assert!(
+            construct_worker(&config, &constraints.pattern, &control)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(control.statistics().0, 0);
+    }
 }

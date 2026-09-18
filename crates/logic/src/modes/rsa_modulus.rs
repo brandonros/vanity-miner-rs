@@ -1,23 +1,15 @@
-//! Resumable RSA mining. Each thread exclusively owns one factor task and its
-//! nonrepeating q progression; no other thread reads or advances that task.
-use crate::search::candidate_derivation::{CandidateDeriver, CandidateDomain};
+//! Independent constructive RSA attempts. Every candidate ID derives one p and
+//! one eligible q entirely on the device; no work survives between candidates.
+use crate::search::{
+    candidate_derivation::{CandidateDeriver, CandidateDomain},
+    candidate_result::CandidateResult,
+    hex_pattern::HexPattern,
+};
 use crypto_bigint::{Encoding, NonZero, U1024, U2048};
 use zeroize::{Zeroize, Zeroizing};
 
-pub const ENTRY: &str = "kernel_rsa_modulus_vanity";
-pub const DEFAULT_STEPS_PER_LAUNCH: u32 = 64;
-pub const MAX_STEPS_PER_LAUNCH: u32 = 1024;
-pub const MAX_CAPACITY: u32 = 1_048_576;
-
-/// Bounds both the candidate-ID reservation and every u32 device counter.
-pub fn launch_work(capacity: u32, steps: u32) -> Result<u32, &'static str> {
-    if capacity == 0 || capacity > MAX_CAPACITY || steps == 0 || steps > MAX_STEPS_PER_LAUNCH {
-        return Err("invalid RSA mining capacity or step budget");
-    }
-    capacity
-        .checked_mul(steps)
-        .ok_or("RSA mining work overflow")
-}
+// New ABI: shared candidate transport, incompatible with the old task kernel.
+pub const ENTRY: &str = "kernel_rsa_modulus_candidate";
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -35,38 +27,6 @@ pub struct SearchConfig {
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Task {
-    pub p: [u8; 128],
-    pub first: [u8; 128],
-    pub count: [u8; 128],
-    pub cursor: [u8; 128],
-    pub remaining: [u8; 128],
-    /// Indices in the original progression excluded by factor separation.
-    pub skip_start: [u8; 128],
-    pub skip_count: [u8; 128],
-    pub id: u64,
-    /// 0 = empty, 2 = active. Range construction is local to the owning thread.
-    pub state: u32,
-    /// Set by the owning thread before retiring a successful task.
-    pub winner: u32,
-}
-impl Task {
-    pub const EMPTY: Self = Self {
-        p: [0; 128],
-        first: [0; 128],
-        count: [0; 128],
-        cursor: [0; 128],
-        remaining: [0; 128],
-        skip_start: [0; 128],
-        skip_count: [0; 128],
-        id: 0,
-        state: 0,
-        winner: 0,
-    };
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pair {
     pub p: [u8; 128],
     pub q: [u8; 128],
@@ -80,20 +40,6 @@ impl Pair {
     };
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
-pub struct Counts {
-    pub p_tested: u32,
-    pub p_accepted: u32,
-    pub ranges: u32,
-    pub q_tested: u32,
-    pub matches: u32,
-    pub errors: u32,
-    /// Threads that evaluated at least one q during this launch.
-    pub active: u32,
-    pub reserved: u32,
-}
-
 macro_rules! record {
     ($ty:ty; $($field:ident),+) => {
         impl Zeroize for $ty {
@@ -104,112 +50,37 @@ macro_rules! record {
     }
 }
 record!(SearchConfig; lower, upper, p_min, p_count, suffix, seed, worker, suffix_bits, reserved);
-record!(Task; p, first, count, cursor, remaining, skip_start, skip_count, id, state, winner);
 record!(Pair; p, q, id);
-record!(Counts; p_tested, p_accepted, ranges, q_tested, matches, errors, active, reserved);
 
-impl Counts {
-    pub fn validate(&self, capacity: u32, steps: u32) -> Result<(), &'static str> {
-        let work = launch_work(capacity, steps)?;
-        if self.errors != 0
-            || self.reserved != 0
-            || self.p_tested > work
-            || self.p_accepted > self.p_tested
-            || self.ranges > self.p_accepted
-            || self.active > capacity
-            || self.active > self.q_tested
-            || self.q_tested > work
-            || u64::from(self.p_tested) + u64::from(self.q_tested) > u64::from(work)
-            || self.matches > self.active
-        {
-            return Err("RSA miner returned invalid counters");
-        }
-        Ok(())
-    }
-}
-
-/// Mine one exclusively owned slot. A step tests a new p (including range
-/// preparation), or one q of an existing task. A match ends this lane's launch:
-/// at most one Pair per lane can be published, with no result queue overflow.
-///
-/// `start` is the launch reservation plus the lane index; `stride` is capacity.
-/// Unused IDs are deliberately skipped. Retained tasks keep their original ID.
-pub fn mine(
-    config: &SearchConfig,
-    pattern: &crate::search::hex_pattern::HexPattern,
-    task: &mut Task,
-    start: u64,
-    stride: u32,
-    steps: u32,
-) -> (Counts, Option<Pair>) {
-    let mut counts = Counts::default();
-    if launch_work(stride, steps).is_err()
-        || start
-            .checked_add(u64::from(stride) * u64::from(steps - 1))
-            .is_none()
-        || (task.state != 0 && task.state != 2)
+/// One complete attempt. A bounded PRF retry failure is an error; a composite
+/// factor or empty eligible range is an ordinary miss. Successful payloads hold p||q.
+pub fn rsa_modulus(config: &SearchConfig, counter: u64, pattern: &HexPattern) -> CandidateResult {
+    if config.reserved != 0
+        || config.suffix_bits == 0
+        || config.suffix_bits > 2048
+        || U2048::from_be_slice(&config.upper) < U2048::from_be_slice(&config.lower)
     {
-        task.zeroize();
-        counts.errors = 1;
-        return (counts, None);
+        return CandidateResult::ERROR;
     }
-    for step in 0..steps {
-        if task.state == 0 {
-            let id = start + u64::from(step) * u64::from(stride);
-            counts.p_tested += 1;
-            let Some(p) = generate_p(config, id) else {
-                counts.errors = 1;
-                task.zeroize();
-                break;
-            };
-            let ranges_first = range_first(config);
-            if !ranges_first && !probable_p(&p) {
-                continue;
-            }
-            if !ranges_first {
-                counts.p_accepted += 1;
-            }
-            task.p = p;
-            task.id = id;
-            match prepare_range(config, task) {
-                Ok(false) => continue,
-                Err(_) => {
-                    counts.errors = 1;
-                    task.zeroize();
-                    break;
-                }
-                Ok(true) => {}
-            }
-            if ranges_first {
-                if !probable_p(&task.p) {
-                    task.zeroize();
-                    continue;
-                }
-                counts.p_accepted += 1;
-            }
-            counts.ranges += 1;
-        } else {
-            let Some(q) = q_at(config, task, 0) else {
-                counts.errors = 1;
-                task.zeroize();
-                break;
-            };
-            counts.active = 1;
-            counts.q_tested += 1;
-            if eligible_pair(&task.p, &q, pattern) {
-                let pair = Pair {
-                    p: task.p,
-                    q,
-                    id: task.id,
-                };
-                task.zeroize();
-                counts.matches = 1;
-                return (counts, Some(pair));
-            }
-            finish_tile(task, 1);
-        }
+    let Some(p) = generate_p(config, counter) else {
+        return CandidateResult::ERROR;
+    };
+    let p = Zeroizing::new(p);
+    let ranges_first = range_first(config);
+    if !ranges_first && !probable_p(&p) {
+        return CandidateResult::MISS;
     }
-    (counts, None)
+    let q = match generate_q(config, &p, counter) {
+        Ok(Some(q)) => Zeroizing::new(q),
+        Ok(None) => return CandidateResult::MISS,
+        Err(_) => return CandidateResult::ERROR,
+    };
+    if (ranges_first && !probable_p(&p)) || !eligible_pair(&p, &q, pattern) {
+        return CandidateResult::MISS;
+    }
+    let mut result = CandidateResult::matched(&p[..]);
+    result.bytes[128..].copy_from_slice(&q[..]);
+    result
 }
 
 /// Exact rejection sampling. Four disjoint PRF inputs supply the 1024 bits;
@@ -334,16 +205,22 @@ pub fn progression(config: &SearchConfig, p_bytes: &[u8; 128]) -> Option<([u8; 1
     ))
 }
 
-/// Device-side failure code; no host string pointer enters the result layout.
+/// Device-side errors contain no host string pointers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RangeError {
     SamplingExhausted,
+    FactorOutOfBounds,
 }
 
-pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, RangeError> {
-    let Some((first, count)) = progression(config, &task.p) else {
-        task.zeroize();
-        return Ok(false);
+/// Construct the exact range, exclude insufficiently separated factors, then
+/// select one q by unbiased, domain-separated rejection sampling for this ID.
+pub fn generate_q(
+    config: &SearchConfig,
+    p_bytes: &[u8; 128],
+    id: u64,
+) -> Result<Option<[u8; 128]>, RangeError> {
+    let Some((first, count)) = progression(config, p_bytes) else {
+        return Ok(None);
     };
     let first_wide: U2048 = U1024::from_be_slice(&first).resize();
     let total: U2048 = U1024::from_be_slice(&count).resize();
@@ -354,7 +231,7 @@ pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, Ran
         total.wrapping_sub(&U2048::ONE).shl_vartime(bits)
     };
     let last = first_wide.wrapping_add(&step);
-    let p: U2048 = U1024::from_be_slice(&task.p).resize();
+    let p: U2048 = U1024::from_be_slice(p_bytes).resize();
     let distance = U2048::ONE.shl_vartime(924);
     let forbidden_low = p.wrapping_sub(&distance).max(first_wide);
     let forbidden_high = p.wrapping_add(&distance).min(last);
@@ -378,76 +255,24 @@ pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, Ran
     }
     let eligible: U1024 = total.wrapping_sub(&skip_count).resize();
     if eligible == U1024::ZERO {
-        task.zeroize();
-        return Ok(false);
+        return Ok(None);
     }
-    let cursor = sample(config, task.id, CandidateDomain::RsaRangeStart, &eligible)
+    let cursor = sample(config, id, CandidateDomain::RsaRangeStart, &eligible)
         .ok_or(RangeError::SamplingExhausted)?;
-    task.first = first;
-    task.count = eligible.to_be_bytes();
-    task.remaining = task.count;
-    task.skip_start = skip_start.resize::<{ U1024::LIMBS }>().to_be_bytes();
-    task.skip_count = skip_count.resize::<{ U1024::LIMBS }>().to_be_bytes();
-    task.cursor = cursor.to_be_bytes();
-    task.state = 2;
-    task.winner = 0;
-    Ok(true)
-}
-
-/// Return the q at an offset from this task's cursor, or None past its remaining
-/// range. The owning mining thread normally evaluates offset zero and advances.
-pub fn q_at(config: &SearchConfig, task: &Task, offset: u32) -> Option<[u8; 128]> {
-    if task.state != 2 {
-        return None;
+    let mut index: U2048 = cursor.resize();
+    if index >= skip_start {
+        index = index.wrapping_add(&skip_count);
     }
-    let offset = U1024::from_u32(offset);
-    if offset >= U1024::from_be_slice(&task.remaining) {
-        return None;
-    }
-    let count: U2048 = U1024::from_be_slice(&task.count).resize();
-    let mut index: U2048 = U1024::from_be_slice(&task.cursor)
-        .resize::<{ U2048::LIMBS }>()
-        .wrapping_add(&offset.resize());
-    if index >= count {
-        index = index.wrapping_sub(&count);
-    }
-    if index >= U1024::from_be_slice(&task.skip_start).resize() {
-        index = index.wrapping_add(&U1024::from_be_slice(&task.skip_count).resize());
-    }
-    let step = if config.suffix_bits >= 1024 {
+    let delta = if bits >= 1024 {
         U2048::ZERO
     } else {
-        index.shl_vartime(config.suffix_bits as usize)
+        index.shl_vartime(bits)
     };
-    let q = U1024::from_be_slice(&task.first)
-        .resize::<{ U2048::LIMBS }>()
-        .wrapping_add(&step);
+    let q = first_wide.wrapping_add(&delta);
     if q.bits_vartime() != 1024 {
-        return None;
+        return Err(RangeError::FactorOutOfBounds);
     }
-    Some(q.resize::<{ U1024::LIMBS }>().to_be_bytes())
-}
-
-pub fn finish_tile(task: &mut Task, assigned: u32) {
-    if task.winner != 0 {
-        task.zeroize();
-        return;
-    }
-    let remaining = U1024::from_be_slice(&task.remaining);
-    let used = U1024::from_u32(assigned).min(remaining);
-    if used == remaining {
-        task.zeroize();
-        return;
-    }
-    let count: U2048 = U1024::from_be_slice(&task.count).resize();
-    let mut cursor: U2048 = U1024::from_be_slice(&task.cursor)
-        .resize::<{ U2048::LIMBS }>()
-        .wrapping_add(&used.resize());
-    if cursor >= count {
-        cursor = cursor.wrapping_sub(&count);
-    }
-    task.cursor = cursor.resize::<{ U1024::LIMBS }>().to_be_bytes();
-    task.remaining = remaining.wrapping_sub(&used).to_be_bytes();
+    Ok(Some(q.resize::<{ U1024::LIMBS }>().to_be_bytes()))
 }
 
 pub fn eligible_pair(
@@ -471,12 +296,9 @@ pub fn eligible_pair(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     #[test]
     fn records_are_padding_free() {
-        assert_eq!(core::mem::size_of::<SearchConfig>(), 1072);
-        assert_eq!(core::mem::size_of::<Task>(), 912);
-        assert_eq!(core::mem::size_of::<Pair>(), 264);
-        assert_eq!(core::mem::size_of::<Counts>(), 32);
+        assert_eq!(core::mem::size_of::<super::SearchConfig>(), 1072);
+        assert_eq!(core::mem::size_of::<super::Pair>(), 264);
     }
 }

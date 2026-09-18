@@ -59,7 +59,7 @@ compiler, rather than the normal paired Nix consumer. This is not a fresh 32-run
 | Shallenge production [#38](https://github.com/brandonros/vanity-miner-rs/issues/38), closed | Pass `4a207e2`; smoke pass `075e963` | Pass `4a207e2`; smoke pass `075e963` | Self-tests are separate |
 | P-256 public-key production [#39](https://github.com/brandonros/vanity-miner-rs/issues/39), closed | Pass `0f98856` | Pass `0f98856` | — |
 | P-256 signature production [#26](https://github.com/brandonros/vanity-miner-rs/issues/26) | Vector parameter rejection `13efc29` | Undefined value `c4e5fac` | Reduce; #41 is a lead |
-| RSA modulus production [#27](https://github.com/brandonros/vanity-miner-rs/issues/27) | Undefined value `c4e5fac` | Undefined `%rd205`, dev `400a8bb`, 9.175 s | Reduce undefined edge; LLVM7 unresolved |
+| RSA modulus production [#27](https://github.com/brandonros/vanity-miner-rs/issues/27) | Independent candidate kernel: undefined `%rs3372` into `$L__BB3_4`, matched `684bb03`; no GPU launch | Historical resumable kernel: undefined `%rd205`, dev `400a8bb`, 9.175 s | Reduce undefined edge; new ABI requires rebuilt PTX |
 | RSA-PSS production [#28](https://github.com/brandonros/vanity-miner-rs/issues/28) | Vector parameter rejection `c4e5fac` | MSL emitted, dev `0dbdb4b`, 65.502 s | Apple preparation / GPU validation; historical #115 |
 | Solana self-tests [#29](https://github.com/brandonros/vanity-miner-rs/issues/29) | Direct-store range rejection `075e963`, 6.215 s | Helper-field type refusal at line50529, dev `70e2ab0`, 3.936 s | Reduce LLVM7 ranges / #140 empty-record context |
 | Bitcoin self-tests [#30](https://github.com/brandonros/vanity-miner-rs/issues/30) | Direct-store range rejection `075e963`, 10.850 s | Pointer-type rejection `f7ceeef`, not rerun | Reduce ranges; #118/#152 leads for LLVM21 |
@@ -67,11 +67,12 @@ compiler, rather than the normal paired Nix consumer. This is not a fresh 32-run
 | Shallenge self-tests [#37](https://github.com/brandonros/vanity-miner-rs/issues/37), closed | **21/21 pass `70294ed`, 34.701 s** | **21/21 pass `70294ed`, 23.756 s** | #152/#157 accepted; PRs unmerged |
 | P-256 public-key self-tests [#32](https://github.com/brandonros/vanity-miner-rs/issues/32) | Undefined value `0f98856` | Metal emitted; GPU unverified `c4e5fac` | Reduce / validate |
 | P-256 signature self-tests [#33](https://github.com/brandonros/vanity-miner-rs/issues/33) | Undefined value `0f98856` | Undefined value `c4e5fac` | Reduce |
-| RSA modulus self-tests [#34](https://github.com/brandonros/vanity-miner-rs/issues/34) | Undefined value `c4e5fac` | Undefined `%rd2065`, dev `400a8bb`, 17.594 s | Reduce undefined edge |
+| RSA modulus self-tests [#34](https://github.com/brandonros/vanity-miner-rs/issues/34) | Independent candidates: undefined `%rs3372` into `$L__BB19_4`, matched `684bb03`; all 16 checks blocked before launch | Historical resumable kernel: undefined `%rd2065`, dev `400a8bb`, 17.594 s | Reduce undefined edge; CPU 16/16 pass |
 | RSA-PSS self-tests [#35](https://github.com/brandonros/vanity-miner-rs/issues/35) | Pointer/integer join rejection, dev `463c541` | MSL emitted, dev `0dbdb4b`, 93.728 s | Apple preparation / GPU checks; original #118 artifact still range-blocked |
 
-Solana/Bitcoin failures above occur before GPU launch: 79/39 checks are blocked,
-not numerical assertion failures. Current inputs remain producer `afe80210`,
+Translation/preparation failures occur before GPU launch and do not represent
+numerical assertion failures. RSA modulus LLVM7 rows record master commit `8e3e338` independent
+candidate kernels (not a rerun of this Metal branch); other inputs remain producer `afe80210`,
 [Actions 35055622652](https://github.com/brandonros/vanity-miner-rs/actions/runs/35055622652).
 Consumer `67950b7` contains the same logic and kernel entries after the crate move.
 

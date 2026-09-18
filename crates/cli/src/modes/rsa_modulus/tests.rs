@@ -15,6 +15,7 @@ impl Drop for Directory {
 }
 
 #[test]
+#[ignore = "manual stochastic search; bounded known-answer tests cover candidate acceptance"]
 fn constructive_keys_round_trip_and_pass_libressl_checks() {
     check_runner();
 }
@@ -41,7 +42,7 @@ fn check_runner() {
         let control = Arc::new(SearchControl::new());
         let report = run_cpu(&config, control).unwrap();
         assert!(report.found);
-        assert!(report.q_candidates_tested > 0);
+        assert!(report.candidates_tested > 0);
         let record = report.output.as_ref().unwrap();
         let key = RsaPrivateKey::from_pkcs8_der(&crate::modes::tests::console_field(
             record,

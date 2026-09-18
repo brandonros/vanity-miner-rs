@@ -55,6 +55,11 @@ def main():
     if options.case and (not options.output or options.monolithic_self_test):
         parser.error('--case requires explicit --output and cannot be combined with --monolithic-self-test')
     compiler = options.llvm_metal.resolve()
+    # Nix store sources share normalized mtimes. Cargo can otherwise retain old
+    # native build-script objects when the compiler pin changes in this checkout.
+    compiler_key = hashlib.sha256(str(compiler).encode()).hexdigest()[:16]
+    compiler_target = ROOT / 'target/metal/compiler' / compiler_key
+    compiler_binary = compiler_target / 'release/llvm-metalc'
     device = ROOT / f'crates/kernels/{options.mode}/metal'
     entry = json.loads((device / 'kernel.interface.json').read_text())['entry']
     device_target = ROOT / 'target/metal/device' / options.mode
@@ -75,7 +80,7 @@ def main():
         raise RuntimeError('use llvm-metal\'s .#rust-fixtures shell (stable Rust 1.93 / LLVM 21.1.8)')
     if 'LLVM version 21.1.8' not in run('llvm-link', '--version', capture=True):
         raise RuntimeError('LLVM tools must be 21.1.8')
-    run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', ROOT / 'target/metal/compiler')
+    run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', compiler_target)
     common = ['--locked', '--manifest-path', device / 'Cargo.toml', '--release', '--target-dir', device_target]
     run('cargo', 'test', *common)
     inventory = []
@@ -120,7 +125,7 @@ def main():
         run('llvm-link', *modules, '-o', stage / 'linked.bc')
         timings['link_seconds'] = time.perf_counter() - stage_start
         shared_frontend_seconds = time.perf_counter() - start
-        compiler_hash = digest(ROOT / 'target/metal/compiler/release/llvm-metalc')
+        compiler_hash = digest(compiler_binary)
         group_cases = []
         lowering_total = 0.0
         frontend_total = shared_frontend_seconds
@@ -158,7 +163,7 @@ def main():
             frontend_total += frontend_seconds
             stage_start = time.perf_counter()
             try:
-                run(ROOT / 'target/metal/compiler/release/llvm-metalc', 'compile', unit / 'kernel.bc', '--interface', interface, '--output', unit)
+                run(compiler_binary, 'compile', unit / 'kernel.bc', '--interface', interface, '--output', unit)
             except subprocess.CalledProcessError:
                 for name in ['kernel.bc', 'kernel.ll']:
                     shutil.copyfile(unit / name, destination / ('rejected.' + name.split('.')[-1]))
@@ -167,7 +172,7 @@ def main():
             lowering_total += lowering_seconds
             if source_hashes != {str(p.relative_to(ROOT)): digest(p) for p in sources}:
                 raise RuntimeError('source changed during build; rerun to produce an attributable bundle')
-            if compiler_hash != digest(ROOT / 'target/metal/compiler/release/llvm-metalc'):
+            if compiler_hash != digest(compiler_binary):
                 raise RuntimeError('compiler changed during lowering; rerun the build')
             names = ['kernel.bc', 'kernel.ll', 'kernel.air.ll', 'kernel.air.bc', 'kernel.bindings.json', 'kernel.metallib']
             report = dict(schema=1, rustc=rust, source_revision=source_revision,

@@ -7,7 +7,8 @@ use std::{path::PathBuf, sync::Arc};
 #[cfg(any(
     feature = "p256-public-key",
     feature = "p256-signature",
-    feature = "rsa-pss"
+    feature = "rsa-pss",
+    feature = "rsa-modulus"
 ))]
 pub mod candidate;
 #[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
@@ -109,7 +110,3 @@ mod bitcoin_contract;
 #[cfg(feature = "solana")]
 #[path = "../../../../kernels/solana/metal/src/contract.rs"]
 mod solana_contract;
-
-#[cfg(feature = "rsa-modulus")]
-#[path = "../../../../kernels/rsa-modulus/metal/src/contract.rs"]
-mod rsa_contract;
