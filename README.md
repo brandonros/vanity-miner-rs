@@ -1,7 +1,7 @@
 # vanity-miner-rs
 
 Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-CuMetal, and direct Metal for Shallenge, Ethereum and Bitcoin on Apple Silicon.
+CuMetal, and direct Metal for Shallenge, Ethereum, Bitcoin and Solana on Apple Silicon.
 
 ## Modes
 
@@ -25,7 +25,7 @@ cargo build -p vanity-miner --release --locked --no-default-features --features 
 ./target/release/vanity-miner solana-vanity --prefix aaa
 ```
 
-Combine mode features with commas. Run `<command> --help` for its options.
+Combine mode features with commas; use `<command> --help` for options.
 Address searches accept `--prefix` and `--suffix`; signature searches also need
 `--key` and `--message`. Matches print to stdout; Ctrl-C stops the search.
 
@@ -60,7 +60,7 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 This builds matching device/host artifacts using `nix develop .#metal` (stable
 Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
 `--verify` compares every lane with the CPU; winners are always CPU-verified.
-Ethereum and Bitcoin P2WPKH (`bc1q…`) need the newer local llvm-metal checkout:
+Ethereum, Bitcoin P2WPKH (`bc1q…`) and Solana need a newer local llvm-metal checkout:
 
 ```sh
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode ethereum \
@@ -69,6 +69,9 @@ Ethereum and Bitcoin P2WPKH (`bc1q…`) need the newer local llvm-metal checkout
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode bitcoin \
   --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
   bitcoin-vanity --prefix bc1qg --suffix 6m
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode solana \
+  --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
+  solana-vanity --prefix aaa --suffix NFC
 ```
 
 The legacy CUDA/CuMetal paths still use their existing toolchains. Backend
@@ -94,5 +97,3 @@ cargo run -p vanity-miner --release --locked --no-default-features --features se
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-Use `self-test --list` to list checks and `self-test --check <name>` to select one.
-GPU builds use the same command with their backend feature and matching PTX.

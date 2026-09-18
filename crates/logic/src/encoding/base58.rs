@@ -77,7 +77,7 @@ pub fn base58_encode_32(input: &[u8; 32], output: &mut [u8; 64]) -> usize {
         // Extract Base58 digits using precomputed divisors
         for i in 0..DIGITS_PER_LIMB {
             let temp = (limb_value / DIVISORS[i]) % 58;
-            output[output_offset + i] = temp as u8;
+            output[output_offset + i] = BASE58_ALPHABET[temp as usize];
         }
     }
 
@@ -85,23 +85,24 @@ pub fn base58_encode_32(input: &[u8; 32], output: &mut [u8; 64]) -> usize {
     let mut result_len = limb_count * DIGITS_PER_LIMB;
 
     // Trim leading zeros in the result
-    while result_len > 0 && output[result_len - 1] == 0 {
+    while result_len > 0 && output[result_len - 1] == b'1' {
         result_len -= 1;
     }
 
-    // Add a zero byte for each leading zero in the input
-    for _ in 0..num_leading_zeros {
-        output[result_len] = 0;
+    // A 32-byte input needs at most 44 Base58 characters, including leading
+    // zeroes. Keep the storage bound explicit at each write so device builds
+    // do not require bounds-panic routines or pointer-distance arithmetic.
+    let mut remaining = num_leading_zeros;
+    while remaining > 0 && result_len < output.len() {
+        output[result_len] = b'1';
         result_len += 1;
+        remaining -= 1;
     }
-
-    // Apply alphabet encoding
-    for val in &mut output[..result_len] {
-        *val = BASE58_ALPHABET[*val as usize];
-    }
+    result_len = result_len.min(output.len());
 
     // Reverse the result
     output[..result_len].reverse();
+    output[result_len..].fill(0);
 
     result_len
 }

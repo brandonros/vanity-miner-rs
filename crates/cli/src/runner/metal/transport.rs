@@ -71,6 +71,18 @@ impl Contract for Bitcoin {
 }
 #[cfg(feature = "bitcoin")]
 pub type BitcoinTransport = Transport<Bitcoin>;
+#[cfg(feature = "solana")]
+pub struct Solana;
+#[cfg(feature = "solana")]
+impl Contract for Solana {
+    type Launch = super::solana_contract::Launch;
+    const INTERFACE: &'static str = super::solana_contract::INTERFACE;
+    fn candidate(launch: &Self::Launch, lane: u32) -> CandidateResult {
+        super::solana_contract::candidate(launch, lane)
+    }
+}
+#[cfg(feature = "solana")]
+pub type SolanaTransport = Transport<Solana>;
 
 pub struct Transport<C: Contract> {
     contract: std::marker::PhantomData<C>,
@@ -316,6 +328,30 @@ impl Transport<Bitcoin> {
             return Err("invalid Metal candidate range".into());
         }
         let launch = super::bitcoin_contract::Launch {
+            seed: *seed,
+            pattern: *pattern,
+            start,
+            count,
+            audit: u32::from(self.audit),
+        };
+        self.evaluate_launch(&launch, count)
+    }
+}
+
+#[cfg(feature = "solana")]
+impl Transport<Solana> {
+    pub fn evaluate(
+        &mut self,
+        seed: &BatchSeed,
+        pattern: &logic::search::vanity::BytePattern,
+        start: u64,
+        count: u32,
+    ) -> Result<BatchResult, String> {
+        if count == 0 || count > self.capacity || start.checked_add(u64::from(count) - 1).is_none()
+        {
+            return Err("invalid Metal candidate range".into());
+        }
+        let launch = super::solana_contract::Launch {
             seed: *seed,
             pattern: *pattern,
             start,

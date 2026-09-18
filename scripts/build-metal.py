@@ -33,7 +33,7 @@ def post_inline(source, output, *, timeout=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--llvm-metal', type=Path, default=Path(os.environ.get('VANITY_LLVM_METAL_SOURCE', ROOT.parent / 'llvm-metal')))
-    parser.add_argument('--mode', choices=['shallenge', 'ethereum', 'bitcoin'], default='shallenge')
+    parser.add_argument('--mode', choices=['shallenge', 'ethereum', 'bitcoin', 'solana'], default='shallenge')
     parser.add_argument('--output', type=Path)
     options = parser.parse_args()
     compiler = options.llvm_metal.resolve()
