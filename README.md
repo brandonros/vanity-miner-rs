@@ -22,6 +22,9 @@ CPU references verify winners and support testing without a GPU.
 Install Nix, then run from the repository root. The script uses the pinned
 stable Rust and llvm-metal compiler, builds matching kernels and host artifacts,
 and starts the search. `--mode` selects a mode from the table above.
+For Shallenge, Ethereum, Bitcoin, and Solana, the script defaults to 65,536
+candidates per batch and 64 threads per group. Override these with `--batch-size`
+and `--threads-per-group`.
 
 ```sh
 ./scripts/run-metal.sh --mode solana \
