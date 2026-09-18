@@ -52,20 +52,24 @@ impl HexPattern {
         if prefix.len() > len * 2 || suffix.len() > len * 2 {
             return Err(PatternError::TooLong);
         }
-        for (text, start) in [(prefix, 0), (suffix, len * 2 - suffix.len())] {
-            for (offset, c) in text.bytes().enumerate() {
-                let digit = match c {
-                    b'0'..=b'9' => c - b'0',
-                    b'a'..=b'f' => c - b'a' + 10,
-                    b'A'..=b'F' => c - b'A' + 10,
-                    _ => return Err(PatternError::InvalidHex),
-                };
-                let nibble = start + offset;
-                let shift = if nibble % 2 == 0 { 4 } else { 0 };
-                pattern.constrain_byte(nibble / 2, 15 << shift, digit << shift)?;
-            }
-        }
+        pattern.constrain_text(prefix, 0)?;
+        pattern.constrain_text(suffix, len * 2 - suffix.len())?;
         Ok(pattern)
+    }
+
+    fn constrain_text(&mut self, text: &str, start: usize) -> Result<(), PatternError> {
+        for (offset, c) in text.bytes().enumerate() {
+            let digit = match c {
+                b'0'..=b'9' => c - b'0',
+                b'a'..=b'f' => c - b'a' + 10,
+                b'A'..=b'F' => c - b'A' + 10,
+                _ => return Err(PatternError::InvalidHex),
+            };
+            let nibble = start + offset;
+            let shift = if nibble % 2 == 0 { 4 } else { 0 };
+            self.constrain_byte(nibble / 2, 15 << shift, digit << shift)?;
+        }
+        Ok(())
     }
 
     /// Add known format bits, rejecting incompatible requested patterns.
