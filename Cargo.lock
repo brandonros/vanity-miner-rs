@@ -952,7 +952,7 @@ checksum = "df1d3c3b53da64cf5760482273a98e575c651a67eec7f77df96b5b642de8f039"
 [[package]]
 name = "llvm-metal-abi"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=e5cea07dd6a0512d4fb33894646f1dddf03ab1a0#e5cea07dd6a0512d4fb33894646f1dddf03ab1a0"
+source = "git+https://github.com/brandonros/llvm-metal?rev=5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5#5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5"
 dependencies = [
  "serde",
 ]
@@ -960,7 +960,7 @@ dependencies = [
 [[package]]
 name = "llvm-metal-runtime"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=e5cea07dd6a0512d4fb33894646f1dddf03ab1a0#e5cea07dd6a0512d4fb33894646f1dddf03ab1a0"
+source = "git+https://github.com/brandonros/llvm-metal?rev=5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5#5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5"
 dependencies = [
  "llvm-metal-abi",
  "objc2",

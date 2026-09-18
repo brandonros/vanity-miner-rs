@@ -78,8 +78,8 @@ compiler, rather than the normal paired Nix consumer. This is not a fresh 32-run
 | RSA-PSS self-tests [#35](https://github.com/brandonros/vanity-miner-rs/issues/35) | Pointer/integer join rejection, dev `463c541` | MSL emitted, dev `0dbdb4b`, 93.728 s | Apple preparation / GPU checks; original #118 artifact still range-blocked |
 
 Translation/preparation failures occur before GPU launch and do not represent
-numerical assertion failures. RSA modulus LLVM7 rows use freshly rebuilt independent
-candidate kernels; other inputs remain producer `afe80210`,
+numerical assertion failures. RSA modulus LLVM7 rows record master commit `8e3e338` independent
+candidate kernels (not a rerun of this Metal branch); other inputs remain producer `afe80210`,
 [Actions 35055622652](https://github.com/brandonros/vanity-miner-rs/actions/runs/35055622652).
 Consumer `67950b7` contains the same logic and kernel entries after the crate move.
 

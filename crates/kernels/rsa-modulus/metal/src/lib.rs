@@ -1,64 +1,61 @@
-//! Stock-Rust resumable RSA miner; one persistent task belongs to each lane.
+//! Stock-Rust RSA modulus entry; one independent factor pair per candidate.
 #![no_std]
 mod contract;
 pub use contract::*;
 #[cfg(target_arch = "nvptx64")]
 use logic::{
-    modes::rsa_modulus::{self as mining, Counts, Pair, SearchConfig, Task},
-    search::hex_pattern::HexPattern,
+    modes::rsa_modulus::SearchConfig,
+    search::{
+        candidate_result::{BatchResult, CandidateResult},
+        hex_pattern::HexPattern,
+    },
 };
+
 #[cfg(target_arch = "nvptx64")]
 unsafe extern "C" {
     #[link_name = "llvm_metal.linear_thread_index"]
     fn thread_index() -> u32;
     #[link_name = "llvm_metal.atomic_add_device_u32"]
-    fn atomic_add(p: *mut u32, n: u32) -> u32;
+    fn atomic_add(pointer: *mut u32, value: u32) -> u32;
 }
+
 /// # Safety
-/// Disjoint initialized Launch/config/pattern; capacity writable Tasks and Pairs;
-/// zeroed Counts. Each lane owns its task. Host waits for completion before reads
-/// or the next launch. Allocation sizes and launch work are checked by the host.
+/// All six buffers are disjoint and naturally aligned. Launch, request, pattern
+/// and message_len readable message bytes (one allocated byte for empty) are initialized and immutable. Output
+/// is initialized to BatchResult::EMPTY. Records holds count writable candidates
+/// when audit != 0 (one otherwise). Host readers wait for GPU completion.
 #[cfg(target_arch = "nvptx64")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn kernel_rsa_modulus_vanity(
+pub unsafe extern "C" fn kernel_rsa_modulus_candidate(
     launch: *const Launch,
-    config: *const SearchConfig,
+    request: *const SearchConfig,
     pattern: *const HexPattern,
-    tasks: *mut Task,
-    pairs: *mut Pair,
-    counts: *mut Counts,
+    message: *const u8,
+    output: *mut BatchResult,
+    records: *mut CandidateResult,
 ) {
     unsafe {
         let launch = &*launch;
         let lane = thread_index();
-        if lane >= launch.capacity {
+        if lane >= launch.count {
             return;
         }
-        let Some(id) = launch.start.checked_add(u64::from(lane)) else {
-            atomic_add(core::ptr::addr_of_mut!((*counts).errors), 1);
-            return;
-        };
-        // Keep the algorithm's volatile zeroization in private memory. Publish the
-        // resulting persistent record only once after the owning lane's work ends.
-        let mut task = tasks.add(lane as usize).read();
-        let (local, pair) = mining::mine(
-            &*config,
-            &*pattern,
-            &mut task,
-            id,
-            launch.capacity,
-            launch.steps,
-        );
-        tasks.add(lane as usize).write(task);
-        if let Some(pair) = pair {
-            let index = atomic_add(core::ptr::addr_of_mut!((*counts).matches), 1);
-            if index < launch.capacity {
-                pairs.add(index as usize).write(pair);
-            } else {
-                atomic_add(core::ptr::addr_of_mut!((*counts).errors), 1);
+        let message = core::slice::from_raw_parts(message, launch.message_len as usize);
+        let result = candidate(launch, &*request, &*pattern, message, lane);
+        if launch.audit != 0 {
+            records.add(lane as usize).write(result);
+        }
+        match result.status {
+            CandidateResult::STATUS_MISS => {}
+            CandidateResult::STATUS_MATCH => {
+                if atomic_add(core::ptr::addr_of_mut!((*output).matches), 1) == 0 {
+                    (*output).candidate = result;
+                    (*output).lane = lane;
+                }
+            }
+            _ => {
+                atomic_add(core::ptr::addr_of_mut!((*output).errors), 1);
             }
         }
-        macro_rules! publish {($($field:ident),+)=>{$(if local.$field!=0 {atomic_add(core::ptr::addr_of_mut!((*counts).$field),local.$field);})+};}
-        publish!(p_tested, p_accepted, ranges, q_tested, active, errors);
     }
 }

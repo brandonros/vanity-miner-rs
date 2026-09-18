@@ -49,7 +49,8 @@ pub fn verify_pair(
         return Err("RSA device p failed reconstruction".into());
     }
     let expected_q = Zeroizing::new(
-        device_logic::generate_q(config, &pair.p, pair.id)?
+        device_logic::generate_q(config, &pair.p, pair.id)
+            .map_err(|error| format!("RSA candidate range reconstruction failed: {error:?}"))?
             .ok_or("RSA candidate range reconstruction failed")?,
     );
     if pair.q != *expected_q {

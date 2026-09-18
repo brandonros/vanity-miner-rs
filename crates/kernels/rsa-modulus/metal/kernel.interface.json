@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "entry": "kernel_rsa_modulus_vanity",
+  "entry": "kernel_rsa_modulus_candidate",
   "calling_convention": "C",
   "invocations": null,
   "dispatch": "grid1d",
@@ -10,11 +10,11 @@
       "name": "launch",
       "kind": "buffer",
       "access": "read",
-      "bytes": 16,
+      "bytes": 24,
       "alignment": 8
     },
     {
-      "name": "config",
+      "name": "request",
       "kind": "buffer",
       "access": "read",
       "bytes": 1072,
@@ -28,24 +28,24 @@
       "alignment": 4
     },
     {
-      "name": "tasks",
+      "name": "message",
       "kind": "buffer",
-      "access": "read_write",
-      "bytes": 912,
-      "alignment": 8
+      "access": "read",
+      "bytes": 1,
+      "alignment": 1
     },
     {
-      "name": "pairs",
+      "name": "output",
+      "kind": "buffer",
+      "access": "read_write",
+      "bytes": 272,
+      "alignment": 4
+    },
+    {
+      "name": "records",
       "kind": "buffer",
       "access": "write",
-      "bytes": 264,
-      "alignment": 8
-    },
-    {
-      "name": "counts",
-      "kind": "buffer",
-      "access": "read_write",
-      "bytes": 32,
+      "bytes": 260,
       "alignment": 4
     }
   ]

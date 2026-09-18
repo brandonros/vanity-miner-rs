@@ -1,6 +1,6 @@
 {
   inputs = {
-    llvm-metal.url = "github:brandonros/llvm-metal/e5cea07dd6a0512d4fb33894646f1dddf03ab1a0";
+    llvm-metal.url = "github:brandonros/llvm-metal/5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     # LLVM 7 is no longer carried by nixpkgs-unstable. Pin a second nixpkgs just
     # for `llvmPackages_7` so someone else's compat patches do the hard work.
