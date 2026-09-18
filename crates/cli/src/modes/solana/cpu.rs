@@ -34,7 +34,8 @@ fn worker(
 
         data.global_stats.add_launch(1);
 
-        if result.matches {
+        if result.matches && (!cancelled.exit_on_first_match() || cancelled.claim_verified_winner())
+        {
             let encoded_str =
                 std::str::from_utf8(&result.encoded_public_key[0..result.encoded_len])
                     .unwrap_or("invalid_utf8");
@@ -66,17 +67,24 @@ pub fn run(
     prefix: String,
     suffix: String,
     global_stats: Arc<GlobalStats>,
+    exit_on_first_match: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!(
         "Starting CPU solana vanity mode with {} threads",
         num_threads
     );
 
+    let control = Arc::new(crate::runner::session::SearchControl::with_stats(
+        global_stats.clone(),
+    ));
+    if exit_on_first_match {
+        control.set_exit_on_first_match();
+    }
     let data = Arc::new(WorkerData {
         prefix_bytes: prefix.as_bytes().to_vec(),
         suffix_bytes: suffix.as_bytes().to_vec(),
         global_stats,
     });
 
-    spawn_cpu_workers(num_threads, data, worker)
+    spawn_cpu_workers(num_threads, data, control, worker)
 }

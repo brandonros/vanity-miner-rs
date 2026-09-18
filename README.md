@@ -28,6 +28,7 @@ cargo build -p vanity-miner --release --locked --no-default-features --features 
 Combine mode features with commas; use `<command> --help` for options.
 Address searches accept `--prefix` and `--suffix`; signature searches also need
 `--key` and `--message`. Matches print to stdout; Ctrl-C stops the search.
+Use `--exit-on-first-match` to stop after one verified match.
 
 ## CUDA · Linux
 
@@ -51,22 +52,19 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 
 ## Metal · macOS
 
-Use a local llvm-metal checkout. The runner builds matching device and host
-artifacts with stable Rust, then runs the `metal` backend. `--mode` selects a
-mode from the table above; use its command's `--help` for search options.
+The runner builds matching device and host artifacts using the pinned compiler.
+`--llvm-metal` selects a local compiler checkout. `--mode` selects a mode from
+the table above; use its command's `--help` for search options.
 
 ```sh
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode p256-public-key \
-  --batches 2 --batch-size 1 --threads-per-group 1 --verify \
-  p256-public-key-vanity --prefix ab
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode rsa-pss \
-  --batches 2 --batch-size 1 --threads-per-group 1 --verify \
-  rsa-pss-signature-vanity --key private.pem --message message.bin
+./scripts/smoke-metal.sh
 ```
 
+The smoke script builds and runs all 8 modes, requiring one verified match each.
+It creates temporary signing keys; RSA modulus still needs to find a prime pair.
 Omit `--batches` for continuous search. `--verify` compares every lane with the
 CPU; winners are always CPU-verified. P-256 and RSA use OS cryptographic entropy
 and reject `--seed`; start with small batches.

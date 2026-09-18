@@ -24,6 +24,7 @@ pub fn run(
         "keys",
         runner.options.batches,
         runner.options.blocks * runner.options.threads_per_block,
+        runner.exit_on_first_match,
         |control| {
             super::device::search(
                 prefix,

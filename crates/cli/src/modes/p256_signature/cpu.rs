@@ -88,6 +88,7 @@ pub fn run(
     args: &crate::modes::p256_signature::args::P256SignatureArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers)?;
@@ -100,7 +101,7 @@ pub fn run(
     } else {
         "nonces"
     };
-    run_controlled(stats, unit, |control| {
+    run_controlled(stats, unit, exit_on_first_match, |control| {
         crate::modes::p256_signature::run_cpu(&config, control).map(|report| report.found)
     })
 }

@@ -30,6 +30,7 @@ pub fn run(
         "keys",
         options.batches,
         options.batch_size,
+        runner.exit_on_first_match,
         |control| {
             super::run_device(
                 &config,

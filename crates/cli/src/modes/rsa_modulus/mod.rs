@@ -77,7 +77,7 @@ pub fn run_cpu(
         })?;
     let found = output.is_some();
     if let Some(record) = &output {
-        println!("{record}");
+        crate::runner::progress::print_verified(&control, record.clone())?;
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(ModulusReport {

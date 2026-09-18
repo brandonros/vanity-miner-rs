@@ -25,6 +25,7 @@ use std::sync::Arc;
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 pub struct CumetalRunner {
+    pub(crate) exit_on_first_match: bool,
     pub(crate) options: CumetalOptions,
     toolchain: toolchain::Toolchain,
 }
@@ -41,11 +42,18 @@ impl CumetalRunner {
             "CuMetal package is required: build in `nix develop .#cumetal` or pass --cumetal-root from `nix build .#cumetal`",
         )?;
         let toolchain = toolchain::Toolchain::load(root)?;
-        Ok(Self { options, toolchain })
+        Ok(Self {
+            options,
+            toolchain,
+            exit_on_first_match: false,
+        })
     }
 }
 
 impl Runner for CumetalRunner {
+    fn set_exit_on_first_match(&mut self, enabled: bool) {
+        self.exit_on_first_match = enabled;
+    }
     fn device_count(&self) -> usize {
         1
     }

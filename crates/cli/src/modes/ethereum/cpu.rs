@@ -34,7 +34,8 @@ fn worker(
 
         data.global_stats.add_launch(1);
 
-        if result.matches {
+        if result.matches && (!cancelled.exit_on_first_match() || cancelled.claim_verified_winner())
+        {
             let encoded_address_str = hex::encode(result.address);
 
             println!("[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}");
@@ -64,6 +65,7 @@ pub fn run(
     prefix: String,
     suffix: String,
     global_stats: Arc<GlobalStats>,
+    exit_on_first_match: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Ethereum uses hex-encoded prefix/suffix
     let prefix_bytes = hex::decode(&prefix)?;
@@ -74,11 +76,17 @@ pub fn run(
         num_threads
     );
 
+    let control = Arc::new(crate::runner::session::SearchControl::with_stats(
+        global_stats.clone(),
+    ));
+    if exit_on_first_match {
+        control.set_exit_on_first_match();
+    }
     let data = Arc::new(WorkerData {
         prefix_bytes,
         suffix_bytes,
         global_stats,
     });
 
-    spawn_cpu_workers(num_threads, data, worker)
+    spawn_cpu_workers(num_threads, data, control, worker)
 }

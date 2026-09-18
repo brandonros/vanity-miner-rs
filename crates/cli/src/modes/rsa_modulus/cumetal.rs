@@ -23,6 +23,7 @@ pub fn run(
         "candidates",
         runner.options.batches,
         runner.options.blocks * runner.options.threads_per_block,
+        runner.exit_on_first_match,
         |control| {
             super::pipeline::run(&config, &control, |r, p, start, count| {
                 engine.evaluate(r, p, &[], start, count, |counter| {

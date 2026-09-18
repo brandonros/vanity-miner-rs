@@ -13,6 +13,9 @@ use std::error::Error;
 #[command(name = "vanity-miner")]
 #[command(about = "GPU-accelerated vanity address generator for multiple blockchains")]
 pub struct Cli {
+    /// Stop successfully after printing the first fully verified match.
+    #[arg(long, global = true)]
+    pub exit_on_first_match: bool,
     #[cfg(feature = "metal")]
     #[command(flatten)]
     pub metal: crate::runner::metal::MetalOptions,
@@ -221,5 +224,62 @@ pub fn validate_hex_string(hex_string: &str) -> Result<(), Box<dyn Error + Send 
     match hex::decode(hex_string) {
         Ok(_) => Ok(()),
         Err(e) => Err(format!("Invalid hex string: {}", e).into()),
+    }
+}
+
+#[cfg(test)]
+mod first_match_tests {
+    use super::*;
+
+    #[test]
+    fn flag_is_global_and_all_search_modes_default_to_continuous() {
+        let commands: &[&[&str]] = &[
+            #[cfg(feature = "shallenge")]
+            &[
+                "shallenge",
+                "--username",
+                "miner",
+                "--target-hash",
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            ],
+            #[cfg(feature = "ethereum")]
+            &["ethereum-vanity"],
+            #[cfg(feature = "bitcoin")]
+            &["bitcoin-vanity"],
+            #[cfg(feature = "solana")]
+            &["solana-vanity"],
+            #[cfg(feature = "rsa-modulus")]
+            &["rsa-modulus-vanity"],
+            #[cfg(feature = "p256-public-key")]
+            &["p256-public-key-vanity"],
+            #[cfg(feature = "p256-signature")]
+            &[
+                "p256-signature-vanity",
+                "--key",
+                "key.pem",
+                "--message",
+                "message.bin",
+                "--search-source",
+                "ephemeral",
+            ],
+            #[cfg(feature = "rsa-pss")]
+            &[
+                "rsa-pss-signature-vanity",
+                "--key",
+                "key.pem",
+                "--message",
+                "message.bin",
+            ],
+        ];
+        for command in commands {
+            let mut args = vec!["vanity-miner"];
+            args.extend_from_slice(command);
+            assert!(!Cli::try_parse_from(&args).unwrap().exit_on_first_match);
+            args.insert(1, "--exit-on-first-match");
+            assert!(Cli::try_parse_from(&args).unwrap().exit_on_first_match);
+            args.remove(1);
+            args.push("--exit-on-first-match");
+            assert!(Cli::try_parse_from(&args).unwrap().exit_on_first_match);
+        }
     }
 }

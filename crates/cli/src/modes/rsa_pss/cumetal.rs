@@ -27,6 +27,7 @@ pub fn run(
         },
         runner.options.batches,
         runner.options.blocks * runner.options.threads_per_block,
+        runner.exit_on_first_match,
         |control| {
             let report = crate::modes::rsa_pss::run_device(
                 &config,

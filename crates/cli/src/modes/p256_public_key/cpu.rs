@@ -47,6 +47,7 @@ pub fn run(
     args: &crate::modes::p256_public_key::args::P256PublicArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers);
@@ -56,7 +57,7 @@ pub fn run(
         0
     };
     estimate(config.pattern()?.constrained_bits() - structural);
-    run_controlled(stats, "keys", |control| {
+    run_controlled(stats, "keys", exit_on_first_match, |control| {
         crate::modes::p256_public_key::run_cpu(&config, control).map(|report| report.found)
     })
 }

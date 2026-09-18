@@ -9,13 +9,13 @@ type WorkerResult = Result<(), Box<dyn Error + Send + Sync>>;
 pub fn spawn_cpu_workers<T, F>(
     num_workers: usize,
     shared_data: Arc<T>,
+    cancelled: Arc<SearchControl>,
     worker_fn: F,
 ) -> WorkerResult
 where
     T: Send + Sync + 'static,
     F: Fn(usize, Arc<T>, Arc<SearchControl>) -> WorkerResult + Send + Clone + 'static,
 {
-    let cancelled = Arc::new(SearchControl::new());
     let mut handles = Vec::with_capacity(num_workers);
     let mut first_error: Option<Box<dyn Error + Send + Sync>> = None;
     for i in 0..num_workers {
@@ -64,24 +64,29 @@ mod tests {
         let ready = Arc::new(Barrier::new(3));
         let peers_finished = Arc::new(AtomicUsize::new(0));
         let finished = peers_finished.clone();
-        let result = spawn_cpu_workers(3, ready, move |id, ready, stop| {
-            ready.wait();
-            if id == 1 {
-                if panic {
-                    panic!("injected failure");
+        let result = spawn_cpu_workers(
+            3,
+            ready,
+            Arc::new(SearchControl::new()),
+            move |id, ready, stop| {
+                ready.wait();
+                if id == 1 {
+                    if panic {
+                        panic!("injected failure");
+                    }
+                    return Err("injected failure".into());
                 }
-                return Err("injected failure".into());
-            }
-            // Bound failure time so a broken cancellation signal fails the test
-            // instead of leaving an endless worker or hanging the test suite.
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while !stop.stopped() {
-                assert!(Instant::now() < deadline, "peer cancellation timed out");
-                std::thread::yield_now();
-            }
-            finished.fetch_add(1, Ordering::Relaxed);
-            Ok(())
-        });
+                // Bound failure time so a broken cancellation signal fails the test
+                // instead of leaving an endless worker or hanging the test suite.
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while !stop.stopped() {
+                    assert!(Instant::now() < deadline, "peer cancellation timed out");
+                    std::thread::yield_now();
+                }
+                finished.fetch_add(1, Ordering::Relaxed);
+                Ok(())
+            },
+        );
         let error = result.unwrap_err().to_string();
         assert_eq!(
             error,
@@ -92,6 +97,31 @@ mod tests {
             }
         );
         assert_eq!(peers_finished.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn first_verified_match_stops_and_joins_all_workers() {
+        let control = Arc::new(SearchControl::new());
+        control.set_exit_on_first_match();
+        let ready = Arc::new(Barrier::new(8));
+        let printed = Arc::new(AtomicUsize::new(0));
+        let finished = Arc::new(AtomicUsize::new(0));
+        let records = printed.clone();
+        let joined = finished.clone();
+        spawn_cpu_workers(8, ready, control.clone(), move |_, ready, control| {
+            ready.wait();
+            // Each simulated worker has completed verification before claiming.
+            if control.claim_verified_winner() {
+                records.fetch_add(1, Ordering::Relaxed);
+            }
+            assert!(control.stopped());
+            joined.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(printed.load(Ordering::Relaxed), 1);
+        assert_eq!(finished.load(Ordering::Relaxed), 8);
+        assert!(!control.resume_after_match());
     }
 
     #[test]

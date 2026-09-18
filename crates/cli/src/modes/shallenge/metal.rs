@@ -25,6 +25,7 @@ pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) 
         "nonces",
         options.batches,
         options.batch_size,
+        runner.exit_on_first_match,
         |control| {
             super::device::search(
                 &args.username,

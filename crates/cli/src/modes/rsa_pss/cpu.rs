@@ -67,6 +67,7 @@ pub fn run(
     args: &crate::modes::rsa_pss::args::RsaPssArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers)?;
@@ -76,7 +77,7 @@ pub fn run(
     } else {
         "messages"
     };
-    run_controlled(stats, unit, |control| {
+    run_controlled(stats, unit, exit_on_first_match, |control| {
         crate::modes::rsa_pss::run_cpu(&config, control).map(|report| report.found)
     })
 }

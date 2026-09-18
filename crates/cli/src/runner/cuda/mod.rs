@@ -22,6 +22,7 @@ use std::{error::Error, sync::Arc};
 
 type RunResult = Result<(), Box<dyn Error + Send + Sync>>;
 pub struct GpuRunner {
+    pub(crate) exit_on_first_match: bool,
     num_devices: usize,
 }
 impl GpuRunner {
@@ -32,7 +33,10 @@ impl GpuRunner {
             return Err("no CUDA devices available".into());
         }
         println!("Found {num_devices} CUDA devices");
-        Ok(Self { num_devices })
+        Ok(Self {
+            num_devices,
+            exit_on_first_match: false,
+        })
     }
     fn run_devices(
         &self,
@@ -130,11 +134,17 @@ impl GpuRunner {
     }
 }
 impl Runner for GpuRunner {
+    fn set_exit_on_first_match(&mut self, enabled: bool) {
+        self.exit_on_first_match = enabled;
+    }
     fn device_count(&self) -> usize {
         self.num_devices
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> RunResult {
         let control = Arc::new(SearchControl::with_stats(stats.clone()));
+        if self.exit_on_first_match {
+            control.set_exit_on_first_match();
+        }
         if command.details().cuda_module.is_some() {
             control.set_continuous();
             let threads = GpuContext::configured_threads_per_block()? as u32;
