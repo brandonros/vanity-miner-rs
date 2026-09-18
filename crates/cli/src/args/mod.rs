@@ -16,6 +16,10 @@ pub struct Cli {
     /// Stop successfully after printing the first fully verified match.
     #[arg(long, global = true)]
     pub exit_on_first_match: bool,
+    /// CPU worker count (default: available parallelism)
+    #[cfg(not(feature = "metal"))]
+    #[arg(long, global = true)]
+    pub threads: Option<std::num::NonZeroUsize>,
     #[cfg(feature = "metal")]
     #[command(flatten)]
     pub metal: crate::runner::metal::MetalOptions,
@@ -58,25 +62,25 @@ pub enum Command {
 
 impl Command {
     pub fn validate(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
-        match self {
+        match *self {
             #[cfg(feature = "rsa-modulus")]
-            Self::RsaModulusVanity(args) => args.validate(),
+            Self::RsaModulusVanity(ref args) => args.validate(),
             #[cfg(feature = "rsa-pss")]
-            Self::RsaPssSignatureVanity(args) => args.validate(),
+            Self::RsaPssSignatureVanity(ref args) => args.validate(),
             #[cfg(feature = "p256-public-key")]
-            Self::P256PublicKeyVanity(args) => args.validate(),
+            Self::P256PublicKeyVanity(ref args) => args.validate(),
             #[cfg(feature = "p256-signature")]
-            Self::P256SignatureVanity(args) => args.validate(),
+            Self::P256SignatureVanity(ref args) => args.validate(),
             #[cfg(feature = "solana")]
-            Self::SolanaVanity(args) => args.validate(),
+            Self::SolanaVanity(ref args) => args.validate(),
             #[cfg(feature = "bitcoin")]
-            Self::BitcoinVanity(args) => args.validate(),
+            Self::BitcoinVanity(ref args) => args.validate(),
             #[cfg(feature = "ethereum")]
-            Self::EthereumVanity(args) => args.validate(),
+            Self::EthereumVanity(ref args) => args.validate(),
             #[cfg(feature = "shallenge")]
-            Self::Shallenge(args) => args.validate(),
+            Self::Shallenge(ref args) => args.validate(),
             #[cfg(feature = "self_test_support")]
-            Self::SelfTest(args) => args.selected().map(|_| ()).map_err(Into::into),
+            Self::SelfTest(ref args) => args.selected().map(|_| ()).map_err(Into::into),
         }
     }
 }
@@ -173,41 +177,43 @@ pub struct CommandDetails {
     pub prefix_len: usize,
     pub suffix_len: usize,
     pub description: String,
-    #[cfg_attr(feature = "metal", allow(dead_code))]
-    pub cpu_threads: Option<usize>,
 }
 
 impl Command {
     pub fn details(&self) -> CommandDetails {
-        match self {
+        match *self {
             #[cfg(feature = "rsa-modulus")]
-            Self::RsaModulusVanity(args) => args.details(),
+            Self::RsaModulusVanity(ref args) => args.details(),
             #[cfg(feature = "rsa-pss")]
-            Self::RsaPssSignatureVanity(args) => args.details(),
+            Self::RsaPssSignatureVanity(ref args) => args.details(),
             #[cfg(feature = "p256-public-key")]
-            Self::P256PublicKeyVanity(args) => args.details(),
+            Self::P256PublicKeyVanity(ref args) => args.details(),
             #[cfg(feature = "p256-signature")]
-            Self::P256SignatureVanity(args) => args.details(),
+            Self::P256SignatureVanity(ref args) => args.details(),
             #[cfg(feature = "solana")]
-            Self::SolanaVanity(args) => args.details(),
+            Self::SolanaVanity(ref args) => args.details(),
             #[cfg(feature = "bitcoin")]
-            Self::BitcoinVanity(args) => args.details(),
+            Self::BitcoinVanity(ref args) => args.details(),
             #[cfg(feature = "ethereum")]
-            Self::EthereumVanity(args) => args.details(),
+            Self::EthereumVanity(ref args) => args.details(),
             #[cfg(feature = "shallenge")]
-            Self::Shallenge(args) => args.details(),
+            Self::Shallenge(ref args) => args.details(),
             #[cfg(feature = "self_test_support")]
             Self::SelfTest(_) => CommandDetails {
                 prefix_len: 0,
                 suffix_len: 0,
-                cpu_threads: None,
                 description: "Running self-tests".into(),
             },
         }
     }
 }
 
-#[cfg(feature = "crypto-cli")]
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-modulus",
+    feature = "rsa-pss"
+))]
 pub(crate) mod pattern;
 
 #[cfg(any(feature = "ethereum", feature = "shallenge"))]
@@ -266,6 +272,24 @@ mod first_match_tests {
             let mut args = vec!["vanity-miner"];
             args.extend_from_slice(command);
             assert!(!Cli::try_parse_from(&args).unwrap().exit_on_first_match);
+            let mut threads = args.clone();
+            threads.extend(["--threads", "2"]);
+            #[cfg(not(feature = "metal"))]
+            {
+                assert_eq!(
+                    Cli::try_parse_from(&threads)
+                        .unwrap()
+                        .threads
+                        .unwrap()
+                        .get(),
+                    2
+                );
+                *threads.last_mut().unwrap() = "0";
+                assert!(Cli::try_parse_from(&threads).is_err());
+            }
+            #[cfg(feature = "metal")]
+            assert!(Cli::try_parse_from(&threads).is_err());
+
             args.insert(1, "--exit-on-first-match");
             assert!(Cli::try_parse_from(&args).unwrap().exit_on_first_match);
             args.remove(1);

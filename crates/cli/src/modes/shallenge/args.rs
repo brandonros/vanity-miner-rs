@@ -43,7 +43,6 @@ impl ShallengeArgs {
         crate::args::CommandDetails {
             prefix_len: username.len(),
             suffix_len: 0,
-            cpu_threads: None,
 
             description: format!(
                 "Starting shallenge for username '{}' with target hash '{}'",

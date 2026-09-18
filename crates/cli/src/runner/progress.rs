@@ -158,7 +158,6 @@ mod tests {
     }
 }
 
-#[cfg(feature = "crypto-cli")]
 #[cfg(not(feature = "metal"))]
 pub(crate) fn estimate(bits: u32) {
     println!(

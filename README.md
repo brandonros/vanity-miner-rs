@@ -40,7 +40,8 @@ and `--threads-per-group`.
 ```
 
 The smoke script builds and runs all 8 modes, requiring one verified match each.
-It creates temporary signing keys; RSA modulus still needs to find a prime pair.
+It creates temporary signing keys and fails on errors, missing output, or timeout.
+RSA modulus still needs to find a prime pair.
 
 Omit `--batches` for continuous search. `--verify` compares every lane with the
 CPU; winners are always CPU-verified. P-256 and RSA use OS cryptographic entropy
@@ -78,3 +79,5 @@ Select named cases with
 
 CPU-only builds work on Linux and macOS with `--no-default-features` and one or
 more mode features, for example `--features solana`. Combine features with commas.
+CPU searches accept a common `--threads N`; Metal builds select `metal` plus the
+mode feature. `nix develop --command python3 scripts/check-modes.py` checks each.

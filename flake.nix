@@ -1,6 +1,6 @@
 {
   description = "Stock Rust and LLVM-to-Metal development environment";
-  inputs.llvm-metal.url = "github:brandonros/llvm-metal/5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5";
+  inputs.llvm-metal.url = "github:brandonros/llvm-metal/95efdfe30dadd8ba65e20ee20c0c743ccaedeb50";
 
   outputs = { llvm-metal, ... }: {
     devShells = builtins.mapAttrs (system: shells:

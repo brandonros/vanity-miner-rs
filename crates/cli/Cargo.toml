@@ -5,15 +5,14 @@ edition = "2024"
 
 [features]
 default = ["metal", "shallenge"]
-metal = ["shallenge", "dep:llvm-metal-runtime", "dep:llvm-metal-abi", "dep:serde_json", "dep:sha2"]
+metal = ["dep:llvm-metal-runtime", "dep:llvm-metal-abi", "dep:serde_json", "dep:sha2"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]
 ethereum = ["logic/ethereum"]
 shallenge = ["logic/shallenge"]
-crypto-cli = []
-p256-public-key = ["logic/p256-public-key", "dep:p256", "crypto-cli"]
-p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "crypto-cli"]
-rsa-common = ["dep:rsa", "dep:num-bigint-dig", "crypto-cli"]
+p256-public-key = ["logic/p256-public-key", "dep:p256"]
+p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa"]
+rsa-common = ["dep:rsa", "dep:num-bigint-dig"]
 rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
 rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
 self_test = [
@@ -37,8 +36,8 @@ self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss"]
 self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
-llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5", optional = true }
-llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "5c17dfff9c1b2569b5928b2fabca3f0bb9380ae5", optional = true }
+llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "95efdfe30dadd8ba65e20ee20c0c743ccaedeb50", optional = true }
+llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "95efdfe30dadd8ba65e20ee20c0c743ccaedeb50", optional = true }
 sha2 = { version = "0.10", optional = true }
 serde_json = { version = "1", optional = true }
 ctrlc = { version = "3.4" }
@@ -54,7 +53,7 @@ paste = "1.0"
 
 [[example]]
 name = "metal_bench"
-required-features = ["metal"]
+required-features = ["metal", "shallenge"]
 
 [[example]]
 name = "metal_solana_bench"
@@ -62,3 +61,7 @@ required-features = ["metal", "solana"]
 
 [dev-dependencies]
 logic = { path = "../logic", default-features = false, features = ["test-vectors"] }
+
+[[example]]
+name = "metal_candidates_bench"
+required-features = ["metal", "shallenge", "bitcoin", "ethereum", "solana", "p256-public-key", "p256-signature", "rsa-modulus", "rsa-pss"]

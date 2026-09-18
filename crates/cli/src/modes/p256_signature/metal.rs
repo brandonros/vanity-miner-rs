@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, p256::P256SignatureTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -44,12 +44,10 @@ pub fn run(
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal: {} launches; load {:.3} ms; dispatch {:.3} ms; validation {:.3} ms",
-        engine.launches,
-        engine.load_time.as_secs_f64() * 1000.,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.verification_time.as_secs_f64() * 1000.
-    );
+    engine.print_timings("Metal");
     result
 }
+
+#[path = "../../../../kernels/p256-signature/src/contract.rs"]
+mod contract;
+pub type P256SignatureTransport = Transport<contract::P256Signature>;

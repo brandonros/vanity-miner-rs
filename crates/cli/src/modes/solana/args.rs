@@ -42,7 +42,6 @@ impl SolanaArgs {
         crate::args::CommandDetails {
             prefix_len: prefix.len(),
             suffix_len: suffix.len(),
-            cpu_threads: None,
 
             description: format!(
                 "Searching for solana vanity key with prefix '{}' and suffix '{}'",

@@ -27,7 +27,7 @@ impl RsaModulusArgs {
         Ok(crate::modes::rsa_modulus::ModulusSearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         })
     }
 }

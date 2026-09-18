@@ -1,50 +1,27 @@
-//! Stock-Rust Bitcoin device entry.
 #![no_std]
-mod contract;
+pub mod contract;
 pub use contract::*;
 #[cfg(target_arch = "nvptx64")]
-use logic::search::candidate_result::CandidateResult;
-
+#[path = "../../common/candidate_entry.rs"]
+mod entry;
 #[cfg(target_arch = "nvptx64")]
-unsafe extern "C" {
-    #[link_name = "llvm_metal.linear_thread_index"]
-    fn thread_index() -> u32;
-    #[link_name = "llvm_metal.atomic_add_device_u32"]
-    fn atomic_add(pointer: *mut u32, value: u32) -> u32;
-}
-
+use logic::search::{
+    candidate_abi::Launch,
+    candidate_result::{BatchResult, CandidateResult},
+};
 /// # Safety
-/// Disjoint initialized Launch, writable BatchResult initialized to EMPTY,
-/// and count writable CandidateResults if audit != 0 (one otherwise).
-/// All records are naturally aligned; host readers wait for GPU completion.
+/// Buffers satisfy the shared candidate ABI, including dynamic payload/audit spans.
 #[cfg(target_arch = "nvptx64")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn kernel_bitcoin_vanity(
     launch: *const Launch,
-    output: *mut logic::search::candidate_result::BatchResult,
+    request: *const Request,
+    pattern: *const Pattern,
+    message: *const u8,
+    output: *mut BatchResult,
     records: *mut CandidateResult,
 ) {
     unsafe {
-        let launch = &*launch;
-        let lane = thread_index();
-        if lane >= launch.count {
-            return;
-        }
-        let result = candidate(launch, lane);
-        if launch.audit != 0 {
-            records.add(lane as usize).write(result);
-        }
-        match result.status {
-            CandidateResult::STATUS_MISS => {}
-            CandidateResult::STATUS_MATCH => {
-                if atomic_add(core::ptr::addr_of_mut!((*output).matches), 1) == 0 {
-                    (*output).candidate = result;
-                    (*output).lane = lane;
-                }
-            }
-            _ => {
-                atomic_add(core::ptr::addr_of_mut!((*output).errors), 1);
-            }
-        }
+        entry::dispatch::<Bitcoin>(launch, request, pattern, message, output, records);
     }
 }

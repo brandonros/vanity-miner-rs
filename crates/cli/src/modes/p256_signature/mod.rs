@@ -4,7 +4,7 @@ pub(crate) mod args;
 pub(crate) mod cpu;
 
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;
 
 mod device;
 #[cfg(test)]
@@ -31,7 +31,7 @@ use p256::{
     pkcs8::DecodePrivateKey,
 };
 use rand::{RngCore, rngs::OsRng};
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 #[derive(Clone, Copy)]

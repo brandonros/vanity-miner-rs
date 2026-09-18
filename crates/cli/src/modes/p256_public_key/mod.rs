@@ -4,7 +4,7 @@ pub(crate) mod args;
 pub(crate) mod cpu;
 
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;
 
 mod device;
 #[cfg(test)]
@@ -19,7 +19,7 @@ use logic::{
 };
 use p256::SecretKey;
 use rand::{RngCore, rngs::OsRng};
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 pub struct PublicKeySearch {

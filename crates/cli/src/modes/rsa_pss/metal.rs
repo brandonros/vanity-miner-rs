@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, rsa_pss::RsaPssTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -46,12 +46,10 @@ pub fn run(
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal RSA-PSS: {} launches; load {:.3} ms; dispatch/transfer {:.3} ms; validation {:.3} ms",
-        engine.launches,
-        engine.load_time.as_secs_f64() * 1000.,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.verification_time.as_secs_f64() * 1000.
-    );
+    engine.print_timings("Metal RSA-PSS");
     result
 }
+
+#[path = "../../../../kernels/rsa-pss/src/contract.rs"]
+mod contract;
+pub type RsaPssTransport = Transport<contract::RsaPss>;

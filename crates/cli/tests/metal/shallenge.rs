@@ -1,7 +1,7 @@
-#![cfg(all(feature = "metal", target_os = "macos"))]
+#![cfg(all(feature = "metal", feature = "shallenge", target_os = "macos"))]
 use logic::search::xoroshiro::BatchSeed;
 use std::path::PathBuf;
-use vanity_miner::runner::metal::transport::ShallengeTransport;
+use vanity_miner::modes::shallenge::metal::ShallengeTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_ARTIFACTS", "shallenge")
@@ -144,6 +144,14 @@ fn mismatched_artifact_hash_and_bindings_are_rejected_before_loading() {
         .unwrap();
     assert!(error.contains("hash mismatch"), "{error}");
     manifest["artifacts"]["kernel.metallib"] = hex::encode(Sha256::digest(library)).into();
+    std::fs::write(directory.join("kernel.build.json"), manifest.to_string()).unwrap();
+    let error = ShallengeTransport::load(&directory, 1, 1, false)
+        .err()
+        .unwrap();
+    assert!(error.contains("application ABI"), "{error}");
+    let legacy = r#"{"entry":"kernel_shallenge","dispatch":"grid1d","buffers":[{"argument":0,"index":0,"minimum_bytes":104,"alignment":8,"access":"read"},{"argument":1,"index":1,"minimum_bytes":272,"alignment":4,"access":"read_write"},{"argument":2,"index":2,"minimum_bytes":260,"alignment":4,"access":"write"}]}"#;
+    std::fs::write(directory.join("kernel.bindings.json"), legacy).unwrap();
+    manifest["artifacts"]["kernel.bindings.json"] = hex::encode(Sha256::digest(legacy)).into();
     std::fs::write(directory.join("kernel.build.json"), manifest.to_string()).unwrap();
     let error = ShallengeTransport::load(&directory, 1, 1, false)
         .err()

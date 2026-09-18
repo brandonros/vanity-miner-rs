@@ -11,7 +11,7 @@ use logic::{
     search::{hex_pattern::HexPattern, message_window::write_message_counter},
 };
 use std::path::PathBuf;
-use vanity_miner::runner::metal::p256::P256SignatureTransport;
+use vanity_miner::modes::p256_signature::metal::P256SignatureTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_P256_SIGNATURE_ARTIFACTS", "p256-signature")
@@ -52,6 +52,32 @@ fn invalid_dispatch_is_rejected_before_loading_artifacts() {
 fn sources_targets_s_forms_and_variable_messages_match_cpu() {
     let message = b"sample";
     let mut engine = P256SignatureTransport::load(&artifacts(), 3, 4, true).unwrap();
+    // The same prepared pipeline must survive empty/growing/shrinking payloads,
+    // stale output from a preceding winner, and a rejected request.
+    let mut expected_allocations = 1;
+    let mut payload_capacity = 1;
+    for length in [0usize, 1, 65, 0, 64, 129, 2, 129] {
+        let message = vec![b'x'; length];
+        let r = request(&message, 1, 0, 0);
+        let pattern = HexPattern::new("", "", 64).unwrap();
+        if length > payload_capacity {
+            payload_capacity = length.next_power_of_two();
+            expected_allocations += 1;
+        }
+        assert_eq!(
+            engine
+                .evaluate(&r, &pattern, &message, 0, 1)
+                .unwrap()
+                .matches,
+            1
+        );
+        assert_eq!(engine.allocation_rounds, expected_allocations);
+        let mut invalid = r;
+        invalid.source = u32::MAX;
+        assert!(engine.evaluate(&invalid, &pattern, &message, 0, 1).is_err());
+        assert_eq!(engine.allocation_rounds, expected_allocations);
+    }
+
     for source in [0, 1] {
         for (target, representation) in
             [SignatureTarget::Raw, SignatureTarget::R, SignatureTarget::S]

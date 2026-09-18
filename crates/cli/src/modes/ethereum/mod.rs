@@ -1,7 +1,7 @@
 #[cfg(not(feature = "metal"))]
 pub(crate) mod cpu;
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;
 
 pub(crate) mod args;
 

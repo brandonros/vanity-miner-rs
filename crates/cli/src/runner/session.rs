@@ -216,10 +216,10 @@ impl Drop for CancelOnExit<'_> {
     }
 }
 
-#[cfg(all(feature = "crypto-cli", not(feature = "metal")))]
+#[cfg(not(feature = "metal"))]
 use crate::runner::RunResult;
 
-#[cfg(all(feature = "crypto-cli", not(feature = "metal")))]
+#[cfg(not(feature = "metal"))]
 pub(crate) fn run_controlled(
     stats: Arc<crate::runner::progress::GlobalStats>,
     unit: &'static str,

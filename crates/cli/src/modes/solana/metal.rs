@@ -1,7 +1,7 @@
 use super::args::SolanaArgs;
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, transport::SolanaTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -27,20 +27,15 @@ pub fn run(runner: &MetalRunner, args: &SolanaArgs, stats: Arc<GlobalStats>) -> 
                 &args.suffix,
                 options.seed,
                 &control,
-                |seed, pattern, _, start, count| engine.evaluate(seed, pattern, start, count),
+                |seed, pattern, _, start, count| engine.evaluate(seed, pattern, &[], start, count),
             )
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal: {} launches; library {:.3} ms; pipeline {:.3} ms; dispatch {:.3} ms; GPU {:.3} ms ({} timed); validation {:.3} ms",
-        engine.launches,
-        engine.load_stages.library.as_secs_f64() * 1000.,
-        engine.load_stages.pipeline.as_secs_f64() * 1000.,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.gpu_time.as_secs_f64() * 1000.,
-        engine.gpu_timed_launches,
-        engine.verification_time.as_secs_f64() * 1000.,
-    );
+    engine.print_timings("Metal");
     result
 }
+
+#[path = "../../../../kernels/solana/src/contract.rs"]
+mod contract;
+pub type SolanaTransport = Transport<contract::Solana>;

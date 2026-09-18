@@ -1,7 +1,7 @@
 use super::{args::ShallengeArgs, shared_best_hash::SharedBestHash};
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, transport::ShallengeTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -37,11 +37,10 @@ pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) 
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal: {} launches; dispatch {:.3} ms; validation {:.3} ms",
-        engine.launches,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.verification_time.as_secs_f64() * 1000.
-    );
+    engine.print_timings("Metal");
     result
 }
+
+#[path = "../../../../kernels/shallenge/src/contract.rs"]
+mod contract;
+pub type ShallengeTransport = Transport<contract::Shallenge>;

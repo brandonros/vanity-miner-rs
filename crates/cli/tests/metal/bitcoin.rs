@@ -1,7 +1,7 @@
 #![cfg(all(feature = "metal", feature = "bitcoin", target_os = "macos"))]
 use logic::search::vanity::BytePattern;
 use std::path::PathBuf;
-use vanity_miner::runner::metal::transport::BitcoinTransport;
+use vanity_miner::modes::bitcoin::metal::BitcoinTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_BITCOIN_ARTIFACTS", "bitcoin")

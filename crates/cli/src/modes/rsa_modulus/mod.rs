@@ -4,10 +4,10 @@ pub(crate) mod args;
 pub(crate) mod cpu;
 
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;
 
 mod constraints;
-pub mod pipeline;
+pub mod device;
 #[cfg(test)]
 mod tests;
 
@@ -22,7 +22,7 @@ use num_bigint_dig::RandBigInt;
 use num_bigint_dig::{BigUint, ModInverse};
 use rand::rngs::OsRng;
 use rsa::{Pss, RsaPrivateKey, pkcs8::EncodePrivateKey, traits::PublicKeyParts};
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 pub struct ModulusSearch {
@@ -61,16 +61,9 @@ pub fn run_cpu(
         .try_fill_bytes(seed.as_mut())
         .map_err(|_| "OS cryptographic entropy unavailable")?;
     let mining_config = Zeroizing::new(constraints.device_config(*seed, 0)?);
-    let output =
-        thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for _ in 0..config.workers {
-                handles.push(scope.spawn(|| {
-                    cpu::construct_worker(&mining_config, &constraints.pattern, &control)
-                }));
-            }
-            crate::runner::workers::join(handles, &control, "RSA modulus worker panicked")
-        })?;
+    let output = crate::runner::workers::search(config.workers, &control, |_| {
+        cpu::construct_worker(&mining_config, &constraints.pattern, &control)
+    })?;
     let found = output.is_some();
     if let Some(record) = &output {
         crate::runner::progress::print_verified(&control, record.clone())?;

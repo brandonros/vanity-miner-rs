@@ -28,7 +28,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Create runner based on compile-time feature
     #[cfg(not(feature = "metal"))]
-    let mut runner = CpuRunner::new();
+    let mut runner = CpuRunner::new(cli.threads.map(|n| n.get()));
 
     #[cfg(feature = "metal")]
     let mut runner = crate::runner::metal::MetalRunner::new(cli.metal.clone())?;
@@ -39,8 +39,6 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Create stats
     let reporting_workers = runner.device_count();
-    #[cfg(not(feature = "metal"))]
-    let reporting_workers = details.cpu_threads.unwrap_or(reporting_workers);
     let stats = Arc::new(GlobalStats::new(
         reporting_workers,
         details.prefix_len,

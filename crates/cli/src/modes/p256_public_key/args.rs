@@ -30,7 +30,7 @@ impl P256PublicArgs {
                 PublicTarget::Xy => Target::Xy,
                 PublicTarget::Uncompressed => Target::Uncompressed,
             },
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         }
     }
 }

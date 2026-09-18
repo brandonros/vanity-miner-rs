@@ -1,6 +1,6 @@
 //! Lib-linked GPU test: accesses the real private session implementation.
 use super::*;
-use crate::runner::metal::transport::ShallengeTransport;
+use crate::modes::shallenge::metal::ShallengeTransport;
 
 #[test]
 #[ignore = "requires a built Metal kernel bundle and Apple GPU"]

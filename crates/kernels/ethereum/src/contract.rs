@@ -1,24 +1,21 @@
-//! Shared Ethereum host/device launch contract.
-use logic::search::{candidate_result::CandidateResult, vanity::BytePattern, xoroshiro::BatchSeed};
-
-pub const INTERFACE: &str = include_str!("../kernel.interface.json");
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Launch {
-    pub seed: BatchSeed,
-    pub start: u64,
-    pub count: u32,
-    pub audit: u32,
-    pub pattern: BytePattern,
-}
-// SAFETY: repr(C), no implicit padding or pointers, all bit patterns valid.
-unsafe impl logic::search::device_record::DeviceRecord for Launch {}
-
-pub fn candidate(launch: &Launch, lane: u32) -> CandidateResult {
-    match launch.start.checked_add(u64::from(lane)) {
-        Some(counter) => logic::modes::ethereum::candidate(&launch.seed, counter, &launch.pattern),
-        None => CandidateResult::ERROR,
+//! Shared typed host/device contract.
+use logic::search::{candidate_abi::Contract, candidate_result::CandidateResult};
+pub type Request = logic::search::xoroshiro::BatchSeed;
+pub type Pattern = logic::search::vanity::BytePattern;
+pub struct Ethereum;
+// SAFETY: the explicit entry delegates the shared six-buffer mechanics to candidate_entry.
+unsafe impl Contract for Ethereum {
+    type Request = Request;
+    type Pattern = Pattern;
+    const ENTRY: &'static str = "kernel_ethereum_vanity";
+    fn candidate(
+        request: &Request,
+        pattern: &Pattern,
+        payload: &[u8],
+        counter: u64,
+    ) -> CandidateResult {
+        let _ = payload;
+        logic::modes::ethereum::candidate(request, counter, pattern)
     }
 }
 
@@ -28,19 +25,12 @@ mod tests {
 
     #[test]
     fn layout_matching_and_invalid_requests() {
-        assert_eq!(core::mem::size_of::<Launch>(), 168);
-        assert_eq!(core::mem::offset_of!(Launch, pattern), 32);
-        let mut launch = Launch {
-            seed: BatchSeed {
-                seed: 10088153575472065218,
-                width: 32,
-            },
-            start: 0,
-            count: 32,
-            audit: 1,
-            pattern: BytePattern::new(&[0x55], &[0x02]).unwrap(),
+        let mut seed = Request {
+            seed: 10088153575472065218,
+            width: 32,
         };
-        let result = candidate(&launch, 0);
+        let mut pattern = Pattern::new(&[0x55], &[0x02]).unwrap();
+        let result = Ethereum::candidate(&seed, &pattern, &[], 0);
         assert_eq!(result.status, CandidateResult::STATUS_MATCH);
         assert_eq!(
             &result.bytes[..32],
@@ -50,15 +40,21 @@ mod tests {
                 0x73, 0x52, 0xe9, 0x30,
             ]
         );
-        launch.pattern.suffix[0] ^= 1;
-        assert_eq!(candidate(&launch, 0).status, CandidateResult::STATUS_MISS);
-        launch.pattern.prefix_len = 65;
-        assert_eq!(candidate(&launch, 0).status, CandidateResult::STATUS_ERROR);
-        launch.pattern = BytePattern::new(&[], &[]).unwrap();
-        launch.seed.width = 0;
-        assert_eq!(candidate(&launch, 0).status, CandidateResult::STATUS_ERROR);
-        launch.seed.width = 32;
-        launch.start = u64::MAX;
-        assert_eq!(candidate(&launch, 1).status, CandidateResult::STATUS_ERROR);
+        pattern.suffix[0] ^= 1;
+        assert_eq!(
+            Ethereum::candidate(&seed, &pattern, &[], 0).status,
+            CandidateResult::STATUS_MISS
+        );
+        pattern.prefix_len = 65;
+        assert_eq!(
+            Ethereum::candidate(&seed, &pattern, &[], 0).status,
+            CandidateResult::STATUS_ERROR
+        );
+        pattern = Pattern::new(&[], &[]).unwrap();
+        seed.width = 0;
+        assert_eq!(
+            Ethereum::candidate(&seed, &pattern, &[], 0).status,
+            CandidateResult::STATUS_ERROR
+        );
     }
 }

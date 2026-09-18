@@ -85,7 +85,7 @@ impl P256SignatureArgs {
                 SForm::High => Form::High,
                 SForm::Either => Form::Either,
             },
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         })
     }
 }

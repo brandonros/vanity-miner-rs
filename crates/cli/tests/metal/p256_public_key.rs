@@ -5,7 +5,7 @@ use logic::{
     search::hex_pattern::HexPattern,
 };
 use std::path::PathBuf;
-use vanity_miner::runner::metal::p256::P256PublicTransport;
+use vanity_miner::modes::p256_public_key::metal::P256PublicTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_P256_PUBLIC_ARTIFACTS", "p256-public-key")

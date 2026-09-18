@@ -4,19 +4,8 @@ use crate::{
     runner::{RunResult, Runner, progress::GlobalStats},
 };
 use std::{path::PathBuf, sync::Arc};
-#[cfg(any(
-    feature = "p256-public-key",
-    feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
-))]
-pub mod candidate;
-#[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
-pub mod p256;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa;
-#[cfg(feature = "rsa-pss")]
-pub mod rsa_pss;
+pub(crate) mod artifacts;
+mod buffers;
 pub mod transport;
 
 #[derive(clap::Args, Clone)]
@@ -71,49 +60,37 @@ impl Runner for MetalRunner {
         1
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> RunResult {
-        match command {
-            Command::Shallenge(args) => crate::modes::shallenge::metal::run(self, args, stats),
+        match *command {
+            #[cfg(feature = "shallenge")]
+            Command::Shallenge(ref args) => crate::modes::shallenge::metal::run(self, args, stats),
             #[cfg(feature = "ethereum")]
-            Command::EthereumVanity(args) => crate::modes::ethereum::metal::run(self, args, stats),
+            Command::EthereumVanity(ref args) => {
+                crate::modes::ethereum::metal::run(self, args, stats)
+            }
             #[cfg(feature = "bitcoin")]
-            Command::BitcoinVanity(args) => crate::modes::bitcoin::metal::run(self, args, stats),
+            Command::BitcoinVanity(ref args) => {
+                crate::modes::bitcoin::metal::run(self, args, stats)
+            }
             #[cfg(feature = "solana")]
-            Command::SolanaVanity(args) => crate::modes::solana::metal::run(self, args, stats),
+            Command::SolanaVanity(ref args) => crate::modes::solana::metal::run(self, args, stats),
             #[cfg(feature = "rsa-modulus")]
-            Command::RsaModulusVanity(args) => {
+            Command::RsaModulusVanity(ref args) => {
                 crate::modes::rsa_modulus::metal::run(self, args, stats)
             }
             #[cfg(feature = "p256-public-key")]
-            Command::P256PublicKeyVanity(args) => {
+            Command::P256PublicKeyVanity(ref args) => {
                 crate::modes::p256_public_key::metal::run(self, args, stats)
             }
             #[cfg(feature = "p256-signature")]
-            Command::P256SignatureVanity(args) => {
+            Command::P256SignatureVanity(ref args) => {
                 crate::modes::p256_signature::metal::run(self, args, stats)
             }
             #[cfg(feature = "rsa-pss")]
-            Command::RsaPssSignatureVanity(args) => {
+            Command::RsaPssSignatureVanity(ref args) => {
                 crate::modes::rsa_pss::metal::run(self, args, stats)
             }
             #[cfg(feature = "self_test_support")]
-            Command::SelfTest(args) => crate::modes::self_test::metal::run(self, args),
-            #[allow(unreachable_patterns)]
-            _ => Err("command is unavailable in this Metal build".into()),
+            Command::SelfTest(ref args) => crate::modes::self_test::metal::run(self, args),
         }
     }
 }
-
-#[path = "../../../../kernels/shallenge/src/contract.rs"]
-mod contract;
-
-#[cfg(feature = "ethereum")]
-#[path = "../../../../kernels/ethereum/src/contract.rs"]
-mod ethereum_contract;
-
-#[cfg(feature = "bitcoin")]
-#[path = "../../../../kernels/bitcoin/src/contract.rs"]
-mod bitcoin_contract;
-
-#[cfg(feature = "solana")]
-#[path = "../../../../kernels/solana/src/contract.rs"]
-mod solana_contract;

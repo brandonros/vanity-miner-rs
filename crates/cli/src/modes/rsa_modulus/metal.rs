@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, rsa::RsaTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -28,17 +28,15 @@ pub fn run(
         options.batch_size,
         runner.exit_on_first_match,
         |control| {
-            super::pipeline::run(&config, &control, |r, p, start, count| {
+            super::device::run(&config, &control, |r, p, start, count| {
                 engine.evaluate(r, p, &[], start, count)
             })
         },
     );
-    eprintln!(
-        "Metal RSA: {} launches; load {:.3} ms; dispatch/transfer {:.3} ms; validation {:.3} ms",
-        engine.launches,
-        engine.load_time.as_secs_f64() * 1000.,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.verification_time.as_secs_f64() * 1000.
-    );
+    engine.print_timings("Metal RSA");
     result
 }
+
+#[path = "../../../../kernels/rsa-modulus/src/contract.rs"]
+mod contract;
+pub type RsaTransport = Transport<contract::RsaModulus>;
