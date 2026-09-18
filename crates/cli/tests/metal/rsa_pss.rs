@@ -229,8 +229,6 @@ fn cli_both_sources_verify_exported_signatures_and_reject_seed() {
     for source in ["salt", "message"] {
         let mut command = super::support::command(&artifacts());
         command
-            .args(["--metal-artifacts"])
-            .arg(artifacts())
             .args([
                 "--verify",
                 "--batch-size",
