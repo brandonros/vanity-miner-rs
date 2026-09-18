@@ -4,6 +4,8 @@ use crate::{
     runner::{RunResult, Runner, progress::GlobalStats},
 };
 use std::{path::PathBuf, sync::Arc};
+#[cfg(feature = "rsa-modulus")]
+pub mod rsa;
 pub mod transport;
 
 #[derive(clap::Args, Clone)]
@@ -59,8 +61,15 @@ impl Runner for MetalRunner {
             Command::BitcoinVanity(args) => crate::modes::bitcoin::metal::run(self, args, stats),
             #[cfg(feature = "solana")]
             Command::SolanaVanity(args) => crate::modes::solana::metal::run(self, args, stats),
+            #[cfg(feature = "rsa-modulus")]
+            Command::RsaModulusVanity(args) => {
+                crate::modes::rsa_modulus::metal::run(self, args, stats)
+            }
             #[allow(unreachable_patterns)]
-            _ => Err("the Metal backend supports Shallenge, Ethereum, Bitcoin, and Solana".into()),
+            _ => Err(
+                "the Metal backend supports Shallenge, Ethereum, Bitcoin, Solana, and RSA modulus"
+                    .into(),
+            ),
         }
     }
 }
@@ -79,3 +88,7 @@ mod bitcoin_contract;
 #[cfg(feature = "solana")]
 #[path = "../../../../kernels/solana/metal/src/contract.rs"]
 mod solana_contract;
+
+#[cfg(feature = "rsa-modulus")]
+#[path = "../../../../kernels/rsa-modulus/metal/src/contract.rs"]
+mod rsa_contract;

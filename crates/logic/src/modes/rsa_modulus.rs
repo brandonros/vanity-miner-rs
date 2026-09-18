@@ -214,6 +214,7 @@ pub fn mine(
 
 /// Exact rejection sampling. Four disjoint PRF inputs supply the 1024 bits;
 /// neither factor generation nor q-range starts reduce random bytes modulo n.
+#[inline(always)]
 fn sample(config: &SearchConfig, id: u64, domain: CandidateDomain, bound: &U1024) -> Option<U1024> {
     if *bound == U1024::ZERO {
         return None;
@@ -333,7 +334,13 @@ pub fn progression(config: &SearchConfig, p_bytes: &[u8; 128]) -> Option<([u8; 1
     ))
 }
 
-pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, &'static str> {
+/// Device-side failure code; no host string pointer enters the result layout.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RangeError {
+    SamplingExhausted,
+}
+
+pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, RangeError> {
     let Some((first, count)) = progression(config, &task.p) else {
         task.zeroize();
         return Ok(false);
@@ -375,7 +382,7 @@ pub fn prepare_range(config: &SearchConfig, task: &mut Task) -> Result<bool, &'s
         return Ok(false);
     }
     let cursor = sample(config, task.id, CandidateDomain::RsaRangeStart, &eligible)
-        .ok_or("RSA range sampling failed")?;
+        .ok_or(RangeError::SamplingExhausted)?;
     task.first = first;
     task.count = eligible.to_be_bytes();
     task.remaining = task.count;
