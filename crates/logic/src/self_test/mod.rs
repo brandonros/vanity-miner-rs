@@ -7,8 +7,35 @@
 //!
 //! Keep known-answer inputs opaque before the operation under test. A barrier
 //! around the final boolean is too late: the operation can already be folded.
-//! `black_box` is best effort; inspect emitted PTX to verify the computation
-//! survives optimization.
+//! `black_box` uses a private volatile read on NVPTX so direct Metal compilation
+//! preserves opaque inputs without target-specific inline assembly. Check emitted
+//! LLVM/AIR and GPU results to verify the operations survive optimization.
+
+/// Keep known-answer inputs opaque before the operation under test.
+///
+/// The NVPTX producer uses a volatile read from initialized private storage.
+/// This is an identity operation, not a synchronization or memory-ordering API.
+#[inline(always)]
+pub fn black_box<T>(value: T) -> T {
+    #[cfg(target_arch = "nvptx64")]
+    {
+        volatile_identity(value)
+    }
+    #[cfg(not(target_arch = "nvptx64"))]
+    {
+        core::hint::black_box(value)
+    }
+}
+
+#[cfg(any(target_arch = "nvptx64", test))]
+#[inline(always)]
+fn volatile_identity<T>(value: T) -> T {
+    let value = core::mem::ManuallyDrop::new(value);
+    // SAFETY: the aligned reference points to an initialized T. ManuallyDrop
+    // prevents dropping the original; ownership moves to the returned value.
+    // read_volatile also permits zero-sized T and preserves pointer provenance.
+    unsafe { core::ptr::read_volatile(&*value) }
+}
 
 #[macro_use]
 mod registration;
@@ -25,6 +52,9 @@ mod known_answers;
 #[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
 pub(super) fn bytes_eq_prefix(actual: &[u8; 64], expected: &[u8]) -> bool {
     let n = expected.len();
+    if n > actual.len() {
+        return false;
+    }
     let mut i = 0;
     while i < n {
         if actual[i] != expected[i] {
@@ -69,6 +99,29 @@ impl core::ops::IndexMut<usize> for IdxProbe {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn volatile_identity_preserves_values_alignment_and_single_ownership() {
+        use core::cell::Cell;
+        #[repr(align(64))]
+        struct Aligned([u64; 8]);
+        let data = core::array::from_fn(|i| 1u64 << (i * 8));
+        assert_eq!(volatile_identity(Aligned(data)).0, data);
+        let pointer = data.as_ptr();
+        assert_eq!(volatile_identity(pointer), pointer);
+        volatile_identity(());
+        let dropped = Cell::new(0);
+        struct Owned<'a>(&'a Cell<u32>);
+        impl Drop for Owned<'_> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+        let owned = volatile_identity(Owned(&dropped));
+        assert_eq!(dropped.get(), 0);
+        drop(owned);
+        assert_eq!(dropped.get(), 1);
+    }
 
     #[test]
     fn enabled_self_test_checks_pass_on_cpu_and_disabled_slots_are_untouched() {

@@ -53,6 +53,7 @@ macro_rules! define_self_tests {
                     /// Description for enabled checks; the name for disabled checks.
                     pub label: &'static str,
                     pub kernel: &'static str,
+                    pub metal_entry: &'static str,
                     pub enabled: bool,
                     /// Device skip policy, available when the check is enabled.
                     pub gpu_skip: Option<&'static str>,
@@ -67,6 +68,7 @@ macro_rules! define_self_tests {
                         { concat!(stringify!($mode), ".", define_self_tests!(@name $($check)::+)) }
                     },
                     kernel: concat!("kernel_self_test_", stringify!($mode)),
+                    metal_entry: concat!("kernel_self_test_", stringify!($mode), "_", define_self_tests!(@name $($check)::+)),
                     enabled: cfg!(feature = $feature),
                     gpu_skip: {
                         #[cfg(feature = $feature)]
@@ -107,8 +109,34 @@ macro_rules! define_self_tests {
                 $(#[cfg(feature = $feature)]
                 pub mod $mode {
                     use super::super::{Slot, $mode as checks};
+                    $(#[cfg(feature = "self_test_metal_entries")]
+                    /// # Safety
+                    /// One invocation; selector and initialized full registry output
+                    /// must be aligned, valid, and disjoint until execution completes.
+                    #[unsafe(export_name = concat!("kernel_self_test_", stringify!($mode), "_", define_self_tests!(@name $($check)::+)))]
+                    pub unsafe extern "C" fn [<metal $( _ $check)*>](selector: *const u32, results: *mut u32) {
+                        let slot = Slot::[<$mode:camel $($check:camel)*>].index();
+                        let selected = unsafe { selector.read() };
+                        if selected == slot as u32 || selected == u32::MAX {
+                            unsafe { results.add(slot).write(checks::$($check)::+()); }
+                        }
+                    })*
+                    #[cfg(feature = "self_test_metal_entries")]
+                    pub fn metal_entry(slot: usize) -> Option<unsafe extern "C" fn(*const u32, *mut u32)> {
+                        $(if slot == Slot::[<$mode:camel $($check:camel)*>].index() {
+                            return Some([<metal $( _ $check)*>]);
+                        })*
+                        None
+                    }
                     pub fn run(results: &mut [u32]) {
                         $(results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();)*
+                    }
+                    /// Execute one original check, or the full group for u32::MAX.
+                    /// Unlike run_device, this does not apply backend-specific skips.
+                    pub fn run_slot(results: &mut [u32], slot: usize) {
+                        $(if slot == u32::MAX as usize || slot == Slot::[<$mode:camel $($check:camel)*>].index() {
+                            results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();
+                        })*
                     }
                     pub fn run_device(results: &mut [u32]) {
                         $(results[Slot::[<$mode:camel $($check:camel)*>].index()] =

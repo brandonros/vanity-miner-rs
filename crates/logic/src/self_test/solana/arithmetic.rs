@@ -7,8 +7,9 @@ register_self_test! {
         // Two black-boxed operands — forces `div.u32` PTX op (no magic-multiply
         // folding, since the divisor isn't a known constant).
         const EXPECTED: u32 = ARITH_U32_A / 58;
-        let a = core::hint::black_box(ARITH_U32_A);
-        let b = core::hint::black_box(58u32);
+        let a = crate::self_test::black_box(ARITH_U32_A);
+        let b = crate::self_test::black_box(58u32);
+        if b == 0 { return 0; }
         (a / b == EXPECTED) as u32
     }
 }
@@ -20,7 +21,7 @@ register_self_test! {
         // `mul.hi.u32` (or `mul.wide.u32` + shift) magic-multiply. Same path
         // base58_encode_32 uses.
         const EXPECTED: u32 = ARITH_U32_A / 58;
-        let a = core::hint::black_box(ARITH_U32_A);
+        let a = crate::self_test::black_box(ARITH_U32_A);
         (a / 58 == EXPECTED) as u32
     }
 }
@@ -30,8 +31,9 @@ register_self_test! {
     fn arith_u64_div_var() -> u32 {
         // Forces `div.u64` PTX op.
         const EXPECTED: u64 = ARITH_U64_A / 58;
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(58u64);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(58u64);
+        if b == 0 { return 0; }
         (a / b == EXPECTED) as u32
     }
 }
@@ -43,7 +45,7 @@ register_self_test! {
         // `mul.hi.u64` (the smoking-gun op). This is THE path base58_encode_32
         // takes for its divide-by-58 reduction loop.
         const EXPECTED: u64 = ARITH_U64_A / 58;
-        let a = core::hint::black_box(ARITH_U64_A);
+        let a = crate::self_test::black_box(ARITH_U64_A);
         (a / 58 == EXPECTED) as u32
     }
 }
@@ -53,8 +55,9 @@ register_self_test! {
     fn arith_u32_rem_var() -> u32 {
         // Forces `rem.u32`.
         const EXPECTED: u32 = ARITH_U32_A % 58;
-        let a = core::hint::black_box(ARITH_U32_A);
-        let b = core::hint::black_box(58u32);
+        let a = crate::self_test::black_box(ARITH_U32_A);
+        let b = crate::self_test::black_box(58u32);
+        if b == 0 { return 0; }
         (a % b == EXPECTED) as u32
     }
 }
@@ -64,8 +67,9 @@ register_self_test! {
     fn arith_u64_rem_var() -> u32 {
         // Forces `rem.u64`.
         const EXPECTED: u64 = ARITH_U64_A % 58;
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(58u64);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(58u64);
+        if b == 0 { return 0; }
         (a % b == EXPECTED) as u32
     }
 }
@@ -75,8 +79,8 @@ register_self_test! {
     fn arith_u32_mul_lo() -> u32 {
         // Forces `mul.lo.s32` / `mul.lo.u32` (low 32 bits of u32 × u32).
         const EXPECTED: u32 = ARITH_U32_A.wrapping_mul(ARITH_U32_B);
-        let a = core::hint::black_box(ARITH_U32_A);
-        let b = core::hint::black_box(ARITH_U32_B);
+        let a = crate::self_test::black_box(ARITH_U32_A);
+        let b = crate::self_test::black_box(ARITH_U32_B);
         (a.wrapping_mul(b) == EXPECTED) as u32
     }
 }
@@ -89,8 +93,8 @@ register_self_test! {
         // some passing ones via the slice-indexing path, so it's worth a direct
         // isolated check.
         const EXPECTED: u64 = ARITH_U64_A.wrapping_mul(ARITH_U64_B);
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
         (a.wrapping_mul(b) == EXPECTED) as u32
     }
 }
@@ -105,8 +109,8 @@ register_self_test! {
         // passes, the alpha compiler's `mul.hi.u64` codegen is broken.
         const PROD: u128 = (ARITH_U64_A as u128) * (ARITH_U64_B as u128);
         const EXPECTED: u64 = (PROD >> 64) as u64;
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
         let hi = (((a as u128) * (b as u128)) >> 64) as u64;
         (hi == EXPECTED) as u32
     }
@@ -119,8 +123,8 @@ register_self_test! {
         // `mul.hi.u64` + `mad.lo.s64`. Exercises the carry chain rustc emits
         // for >64-bit arithmetic.
         const EXPECTED: u128 = ARITH_U128_A.wrapping_mul(ARITH_U128_B);
-        let a = core::hint::black_box(ARITH_U128_A);
-        let b = core::hint::black_box(ARITH_U128_B);
+        let a = crate::self_test::black_box(ARITH_U128_A);
+        let b = crate::self_test::black_box(ARITH_U128_B);
         (a.wrapping_mul(b) == EXPECTED) as u32
     }
 }
@@ -131,24 +135,24 @@ register_self_test! {
         // Three regimes in one slot so any miscompile of `add.cc.u64` /
         // `addc.cc.u64` (the PTX primitives that carry the boolean out) FAILs
         // the slot regardless of which value range trips it.
-        let a = core::hint::black_box(1u64);
-        let b = core::hint::black_box(2u64);
+        let a = crate::self_test::black_box(1u64);
+        let b = crate::self_test::black_box(2u64);
         let (s, c) = a.overflowing_add(b);
         if s != 3 || c {
             return 0;
         }
 
         // Carry at the wraparound boundary: u64::MAX + 1 → (0, true)
-        let a = core::hint::black_box(u64::MAX);
-        let b = core::hint::black_box(1u64);
+        let a = crate::self_test::black_box(u64::MAX);
+        let b = crate::self_test::black_box(1u64);
         let (s, c) = a.overflowing_add(b);
         if s != 0 || !c {
             return 0;
         }
 
         // Saturating-style overflow: u64::MAX + u64::MAX → (u64::MAX-1, true)
-        let a = core::hint::black_box(u64::MAX);
-        let b = core::hint::black_box(u64::MAX);
+        let a = crate::self_test::black_box(u64::MAX);
+        let b = crate::self_test::black_box(u64::MAX);
         let (s, c) = a.overflowing_add(b);
         if s != u64::MAX - 1 || !c {
             return 0;
@@ -162,24 +166,24 @@ register_self_test! {
     /// arith overflowing_sub
     fn arith_overflowing_sub() -> u32 {
         // No borrow: 5 - 3
-        let a = core::hint::black_box(5u64);
-        let b = core::hint::black_box(3u64);
+        let a = crate::self_test::black_box(5u64);
+        let b = crate::self_test::black_box(3u64);
         let (s, c) = a.overflowing_sub(b);
         if s != 2 || c {
             return 0;
         }
 
         // Borrow at zero boundary: 0 - 1 → (u64::MAX, true)
-        let a = core::hint::black_box(0u64);
-        let b = core::hint::black_box(1u64);
+        let a = crate::self_test::black_box(0u64);
+        let b = crate::self_test::black_box(1u64);
         let (s, c) = a.overflowing_sub(b);
         if s != u64::MAX || !c {
             return 0;
         }
 
         // Borrow from mid-range: 1 - u64::MAX → (2, true)
-        let a = core::hint::black_box(1u64);
-        let b = core::hint::black_box(u64::MAX);
+        let a = crate::self_test::black_box(1u64);
+        let b = crate::self_test::black_box(u64::MAX);
         let (s, c) = a.overflowing_sub(b);
         if s != 2 || !c {
             return 0;
@@ -198,12 +202,12 @@ register_self_test! {
         // FieldElement::add expand to, so a miscompile of the carry-propagation
         // PTX sequence (overflowing_add + boolean OR + add of `prev_carry as
         // u64`) corrupts every field-element add silently.
-        let a0 = core::hint::black_box(u64::MAX);
-        let a1 = core::hint::black_box(u64::MAX);
-        let a2 = core::hint::black_box(0u64);
-        let b0 = core::hint::black_box(1u64);
-        let b1 = core::hint::black_box(0u64);
-        let b2 = core::hint::black_box(0u64);
+        let a0 = crate::self_test::black_box(u64::MAX);
+        let a1 = crate::self_test::black_box(u64::MAX);
+        let a2 = crate::self_test::black_box(0u64);
+        let b0 = crate::self_test::black_box(1u64);
+        let b1 = crate::self_test::black_box(0u64);
+        let b2 = crate::self_test::black_box(0u64);
 
         let (s0, c0) = a0.overflowing_add(b0);
         let (s1a, c1a) = a1.overflowing_add(b1);
@@ -228,8 +232,8 @@ register_self_test! {
         const EXPECTED_LO: u64 = PROD as u64;
         const EXPECTED_HI: u64 = (PROD >> 64) as u64;
 
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
         let p = (a as u128) * (b as u128);
         let lo = p as u64;
         let hi = (p >> 64) as u64;
@@ -246,9 +250,9 @@ register_self_test! {
         const EXPECTED: u64 = ARITH_U64_A
             .wrapping_mul(ARITH_U64_B)
             .wrapping_add(ARITH_U64_A);
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
-        let c = core::hint::black_box(ARITH_U64_A);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
+        let c = crate::self_test::black_box(ARITH_U64_A);
         (a.wrapping_mul(b).wrapping_add(c) == EXPECTED) as u32
     }
 }
@@ -261,9 +265,9 @@ register_self_test! {
         const PROD: u128 = (ARITH_U64_A as u128) * (ARITH_U64_B as u128);
         const EXPECTED: u64 = ((PROD >> 64) as u64).wrapping_add(ARITH_U64_A);
 
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
-        let c = core::hint::black_box(ARITH_U64_A);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
+        let c = crate::self_test::black_box(ARITH_U64_A);
         let hi = (((a as u128) * (b as u128)) >> 64) as u64;
         (hi.wrapping_add(c) == EXPECTED) as u32
     }
@@ -276,8 +280,8 @@ register_self_test! {
         // emit `mul.wide.u32` (one PTX op, distinct from `mul.lo.u64`). k256's
         // 32-bit big-int paths take exactly this shape.
         const EXPECTED: u64 = (ARITH_U32_A as u64) * (ARITH_U32_B as u64);
-        let a = core::hint::black_box(ARITH_U32_A);
-        let b = core::hint::black_box(ARITH_U32_B);
+        let a = crate::self_test::black_box(ARITH_U32_A);
+        let b = crate::self_test::black_box(ARITH_U32_B);
         ((a as u64) * (b as u64) == EXPECTED) as u32
     }
 }
@@ -292,9 +296,9 @@ register_self_test! {
         // `cond as u64` → `wrapping_neg()` lowering is wrong, unwrap silently
         // returns the wrong arm (matches the "consistent-but-wrong" secp256k1
         // symptom).
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
-        let cond = core::hint::black_box(true);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
+        let cond = crate::self_test::black_box(true);
         let mask = (cond as u64).wrapping_neg();
         let r = (a & mask) | (b & !mask);
         (r == ARITH_U64_A) as u32
@@ -307,9 +311,9 @@ register_self_test! {
         // Same as above but with cond=false — selects b. Splitting true/false
         // into two slots means a bug that breaks only one arm pinpoints
         // immediately.
-        let a = core::hint::black_box(ARITH_U64_A);
-        let b = core::hint::black_box(ARITH_U64_B);
-        let cond = core::hint::black_box(false);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let b = crate::self_test::black_box(ARITH_U64_B);
+        let cond = crate::self_test::black_box(false);
         let mask = (cond as u64).wrapping_neg();
         let r = (a & mask) | (b & !mask);
         (r == ARITH_U64_B) as u32
@@ -323,8 +327,8 @@ register_self_test! {
         // distinct from constant-amount shifts which can be folded. Montgomery
         // reductions in k256 do variable shifts during scalar splitting.
         const EXPECTED: u64 = ARITH_U64_A >> 13;
-        let a = core::hint::black_box(ARITH_U64_A);
-        let n = core::hint::black_box(13u32);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let n = crate::self_test::black_box(13u32);
         (a >> n == EXPECTED) as u32
     }
 }
@@ -334,8 +338,8 @@ register_self_test! {
     fn arith_var_shl_u64() -> u32 {
         // Same as var_shr but the other direction (`shl.b64`).
         const EXPECTED: u64 = ARITH_U64_A << 13;
-        let a = core::hint::black_box(ARITH_U64_A);
-        let n = core::hint::black_box(13u32);
+        let a = crate::self_test::black_box(ARITH_U64_A);
+        let n = crate::self_test::black_box(13u32);
         (a << n == EXPECTED) as u32
     }
 }
@@ -350,7 +354,7 @@ register_self_test! {
         // bug. Tests with `0xDEADBEEFCAFEBABE` so a zero return is obviously
         // wrong.
         let v: u64 = 0xDEADBEEFCAFEBABE;
-        (core::hint::black_box(v) == v) as u32
+        (crate::self_test::black_box(v) == v) as u32
     }
 }
 
@@ -360,7 +364,7 @@ register_self_test! {
         // u32 variant — same probe at half the width in case the bug is
         // type-specific.
         let v: u32 = 0xDEADBEEF;
-        (core::hint::black_box(v) == v) as u32
+        (crate::self_test::black_box(v) == v) as u32
     }
 }
 
@@ -412,7 +416,7 @@ register_self_test! {
 
         let mut i = 0;
         while i < INPUTS.len() {
-            let x = core::hint::black_box(INPUTS[i]);
+            let x = crate::self_test::black_box(INPUTS[i]);
             if x / D != EXPECTED_Q[i] || x % D != EXPECTED_R[i] {
                 return 0;
             }
@@ -440,8 +444,8 @@ register_self_test! {
 
         // Case 0: (MAX, 0) + (1, 0) = (0, 1). Pure low→high carry.
         {
-            let a = core::hint::black_box(u64::MAX as u128);
-            let b = core::hint::black_box(1u128);
+            let a = crate::self_test::black_box(u64::MAX as u128);
+            let b = crate::self_test::black_box(1u128);
             const E: u128 = (u64::MAX as u128).wrapping_add(1);
             if a.wrapping_add(b) != E {
                 return 0;
@@ -450,8 +454,8 @@ register_self_test! {
 
         // Case 1: (MAX, MAX) + (1, 0) = (0, 0). Carry rolls all the way over.
         {
-            let a = core::hint::black_box(u128::MAX);
-            let b = core::hint::black_box(1u128);
+            let a = crate::self_test::black_box(u128::MAX);
+            let b = crate::self_test::black_box(1u128);
             const E: u128 = u128::MAX.wrapping_add(1);
             if a.wrapping_add(b) != E {
                 return 0;
@@ -463,10 +467,10 @@ register_self_test! {
         //   → low halves wrap three times (3 carries to high) + 1 from d's
         //     high half → high = 4, low = ((MAX*3) wrapping) + 1.
         {
-            let a = core::hint::black_box(u64::MAX as u128);
-            let b = core::hint::black_box(u64::MAX as u128);
-            let c = core::hint::black_box(u64::MAX as u128);
-            let d = core::hint::black_box((1u128 << 64) | 1u128);
+            let a = crate::self_test::black_box(u64::MAX as u128);
+            let b = crate::self_test::black_box(u64::MAX as u128);
+            let c = crate::self_test::black_box(u64::MAX as u128);
+            let d = crate::self_test::black_box((1u128 << 64) | 1u128);
             let s = a.wrapping_add(b).wrapping_add(c).wrapping_add(d);
             const E: u128 = (u64::MAX as u128)
                 .wrapping_add(u64::MAX as u128)
@@ -508,12 +512,12 @@ register_self_test! {
             .wrapping_add((A1 as u128).wrapping_mul(B1 as u128))
             .wrapping_add((A2 as u128).wrapping_mul(B0 as u128));
 
-        let a0 = core::hint::black_box(A0) as u128;
-        let a1 = core::hint::black_box(A1) as u128;
-        let a2 = core::hint::black_box(A2) as u128;
-        let b0 = core::hint::black_box(B0) as u128;
-        let b1 = core::hint::black_box(B1) as u128;
-        let b2 = core::hint::black_box(B2) as u128;
+        let a0 = crate::self_test::black_box(A0) as u128;
+        let a1 = crate::self_test::black_box(A1) as u128;
+        let a2 = crate::self_test::black_box(A2) as u128;
+        let b0 = crate::self_test::black_box(B0) as u128;
+        let b1 = crate::self_test::black_box(B1) as u128;
+        let b2 = crate::self_test::black_box(B2) as u128;
 
         let z = a0
             .wrapping_mul(b2)
@@ -534,7 +538,7 @@ register_self_test! {
     fn arith_u128_imm_shr_52() -> u32 {
         const SUM: u128 = 0xFEDC_BA98_7654_3210_0123_4567_89AB_CDEF;
         const EXPECTED: u128 = SUM >> 52;
-        let sum = core::hint::black_box(SUM);
+        let sum = crate::self_test::black_box(SUM);
         let shifted = sum >> 52;
         (shifted == EXPECTED) as u32
     }

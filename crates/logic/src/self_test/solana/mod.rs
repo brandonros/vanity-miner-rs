@@ -40,7 +40,7 @@ const SOLANA_PRIMITIVE_PUB: [u8; 32] = [
 register_self_test! {
     /// xoroshiro priv
     fn primitive_xoroshiro() -> u32 {
-        let priv_key = generate_random_private_key(core::hint::black_box(3), core::hint::black_box(583437459223573146));
+        let priv_key = generate_random_private_key(crate::self_test::black_box(3), crate::self_test::black_box(583437459223573146));
         (priv_key == SOLANA_PRIMITIVE_PRIV) as u32
     }
 }
@@ -48,7 +48,7 @@ register_self_test! {
 register_self_test! {
     /// sha512 of priv
     fn primitive_sha512() -> u32 {
-        let hashed = sha512_32bytes_from_bytes(&core::hint::black_box(SOLANA_PRIMITIVE_PRIV));
+        let hashed = sha512_32bytes_from_bytes(&crate::self_test::black_box(SOLANA_PRIMITIVE_PRIV));
         (hashed == SOLANA_PRIMITIVE_HASHED_PRIV) as u32
     }
 }
@@ -56,7 +56,7 @@ register_self_test! {
 register_self_test! {
     /// ed25519 derive
     fn primitive_ed25519() -> u32 {
-        let pub_key = ed25519_derive_public_key(&core::hint::black_box(SOLANA_PRIMITIVE_HASHED_PRIV));
+        let pub_key = ed25519_derive_public_key(&crate::self_test::black_box(SOLANA_PRIMITIVE_HASHED_PRIV));
         (pub_key == SOLANA_PRIMITIVE_PUB) as u32
     }
 }
@@ -66,7 +66,7 @@ register_self_test! {
     fn primitive_base58() -> u32 {
         let expected: &[u8] = b"aaatgciWHhvVra6u4znVSfSqqJszUcpDDFEEKrPjNFC";
         let mut out = [0u8; 64];
-        let n = base58_encode_32(&core::hint::black_box(SOLANA_PRIMITIVE_PUB), &mut out);
+        let n = base58_encode_32(&crate::self_test::black_box(SOLANA_PRIMITIVE_PUB), &mut out);
         (n == expected.len() && bytes_eq_prefix(&out, expected)) as u32
     }
 }
@@ -74,13 +74,15 @@ register_self_test! {
 // === Solana (rng_seed=583437459223573146, thread_idx=3) ===
 
 fn solana_test() -> SolanaVanityKeyResult {
+    let prefix = crate::self_test::black_box(*b"");
+    let suffix = crate::self_test::black_box(*b"");
     let req = SolanaVanityKeyRequest {
-        prefix: b"",
-        suffix: b"",
-        thread_idx: 3,
-        rng_seed: 583437459223573146,
+        prefix: &prefix,
+        suffix: &suffix,
+        thread_idx: crate::self_test::black_box(3),
+        rng_seed: crate::self_test::black_box(583437459223573146),
     };
-    generate_and_check_solana_vanity_key(&core::hint::black_box(req))
+    generate_and_check_solana_vanity_key(&req)
 }
 
 register_self_test! {

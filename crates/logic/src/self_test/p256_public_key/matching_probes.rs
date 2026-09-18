@@ -1,12 +1,13 @@
 //! Matching probes owned by the p256_public_key self-test kernel.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// hex pattern odd nibbles suffix and width
     fn hex_pattern_nibbles() -> u32 {
         use crate::search::hex_pattern::HexPattern;
         // Construction occurs on the host in production; black_box the resulting device record.
-        let pattern = black_box(HexPattern::new("AbC", "dEf", 4).unwrap());
+        let Ok(pattern) = HexPattern::new("AbC", "dEf", 4) else { return 0; };
+        let pattern = black_box(pattern);
         u32::from(
             pattern.matches(&black_box([0xab, 0xc0, 0x0d, 0xef]))
                 && pattern.matches(&black_box([0xab, 0xcf, 0xfd, 0xef]))
@@ -22,7 +23,8 @@ register_self_test! {
     fn hex_pattern_max_width() -> u32 {
         use crate::search::hex_pattern::HexPattern;
         // The matcher is shared with RSA's 256-byte targets.
-        let pattern = black_box(HexPattern::new("d", "f", 256).unwrap());
+        let Ok(pattern) = HexPattern::new("d", "f", 256) else { return 0; };
+        let pattern = black_box(pattern);
         let mut input = black_box([0xa5; 256]);
         input[0] = black_box(0xda);
         input[255] = black_box(0x1f);

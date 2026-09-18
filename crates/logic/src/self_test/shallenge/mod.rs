@@ -26,31 +26,39 @@ const SHALLENGE_TEST_HASH: [u8; 32] = [
 register_self_test! {
     /// sha256 variable
     fn primitive_sha256_variable() -> u32 {
-        let hash = sha256_from_bytes(&core::hint::black_box(HASH_PRIMITIVE_INPUT_33));
+        let hash = sha256_from_bytes(&crate::self_test::black_box(HASH_PRIMITIVE_INPUT_33));
         (hash == SHA256_PRIMITIVE_OUTPUT_VARIABLE) as u32
     }
 }
 
 // === Shallenge (rng_seed=12345, thread_idx=0, "brandonros", target=max) ===
 
-fn shallenge_test() -> ShallengeResult {
-    let user = *b"brandonros";
-    let target = [0xffu8; 32];
+fn shallenge_test() -> Option<ShallengeResult> {
+    let user = crate::self_test::black_box(*b"brandonros");
+    let target = crate::self_test::black_box([0xffu8; 32]);
     let req = ShallengeRequest {
         username: &user,
-        username_len: 10,
+        username_len: crate::self_test::black_box(10),
         target_hash: &target,
-        thread_idx: 0,
-        rng_seed: 12345,
+        thread_idx: crate::self_test::black_box(0),
+        rng_seed: crate::self_test::black_box(12345),
     };
-    generate_and_check_shallenge(&core::hint::black_box(req))
+    // Malformed opaque lengths must fail the check rather than introduce
+    // a device panic path. Pointer provenance remains visible to the compiler.
+    if req.username_len == 0
+        || req.username_len > crate::modes::shallenge::MAX_USERNAME_LEN
+        || req.username_len > req.username.len()
+    {
+        return None;
+    }
+    Some(generate_and_check_shallenge(&req))
 }
 
 register_self_test! {
     /// shallenge hash
     fn hash() -> u32 {
         let expected = SHALLENGE_TEST_HASH;
-        (shallenge_test().hash == expected) as u32
+        u32::from(shallenge_test().is_some_and(|result| result.hash == expected))
     }
 }
 
@@ -58,7 +66,7 @@ register_self_test! {
     /// shallenge nonce_len
     fn nonce_len() -> u32 {
         // This slot tests length arithmetic; hash and nonce generation have separate checks.
-        let username_len = core::hint::black_box(10usize);
+        let username_len = crate::self_test::black_box(10usize);
         (crate::modes::shallenge::shallenge_nonce_len(username_len) == 21) as u32
     }
 }
@@ -66,7 +74,7 @@ register_self_test! {
 register_self_test! {
     /// shallenge is_better
     fn is_better() -> u32 {
-        shallenge_test().is_better as u32
+        u32::from(shallenge_test().is_some_and(|result| result.is_better))
     }
 }
 
@@ -75,8 +83,8 @@ register_self_test! {
 register_self_test! {
     /// compare_hashes lt
     fn compare_hashes_lt() -> u32 {
-        let zero = core::hint::black_box([0u8; 32]);
-        let max = core::hint::black_box([0xffu8; 32]);
+        let zero = crate::self_test::black_box([0u8; 32]);
+        let max = crate::self_test::black_box([0xffu8; 32]);
         (compare_hashes(&zero, &max) == -1) as u32
     }
 }
@@ -84,8 +92,8 @@ register_self_test! {
 register_self_test! {
     /// compare_hashes gt
     fn compare_hashes_gt() -> u32 {
-        let zero = core::hint::black_box([0u8; 32]);
-        let max = core::hint::black_box([0xffu8; 32]);
+        let zero = crate::self_test::black_box([0u8; 32]);
+        let max = crate::self_test::black_box([0xffu8; 32]);
         (compare_hashes(&max, &zero) == 1) as u32
     }
 }
@@ -93,8 +101,8 @@ register_self_test! {
 register_self_test! {
     /// compare_hashes eq
     fn compare_hashes_eq() -> u32 {
-        let a = core::hint::black_box([0u8; 32]);
-        let b = core::hint::black_box([0u8; 32]);
+        let a = crate::self_test::black_box([0u8; 32]);
+        let b = crate::self_test::black_box([0u8; 32]);
         (compare_hashes(&a, &b) == 0) as u32
     }
 }
@@ -112,7 +120,7 @@ register_self_test! {
     /// xoroshiro base64 nonce
     fn xoroshiro_base64_nonce() -> u32 {
         let mut nonce = [0u8; 21];
-        generate_base64_nonce(core::hint::black_box(0), core::hint::black_box(12345), &mut nonce);
+        generate_base64_nonce(crate::self_test::black_box(0), crate::self_test::black_box(12345), &mut nonce);
         (nonce == XOROSHIRO_NONCE_EXPECTED) as u32
     }
 }

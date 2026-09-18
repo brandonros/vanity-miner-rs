@@ -1,6 +1,6 @@
 //! Candidate probes owned by the shallenge self-test kernel.
 use crate::search::candidate_result::CandidateResult;
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// shallenge candidate hash nonce length and padding
@@ -14,7 +14,7 @@ register_self_test! {
             &seed,
             black_box(32),
             &black_box([255; 32]),
-            black_box(b"brandonros"),
+            &black_box(*b"brandonros"),
         );
         let mut expected = [0u8; 256];
         expected[..32].copy_from_slice(&super::SHALLENGE_TEST_HASH);
@@ -37,7 +37,7 @@ register_self_test! {
                 &seed,
                 black_box(32),
                 &black_box(target),
-                black_box(b"brandonros"),
+                &black_box(*b"brandonros"),
             );
             if result.status != CandidateResult::STATUS_MISS || result.bytes != [0; 256] {
                 return 0;
@@ -56,7 +56,7 @@ register_self_test! {
             width: 32,
         });
         let target = black_box([255; 32]);
-        let result = crate::modes::shallenge::candidate(&seed, black_box(0), &target, black_box(b""));
+        let result = crate::modes::shallenge::candidate(&seed, black_box(0), &target, &black_box(*b""));
         if result.status != CandidateResult::STATUS_ERROR || result.bytes != [0; 256] {
             return 0;
         }
@@ -70,7 +70,7 @@ register_self_test! {
             width: 0,
         });
         let result =
-            crate::modes::shallenge::candidate(&seed, black_box(0), &target, black_box(b"brandonros"));
+            crate::modes::shallenge::candidate(&seed, black_box(0), &target, &black_box(*b"brandonros"));
         u32::from(result.status == CandidateResult::STATUS_ERROR && result.bytes == [0; 256])
     }
 }

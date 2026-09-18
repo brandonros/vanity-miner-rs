@@ -1,6 +1,6 @@
 //! Concrete secp256k1 probes used by this mode's device self-test.
 use super::*;
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 // Slot 73: `SecretKey::from_bytes` for the smallest valid scalar (=1).
 // Tests just the validation/wrap step (range check + GenericArray copy).
@@ -32,8 +32,8 @@ register_self_test! {
     fn k256_derive_scalar_one() -> u32 {
         let mut priv_bytes = [0u8; 32];
         priv_bytes[31] = 1;
-        let pub_key = secp256k1_derive_public_key(&priv_bytes);
-        (pub_key == SECP256K1_GENERATOR_COMPRESSED) as u32
+        let pub_key = try_secp256k1_derive_public_key(&priv_bytes);
+        (pub_key == Some(SECP256K1_GENERATOR_COMPRESSED)) as u32
     }
 }
 
@@ -42,8 +42,8 @@ register_self_test! {
     fn k256_derive_scalar_two() -> u32 {
         let mut priv_bytes = [0u8; 32];
         priv_bytes[31] = 2;
-        let pub_key = secp256k1_derive_public_key(&priv_bytes);
-        (pub_key == SECP256K1_TWO_G_COMPRESSED) as u32
+        let pub_key = try_secp256k1_derive_public_key(&priv_bytes);
+        (pub_key == Some(SECP256K1_TWO_G_COMPRESSED)) as u32
     }
 }
 
@@ -106,11 +106,7 @@ register_self_test! {
         let s = Scalar::ONE;
         let repr = s.to_repr();
         let s2_opt = Scalar::from_repr(repr);
-        let recovered: bool = s2_opt.is_some().into();
-        if !recovered {
-            return 0;
-        }
-        let s2 = s2_opt.unwrap();
+        let Some(s2) = Option::<Scalar>::from(s2_opt) else { return 0; };
         (s2 == s) as u32
     }
 }
@@ -142,8 +138,8 @@ register_self_test! {
     fn k256_encoded_point_from_affine_coords() -> u32 {
         use k256::EncodedPoint;
         use k256::elliptic_curve::FieldBytes;
-        let x_bytes = core::hint::black_box(SECP256K1_GX_BYTES);
-        let y_bytes = core::hint::black_box(SECP256K1_GY_BYTES);
+        let x_bytes = crate::self_test::black_box(SECP256K1_GX_BYTES);
+        let y_bytes = crate::self_test::black_box(SECP256K1_GY_BYTES);
         let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
         let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
         let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
