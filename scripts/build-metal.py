@@ -45,7 +45,7 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--case', help='Build one named self-test case into an explicit --output directory')
     parser.add_argument('--monolithic-self-test', action='store_true', help='Build the legacy whole-group self-test kernel')
-    parser.add_argument('--inlining', choices=['all', 'retain-scalar', 'selective'], default='all', help='Experimental helper-retention policy; default keeps the established fully inlined pipeline')
+    parser.add_argument('--inlining', choices=['all', 'retain-scalar', 'selective'], default='selective', help='Helper-retention policy (default: selective); use all to force full inlining')
     options = parser.parse_args()
     is_self_test = options.mode.startswith('self-test-')
     if (options.case or options.monolithic_self_test) and not is_self_test:
@@ -192,7 +192,7 @@ def main():
             stage_start = time.perf_counter()
             try:
                 run(compiler_binary, 'compile', unit / 'kernel.bc', '--descriptor', interface, '--output', unit,
-                    *(['--inlining', options.inlining] if options.inlining != 'all' else []))
+                    '--inlining', options.inlining)
             except subprocess.CalledProcessError:
                 for name in ['kernel.bc', 'kernel.ll']:
                     shutil.copyfile(unit / name, destination / ('rejected.' + name.split('.')[-1]))

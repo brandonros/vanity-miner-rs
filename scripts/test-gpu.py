@@ -50,6 +50,7 @@ def main():
     parser.add_argument('--list', action='store_true', help='Check Cargo discovery against the inventory without loading Metal')
     parser.add_argument('--suite', choices=['all', 'production', 'self-tests', 'cli'], default='all')
     parser.add_argument('--timeout', type=int, default=10800, help='Deadline in seconds for each build/test command')
+    parser.add_argument('--inlining', choices=['selective', 'all', 'retain-scalar'], default='selective', help='Required build policy (default: selective); use all to opt out')
     options = parser.parse_args()
     if platform.system() != 'Darwin':
         parser.error('GPU execution/discovery requires macOS; CPU references run with --no-default-features')
@@ -88,7 +89,7 @@ def main():
     groups = (MODES if options.suite != 'self-tests' else []) + (['self-test-' + mode for mode in MODES] if options.suite in ['all', 'self-tests'] else [])
     if not options.skip_build:
         for mode in groups:
-            run(['python3', 'scripts/build-metal.py', '--mode', mode, '--output', str(bundles / mode)], options.timeout)
+            run(['python3', 'scripts/build-metal.py', '--mode', mode, '--inlining', options.inlining, '--output', str(bundles / mode)], options.timeout)
     # The loader validates artifact hashes/ABI; verify source provenance here too.
     # CI downloads bundles built in a different checkout, so compare relative source hashes.
     import hashlib
@@ -99,6 +100,8 @@ def main():
             raise RuntimeError(f'no build manifests in {directory}')
         for path in manifests:
             manifest = json.loads(path.read_text())
+            if manifest.get('inlining') != options.inlining:
+                raise RuntimeError(f'wrong inlining policy in {path}: expected {options.inlining}')
             for source, digest in manifest['source_sha256'].items():
                 if hashlib.sha256((ROOT / source).read_bytes()).hexdigest() != digest:
                     raise RuntimeError(f'stale bundle {path}: source changed: {source}')
