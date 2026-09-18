@@ -8,7 +8,7 @@ use std::{
 /// Validate bundle hashes and exact application bindings before creating a pipeline.
 pub(crate) fn load_artifact(
     directory: &Path,
-    interface_json: &str,
+    expected: &llvm_metal_abi::MetalBindings,
 ) -> Result<(Kernel, Duration), String> {
     let read = |name| fs::read(directory.join(name)).map_err(|e| format!("{name}: {e}"));
     let manifest: serde_json::Value =
@@ -25,11 +25,7 @@ pub(crate) fn load_artifact(
     }
     let bindings: llvm_metal_abi::MetalBindings =
         serde_json::from_slice(&read("kernel.bindings.json")?).map_err(|e| e.to_string())?;
-    let interface: llvm_metal_abi::KernelInterface =
-        serde_json::from_str(interface_json).map_err(|e| e.to_string())?;
-    if serde_json::to_value(&bindings).unwrap()
-        != serde_json::to_value(interface.validate()?).unwrap()
-    {
+    if &bindings != expected {
         return Err("Metal kernel bindings do not match the application ABI".into());
     }
     let start = Instant::now();

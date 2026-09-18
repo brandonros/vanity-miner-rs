@@ -10,7 +10,7 @@ unsafe extern "C" {
     fn atomic_add(pointer: *mut u32, value: u32) -> u32;
 }
 /// # Safety
-/// Six aligned, disjoint buffers matching C::layout(). Payload has message_len
+/// Six aligned, disjoint buffers matching the generated entry descriptor. Payload has message_len
 /// readable bytes (one allocated byte if empty); audit has count records if enabled.
 /// Output is initialized to EMPTY. No host access until synchronous completion.
 pub unsafe fn dispatch<C: Contract>(

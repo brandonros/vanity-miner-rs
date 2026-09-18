@@ -58,19 +58,14 @@ def main():
     compiler_target = ROOT / 'target/metal/compiler' / compiler_key
     compiler_binary = compiler_target / 'release/llvm-metalc'
     device = ROOT / f'crates/kernels/{options.mode}'
-    typed_interface = (device / 'examples/interface.rs').exists()
-    declared_interface = device / 'kernel.interface.json'
     device_target = ROOT / 'target/metal/device' / options.mode
     output = (options.output or ROOT / 'target/metal' / options.mode).resolve()
     sources = [device / 'Cargo.toml', device / 'Cargo.lock', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock', ROOT / 'scripts/modes.py',
                    *sorted((device / 'src').rglob('*.rs')),
                    *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()),
                    *sorted(p for p in (ROOT / 'vendor/sec1').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
-    if not typed_interface:
-        sources.append(declared_interface)
-    else:
-        sources.extend(sorted((device / 'examples').rglob('*.rs')))
-        sources.extend(sorted((ROOT / 'crates/kernels/common').glob('candidate_*.rs')))
+    sources.extend(sorted((device / 'examples').rglob('*.rs')))
+    sources.extend(sorted((ROOT / 'crates/kernels/common').glob('candidate_*.rs')))
     if is_self_test:
         sources.append(ROOT / 'crates/kernels/common/metal_self_test_inventory.rs')
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources}
@@ -86,21 +81,22 @@ def main():
     run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', compiler_target)
     common = ['--locked', '--manifest-path', device / 'Cargo.toml', '--release', '--target-dir', device_target]
     run('cargo', 'test', *common)
-    if typed_interface:
-        description = json.loads(run('cargo', 'run', *common, '--example', 'interface', capture=True))
-        declared_interface = device_target / 'kernel.interface.json'
-        declared_interface.write_text(json.dumps(description, indent=2) + '\n')
-    entry = json.loads(declared_interface.read_text())['entry']
+    entry = None
     inventory = []
-    if is_self_test and not options.monolithic_self_test:
+    if is_self_test:
         listing = run('cargo', 'run', *common, '--example', 'inventory', capture=True)
         for row in listing.splitlines():
             slot, name, group, case_entry = row.split('\t')
+            if entry is None:
+                entry = group
             if group != entry:
                 raise RuntimeError('self-test inventory contains a different group')
             inventory.append(dict(slot=int(slot), name=name, entry=case_entry))
         if not inventory or len({c['name'] for c in inventory}) != len(inventory):
             raise RuntimeError('empty or duplicate self-test inventory')
+        expected_entries = {entry, *(c['entry'] for c in inventory)}
+        if options.monolithic_self_test:
+            inventory = []
         if options.case:
             inventory = [case for case in inventory if case['name'] == options.case]
             if len(inventory) != 1:
@@ -132,6 +128,19 @@ def main():
                     modules.append(path)
         run('llvm-link', *modules, '-o', stage / 'linked.bc')
         timings['link_seconds'] = time.perf_counter() - stage_start
+        linked_hash = digest(stage / 'linked.bc')
+        descriptor_start = time.perf_counter()
+        run(compiler_binary, 'extract', stage / 'linked.bc', '--output', stage / 'extracted')
+        descriptors = json.loads((stage / 'extracted/descriptors.json').read_text())
+        if is_self_test:
+            if set(descriptors) != expected_entries:
+                raise RuntimeError(f'device descriptors differ from native self-test inventory: missing={sorted(expected_entries - set(descriptors))}, unexpected={sorted(set(descriptors) - expected_entries)}')
+        else:
+            if len(descriptors) != 1:
+                raise RuntimeError('production module must declare exactly one entry')
+            entry = next(iter(descriptors))
+        linked_input = stage / 'extracted/stripped.bc'
+        timings['descriptor_seconds'] = time.perf_counter() - descriptor_start
         shared_frontend_seconds = time.perf_counter() - start
         compiler_hash = digest(compiler_binary)
         group_cases = []
@@ -141,12 +150,8 @@ def main():
             unit = stage / ('case-' + str(case['slot']) if case else 'unit')
             unit.mkdir()
             unit_entry = case['entry'] if case else entry
-            interface = declared_interface
-            if case:
-                description = json.loads(interface.read_text())
-                description['entry'] = unit_entry
-                interface = unit / 'kernel.interface.json'
-                interface.write_text(json.dumps(description, indent=2) + '\n')
+            interface = unit / 'kernel.descriptor.json'
+            interface.write_text(json.dumps(descriptors[unit_entry], indent=2) + '\n')
             unit_start = time.perf_counter()
             # Select and discard unrelated exported cases before forced inlining.
             # Rust compilation/linking are shared once across this group's cases.
@@ -154,7 +159,7 @@ def main():
                 '-force-remove-attribute=noinline', '-force-attribute=alwaysinline',
                 '-inline-threshold=10000', f'-internalize-public-api-list={unit_entry}',
                 '-vectorize-slp=false', '-vectorize-loops=false',
-                stage / 'linked.bc', '-o', unit / 'inlined.bc')
+                linked_input, '-o', unit / 'inlined.bc')
             unit_timings = dict(timings, inline_seconds=time.perf_counter() - unit_start)
             stage_start = time.perf_counter()
             post_inline(unit / 'inlined.bc', unit / 'kernel.bc')
@@ -171,7 +176,7 @@ def main():
             frontend_total += frontend_seconds
             stage_start = time.perf_counter()
             try:
-                run(compiler_binary, 'compile', unit / 'kernel.bc', '--interface', interface, '--output', unit)
+                run(compiler_binary, 'compile', unit / 'kernel.bc', '--descriptor', interface, '--output', unit)
             except subprocess.CalledProcessError:
                 for name in ['kernel.bc', 'kernel.ll']:
                     shutil.copyfile(unit / name, destination / ('rejected.' + name.split('.')[-1]))
@@ -182,11 +187,11 @@ def main():
                 raise RuntimeError('source changed during build; rerun to produce an attributable bundle')
             if compiler_hash != digest(compiler_binary):
                 raise RuntimeError('compiler changed during lowering; rerun the build')
-            names = ['kernel.bc', 'kernel.ll', 'kernel.air.ll', 'kernel.air.bc', 'kernel.bindings.json', 'kernel.metallib']
+            names = ['kernel.descriptor.json'] + ['kernel.bc', 'kernel.ll', 'kernel.air.ll', 'kernel.air.bc', 'kernel.bindings.json', 'kernel.metallib']
             report = dict(schema=1, rustc=rust, source_revision=source_revision,
                           compiler_source=str(compiler), compiler_flake_lock_sha256=digest(compiler / 'flake.lock'),
                           compiler_sha256=compiler_hash,
-                          source_sha256=source_hashes,
+                          linked_bitcode_sha256=linked_hash, source_sha256=source_hashes,
                           artifacts={name: digest(unit / name) for name in names}, commands=list(COMMANDS),
                           timings=dict(frontend_seconds=shared_frontend_seconds + frontend_seconds, lowering_seconds=lowering_seconds, **unit_timings),
                           cache='Cargo may reuse matching artifacts; Rust/link shared once per group; per-entry LLVM optimization/lowering rerun' if case else 'Cargo may reuse matching artifacts; LLVM linking/lowering rerun',

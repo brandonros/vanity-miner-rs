@@ -1,17 +1,7 @@
 //! Original solana known-answer checks through stock Rust and direct Metal.
 #![no_std]
 
-/// # Safety
-/// One invocation only. `selector` points to an initialized u32, and `results`
-/// to SELF_TEST_NUM_CHECKS initialized, aligned u32 values in disjoint storage.
-/// u32::MAX executes the full group; other values select one global registry slot.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn kernel_self_test_solana(selector: *const u32, results: *mut u32) {
-    let slot = unsafe { selector.read() };
-    let results =
-        unsafe { core::slice::from_raw_parts_mut(results, logic::self_test::SELF_TEST_NUM_CHECKS) };
-    logic::self_test::runners::solana::run_slot(results, slot as usize);
-}
+pub use logic::self_test::runners::solana::kernel_self_test_solana;
 
 #[cfg(test)]
 mod tests {
@@ -28,7 +18,7 @@ mod tests {
             count as u32,
         ] {
             let mut results = [SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS + 2];
-            unsafe { kernel_self_test_solana(&selector, results.as_mut_ptr().add(1)) };
+            unsafe { kernel_self_test_solana(&selector, results.as_mut_ptr().add(1).cast()) };
             assert_eq!(results[0], SENTINEL);
             assert_eq!(results[count + 1], SENTINEL);
             for case in cases {
@@ -54,7 +44,7 @@ mod tests {
             for selector in [case.slot as u32, count as u32] {
                 let mut results = [SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS + 2];
                 unsafe {
-                    entry(&selector, results.as_mut_ptr().add(1));
+                    entry(&selector, results.as_mut_ptr().add(1).cast());
                 }
                 for (index, value) in results.into_iter().enumerate() {
                     assert_eq!(

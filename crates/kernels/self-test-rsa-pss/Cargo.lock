@@ -63,12 +63,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "llvm-metal-kernel"
+version = "0.1.0"
+source = "git+https://github.com/brandonros/llvm-metal?rev=9cbb88e2b54e4719fb833eca14fb5f41421ebad0#9cbb88e2b54e4719fb833eca14fb5f41421ebad0"
+
+[[package]]
 name = "logic"
 version = "0.1.0"
 dependencies = [
  "crypto-bigint",
  "digest",
  "hex",
+ "llvm-metal-kernel",
  "paste",
  "rand_core",
  "rand_xoshiro",

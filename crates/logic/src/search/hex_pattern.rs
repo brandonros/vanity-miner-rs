@@ -3,13 +3,14 @@
 /// Largest supported target: an RSA-2048 modulus or signature.
 pub const MAX_HEX_TARGET_BYTES: usize = 256;
 
+llvm_metal_kernel::record! {
 /// A byte mask avoids allocating or parsing strings inside device kernels.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct HexPattern {
     value: [u8; MAX_HEX_TARGET_BYTES],
     mask: [u8; MAX_HEX_TARGET_BYTES],
     len: u32,
+}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

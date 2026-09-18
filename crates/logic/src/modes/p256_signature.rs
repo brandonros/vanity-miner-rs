@@ -2,7 +2,7 @@
 //! Owners must clear secret records after synchronized device use.
 use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
-#[repr(C)]
+llvm_metal_kernel::record! {
 #[derive(Clone, Copy)]
 pub struct P256SignatureRequest {
     pub private: [u8; 32],
@@ -19,6 +19,7 @@ pub struct P256SignatureRequest {
     /// 0 = low, 1 = high, 2 = either.
     pub s_form: u32,
     pub reserved: u32,
+}
 }
 
 pub fn p256_signature(
@@ -99,15 +100,6 @@ impl zeroize::Zeroize for P256SignatureRequest {
         self.target.zeroize();
         self.s_form.zeroize();
         self.reserved.zeroize();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn request_has_no_implicit_padding() {
-        // Metal transport copies the complete initialized request record.
-        assert_eq!(core::mem::size_of::<super::P256SignatureRequest>(), 168);
     }
 }
 

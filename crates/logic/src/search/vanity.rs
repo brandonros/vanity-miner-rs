@@ -82,14 +82,15 @@ mod test {
     }
 }
 
+llvm_metal_kernel::record! {
 /// Prefix and suffix bytes passed to an address-search kernel.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BytePattern {
     pub prefix_len: u32,
     pub suffix_len: u32,
     pub prefix: [u8; 64],
     pub suffix: [u8; 64],
+}
 }
 impl BytePattern {
     pub fn new(prefix: &[u8], suffix: &[u8]) -> Result<Self, &'static str> {
