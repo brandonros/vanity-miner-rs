@@ -1,16 +1,11 @@
 #![cfg(all(feature = "metal", feature = "self_test_support", target_os = "macos"))]
 use std::{path::PathBuf, process::Command};
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_SELF_TEST_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal"))
+    super::support::artifacts("VANITY_METAL_SELF_TEST_ARTIFACTS", "")
 }
 fn command() -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_vanity-miner"));
-    command
-        .arg("--metal-artifacts")
-        .arg(artifacts())
-        .arg("self-test");
+    let mut command = super::support::command(&artifacts());
+    command.arg("self-test");
     command
 }
 #[test]
@@ -18,6 +13,7 @@ fn command() -> Command {
 fn original_registry_groups_pass_on_metal_without_skips() {
     let output = command().output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout);
+    eprintln!("{stdout}\n{}", String::from_utf8_lossy(&output.stderr));
     assert!(
         output.status.success(),
         "{stdout}\n{}",

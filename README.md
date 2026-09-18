@@ -68,7 +68,10 @@ nix develop --command cargo run -p vanity-miner --release --locked \
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-The Metal script requires every slot to pass; `--skip-build` reuses device bundles.
+The Metal script requires every slot to pass; `--skip-build` reuses matching bundles.
+`./scripts/test-gpu.sh` runs production, CLI, session, and registry GPU tests.
+Use `--list` to check discovery against `crates/cli/tests/gpu-coverage.json`
+without executing GPU code. CPU-only layout/rejection tests remain in Cargo.
 For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
 Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.

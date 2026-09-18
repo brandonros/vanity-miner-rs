@@ -24,7 +24,8 @@ self_test = [
     "self_test_rsa_pss",
     "self_test_rsa_modulus",
 ]
-self_test_support = ["dep:paste"]
+test-vectors = []
+self_test_support = ["dep:paste", "test-vectors"]
 self_test_metal_entries = ["self_test_support"]
 self_test_solana = ["self_test_support", "solana"]
 self_test_bitcoin = ["self_test_support", "bitcoin"]

@@ -10,15 +10,11 @@ use logic::{
     modes::p256_signature::{P256SignatureRequest, p256_signature},
     search::{hex_pattern::HexPattern, message_window::write_message_counter},
 };
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use vanity_miner::runner::metal::p256::P256SignatureTransport;
 
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_P256_SIGNATURE_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal/p256-signature")
-        })
+    super::support::artifacts("VANITY_METAL_P256_SIGNATURE_ARTIFACTS", "p256-signature")
 }
 fn request(message: &[u8], source: u32, target: u32, s_form: u32) -> P256SignatureRequest {
     // Published RFC 6979 A.2.5 example, never a generated/user private key.
@@ -210,10 +206,8 @@ fn bounded_cli_verifies_both_sources_and_s_forms() {
     std::fs::write(&message_path, message).unwrap();
     for source in ["message", "ephemeral"] {
         for form in ["low", "high", "either"] {
-            let mut command = Command::new(env!("CARGO_BIN_EXE_vanity-miner"));
+            let mut command = super::support::command(&artifacts());
             command.args([
-                "--metal-artifacts",
-                artifacts().to_str().unwrap(),
                 "--batches",
                 "2",
                 "--batch-size",
@@ -275,7 +269,7 @@ fn bounded_cli_verifies_both_sources_and_s_forms() {
             }
         }
     }
-    let rejected = Command::new(env!("CARGO_BIN_EXE_vanity-miner"))
+    let rejected = super::support::command(&artifacts())
         .args([
             "--seed",
             "1",

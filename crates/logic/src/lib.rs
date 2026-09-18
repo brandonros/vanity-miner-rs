@@ -9,3 +9,6 @@ pub mod search;
 
 #[cfg(feature = "self_test_support")]
 pub mod self_test;
+
+#[cfg(feature = "test-vectors")]
+pub mod test_vectors;

@@ -1,14 +1,10 @@
 #![cfg(all(feature = "metal", target_os = "macos"))]
 use logic::search::xoroshiro::BatchSeed;
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use vanity_miner::runner::metal::transport::ShallengeTransport;
 
 fn artifacts() -> PathBuf {
-    std::env::var_os("VANITY_METAL_ARTIFACTS")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target/metal/shallenge")
-        })
+    super::support::artifacts("VANITY_METAL_ARTIFACTS", "shallenge")
 }
 
 #[test]
@@ -80,10 +76,8 @@ fn application_batches_compare_every_lane_and_preserve_guards() {
 #[ignore = "build scripts/build-metal.py --mode shallenge first; requires Apple GPU"]
 fn bounded_cli_search_verifies_winners_and_finishes_without_matches() {
     for target in ["ff".repeat(32), "00".repeat(32)] {
-        let output = Command::new(env!("CARGO_BIN_EXE_vanity-miner"))
+        let output = super::support::command(&artifacts())
             .args([
-                "--metal-artifacts",
-                artifacts().to_str().unwrap(),
                 "--batches",
                 "4",
                 "--batch-size",
