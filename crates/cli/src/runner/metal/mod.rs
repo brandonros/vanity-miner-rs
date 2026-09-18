@@ -57,8 +57,10 @@ impl Runner for MetalRunner {
             Command::EthereumVanity(args) => crate::modes::ethereum::metal::run(self, args, stats),
             #[cfg(feature = "bitcoin")]
             Command::BitcoinVanity(args) => crate::modes::bitcoin::metal::run(self, args, stats),
+            #[cfg(feature = "solana")]
+            Command::SolanaVanity(args) => crate::modes::solana::metal::run(self, args, stats),
             #[allow(unreachable_patterns)]
-            _ => Err("the Metal backend supports Shallenge, Ethereum, and Bitcoin".into()),
+            _ => Err("the Metal backend supports Shallenge, Ethereum, Bitcoin, and Solana".into()),
         }
     }
 }
@@ -73,3 +75,7 @@ mod ethereum_contract;
 #[cfg(feature = "bitcoin")]
 #[path = "../../../../kernels/bitcoin/metal/src/contract.rs"]
 mod bitcoin_contract;
+
+#[cfg(feature = "solana")]
+#[path = "../../../../kernels/solana/metal/src/contract.rs"]
+mod solana_contract;

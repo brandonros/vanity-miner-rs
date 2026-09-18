@@ -131,3 +131,7 @@ optional = true
 [[example]]
 name = "metal_bench"
 required-features = ["metal"]
+
+[[example]]
+name = "metal_solana_bench"
+required-features = ["metal", "solana"]

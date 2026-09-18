@@ -1,7 +1,8 @@
-//! Shared CUDA/CuMetal candidate reconstruction, verification, and output.
+//! Shared GPU candidate reconstruction, verification, and output.
 use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, vanity::BytePattern, xoroshiro::BatchSeed};
 
+#[cfg(any(feature = "gpu", feature = "cumetal"))]
 pub const ENTRY: &str = "kernel_solana_vanity";
 
 pub fn search(
