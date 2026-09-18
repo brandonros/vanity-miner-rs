@@ -430,7 +430,7 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 [[package]]
 name = "llvm-metal-abi"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=154ec386346f5dee9b9ffb290d82eea0837ca4f9#154ec386346f5dee9b9ffb290d82eea0837ca4f9"
+source = "git+https://github.com/brandonros/llvm-metal?rev=6870fd3f231dd81ed8a410e63ac2ea19f2cff348#6870fd3f231dd81ed8a410e63ac2ea19f2cff348"
 dependencies = [
  "llvm-metal-kernel",
  "serde",
@@ -439,12 +439,12 @@ dependencies = [
 [[package]]
 name = "llvm-metal-kernel"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=154ec386346f5dee9b9ffb290d82eea0837ca4f9#154ec386346f5dee9b9ffb290d82eea0837ca4f9"
+source = "git+https://github.com/brandonros/llvm-metal?rev=6870fd3f231dd81ed8a410e63ac2ea19f2cff348#6870fd3f231dd81ed8a410e63ac2ea19f2cff348"
 
 [[package]]
 name = "llvm-metal-runtime"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=154ec386346f5dee9b9ffb290d82eea0837ca4f9#154ec386346f5dee9b9ffb290d82eea0837ca4f9"
+source = "git+https://github.com/brandonros/llvm-metal?rev=6870fd3f231dd81ed8a410e63ac2ea19f2cff348#6870fd3f231dd81ed8a410e63ac2ea19f2cff348"
 dependencies = [
  "llvm-metal-abi",
  "objc2",
