@@ -16,9 +16,9 @@ fn main() -> Result<(), String> {
         &std::fs::read(artifacts.join("kernel.build.json")).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    // '0' is absent from the Base58 alphabet. Runtime matching still executes
-    // the complete production candidate; no winner printing or audit transfers.
-    let pattern = BytePattern::new(b"0", b"")?;
+    // A valid, selective Base58 prefix exercises a normal production search.
+    // Abort if it matches so winner handling cannot contaminate this timing.
+    let pattern = BytePattern::new(b"zzzzzzzz", b"")?;
     for count in [256_u32, 1024, 4096] {
         let seed = BatchSeed {
             seed: 583437459223573146,
