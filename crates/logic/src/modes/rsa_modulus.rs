@@ -11,7 +11,7 @@ use zeroize::{Zeroize, Zeroizing};
 // New ABI: shared candidate transport, incompatible with the old task kernel.
 pub const ENTRY: &str = "kernel_rsa_modulus_candidate";
 
-#[repr(C)]
+llvm_metal_kernel::record! {
 #[derive(Clone, Copy)]
 pub struct SearchConfig {
     pub lower: [u8; 256],
@@ -24,13 +24,15 @@ pub struct SearchConfig {
     pub suffix_bits: u32,
     pub reserved: u32,
 }
+}
 
-#[repr(C)]
+llvm_metal_kernel::record! {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pair {
     pub p: [u8; 128],
     pub q: [u8; 128],
     pub id: u64,
+}
 }
 impl Pair {
     pub const EMPTY: Self = Self {
@@ -292,13 +294,4 @@ pub fn eligible_pair(
         && n.bits_vartime() == 2048
         && pattern.matches(&n.to_be_bytes())
         && crate::crypto::rsa_prime::probable_prime(&q)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn records_are_padding_free() {
-        assert_eq!(core::mem::size_of::<super::SearchConfig>(), 1072);
-        assert_eq!(core::mem::size_of::<super::Pair>(), 264);
-    }
 }

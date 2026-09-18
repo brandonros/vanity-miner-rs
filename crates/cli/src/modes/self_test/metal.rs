@@ -54,34 +54,10 @@ impl Timings {
     }
 }
 
-fn interface(kernel: &str) -> Result<&'static str, String> {
-    match kernel {
-        "kernel_self_test_solana" => Ok(include_str!(
-            "../../../../kernels/self-test-solana/kernel.interface.json"
-        )),
-        "kernel_self_test_bitcoin" => Ok(include_str!(
-            "../../../../kernels/self-test-bitcoin/kernel.interface.json"
-        )),
-        "kernel_self_test_ethereum" => Ok(include_str!(
-            "../../../../kernels/self-test-ethereum/kernel.interface.json"
-        )),
-        "kernel_self_test_shallenge" => Ok(include_str!(
-            "../../../../kernels/self-test-shallenge/kernel.interface.json"
-        )),
-        "kernel_self_test_p256_public_key" => Ok(include_str!(
-            "../../../../kernels/self-test-p256-public-key/kernel.interface.json"
-        )),
-        "kernel_self_test_p256_signature" => Ok(include_str!(
-            "../../../../kernels/self-test-p256-signature/kernel.interface.json"
-        )),
-        "kernel_self_test_rsa_pss" => Ok(include_str!(
-            "../../../../kernels/self-test-rsa-pss/kernel.interface.json"
-        )),
-        "kernel_self_test_rsa_modulus" => Ok(include_str!(
-            "../../../../kernels/self-test-rsa-modulus/kernel.interface.json"
-        )),
-        _ => Err(format!("unknown Metal self-test group: {kernel}")),
-    }
+fn descriptor(entry: &str) -> Result<llvm_metal_abi::descriptor::Descriptor, String> {
+    let bytes = logic::self_test::descriptor(entry)
+        .ok_or_else(|| format!("unknown Metal self-test entry: {entry}"))?;
+    llvm_metal_abi::descriptor::Descriptor::decode(bytes)
 }
 
 fn guarded(size: usize) -> Buffer {
@@ -115,24 +91,34 @@ fn launch(
     case_entry: Option<&str>,
     timings: &mut Timings,
 ) -> Result<Vec<u32>, String> {
-    let json = interface(kernel_name)?;
-    let mut declared: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    if let Some(entry) = case_entry {
-        declared["entry"] = entry.into();
-    }
-    let json = declared.to_string();
-    if declared["arguments"][1]["bytes"] != logic::self_test::SELF_TEST_NUM_CHECKS * 4 {
-        return Err("Metal self-test interface differs from the registry size".into());
-    }
-    let (kernel, _) = load_artifact(directory, &json)?;
+    let declared = descriptor(case_entry.unwrap_or(kernel_name))?;
+    let selector_slot = declared
+        .arguments
+        .iter()
+        .position(|a| a.name == "selector")
+        .ok_or("missing selector binding")?;
+    let result_slot = declared
+        .arguments
+        .iter()
+        .position(|a| a.name == "results")
+        .ok_or("missing results binding")?;
+    let (kernel, _) = load_artifact(directory, &declared.bindings()?)?;
     let load = kernel.load_timings();
     timings.load.library += load.library;
     timings.load.pipeline += load.pipeline;
     timings.pipelines += 1;
-    let mut buffers = [
-        guarded(4),
-        guarded(logic::self_test::SELF_TEST_NUM_CHECKS * 4),
-    ];
+    let mut buffers: Vec<_> = declared
+        .arguments
+        .iter()
+        .map(|a| guarded(a.layout.size as usize))
+        .collect();
+    declared.validate_lengths(
+        &buffers
+            .iter()
+            .map(|b| b.bytes.len() - GUARD * 2)
+            .collect::<Vec<_>>(),
+        &[1, 1],
+    )?;
     let mut kernel = kernel.prepare(&buffers)?;
     let selectors: Vec<u32> = match selected {
         Some(slots) => slots.iter().map(|&slot| slot as u32).collect(),
@@ -140,8 +126,8 @@ fn launch(
     };
     let mut results = vec![super::SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
     for selector in selectors {
-        buffers[0].bytes[GUARD..GUARD + 4].copy_from_slice(&selector.to_le_bytes());
-        let expected_input = buffers[0].bytes.clone();
+        buffers[selector_slot].bytes[GUARD..GUARD + 4].copy_from_slice(&selector.to_le_bytes());
+        let expected_input = buffers[selector_slot].bytes.clone();
         // SAFETY: hash/ABI checked single-invocation kernel; disjoint initialized
         // selector and full registry storage, with guards outside both bindings.
         let timing = unsafe { kernel.run(&mut buffers, 1, 1)? };
@@ -155,10 +141,10 @@ fn launch(
             case_entry.unwrap_or(kernel_name),
             timing.wall.as_secs_f64() * 1000.
         );
-        if buffers[0].bytes != expected_input {
+        if buffers[selector_slot].bytes != expected_input {
             return Err("Metal self-test changed selector input or its guards".into());
         }
-        let actual = output(&buffers[1])?;
+        let actual = output(&buffers[result_slot])?;
         for case in logic::self_test::metadata::CASES {
             let writable = case.kernel == kernel_name
                 && (selector == u32::MAX || selector as usize == case.slot);
@@ -377,12 +363,14 @@ mod tests {
     }
     #[test]
     fn all_registered_groups_have_matching_interfaces() {
-        for case in logic::self_test::metadata::CASES {
-            let interface: llvm_metal_abi::KernelInterface =
-                serde_json::from_str(interface(case.kernel).unwrap()).unwrap();
-            interface.validate().unwrap();
+        for case in logic::self_test::metadata::CASES
+            .iter()
+            .filter(|c| c.enabled)
+        {
+            descriptor(case.kernel).unwrap().bindings().unwrap();
+            descriptor(case.metal_entry).unwrap().bindings().unwrap();
         }
-        assert!(interface("kernel_unknown").is_err());
+        assert!(descriptor("kernel_unknown").is_err());
     }
     #[test]
     fn corrupt_output_guards_are_rejected() {

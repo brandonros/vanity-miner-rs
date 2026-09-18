@@ -24,7 +24,6 @@ def check_metadata():
     for mode in MODES:
         module = mode.replace('-', '_')
         for path in [f'crates/kernels/{mode}/src/contract.rs',
-                     f'crates/kernels/{mode}/examples/interface.rs',
                      f'crates/kernels/self-test-{mode}/Cargo.toml',
                      f'crates/cli/src/modes/{module}/cpu.rs',
                      f'crates/cli/src/modes/{module}/metal.rs',

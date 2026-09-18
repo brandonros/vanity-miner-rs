@@ -59,14 +59,15 @@ mod test {
     }
 }
 
+llvm_metal_kernel::record! {
 /// Reproduce a candidate from its session counter. The effective RNG input is
 /// seed + counter (modulo 2^64), independent of the batch partition. Advancing
 /// only by the batch number would overlap adjacent batches when lanes are added.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BatchSeed {
     pub seed: u64,
     pub width: u64,
+}
 }
 impl BatchSeed {
     pub fn position(&self, counter: u64) -> Option<(u64, usize)> {

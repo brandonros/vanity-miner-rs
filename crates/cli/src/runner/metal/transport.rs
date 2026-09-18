@@ -1,12 +1,17 @@
 //! One prepared six-buffer engine for typed requests and patterns.
+#[cfg(test)]
+#[macro_use]
+#[path = "../../../../kernels/common/candidate_bindings.rs"]
+mod test_bindings;
 use super::{
     artifacts::load_artifact,
     buffers::{bytes, guarded, record},
 };
+use llvm_metal_abi::descriptor::Descriptor;
 use llvm_metal_runtime::{Buffer, LoadTimings, PreparedKernel};
 pub use logic::search::candidate_abi::Contract;
 use logic::search::{
-    candidate_abi::Launch,
+    candidate_abi::{Arguments, Launch},
     candidate_result::{BatchResult, CandidateResult},
 };
 use std::{
@@ -14,8 +19,6 @@ use std::{
     time::{Duration, Instant},
 };
 use zeroize::{Zeroize, Zeroizing};
-#[path = "../../../../kernels/common/candidate_interface.rs"]
-mod interface;
 
 struct Buffers([Buffer; 6]);
 impl Buffers {
@@ -33,6 +36,8 @@ impl Drop for Buffers {
 
 pub struct Transport<C: Contract> {
     kernel: PreparedKernel,
+    descriptor: Descriptor,
+    slots: Arguments<usize>,
     buffers: Buffers,
     contract: std::marker::PhantomData<C>,
     capacity: u32,
@@ -61,11 +66,13 @@ impl<C: Contract> Transport<C> {
         if capacity == 0 || capacity > 1_048_576 || group == 0 || group > 1024 {
             return Err("invalid Metal candidate dispatch size".into());
         }
-        let (kernel, load_time) = load_artifact(directory, &interface::interface::<C>())?;
+        let descriptor = Descriptor::decode(C::descriptor())?;
+        let slots = C::slots();
+        let (kernel, load_time) = load_artifact(directory, &descriptor.bindings()?)?;
         let load_stages = kernel.load_timings();
         let started = Instant::now();
-        let mut buffers = Buffers(C::layout().map(|a| guarded(a.bytes)));
-        buffers.0[5] = guarded(if audit {
+        let mut buffers = Buffers(initial_buffers::<C>()?);
+        buffers.0[slots.records] = guarded(if audit {
             capacity as usize * size_of::<CandidateResult>()
         } else {
             size_of::<CandidateResult>()
@@ -73,6 +80,8 @@ impl<C: Contract> Transport<C> {
         let kernel = kernel.prepare(&buffers.0)?;
         Ok(Self {
             kernel,
+            descriptor,
+            slots,
             buffers,
             contract: std::marker::PhantomData,
             capacity,
@@ -147,13 +156,13 @@ impl<C: Contract> Transport<C> {
             audit: u32::from(self.audit),
         };
         let started = Instant::now();
-        if message.len() > self.buffers.0[3].bytes.len() - 512 {
+        if message.len() > self.buffers.0[self.slots.message].bytes.len() - 512 {
             let length = message
                 .len()
                 .checked_next_power_of_two()
                 .and_then(|n| n.checked_add(512))
                 .ok_or("Metal payload is too large")?;
-            self.buffers.0[3].bytes.resize(length, 0);
+            self.buffers.0[self.slots.message].bytes.resize(length, 0);
         }
         if self.kernel.reconfigure(&self.buffers.0)? {
             self.allocation_rounds += 1;
@@ -162,19 +171,28 @@ impl<C: Contract> Transport<C> {
         for buffer in &mut self.buffers.0 {
             buffer.bytes.fill(0xa5);
         }
-        let sizes = [
-            size_of::<Launch>(),
-            size_of::<C::Request>(),
-            size_of::<C::Pattern>(),
-            message.len().max(1),
-            size_of::<BatchResult>(),
-            count as usize * size_of::<CandidateResult>(),
+        let inputs = [
+            (self.slots.launch, bytes(&launch)),
+            (self.slots.request, bytes(request)),
+            (self.slots.pattern, bytes(pattern)),
+            (self.slots.message, message),
         ];
-        let inputs = [bytes(&launch), bytes(request), bytes(pattern), message];
-        for (buffer, input) in self.buffers.0[..4].iter_mut().zip(inputs) {
-            buffer.bytes[256..256 + input.len()].copy_from_slice(input);
+        for (slot, input) in inputs {
+            self.buffers.0[slot].bytes[256..256 + input.len()].copy_from_slice(input);
         }
-        self.buffers.0[4].bytes[256..256 + sizes[4]].copy_from_slice(bytes(&BatchResult::EMPTY));
+        self.buffers.0[self.slots.output].bytes[256..256 + size_of::<BatchResult>()]
+            .copy_from_slice(bytes(&BatchResult::EMPTY));
+        self.descriptor.validate_lengths(
+            &self.buffers.0.each_ref().map(|b| b.bytes.len() - 512),
+            &C::pack(Arguments {
+                launch: 1,
+                request: 1,
+                pattern: 1,
+                message: message.len(),
+                output: 1,
+                records: if self.audit { count as usize } else { 0 },
+            }),
+        )?;
         // SAFETY: exact typed ABI, disjoint guarded spans, padded lanes ignored,
         // validated counter range and input sizes, bounded audit capacity.
         let timing = unsafe {
@@ -199,6 +217,16 @@ impl<C: Contract> Transport<C> {
     }
 }
 
+fn initial_buffers<C: Contract>() -> Result<[Buffer; 6], String> {
+    Descriptor::decode(C::descriptor())?
+        .arguments
+        .into_iter()
+        .map(|a| guarded(a.layout.size as usize))
+        .collect::<Vec<_>>()
+        .try_into()
+        .map_err(|_| "candidate descriptor must have six arguments".into())
+}
+
 fn verify<C: Contract>(
     buffers: &[Buffer; 6],
     launch: &Launch,
@@ -206,23 +234,25 @@ fn verify<C: Contract>(
     pattern: &C::Pattern,
     message: &[u8],
 ) -> Result<BatchResult, String> {
-    let sizes = [
-        size_of::<Launch>(),
-        size_of::<C::Request>(),
-        size_of::<C::Pattern>(),
-        message.len().max(1),
-        size_of::<BatchResult>(),
-        launch.count as usize * size_of::<CandidateResult>(),
+    let slots = C::slots();
+    let inputs = [
+        (slots.launch, bytes(launch)),
+        (slots.request, bytes(request)),
+        (slots.pattern, bytes(pattern)),
+        (slots.message, message),
     ];
-    let inputs = [bytes(launch), bytes(request), bytes(pattern), message];
-    let used = [
-        sizes[0],
-        sizes[1],
-        sizes[2],
-        message.len(),
-        sizes[4],
-        if launch.audit != 0 { sizes[5] } else { 0 },
-    ];
+    let used = C::pack(Arguments {
+        launch: size_of::<Launch>(),
+        request: size_of::<C::Request>(),
+        pattern: size_of::<C::Pattern>(),
+        message: message.len(),
+        output: size_of::<BatchResult>(),
+        records: if launch.audit != 0 {
+            launch.count as usize * size_of::<CandidateResult>()
+        } else {
+            0
+        },
+    });
     for (buffer, used) in buffers.iter().zip(used) {
         if buffer.bytes[..256]
             .iter()
@@ -232,12 +262,13 @@ fn verify<C: Contract>(
             return Err("Metal kernel changed a guard or unused output byte".into());
         }
     }
-    for (buffer, input) in buffers[..4].iter().zip(inputs) {
-        if &buffer.bytes[256..256 + input.len()] != input {
+    for (slot, input) in inputs {
+        if &buffers[slot].bytes[256..256 + input.len()] != input {
             return Err("Metal kernel changed an input".into());
         }
     }
-    let result: BatchResult = record(&buffers[4].bytes[256..256 + sizes[4]]);
+    let result: BatchResult =
+        record(&buffers[slots.output].bytes[256..256 + size_of::<BatchResult>()]);
     if launch.audit != 0 {
         let (mut matches, mut errors) = (0, 0);
         for lane in 0..launch.count {
@@ -249,7 +280,7 @@ fn verify<C: Contract>(
             ));
             let offset = 256 + lane as usize * size_of::<CandidateResult>();
             let actual = Zeroizing::new(record::<CandidateResult>(
-                &buffers[5].bytes[offset..offset + size_of::<CandidateResult>()],
+                &buffers[slots.records].bytes[offset..offset + size_of::<CandidateResult>()],
             ));
             if actual.status != expected.status || actual.bytes != expected.bytes {
                 return Err(format!("Metal lane {lane} differs from CPU reference"));
@@ -284,11 +315,19 @@ fn verify<C: Contract>(
 mod tests {
     use super::*;
     struct Toy;
+    logic::llvm_metal_kernel::kernel! {
+        pub mod abi;
+        #[allow(dead_code, unused_variables)]
+        pub unsafe extern "C" fn test_only(
+            launch: Read Fixed Launch, request: Read Fixed [u8; 1], pattern: Read Fixed [u8; 1],
+            message: Read Slice u8, output: ReadWrite Fixed BatchResult, records: Write Slice CandidateResult,
+        ) {} dispatch Grid1d;
+    }
     // SAFETY: used only for CPU-side verification tests; never dispatched.
     unsafe impl Contract for Toy {
         type Request = [u8; 1];
         type Pattern = [u8; 1];
-        const ENTRY: &'static str = "test_only";
+        candidate_bindings!();
         fn candidate(r: &[u8; 1], p: &[u8; 1], _: &[u8], _: u64) -> CandidateResult {
             if r == p {
                 CandidateResult::matched(r)
@@ -298,7 +337,7 @@ mod tests {
         }
     }
     fn buffers(launch: &Launch, r: &[u8; 1], p: &[u8; 1], result: &BatchResult) -> [Buffer; 6] {
-        let mut buffers = Toy::layout().map(|a| guarded(a.bytes));
+        let mut buffers = initial_buffers::<Toy>().unwrap();
         for (buffer, data) in buffers
             .iter_mut()
             .zip([bytes(launch), r, p, &[], bytes(result), &[]])
@@ -309,7 +348,7 @@ mod tests {
     }
     #[test]
     fn cleanup_preserves_reusable_host_storage() {
-        let mut buffers = Buffers(Toy::layout().map(|a| guarded(a.bytes)));
+        let mut buffers = Buffers(initial_buffers::<Toy>().unwrap());
         let shapes = buffers.0.each_ref().map(|b| (b.bytes.len(), b.offset));
         buffers.clear();
         assert_eq!(

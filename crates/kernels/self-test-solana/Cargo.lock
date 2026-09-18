@@ -69,11 +69,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
+name = "llvm-metal-kernel"
+version = "0.1.0"
+source = "git+https://github.com/brandonros/llvm-metal?rev=9cbb88e2b54e4719fb833eca14fb5f41421ebad0#9cbb88e2b54e4719fb833eca14fb5f41421ebad0"
+
+[[package]]
 name = "logic"
 version = "0.1.0"
 dependencies = [
  "curve25519-dalek",
  "hex",
+ "llvm-metal-kernel",
  "paste",
  "rand_core",
  "rand_xoshiro",
