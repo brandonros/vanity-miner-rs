@@ -35,6 +35,7 @@ jobs:
       - name: Check formatting and test Metal host validation
         run: |
           nix develop --command cargo fmt --all --check
+          nix develop --command python3 scripts/check-modes.py
           nix develop --command cargo test --locked --release --workspace --all-features
           ./scripts/test-gpu.sh --list
 
