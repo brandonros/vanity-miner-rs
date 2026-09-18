@@ -13,14 +13,22 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = []
 
-def run(*args, capture=False):
+def run(*args, capture=False, timeout=None):
     args = list(map(str, args))
     COMMANDS.append(args)
-    return subprocess.run(args, cwd=ROOT, check=True, text=True,
+    return subprocess.run(args, cwd=ROOT, check=True, text=True, timeout=timeout,
                           stdout=subprocess.PIPE if capture else None).stdout
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def post_inline(source, output, *, timeout=None):
+    # Match llvm-metal's producer: simplify counters and unroll before O3's
+    # expensive ScalarEvolution analysis of partly unrolled Bech32 loops.
+    run('opt', '-passes=function(loop-simplify,lcssa,loop(indvars),loop-unroll,'
+        'sroa,instcombine,simplifycfg),default<O3>,globaldce,strip-dead-prototypes,verify',
+        '-unroll-threshold=1000', '-vectorize-slp=false', '-vectorize-loops=false',
+        source, '-o', output, timeout=timeout)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -46,6 +54,8 @@ def main():
     run('cargo', 'test', *common)
     start = time.perf_counter()
     messages = run('cargo', 'rustc', *common, '--lib', '--target', 'nvptx64-nvidia-cuda', '--config', 'target.nvptx64-nvidia-cuda.rustflags=["-Cno-vectorize-slp", "-Cno-vectorize-loops"]', '--message-format=json', '--', '--emit=llvm-bc', '-Cembed-bitcode=yes', capture=True)
+    timings = dict(rustc_seconds=time.perf_counter() - start)
+    stage_start = time.perf_counter()
     archives = [Path(f) for line in messages.splitlines() for m in [json.loads(line)]
                 if m.get('reason') == 'compiler-artifact' for f in m['filenames'] if f.endswith('.rlib') and Path(f).is_relative_to(device_target / 'nvptx64-nvidia-cuda')]
     if not archives:
@@ -64,13 +74,16 @@ def main():
                     path.write_bytes(data)
                     modules.append(path)
         run('llvm-link', *modules, '-o', stage / 'linked.bc')
+        timings['link_seconds'] = time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
         run('opt', '-passes=internalize,globaldce,default<O3>,globaldce,strip-dead-prototypes,verify',
             '-inline-threshold=10000', f'-internalize-public-api-list={entry}',
             '-vectorize-slp=false', '-vectorize-loops=false',
             stage / 'linked.bc', '-o', stage / 'inlined.bc')
-        run('opt', '-passes=default<O3>,globaldce,strip-dead-prototypes,verify',
-            '-unroll-threshold=1000', '-vectorize-slp=false', '-vectorize-loops=false',
-            stage / 'inlined.bc', '-o', stage / 'kernel.bc')
+        timings['inline_seconds'] = time.perf_counter() - stage_start
+        stage_start = time.perf_counter()
+        post_inline(stage / 'inlined.bc', stage / 'kernel.bc')
+        timings['post_inline_seconds'] = time.perf_counter() - stage_start
         undefined = run('llvm-nm', '--undefined-only', stage / 'kernel.bc', capture=True)
         if any(line.split()[-1] not in {'llvm_metal.linear_thread_index', 'llvm_metal.atomic_add_device_u32'} for line in undefined.splitlines()):
             run('llvm-dis', stage / 'kernel.bc', '-o', output / 'rejected.ll')
@@ -93,7 +106,7 @@ def main():
                       compiler_sha256=digest(ROOT / 'target/metal/compiler/release/llvm-metalc'),
                       source_sha256={str(p.relative_to(ROOT)): digest(p) for p in sources},
                       artifacts={name: digest(stage / name) for name in names}, commands=COMMANDS,
-                      timings=dict(frontend_seconds=frontend_seconds, lowering_seconds=lowering_seconds),
+                      timings=dict(frontend_seconds=frontend_seconds, lowering_seconds=lowering_seconds, **timings),
                       cache='Cargo may reuse matching artifacts; LLVM linking/lowering rerun', metal_execution='not run by builder')
         (stage / 'kernel.build.json').write_text(json.dumps(report, indent=2)+'\n')
         for name in names + ['kernel.build.json']:
