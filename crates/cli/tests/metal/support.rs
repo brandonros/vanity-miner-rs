@@ -63,7 +63,24 @@ pub mod address {
             }
         };
     }
-    engine!("bitcoin", BitcoinTransport);
+    #[cfg(feature = "bitcoin")]
+    impl Engine for vanity_miner::runner::metal::transport::BitcoinTransport {
+        fn load(path: &Path, capacity: u32, group: usize, audit: bool) -> Result<Self, String> {
+            Self::load(path, capacity, group, audit)
+        }
+        fn evaluate(
+            &mut self,
+            seed: &BatchSeed,
+            pattern: &BytePattern,
+            start: u64,
+            count: u32,
+        ) -> Result<BatchResult, String> {
+            self.evaluate(seed, pattern, &[], start, count)
+        }
+        fn launches(&self) -> u64 {
+            self.launches
+        }
+    }
     engine!("ethereum", EthereumTransport);
     engine!("solana", SolanaTransport);
 

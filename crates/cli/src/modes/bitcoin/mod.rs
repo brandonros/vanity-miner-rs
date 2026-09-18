@@ -8,4 +8,4 @@ pub(crate) mod args;
 mod device;
 
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;

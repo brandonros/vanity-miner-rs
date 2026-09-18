@@ -18,6 +18,7 @@ pub mod rsa;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss;
 pub mod transport;
+pub mod unified;
 
 #[derive(clap::Args, Clone)]
 pub struct MetalOptions {
@@ -109,10 +110,6 @@ mod contract;
 #[cfg(feature = "ethereum")]
 #[path = "../../../../kernels/ethereum/src/contract.rs"]
 mod ethereum_contract;
-
-#[cfg(feature = "bitcoin")]
-#[path = "../../../../kernels/bitcoin/src/contract.rs"]
-mod bitcoin_contract;
 
 #[cfg(feature = "solana")]
 #[path = "../../../../kernels/solana/src/contract.rs"]

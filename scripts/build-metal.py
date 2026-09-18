@@ -61,13 +61,19 @@ def main():
     compiler_target = ROOT / 'target/metal/compiler' / compiler_key
     compiler_binary = compiler_target / 'release/llvm-metalc'
     device = ROOT / f'crates/kernels/{options.mode}'
-    entry = json.loads((device / 'kernel.interface.json').read_text())['entry']
+    typed_interface = (device / 'examples/interface.rs').exists()
+    declared_interface = device / 'kernel.interface.json'
     device_target = ROOT / 'target/metal/device' / options.mode
     output = (options.output or ROOT / 'target/metal' / options.mode).resolve()
-    sources = [device / 'Cargo.toml', device / 'Cargo.lock', device / 'kernel.interface.json', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock',
+    sources = [device / 'Cargo.toml', device / 'Cargo.lock', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock',
                    *sorted((device / 'src').rglob('*.rs')),
                    *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()),
                    *sorted(p for p in (ROOT / 'vendor/sec1').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
+    if not typed_interface:
+        sources.append(declared_interface)
+    else:
+        sources.extend(sorted((device / 'examples').rglob('*.rs')))
+        sources.extend(sorted((ROOT / 'crates/kernels/common').glob('candidate_*.rs')))
     if is_self_test:
         sources.append(ROOT / 'crates/kernels/common/metal_self_test_inventory.rs')
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources}
@@ -83,6 +89,11 @@ def main():
     run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', compiler_target)
     common = ['--locked', '--manifest-path', device / 'Cargo.toml', '--release', '--target-dir', device_target]
     run('cargo', 'test', *common)
+    if typed_interface:
+        description = json.loads(run('cargo', 'run', *common, '--example', 'interface', capture=True))
+        declared_interface = device_target / 'kernel.interface.json'
+        declared_interface.write_text(json.dumps(description, indent=2) + '\n')
+    entry = json.loads(declared_interface.read_text())['entry']
     inventory = []
     if is_self_test and not options.monolithic_self_test:
         listing = run('cargo', 'run', *common, '--example', 'inventory', capture=True)
@@ -133,7 +144,7 @@ def main():
             unit = stage / ('case-' + str(case['slot']) if case else 'unit')
             unit.mkdir()
             unit_entry = case['entry'] if case else entry
-            interface = device / 'kernel.interface.json'
+            interface = declared_interface
             if case:
                 description = json.loads(interface.read_text())
                 description['entry'] = unit_entry

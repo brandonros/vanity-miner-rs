@@ -24,22 +24,4 @@ unsafe impl Contract for PublicKey {
 pub type P256PublicTransport = CandidateTransport<PublicKey>;
 
 #[cfg(feature = "p256-signature")]
-pub struct Signature;
-#[cfg(feature = "p256-signature")]
-// SAFETY: the matching stock-Rust entry uses the six-buffer contract, guards
-// padded lanes, bounds audit writes by count, and atomically claims the winner.
-unsafe impl Contract for Signature {
-    type Request = logic::modes::p256_signature::P256SignatureRequest;
-    const INTERFACE: &'static str =
-        include_str!("../../../../kernels/p256-signature/kernel.interface.json");
-    fn candidate(
-        request: &Self::Request,
-        pattern: &HexPattern,
-        message: &[u8],
-        counter: u64,
-    ) -> CandidateResult {
-        logic::modes::p256_signature::p256_signature(request, message, counter, pattern)
-    }
-}
-#[cfg(feature = "p256-signature")]
-pub type P256SignatureTransport = CandidateTransport<Signature>;
+pub use crate::modes::p256_signature::metal::P256SignatureTransport;

@@ -16,4 +16,5 @@ pub mod salt_counter;
 pub mod vanity;
 pub mod xoroshiro;
 
+pub mod candidate_abi;
 pub mod device_record;
