@@ -87,9 +87,11 @@ or use `--all-features`.
 
 ```sh
 cargo run -p vanity-miner --release --locked --no-default-features --features self_test -- self-test
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode self-test self-test
+./scripts/test-metal.sh
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-For a Metal group, use `--mode self-test-solana`. Select named cases with
+The Metal script requires every slot to pass; `--skip-build` reuses device bundles.
+For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
+Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the original checks.
