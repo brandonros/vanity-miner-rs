@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, rsa_pss::RsaPssTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -55,3 +55,7 @@ pub fn run(
     );
     result
 }
+
+#[path = "../../../../kernels/rsa-pss/src/contract.rs"]
+mod contract;
+pub type RsaPssTransport = Transport<contract::RsaPss>;

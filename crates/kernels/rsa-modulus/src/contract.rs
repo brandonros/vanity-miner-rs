@@ -1,47 +1,20 @@
-//! Shared RSA modulus host/device launch contract.
-use logic::{
-    modes::rsa_modulus::SearchConfig,
-    search::{candidate_result::CandidateResult, hex_pattern::HexPattern},
-};
-
-pub const INTERFACE: &str = include_str!("../kernel.interface.json");
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Launch {
-    pub start: u64,
-    pub message_len: u64,
-    pub count: u32,
-    pub audit: u32,
-}
-// SAFETY: repr(C), padding-free integer fields, all bit patterns valid.
-unsafe impl logic::search::device_record::DeviceRecord for Launch {}
-
-pub fn candidate(
-    launch: &Launch,
-    request: &SearchConfig,
-    pattern: &HexPattern,
-    message: &[u8],
-    lane: u32,
-) -> CandidateResult {
-    if lane >= launch.count || launch.message_len != message.len() as u64 {
-        return CandidateResult::ERROR;
-    }
-    match launch.start.checked_add(u64::from(lane)) {
-        Some(counter) => logic::modes::rsa_modulus::rsa_modulus(request, counter, pattern),
-        None => CandidateResult::ERROR,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn layout_is_padding_free() {
-        assert_eq!(core::mem::size_of::<Launch>(), 24);
-        assert_eq!(core::mem::offset_of!(Launch, message_len), 8);
-        assert_eq!(core::mem::offset_of!(Launch, count), 16);
-        assert_eq!(core::mem::size_of::<SearchConfig>(), 1072);
-        assert_eq!(core::mem::size_of::<HexPattern>(), 516);
+//! Shared typed host/device contract.
+use logic::search::{candidate_abi::Contract, candidate_result::CandidateResult};
+pub type Request = logic::modes::rsa_modulus::SearchConfig;
+pub type Pattern = logic::search::hex_pattern::HexPattern;
+pub struct RsaModulus;
+// SAFETY: the explicit entry delegates the shared six-buffer mechanics to candidate_entry.
+unsafe impl Contract for RsaModulus {
+    type Request = Request;
+    type Pattern = Pattern;
+    const ENTRY: &'static str = "kernel_rsa_modulus_candidate";
+    fn candidate(
+        request: &Request,
+        pattern: &Pattern,
+        payload: &[u8],
+        counter: u64,
+    ) -> CandidateResult {
+        let _ = payload;
+        logic::modes::rsa_modulus::rsa_modulus(request, counter, pattern)
     }
 }

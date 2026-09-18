@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, p256::P256PublicTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -51,3 +51,7 @@ pub fn run(
     );
     result
 }
+
+#[path = "../../../../kernels/p256-public-key/src/contract.rs"]
+mod contract;
+pub type P256PublicTransport = Transport<contract::P256Public>;

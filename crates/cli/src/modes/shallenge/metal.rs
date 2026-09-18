@@ -1,7 +1,7 @@
 use super::{args::ShallengeArgs, shared_best_hash::SharedBestHash};
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, transport::ShallengeTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -45,3 +45,7 @@ pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) 
     );
     result
 }
+
+#[path = "../../../../kernels/shallenge/src/contract.rs"]
+mod contract;
+pub type ShallengeTransport = Transport<contract::Shallenge>;

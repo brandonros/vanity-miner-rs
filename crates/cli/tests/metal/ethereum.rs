@@ -1,7 +1,7 @@
 #![cfg(all(feature = "metal", feature = "ethereum", target_os = "macos"))]
 use logic::search::vanity::BytePattern;
 use std::path::PathBuf;
-use vanity_miner::runner::metal::transport::EthereumTransport;
+use vanity_miner::modes::ethereum::metal::EthereumTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_ETHEREUM_ARTIFACTS", "ethereum")

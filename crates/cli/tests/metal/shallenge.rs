@@ -1,7 +1,7 @@
 #![cfg(all(feature = "metal", target_os = "macos"))]
 use logic::search::xoroshiro::BatchSeed;
 use std::path::PathBuf;
-use vanity_miner::runner::metal::transport::ShallengeTransport;
+use vanity_miner::modes::shallenge::metal::ShallengeTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_ARTIFACTS", "shallenge")

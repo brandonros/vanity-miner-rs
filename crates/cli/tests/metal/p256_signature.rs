@@ -11,7 +11,7 @@ use logic::{
     search::{hex_pattern::HexPattern, message_window::write_message_counter},
 };
 use std::path::PathBuf;
-use vanity_miner::runner::metal::p256::P256SignatureTransport;
+use vanity_miner::modes::p256_signature::metal::P256SignatureTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_P256_SIGNATURE_ARTIFACTS", "p256-signature")

@@ -24,17 +24,17 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1789755015,
-        "narHash": "sha256-VJ6AfNcAeIvNYzto4GfJZu02gLPcCLkVPAbBNsV7gsE=",
+        "lastModified": 1789755899,
+        "narHash": "sha256-zkP8xK79xE72CqPJ9YnKmUdJIHNoTVjE71jVWjwr67k=",
         "owner": "brandonros",
         "repo": "llvm-metal",
-        "rev": "2d7e7304091ccf6b309cf4c48bea384115c3dbc0",
+        "rev": "95efdfe30dadd8ba65e20ee20c0c743ccaedeb50",
         "type": "github"
       },
       "original": {
         "owner": "brandonros",
         "repo": "llvm-metal",
-        "rev": "2d7e7304091ccf6b309cf4c48bea384115c3dbc0",
+        "rev": "95efdfe30dadd8ba65e20ee20c0c743ccaedeb50",
         "type": "github"
       }
     },

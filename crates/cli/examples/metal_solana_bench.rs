@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-use vanity_miner::runner::metal::transport::SolanaTransport;
+use vanity_miner::modes::solana::metal::SolanaTransport;
 
 fn main() -> Result<(), String> {
     let artifacts = std::env::args_os()
@@ -40,7 +40,7 @@ fn main() -> Result<(), String> {
         for group in [32, 64, 128] {
             let mut engine = SolanaTransport::load(&artifacts, count, group, false)?;
             for batch in 0..3 {
-                engine.evaluate(&seed, &pattern, batch * u64::from(count), count)?;
+                engine.evaluate(&seed, &pattern, &[], batch * u64::from(count), count)?;
             }
             let before = (
                 engine.dispatch_time,
@@ -52,8 +52,13 @@ fn main() -> Result<(), String> {
             let start = Instant::now();
             let mut repeats = 0;
             while start.elapsed() < Duration::from_secs(1) || repeats < 5 {
-                let result =
-                    engine.evaluate(&seed, &pattern, (3 + repeats) * u64::from(count), count)?;
+                let result = engine.evaluate(
+                    &seed,
+                    &pattern,
+                    &[],
+                    (3 + repeats) * u64::from(count),
+                    count,
+                )?;
                 if result.matches != 0 || result.errors != 0 {
                     return Err("unexpected GPU benchmark result".into());
                 }

@@ -3,7 +3,7 @@
 pub(crate) mod args;
 pub(crate) mod cpu;
 #[cfg(feature = "metal")]
-pub(crate) mod metal;
+pub mod metal;
 
 mod device;
 #[cfg(test)]

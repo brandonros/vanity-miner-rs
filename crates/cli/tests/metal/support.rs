@@ -37,9 +37,9 @@ pub mod address {
         fn launches(&self) -> u64;
     }
     macro_rules! engine {
-        ($feature:literal, $name:ident) => {
+        ($feature:literal, $mode:ident, $name:ident) => {
             #[cfg(feature = $feature)]
-            impl Engine for vanity_miner::runner::metal::transport::$name {
+            impl Engine for vanity_miner::modes::$mode::metal::$name {
                 fn load(
                     path: &Path,
                     capacity: u32,
@@ -55,7 +55,7 @@ pub mod address {
                     start: u64,
                     count: u32,
                 ) -> Result<BatchResult, String> {
-                    self.evaluate(seed, pattern, start, count)
+                    self.evaluate(seed, pattern, &[], start, count)
                 }
                 fn launches(&self) -> u64 {
                     self.launches
@@ -63,26 +63,9 @@ pub mod address {
             }
         };
     }
-    #[cfg(feature = "bitcoin")]
-    impl Engine for vanity_miner::runner::metal::transport::BitcoinTransport {
-        fn load(path: &Path, capacity: u32, group: usize, audit: bool) -> Result<Self, String> {
-            Self::load(path, capacity, group, audit)
-        }
-        fn evaluate(
-            &mut self,
-            seed: &BatchSeed,
-            pattern: &BytePattern,
-            start: u64,
-            count: u32,
-        ) -> Result<BatchResult, String> {
-            self.evaluate(seed, pattern, &[], start, count)
-        }
-        fn launches(&self) -> u64 {
-            self.launches
-        }
-    }
-    engine!("ethereum", EthereumTransport);
-    engine!("solana", SolanaTransport);
+    engine!("bitcoin", bitcoin, BitcoinTransport);
+    engine!("ethereum", ethereum, EthereumTransport);
+    engine!("solana", solana, SolanaTransport);
 
     pub struct Cases<'a> {
         pub seed: u64,

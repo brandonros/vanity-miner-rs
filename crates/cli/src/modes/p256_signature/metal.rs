@@ -1,6 +1,6 @@
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, unified::Transport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };

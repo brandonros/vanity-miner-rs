@@ -1,7 +1,7 @@
 #![cfg(all(feature = "metal", feature = "solana", target_os = "macos"))]
 use logic::search::vanity::BytePattern;
 use std::path::PathBuf;
-use vanity_miner::runner::metal::transport::SolanaTransport;
+use vanity_miner::modes::solana::metal::SolanaTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_SOLANA_ARTIFACTS", "solana")

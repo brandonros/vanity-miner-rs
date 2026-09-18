@@ -1,7 +1,7 @@
 //! Execute the original registry checks through independently built Metal groups.
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, transport::load_artifact},
+    metal::{MetalRunner, artifacts::load_artifact},
 };
 use llvm_metal_runtime::{Buffer, DispatchTimings, LoadTimings};
 use sha2::{Digest, Sha256};

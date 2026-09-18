@@ -1,7 +1,7 @@
 use super::args::EthereumArgs;
 use crate::runner::{
     RunResult,
-    metal::{MetalRunner, transport::EthereumTransport},
+    metal::{MetalRunner, transport::Transport},
     progress::GlobalStats,
     session::run_device_session,
 };
@@ -27,7 +27,7 @@ pub fn run(runner: &MetalRunner, args: &EthereumArgs, stats: Arc<GlobalStats>) -
                 &args.suffix,
                 options.seed,
                 &control,
-                |seed, pattern, _, start, count| engine.evaluate(seed, pattern, start, count),
+                |seed, pattern, _, start, count| engine.evaluate(seed, pattern, &[], start, count),
             )
             .map(|_| ())
         },
@@ -44,3 +44,7 @@ pub fn run(runner: &MetalRunner, args: &EthereumArgs, stats: Arc<GlobalStats>) -
     );
     result
 }
+
+#[path = "../../../../kernels/ethereum/src/contract.rs"]
+mod contract;
+pub type EthereumTransport = Transport<contract::Ethereum>;

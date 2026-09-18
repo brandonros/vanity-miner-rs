@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-use vanity_miner::runner::metal::transport::ShallengeTransport;
+use vanity_miner::modes::shallenge::metal::ShallengeTransport;
 
 fn main() -> Result<(), String> {
     let artifacts = std::env::args_os()

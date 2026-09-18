@@ -9,7 +9,7 @@ use rsa::{
 };
 use sha2::{Digest, Sha256};
 use std::path::PathBuf;
-use vanity_miner::runner::metal::rsa_pss::RsaPssTransport;
+use vanity_miner::modes::rsa_pss::metal::RsaPssTransport;
 
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_RSA_PSS_ARTIFACTS", "rsa-pss")

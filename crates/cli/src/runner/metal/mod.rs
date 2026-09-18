@@ -4,21 +4,9 @@ use crate::{
     runner::{RunResult, Runner, progress::GlobalStats},
 };
 use std::{path::PathBuf, sync::Arc};
-#[cfg(any(
-    feature = "p256-public-key",
-    feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
-))]
-pub mod candidate;
-#[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
-pub mod p256;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa;
-#[cfg(feature = "rsa-pss")]
-pub mod rsa_pss;
+pub(crate) mod artifacts;
+mod buffers;
 pub mod transport;
-pub mod unified;
 
 #[derive(clap::Args, Clone)]
 pub struct MetalOptions {
@@ -103,14 +91,3 @@ impl Runner for MetalRunner {
         }
     }
 }
-
-#[path = "../../../../kernels/shallenge/src/contract.rs"]
-mod contract;
-
-#[cfg(feature = "ethereum")]
-#[path = "../../../../kernels/ethereum/src/contract.rs"]
-mod ethereum_contract;
-
-#[cfg(feature = "solana")]
-#[path = "../../../../kernels/solana/src/contract.rs"]
-mod solana_contract;

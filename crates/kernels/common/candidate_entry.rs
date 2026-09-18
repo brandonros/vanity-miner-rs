@@ -18,7 +18,7 @@ pub unsafe fn dispatch<C: Contract>(launch: *const Launch, request: *const C::Re
         let lane = thread_index();
         if lane >= launch.count { return; }
         let payload = core::slice::from_raw_parts(message, launch.message_len as usize);
-        let result = match launch.start.checked_add(u64::from(lane)) {
+        let result = match launch.counter(lane) {
             Some(counter) => C::candidate(&*request, &*pattern, payload, counter),
             None => CandidateResult::ERROR,
         };

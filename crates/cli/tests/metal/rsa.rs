@@ -4,7 +4,9 @@ mod factors;
 use logic::{modes::rsa_modulus::SearchConfig, search::hex_pattern::HexPattern};
 use num_bigint_dig::BigUint;
 use std::{path::PathBuf, process::Command};
-use vanity_miner::{modes::rsa_modulus::pipeline::verify_pair, runner::metal::rsa::RsaTransport};
+use vanity_miner::{
+    modes::rsa_modulus::metal::RsaTransport, modes::rsa_modulus::pipeline::verify_pair,
+};
 fn artifacts() -> PathBuf {
     super::support::artifacts("VANITY_METAL_RSA_ARTIFACTS", "rsa-modulus")
 }

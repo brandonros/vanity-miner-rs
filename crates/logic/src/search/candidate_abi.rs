@@ -13,6 +13,15 @@ pub struct Launch {
     pub count: u32,
     pub audit: u32,
 }
+impl Launch {
+    pub fn counter(&self, lane: u32) -> Option<u64> {
+        if lane >= self.count {
+            None
+        } else {
+            self.start.checked_add(u64::from(lane))
+        }
+    }
+}
 // SAFETY: repr(C), padding-free integers, every bit pattern valid.
 unsafe impl DeviceRecord for Launch {}
 
@@ -67,6 +76,20 @@ pub unsafe trait Contract {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn partial_grids_and_counter_exhaustion_never_wrap() {
+        let launch = Launch {
+            start: u64::MAX - 1,
+            message_len: 0,
+            count: 3,
+            audit: 0,
+        };
+        assert_eq!(launch.counter(0), Some(u64::MAX - 1));
+        assert_eq!(launch.counter(1), Some(u64::MAX));
+        assert_eq!(launch.counter(2), None);
+        assert_eq!(launch.counter(3), None);
+        assert_eq!(Launch { count: 0, ..launch }.counter(0), None);
+    }
     #[test]
     fn launch_is_a_padding_free_portable_record() {
         assert_eq!(
