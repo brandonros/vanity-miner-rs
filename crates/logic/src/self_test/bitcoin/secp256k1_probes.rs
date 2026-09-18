@@ -60,7 +60,7 @@ register_self_test! {
         let g = ProjectivePoint::GENERATOR;
         let affine = g.to_affine();
         let encoded = affine.to_encoded_point(true);
-        let bytes = encoded.as_bytes();
+        let Ok(bytes) = encoded.try_as_bytes() else { return 0; };
         if bytes.len() != 33 {
             return 0;
         }
@@ -83,7 +83,7 @@ register_self_test! {
         let g2 = ProjectivePoint::GENERATOR.double();
         let affine = g2.to_affine();
         let encoded = affine.to_encoded_point(true);
-        let bytes = encoded.as_bytes();
+        let Ok(bytes) = encoded.try_as_bytes() else { return 0; };
         if bytes.len() != 33 {
             return 0;
         }
@@ -123,7 +123,7 @@ register_self_test! {
         use k256::elliptic_curve::sec1::ToEncodedPoint;
         let g = AffinePoint::GENERATOR;
         let encoded = g.to_encoded_point(true);
-        let bytes = encoded.as_bytes();
+        let Ok(bytes) = encoded.try_as_bytes() else { return 0; };
         if bytes.len() != 33 {
             return 0;
         }
@@ -143,7 +143,7 @@ register_self_test! {
         let x: &FieldBytes<k256::Secp256k1> = (&x_bytes).into();
         let y: &FieldBytes<k256::Secp256k1> = (&y_bytes).into();
         let encoded = EncodedPoint::from_affine_coordinates(x, y, true);
-        let bytes = encoded.as_bytes();
+        let Ok(bytes) = encoded.try_as_bytes() else { return 0; };
         if bytes.len() != 33 {
             return 0;
         }
