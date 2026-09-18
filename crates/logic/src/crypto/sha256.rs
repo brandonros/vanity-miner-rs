@@ -280,7 +280,6 @@ pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
 pub struct Sha256 {
     state: [u32; 8],
     buffer: [u8; 64],
-    used: usize,
     bytes: u64,
 }
 
@@ -289,7 +288,6 @@ impl Sha256 {
         Self {
             state: H0,
             buffer: [0; 64],
-            used: 0,
             bytes: 0,
         }
     }
@@ -303,24 +301,25 @@ impl Sha256 {
     }
 
     fn update_slice(&mut self, mut input: &[u8]) {
+        // The buffered length is the low six bits of the total byte count.
+        // Deriving it here keeps the bound explicit across non-inlined calls;
+        // wrapping the count also preserves its remainder modulo 64.
+        let used = (self.bytes & 63) as usize;
         self.bytes = self.bytes.wrapping_add(input.len() as u64);
-        if self.used != 0 {
-            let take = (64 - self.used).min(input.len());
-            self.buffer[self.used..self.used + take].copy_from_slice(&input[..take]);
-            self.used += take;
+        if used != 0 {
+            let take = (64 - used).min(input.len());
+            self.buffer[used..used + take].copy_from_slice(&input[..take]);
             input = &input[take..];
-            if self.used != 64 {
+            if used + take != 64 {
                 return;
             }
             Self::compress(&mut self.state, &self.buffer);
-            self.used = 0;
         }
         while input.len() >= 64 {
             Self::compress(&mut self.state, &input[..64]);
             input = &input[64..];
         }
         self.buffer[..input.len()].copy_from_slice(input);
-        self.used = input.len();
     }
 
     fn compress(state: &mut [u32; 8], bytes: &[u8]) {
@@ -332,9 +331,10 @@ impl Sha256 {
     }
 
     pub fn finalize(mut self) -> [u8; 32] {
-        self.buffer[self.used] = 0x80;
-        self.buffer[self.used + 1..].fill(0);
-        if self.used >= 56 {
+        let used = (self.bytes & 63) as usize;
+        self.buffer[used] = 0x80;
+        self.buffer[used + 1..].fill(0);
+        if used >= 56 {
             Self::compress(&mut self.state, &self.buffer);
             self.buffer = [0; 64];
         }
