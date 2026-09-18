@@ -1,19 +1,13 @@
-//! Host setup and final verification for continuous device-owned RSA searches.
+//! Fixed search inputs and independent verification of completed candidates.
 use super::*;
-use logic::modes::rsa_modulus::{self as device_logic, Counts, Pair, SearchConfig};
+use logic::modes::rsa_modulus::{self as device_logic, Pair, SearchConfig};
+use logic::search::candidate_result::BatchResult;
 use rand::RngCore;
 
 pub fn run(
     search: &ModulusSearch,
     control: &SearchControl,
-    stages: &StageStats,
-    steps: u32,
-    mut cycle: impl FnMut(
-        &SearchConfig,
-        &HexPattern,
-        u64,
-        u32,
-    ) -> Result<(Counts, Zeroizing<Vec<Pair>>), String>,
+    mut evaluate: impl FnMut(&SearchConfig, &HexPattern, u64, u32) -> Result<BatchResult, String>,
 ) -> Result<(), String> {
     let constraints = search.validate()?;
     let mut seed = Zeroizing::new([0; 32]);
@@ -21,50 +15,23 @@ pub fn run(
         .try_fill_bytes(seed.as_mut())
         .map_err(|_| "OS cryptographic entropy unavailable")?;
     let config = Zeroizing::new(constraints.device_config(*seed, 0)?);
-    let capacity = control.batch_size();
-    let work = device_logic::launch_work(capacity, steps)?;
-    // IDs are start + step * capacity + lane, so id % capacity identifies the
-    // owning slot. Track retirement without retaining exported private factors.
-    let mut retired = vec![None; capacity as usize];
-    crate::runner::batches::pump(
+    let output = crate::runner::batches::search(
+        |start, count| evaluate(&config, &constraints.pattern, start, count),
+        u64::MAX,
         control,
-        || {
-            let Some(ids) = control.reserve_batch(u64::from(work)) else {
-                return Ok(None);
-            };
-            if !control.reserve_device_launch() {
-                return Ok(None);
-            }
-            let (counts, pairs) = cycle(&config, &constraints.pattern, ids.start, capacity)?;
-            counts.validate(capacity, steps)?;
-            if pairs.len() != counts.matches as usize {
-                return Err("RSA miner returned invalid result count".into());
-            }
-            if pairs.iter().any(|pair| pair.id >= ids.end) {
-                return Err("RSA pipeline returned an unassigned task identifier".into());
-            }
-            control.add_tested(u64::from(counts.p_tested) + u64::from(counts.q_tested));
-            stages.add(
-                u64::from(counts.p_tested),
-                u64::from(counts.p_accepted),
-                u64::from(counts.ranges),
-                u64::from(counts.q_tested),
-            );
-            Ok(Some(pairs))
+        |id, bytes| {
+            let pair = Zeroizing::new(Pair {
+                p: bytes[..128].try_into().unwrap(),
+                q: bytes[128..].try_into().unwrap(),
+                id,
+            });
+            verify_pair(&config, &constraints.pattern, &pair).map(Some)
         },
-        |pairs| {
-            for pair in pairs.iter() {
-                let previous = &mut retired[(pair.id % u64::from(capacity)) as usize];
-                if previous.is_some_and(|id| id >= pair.id) {
-                    return Err("RSA pipeline attempted to export a retired factor task".into());
-                }
-                let output = verify_pair(&config, &constraints.pattern, pair)?;
-                *previous = Some(pair.id);
-                crate::runner::progress::print_verified(control, output)?;
-            }
-            Ok(())
-        },
-    )
+    )?;
+    if let Some(output) = output {
+        println!("{output}");
+    }
+    Ok(())
 }
 
 /// The CPU touches factor arithmetic only for a completed candidate pair.
@@ -80,6 +47,13 @@ pub fn verify_pair(
     );
     if pair.p != *expected {
         return Err("RSA device p failed reconstruction".into());
+    }
+    let expected_q = Zeroizing::new(
+        device_logic::generate_q(config, &pair.p, pair.id)?
+            .ok_or("RSA candidate range reconstruction failed")?,
+    );
+    if pair.q != *expected_q {
+        return Err("RSA device q failed reconstruction".into());
     }
     let p = Zeroizing::new(BigUint::from_bytes_be(&pair.p));
     let q = Zeroizing::new(BigUint::from_bytes_be(&pair.q));
@@ -108,68 +82,4 @@ pub fn verify_pair(
         hex::encode(key.e().to_bytes_be()),
         hex::encode(private.as_bytes()),
     ))
-}
-
-/// Per-session RSA stage totals shared by all selected devices or CPU workers.
-#[derive(Default)]
-pub struct StageStats {
-    counts: [std::sync::atomic::AtomicU64; 4],
-}
-
-impl StageStats {
-    pub fn attach(progress: &crate::runner::progress::GlobalStats) -> Result<Arc<Self>, String> {
-        let stages = Arc::new(Self::default());
-        let display = stages.clone();
-        let workers = progress.worker_count();
-        progress.set_details(move |elapsed| display.format(elapsed, workers))?;
-        Ok(stages)
-    }
-
-    pub(super) fn add(&self, p: u64, accepted: u64, ranges: u64, q: u64) {
-        use std::sync::atomic::Ordering;
-        for (counter, amount) in self.counts.iter().zip([p, accepted, ranges, q]) {
-            let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
-                Some(old.saturating_add(amount))
-            });
-        }
-    }
-
-    fn format(&self, elapsed: Duration, workers: usize) -> String {
-        use std::sync::atomic::Ordering;
-        let [p, accepted, ranges, q] = self.counts.each_ref().map(|v| v.load(Ordering::Relaxed));
-        if p == 0 {
-            return String::new();
-        }
-        let seconds = elapsed.as_secs_f64().max(1e-9);
-        format!(
-            "  RSA stages: {p} p tested ({:.2}/sec; {:.2}/sec average per device/worker), {accepted} probable p, {ranges} nonempty ranges, {q} q tested ({:.2}/sec)",
-            p as f64 / seconds,
-            p as f64 / seconds / workers.max(1) as f64,
-            q as f64 / seconds
-        )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rsa_rates_average_shared_totals_over_selected_workers() {
-        let progress = crate::runner::progress::GlobalStats::new(8, 258, 0);
-        let stages = StageStats::attach(&progress).unwrap();
-        for _ in 0..2 {
-            std::thread::scope(|scope| {
-                for _ in 0..8 {
-                    let stages = &stages;
-                    scope.spawn(move || stages.add(1000, 1, 1, 1));
-                }
-            });
-        }
-        let report = stages.format(Duration::from_secs(2), progress.worker_count());
-        assert!(
-            report.contains("16000 p tested (8000.00/sec; 1000.00/sec average per device/worker)")
-        );
-        assert!(report.contains("16 probable p, 16 nonempty ranges, 16 q tested (8.00/sec)"));
-    }
 }

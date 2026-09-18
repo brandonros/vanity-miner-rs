@@ -14,7 +14,8 @@ use crate::modes::solana::args::SolanaArgs;
     feature = "shallenge",
     feature = "p256-public-key",
     feature = "p256-signature",
-    feature = "rsa-pss"
+    feature = "rsa-pss",
+    feature = "rsa-modulus"
 ))]
 pub(crate) mod batch_transport;
 pub(crate) mod driver;

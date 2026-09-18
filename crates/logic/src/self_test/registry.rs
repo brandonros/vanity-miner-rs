@@ -254,19 +254,19 @@ define_self_tests! {
         progression_carry;
         prime_filter;
         pseudoprime_rejected;
-        empty_task_rejected;
+        zero_count_rejected;
         upper_bound_rejected;
         equal_factors_rejected;
         undersized_factor_rejected;
         end_to_end;
         device_range;
-        device_cursor;
+        candidate_repeatability;
         device_derivation;
 
         // Range probes.
         range_probes::range_empty;
         range_probes::range_multiple;
-        range_probes::range_exhausted;
-        range_probes::range_partial_tile;
+        range_probes::range_single_value;
+        range_probes::range_separation;
     }
 }

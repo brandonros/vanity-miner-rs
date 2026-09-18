@@ -1,5 +1,5 @@
 #![cfg(feature = "rsa-modulus")]
-use logic::modes::rsa_modulus::{self as pipeline, SearchConfig, Task};
+use logic::modes::rsa_modulus::{self as pipeline, SearchConfig};
 use num_bigint_dig::{BigUint, ModInverse};
 
 fn bytes<const N: usize>(n: &BigUint) -> [u8; N] {
@@ -206,385 +206,157 @@ fn device_generation_is_bounded_and_domain_separated() {
     }
 }
 
-#[test]
-fn tiles_cover_short_ranges_once_and_retire_winners() {
-    let c = config("", "");
-    let first = (BigUint::from(1u8) << 1023) + BigUint::from(1u8);
-    for count in [1u32, 2, 3, 63, 64, 65, 257, 1000] {
-        for tile in [1u32, 7, 64, 256] {
-            let mut task = Task {
-                state: 2,
-                first: bytes(&first),
-                count: bytes(&BigUint::from(count)),
-                remaining: bytes(&BigUint::from(count)),
-                cursor: bytes(&BigUint::from(count - 1)),
-                ..Task::EMPTY
-            };
-            let mut seen = std::collections::BTreeSet::new();
-            while task.state != 0 {
-                for offset in 0..tile {
-                    if let Some(q) = pipeline::q_at(&c, &task, offset) {
-                        assert!(seen.insert(BigUint::from_bytes_be(&q)));
-                    }
-                }
-                pipeline::finish_tile(&mut task, tile);
-            }
-            assert_eq!(seen.len(), count as usize);
-            assert_eq!(seen.first(), Some(&first));
-            assert_eq!(
-                seen.last(),
-                Some(&(&first + BigUint::from(count - 1) * 2u8))
-            );
-        }
-    }
-    let mut task = Task {
-        state: 2,
-        winner: 1,
-        p: [42; 128],
-        ..Task::EMPTY
-    };
-    pipeline::finish_tile(&mut task, 1);
-    assert_eq!(task.state, 0);
-    assert_eq!(task.p, [0; 128]);
+#[path = "support/rsa_factors.rs"]
+mod factors;
+use logic::search::{
+    candidate_result::{BatchResult, CandidateResult},
+    hex_pattern::HexPattern,
+};
+fn known_config() -> SearchConfig {
+    let n = BigUint::from_bytes_be(&factors::P) * BigUint::from_bytes_be(&factors::Q);
+    let mut c = config(&hex::encode(bytes::<256>(&n)), "");
+    c.p_min = factors::P;
+    c.p_count = bytes(&BigUint::from(1u8));
+    c
 }
-
 #[test]
-fn range_cursors_do_not_truncate_to_machine_integers() {
-    let count = BigUint::from(1u8) << 1000;
-    let mut task = Task {
-        state: 2,
-        count: bytes(&count),
-        remaining: bytes(&count),
-        cursor: bytes(&(&count - BigUint::from(2u8))),
-        ..Task::EMPTY
+fn independent_candidate_matches_and_export_passes_host_verification() {
+    use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
+    use vanity_miner::modes::rsa_modulus::pipeline::verify_pair;
+    let c = known_config();
+    let pattern = HexPattern::new("", "", 256).unwrap();
+    for id in [9, 10, 9, u64::MAX] {
+        let result = pipeline::rsa_modulus(&c, id, &pattern);
+        assert_eq!(result.status, 1);
+        assert_eq!(result.bytes[..128], factors::P);
+        assert_eq!(result.bytes[128..], factors::Q);
+    }
+    let pair = pipeline::Pair {
+        p: factors::P,
+        q: factors::Q,
+        id: 9,
     };
-    pipeline::finish_tile(&mut task, 7);
-    assert_eq!(BigUint::from_bytes_be(&task.cursor), BigUint::from(5u8));
+    let output = zeroize::Zeroizing::new(verify_pair(&c, &pattern, &pair).unwrap());
+    let encoded = output
+        .lines()
+        .find_map(|l| l.strip_prefix("[rsa-modulus] private_key_pkcs8="))
+        .unwrap();
+    let der = zeroize::Zeroizing::new(hex::decode(encoded).unwrap());
+    let key = RsaPrivateKey::from_pkcs8_der(&der).unwrap();
+    key.validate().unwrap();
+    assert_eq!(bytes::<256>(key.n()), c.lower);
+    let mut corrupt = pair;
+    corrupt.p[1] ^= 1;
+    assert!(verify_pair(&c, &pattern, &corrupt).is_err());
+    let mut corrupt = pair;
+    corrupt.q[1] ^= 1;
+    assert!(verify_pair(&c, &pattern, &corrupt).is_err());
     assert_eq!(
-        BigUint::from_bytes_be(&task.remaining),
-        count - BigUint::from(7u8)
+        pipeline::rsa_modulus(&c, 9, &HexPattern::new("00", "", 256).unwrap()).status,
+        0
     );
 }
-
 #[test]
-fn preparation_excludes_the_entire_forbidden_factor_interval() {
-    let one = BigUint::from(1u8);
-    let distance = &one << 924;
-    let p = (&one << 1023) + (&one << 1022) + &one;
-    let c = config("", "");
-    let mut task = Task {
-        state: 1,
-        p: bytes(&p),
-        id: 42,
-        ..Task::EMPTY
-    };
-    assert!(pipeline::prepare_range(&c, &mut task).unwrap());
-    assert!(BigUint::from_bytes_be(&task.skip_count) > BigUint::from(0u8));
-    // Check both ends of both retained intervals by selecting compressed indices.
-    let count = BigUint::from_bytes_be(&task.count);
-    let skip = BigUint::from_bytes_be(&task.skip_start);
-    for cursor in [BigUint::from(0u8), &skip - &one, skip, &count - &one] {
-        task.cursor = bytes(&cursor);
-        let q = BigUint::from_bytes_be(&pipeline::q_at(&c, &task, 0).unwrap());
-        let delta = if p > q { &p - &q } else { &q - &p };
-        assert!(delta > distance);
+fn sampling_excludes_close_factors_and_is_independent_of_batch_partition() {
+    let mut c = config("", "1");
+    let p = BigUint::from_bytes_be(&factors::P);
+    let d = BigUint::from(1u8) << 924usize;
+    // A narrow progression straddles both boundaries of the excluded region.
+    c.lower = bytes::<256>(&(&p * (&p - &d - BigUint::from(64u8))));
+    c.upper = bytes::<256>(&(&p * (&p + &d + BigUint::from(64u8))));
+    let baseline: Vec<_> = (0..65)
+        .map(|id| pipeline::generate_q(&c, &factors::P, id).unwrap().unwrap())
+        .collect();
+    for chunk in [1, 7, 32, 64] {
+        for start in (0..65).step_by(chunk) {
+            for id in start..(start + chunk).min(65) {
+                let q = pipeline::generate_q(&c, &factors::P, id as u64)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(q, baseline[id]);
+                let q = BigUint::from_bytes_be(&q);
+                let distance = if q > p { &q - &p } else { &p - &q };
+                assert!(distance > d);
+                assert_eq!((&p * q) % 16u8, BigUint::from(1u8));
+            }
+        }
     }
-    // A tightly constrained modulus whose only q equals p must be retired,
-    // rather than remaining active forever while every candidate is rejected.
-    let n = hex::encode(bytes::<256>(&(&p * &p)));
-    for (prefix, suffix) in [(&n[..], ""), ("", &n[..])] {
-        let c = config(prefix, suffix);
-        let mut task = Task {
-            state: 1,
-            p: bytes(&p),
-            ..Task::EMPTY
-        };
-        assert!(!pipeline::prepare_range(&c, &mut task).unwrap());
-        assert_eq!(task.state, 0);
-        assert_eq!(task.p, [0; 128]);
-    }
+    assert!(
+        baseline
+            .iter()
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+            > 1
+    );
+    c.lower = bytes::<256>(&(&p * &p));
+    c.upper = c.lower;
+    c.suffix = c.lower;
+    c.suffix_bits = 2048;
+    assert!(pipeline::generate_q(&c, &factors::P, 9).unwrap().is_none());
 }
-
 #[test]
-fn pipeline_host_reserves_unique_tasks_and_rejects_invalid_counts() {
+fn malformed_requests_are_errors_and_empty_ranges_are_misses() {
+    let c = known_config();
+    let pattern = HexPattern::new("", "", 256).unwrap();
+    for invalid in [
+        SearchConfig {
+            suffix_bits: 0,
+            ..c
+        },
+        SearchConfig {
+            suffix_bits: 2049,
+            ..c
+        },
+        SearchConfig { reserved: 1, ..c },
+        SearchConfig {
+            p_count: [0; 128],
+            ..c
+        },
+        SearchConfig {
+            upper: [0; 256],
+            ..c
+        },
+    ] {
+        assert_eq!(
+            pipeline::rsa_modulus(&invalid, 9, &pattern).status,
+            CandidateResult::STATUS_ERROR
+        );
+    }
+    let mut empty = c;
+    let n = BigUint::from_bytes_be(&c.lower) + BigUint::from(1u8);
+    empty.lower = bytes(&n);
+    empty.upper = empty.lower;
+    assert_eq!(
+        pipeline::rsa_modulus(&empty, 9, &pattern).status,
+        CandidateResult::STATUS_MISS
+    );
+}
+#[test]
+fn shared_batch_validation_rejects_bad_winners_and_propagates_errors() {
     use vanity_miner::{
         modes::rsa_modulus::{ModulusSearch, pipeline as host},
         runner::session::SearchControl,
     };
     let search = ModulusSearch {
         prefix: "abc".into(),
-        suffix: "1".into(),
+        suffix: String::new(),
         workers: 1,
     };
-    let control = SearchControl::new();
-    control.set_batch_size(17).unwrap();
-    control.set_device_launch_limit(Some(3));
-    let mut launches = Vec::new();
-    let mut seed = None;
-    host::run(
-        &search,
-        &control,
-        &host::StageStats::default(),
-        4,
-        |config, _, start, capacity| {
-            if let Some(previous) = seed {
-                assert_eq!(config.seed, previous);
-            }
-            seed = Some(config.seed);
-            launches.push(start);
-            assert_eq!(capacity, 17);
-            Ok((
-                pipeline::Counts {
-                    p_tested: capacity,
-                    ..Default::default()
-                },
-                zeroize::Zeroizing::new(Vec::new()),
-            ))
+    for output in [
+        BatchResult {
+            matches: 1,
+            errors: 0,
+            lane: 65,
+            candidate: CandidateResult::matched(&[0; 256]),
         },
-    )
-    .unwrap();
-    assert_eq!(launches, [0, 68, 136]);
-    assert_eq!(control.statistics().0, 51);
-
-    let control = SearchControl::new();
-    let result = host::run(
-        &search,
-        &control,
-        &host::StageStats::default(),
-        4,
-        |_, _, _, capacity| {
-            Ok((
-                pipeline::Counts {
-                    q_tested: capacity * 4 + 1,
-                    ..Default::default()
-                },
-                zeroize::Zeroizing::new(Vec::new()),
-            ))
+        BatchResult {
+            errors: 1,
+            ..BatchResult::EMPTY
         },
-    );
-    assert!(result.is_err());
-    assert!(control.stopped());
-}
-
-#[test]
-fn completed_pairs_are_independently_verified_before_export() {
-    use rsa::{
-        RsaPrivateKey,
-        pkcs8::DecodePrivateKey,
-        traits::{PrivateKeyParts, PublicKeyParts},
-    };
-    use vanity_miner::modes::rsa_modulus::pipeline::verify_pair;
-    let key = RsaPrivateKey::new(&mut rand::rngs::OsRng, 2048).unwrap();
-    let n = hex::encode(bytes::<256>(key.n()));
-    let mut c = config(&n, "");
-    // Public test fixture configuration: a single known p lets the test exercise
-    // full verification without waiting for a stochastic search to finish.
-    c.p_min = bytes(&key.primes()[0]);
-    c.p_count = bytes(&BigUint::from(1u8));
-    let pair = pipeline::Pair {
-        p: c.p_min,
-        q: bytes(&key.primes()[1]),
-        id: 9,
-    };
-    let pattern = logic::search::hex_pattern::HexPattern::new(&n, "", 256).unwrap();
-    // One step prepares p; the next launch must resume it without generating p again.
-    let mut task = Task::EMPTY;
-    let (prepared, found) = pipeline::mine(&c, &pattern, &mut task, 9, 1, 1);
-    assert!(found.is_none());
-    assert_eq!(
-        (
-            prepared.p_tested,
-            prepared.p_accepted,
-            prepared.ranges,
-            prepared.q_tested
-        ),
-        (1, 1, 1, 0)
-    );
-    assert_eq!(task.id, 9);
-    let (searched, found) = pipeline::mine(&c, &pattern, &mut task, 10, 1, 64);
-    assert_eq!(
-        (searched.p_tested, searched.q_tested, searched.matches),
-        (0, 1, 1)
-    );
-    assert!(found == Some(pair));
-    assert!(task == Task::EMPTY);
-    // Even a large budget stops after one match, bounding the output per lane.
-    let (combined, found) = pipeline::mine(&c, &pattern, &mut task, 11, 1, 1024);
-    assert_eq!(
-        (combined.p_tested, combined.q_tested, combined.matches),
-        (1, 1, 1)
-    );
-    assert_eq!(found.unwrap().id, 11);
-    assert!(task == Task::EMPTY);
-    let output = zeroize::Zeroizing::new(verify_pair(&c, &pattern, &pair).unwrap());
-    let encoded = output
-        .lines()
-        .find_map(|line| line.strip_prefix("[rsa-modulus] private_key_pkcs8="))
-        .unwrap();
-    let der = zeroize::Zeroizing::new(hex::decode(encoded).unwrap());
-    let recovered = RsaPrivateKey::from_pkcs8_der(&der).unwrap();
-    assert_eq!(recovered.n(), key.n());
-    recovered.validate().unwrap();
-
-    let mut corrupt = pair;
-    corrupt.p[1] ^= 1;
-    assert!(verify_pair(&c, &pattern, &corrupt).is_err());
-    let mut corrupt = pair;
-    corrupt.q[127] &= 0xfe;
-    assert!(verify_pair(&c, &pattern, &corrupt).is_err());
-}
-
-#[test]
-fn mining_launches_resume_without_repeating_or_skipping_q_values() {
-    let c = config("", "");
-    let pattern = logic::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
-    let first = (BigUint::from(1u8) << 1023) + BigUint::from(1u8);
-    let mut task = Task {
-        // An undersized p ensures every q misses before primality testing.
-        state: 2,
-        id: 7,
-        first: bytes(&first),
-        count: bytes(&BigUint::from(9u8)),
-        remaining: bytes(&BigUint::from(9u8)),
-        cursor: bytes(&BigUint::from(7u8)),
-        ..Task::EMPTY
-    };
-    let mut seen = std::collections::BTreeSet::new();
-    let mut used = 0u32;
-    for steps in [3, 2, 4] {
-        // Independent expected progression across the wrap and launch boundaries.
-        for offset in 0..steps {
-            let expected = &first + BigUint::from((7 + used + offset) % 9) * 2u8;
-            let actual = pipeline::q_at(&c, &task, offset).unwrap();
-            assert_eq!(BigUint::from_bytes_be(&actual), expected);
-            assert!(seen.insert(actual));
-        }
-        let (counts, found) =
-            pipeline::mine(&c, &pattern, &mut task, 100 + u64::from(used), 1, steps);
-        assert!(found.is_none());
-        assert_eq!(
-            (
-                counts.p_tested,
-                counts.q_tested,
-                counts.active,
-                counts.errors
-            ),
-            (0, steps, 1, 0)
-        );
-        used += steps;
-        if used < 9 {
-            assert_eq!(task.id, 7);
-            assert_eq!(
-                BigUint::from_bytes_be(&task.cursor),
-                BigUint::from((7 + used) % 9)
-            );
-            assert_eq!(
-                BigUint::from_bytes_be(&task.remaining),
-                BigUint::from(9 - used)
-            );
-        }
-    }
-    assert_eq!(seen.len(), 9);
-    assert!(task == Task::EMPTY);
-
-    let mut refill_config = c;
-    // Composite p divisible by 3: refills are guaranteed to miss deterministically.
-    refill_config.p_min = bytes(&first);
-    refill_config.p_count = bytes(&BigUint::from(1u8));
-    let (counts, found) = pipeline::mine(&refill_config, &pattern, &mut task, 500, 17, 4);
-    assert_eq!(
-        (
-            counts.p_tested,
-            counts.p_accepted,
-            counts.q_tested,
-            counts.errors
-        ),
-        (4, 0, 0, 0)
-    );
-    assert!(found.is_none());
-    assert!(task == Task::EMPTY);
-
-    // The mining loop also retains full-width cursors, not only finish_tile itself.
-    let count = BigUint::from(1u8) << 1000;
-    let mut task = Task {
-        state: 2,
-        first: bytes(&first),
-        count: bytes(&count),
-        remaining: bytes(&count),
-        cursor: bytes(&(&count - BigUint::from(2u8))),
-        ..Task::EMPTY
-    };
-    let (counts, _) = pipeline::mine(&c, &pattern, &mut task, 0, 1, 7);
-    assert_eq!((counts.q_tested, counts.errors), (7, 0));
-    assert_eq!(BigUint::from_bytes_be(&task.cursor), BigUint::from(5u8));
-    assert_eq!(
-        BigUint::from_bytes_be(&task.remaining),
-        count - BigUint::from(7u8)
-    );
-}
-
-#[test]
-fn mining_rejects_invalid_work_and_counter_overflow() {
-    let c = config("", "");
-    let pattern = logic::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
-    for (start, stride, steps) in [
-        (0, 0, 1),
-        (0, 1, 0),
-        (0, 1, 1025),
-        (u64::MAX, 1, 2),
-        (u64::MAX - 5, 3, 3),
     ] {
-        let mut task = Task::EMPTY;
-        let (counts, pair) = pipeline::mine(&c, &pattern, &mut task, start, stride, steps);
-        assert!(task == Task::EMPTY);
-        assert_eq!(counts.errors, 1);
-        assert!(pair.is_none());
+        let control = SearchControl::new();
+        let result = host::run(&search, &control, |_, _, _, _| Ok(output));
+        assert!(result.is_err());
+        assert!(control.stopped());
     }
-    assert!(pipeline::launch_work(pipeline::MAX_CAPACITY, pipeline::MAX_STEPS_PER_LAUNCH).is_ok());
-    assert!(pipeline::launch_work(pipeline::MAX_CAPACITY + 1, 1).is_err());
-    let invalid = pipeline::Counts {
-        p_tested: 64,
-        q_tested: 64,
-        ..Default::default()
-    };
-    assert!(invalid.validate(1, 64).is_err());
-}
-
-#[test]
-fn eight_workers_reserve_disjoint_mining_ids() {
-    use std::sync::{Arc, Barrier};
-    use vanity_miner::runner::session::SearchControl;
-    let control = Arc::new(SearchControl::new());
-    let barrier = Arc::new(Barrier::new(8));
-    let capacity = 17;
-    let steps = 4;
-    let work = pipeline::launch_work(capacity, steps).unwrap();
-    let workers: Vec<_> = (0..8)
-        .map(|_| {
-            let control = control.clone();
-            let barrier = barrier.clone();
-            std::thread::spawn(move || {
-                barrier.wait();
-                let mut ids = Vec::new();
-                for _ in 0..3 {
-                    let range = control.reserve_batch(u64::from(work)).unwrap();
-                    for lane in 0..capacity {
-                        for step in 0..steps {
-                            let id = range.start + u64::from(step * capacity + lane);
-                            assert!(range.contains(&id));
-                            assert_eq!(id % u64::from(capacity), u64::from(lane));
-                            ids.push(id);
-                        }
-                    }
-                }
-                ids
-            })
-        })
-        .collect();
-    let mut ids: Vec<_> = workers
-        .into_iter()
-        .flat_map(|worker| worker.join().unwrap())
-        .collect();
-    ids.sort_unstable();
-    assert_eq!(ids, (0..8 * 3 * u64::from(work)).collect::<Vec<_>>());
 }
