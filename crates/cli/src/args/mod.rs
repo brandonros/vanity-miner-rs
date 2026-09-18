@@ -16,6 +16,10 @@ pub struct Cli {
     /// Stop successfully after printing the first fully verified match.
     #[arg(long, global = true)]
     pub exit_on_first_match: bool,
+    /// CPU worker count (default: available parallelism)
+    #[cfg(not(feature = "metal"))]
+    #[arg(long, global = true)]
+    pub threads: Option<std::num::NonZeroUsize>,
     #[cfg(feature = "metal")]
     #[command(flatten)]
     pub metal: crate::runner::metal::MetalOptions,
@@ -173,8 +177,6 @@ pub struct CommandDetails {
     pub prefix_len: usize,
     pub suffix_len: usize,
     pub description: String,
-    #[cfg_attr(feature = "metal", allow(dead_code))]
-    pub cpu_threads: Option<usize>,
 }
 
 impl Command {
@@ -200,14 +202,18 @@ impl Command {
             Self::SelfTest(_) => CommandDetails {
                 prefix_len: 0,
                 suffix_len: 0,
-                cpu_threads: None,
                 description: "Running self-tests".into(),
             },
         }
     }
 }
 
-#[cfg(feature = "crypto-cli")]
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-modulus",
+    feature = "rsa-pss"
+))]
 pub(crate) mod pattern;
 
 #[cfg(any(feature = "ethereum", feature = "shallenge"))]
@@ -266,6 +272,24 @@ mod first_match_tests {
             let mut args = vec!["vanity-miner"];
             args.extend_from_slice(command);
             assert!(!Cli::try_parse_from(&args).unwrap().exit_on_first_match);
+            let mut threads = args.clone();
+            threads.extend(["--threads", "2"]);
+            #[cfg(not(feature = "metal"))]
+            {
+                assert_eq!(
+                    Cli::try_parse_from(&threads)
+                        .unwrap()
+                        .threads
+                        .unwrap()
+                        .get(),
+                    2
+                );
+                *threads.last_mut().unwrap() = "0";
+                assert!(Cli::try_parse_from(&threads).is_err());
+            }
+            #[cfg(feature = "metal")]
+            assert!(Cli::try_parse_from(&threads).is_err());
+
             args.insert(1, "--exit-on-first-match");
             assert!(Cli::try_parse_from(&args).unwrap().exit_on_first_match);
             args.remove(1);

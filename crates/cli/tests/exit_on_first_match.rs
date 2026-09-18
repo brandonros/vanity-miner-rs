@@ -79,7 +79,7 @@ fn cpu_cli_prints_one_record_and_exits_successfully() {
     .unwrap();
     std::fs::write(&rsa, key.to_pkcs8_pem(LineEnding::LF).unwrap().as_bytes()).unwrap();
     for command in ["ethereum-vanity", "bitcoin-vanity", "solana-vanity"] {
-        check(&[command], "Vanity match: rng_seed =");
+        check(&[command, "--threads", "2"], "Vanity match: rng_seed =");
     }
     check(
         &[
@@ -125,4 +125,80 @@ fn cpu_cli_prints_one_record_and_exits_successfully() {
     );
     // RSA modulus generation is stochastic and already has a bounded known-pair
     // worker test; flag parsing and the shared stop/restart policy cover it.
+}
+
+#[cfg(unix)]
+#[test]
+fn continuous_cpu_records_are_complete_and_ctrl_c_joins_workers() {
+    use std::io::{BufRead, BufReader};
+    use std::sync::mpsc;
+    // Empty Ethereum patterns produce frequent records, stressing worker/output
+    // coordination. Read concurrently so a full stdout pipe cannot block shutdown.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_vanity-miner"))
+        .args(["--threads", "4", "ethereum-vanity"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let (ready, records) = mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        let mut text = String::new();
+        let mut count = 0;
+        for line in BufReader::new(stdout).lines() {
+            let line = line.unwrap();
+            if line.contains("Vanity match: wallet =") {
+                count += 1;
+                if count == 2 {
+                    let _ = ready.send(());
+                }
+            }
+            text.push_str(&line);
+            text.push('\n');
+        }
+        text
+    });
+    if records.recv_timeout(Duration::from_secs(30)).is_err() {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = reader.join();
+        panic!("continuous CPU search did not deliver two records");
+    }
+    assert!(
+        Command::new("kill")
+            .args(["-INT", &child.id().to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while child.try_wait().unwrap().is_none() {
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            panic!("Ctrl-C did not join CPU workers");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(child.wait().unwrap().success());
+    let text = reader.join().unwrap();
+    let mut pending = None;
+    let mut count = 0;
+    for line in text.lines().filter(|line| line.contains("Vanity match:")) {
+        let worker = line.split(']').next().unwrap();
+        if line.contains("rng_seed =") {
+            assert!(
+                pending.replace(worker).is_none(),
+                "interleaved record: {text}"
+            );
+        }
+        assert_eq!(pending, Some(worker), "interleaved worker: {text}");
+        if line.contains("wallet =") {
+            pending = None;
+            count += 1;
+        }
+    }
+    assert!(pending.is_none(), "truncated result record");
+    assert!(count >= 2);
 }

@@ -61,6 +61,7 @@ impl Runner for MetalRunner {
     }
     fn run(&self, command: &Command, stats: Arc<GlobalStats>) -> RunResult {
         match command {
+            #[cfg(feature = "shallenge")]
             Command::Shallenge(args) => crate::modes::shallenge::metal::run(self, args, stats),
             #[cfg(feature = "ethereum")]
             Command::EthereumVanity(args) => crate::modes::ethereum::metal::run(self, args, stats),

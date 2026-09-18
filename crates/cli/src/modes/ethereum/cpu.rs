@@ -1,8 +1,12 @@
 use crate::runner::progress::GlobalStats;
-use std::error::Error;
+use std::fmt::Write as _;
 use std::sync::Arc;
 
-use crate::runner::workers::cpu::spawn_cpu_workers;
+use crate::runner::{
+    progress::print_verified,
+    session::{SearchControl, run_controlled},
+    workers,
+};
 use rand::Rng as _;
 
 struct WorkerData {
@@ -13,12 +17,10 @@ struct WorkerData {
 
 fn worker(
     thread_id: usize,
-    data: Arc<WorkerData>,
-    cancelled: Arc<crate::runner::session::SearchControl>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+    data: &WorkerData,
+    cancelled: &SearchControl,
+) -> Result<Option<String>, String> {
     let mut rng = rand::thread_rng();
-
-    println!("[CPU-{thread_id}] Starting CPU ethereum vanity worker thread");
 
     while !cancelled.stopped() {
         let rng_seed: u64 = rng.r#gen();
@@ -34,59 +36,72 @@ fn worker(
 
         data.global_stats.add_launch(1);
 
-        if result.matches && (!cancelled.exit_on_first_match() || cancelled.claim_verified_winner())
-        {
+        if result.matches && cancelled.claim_verified_winner() {
             let encoded_address_str = hex::encode(result.address);
 
-            println!("[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}");
-            println!("[CPU-{thread_id}] Vanity match: thread_idx = {thread_id}");
-            println!("[CPU-{thread_id}] Vanity match: address = 0x{encoded_address_str}");
-            println!(
+            let mut record = String::new();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}"
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: thread_idx = {thread_id}"
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: address = 0x{encoded_address_str}"
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: public_key = {}",
                 hex::encode(result.public_key)
-            );
-            println!(
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: private_key = 0x{}",
                 hex::encode(result.private_key)
-            );
-            println!(
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: wallet = 0x{}",
                 hex::encode(result.private_key)
-            );
+            )
+            .unwrap();
 
-            data.global_stats.add_matches(1);
+            return Ok(Some(record));
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 pub fn run(
-    num_threads: usize,
-    prefix: String,
-    suffix: String,
+    args: &super::args::EthereumArgs,
+    workers: usize,
     global_stats: Arc<GlobalStats>,
     exit_on_first_match: bool,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // Ethereum uses hex-encoded prefix/suffix
-    let prefix_bytes = hex::decode(&prefix)?;
-    let suffix_bytes = hex::decode(&suffix)?;
+) -> crate::runner::RunResult {
+    let prefix_bytes = hex::decode(&args.prefix)?;
+    let suffix_bytes = hex::decode(&args.suffix)?;
 
-    println!(
-        "Starting CPU ethereum vanity mode with {} threads",
-        num_threads
-    );
-
-    let control = Arc::new(crate::runner::session::SearchControl::with_stats(
-        global_stats.clone(),
-    ));
-    if exit_on_first_match {
-        control.set_exit_on_first_match();
-    }
-    let data = Arc::new(WorkerData {
+    let data = WorkerData {
         prefix_bytes,
         suffix_bytes,
-        global_stats,
-    });
+        global_stats: global_stats.clone(),
+    };
 
-    spawn_cpu_workers(num_threads, data, control, worker)
+    run_controlled(global_stats, "keys", exit_on_first_match, |control| {
+        let winner = workers::search(workers, &control, |id| worker(id, &data, &control))?;
+        if let Some(record) = winner {
+            print_verified(&control, record)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    })
 }

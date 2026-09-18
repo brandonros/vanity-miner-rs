@@ -222,7 +222,7 @@ fn known_config() -> SearchConfig {
 #[test]
 fn independent_candidate_matches_and_export_passes_host_verification() {
     use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
-    use vanity_miner::modes::rsa_modulus::pipeline::verify_pair;
+    use vanity_miner::modes::rsa_modulus::device::verify_pair;
     let c = known_config();
     let pattern = HexPattern::new("", "", 256).unwrap();
     for id in [9, 10, 9, u64::MAX] {
@@ -334,7 +334,7 @@ fn malformed_requests_are_errors_and_empty_ranges_are_misses() {
 #[test]
 fn shared_batch_validation_rejects_bad_winners_and_propagates_errors() {
     use vanity_miner::{
-        modes::rsa_modulus::{ModulusSearch, pipeline as host},
+        modes::rsa_modulus::{ModulusSearch, device as host},
         runner::session::SearchControl,
     };
     let search = ModulusSearch {

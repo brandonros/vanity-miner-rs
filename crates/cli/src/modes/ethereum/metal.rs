@@ -32,16 +32,7 @@ pub fn run(runner: &MetalRunner, args: &EthereumArgs, stats: Arc<GlobalStats>) -
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal: {} launches; library {:.3} ms; pipeline {:.3} ms; dispatch {:.3} ms; GPU {:.3} ms ({} timed); validation {:.3} ms",
-        engine.launches,
-        engine.load_stages.library.as_secs_f64() * 1000.,
-        engine.load_stages.pipeline.as_secs_f64() * 1000.,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.gpu_time.as_secs_f64() * 1000.,
-        engine.gpu_timed_launches,
-        engine.verification_time.as_secs_f64() * 1000.,
-    );
+    engine.print_timings("Metal");
     result
 }
 

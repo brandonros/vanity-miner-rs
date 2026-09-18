@@ -19,7 +19,7 @@ if [[ "${1:-}" != --skip-build ]]; then
     done
 fi
 cargo build --release --locked -p vanity-miner --no-default-features \
-    --features metal,ethereum,bitcoin,solana,rsa-modulus,p256-public-key,p256-signature,rsa-pss \
+    --features metal,shallenge,ethereum,bitcoin,solana,rsa-modulus,p256-public-key,p256-signature,rsa-pss \
     --target-dir target/metal/host
 miner="$miner_root/target/metal/host/release/vanity-miner"
 
@@ -38,7 +38,7 @@ run() {
     if [[ "$mode" == rsa-modulus ]]; then batch_size=256; threads=32; fi
     if [[ "$mode" == shallenge ]]; then marker='[shallenge] hash='; fi
     echo "=== $mode ==="
-    "$miner" --exit-on-first-match --verify \
+    python3 scripts/bounded-command.py "${VANITY_SMOKE_TIMEOUT:-1800}" "$miner" --exit-on-first-match --verify \
         --batch-size "$batch_size" --threads-per-group "$threads" \
         --metal-artifacts "target/metal/$mode" "$@" | tee "$smoke_dir/$mode.log"
     if [[ $(grep -cF "$marker" "$smoke_dir/$mode.log" || true) != 1 ]]; then

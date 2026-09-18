@@ -37,12 +37,7 @@ pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) 
             .map(|_| ())
         },
     );
-    eprintln!(
-        "Metal: {} launches; dispatch {:.3} ms; validation {:.3} ms",
-        engine.launches,
-        engine.dispatch_time.as_secs_f64() * 1000.,
-        engine.verification_time.as_secs_f64() * 1000.
-    );
+    engine.print_timings("Metal");
     result
 }
 

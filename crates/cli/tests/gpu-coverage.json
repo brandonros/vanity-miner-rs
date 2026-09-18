@@ -86,18 +86,18 @@
     },
     {
       "target": "metal_gpu",
-      "name": "p256_public::targets_multilane_winners_misses_and_errors_match_cpu",
+      "name": "p256_public_key::targets_multilane_winners_misses_and_errors_match_cpu",
       "previous": "metal_p256_public::targets_multilane_winners_misses_and_errors_match_cpu",
-      "owner": "crates/cli/tests/metal/p256_public.rs",
+      "owner": "crates/cli/tests/metal/p256_public_key.rs",
       "coverage": "targets multilane winners misses and errors match cpu",
       "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
       "suite": "production"
     },
     {
       "target": "metal_gpu",
-      "name": "p256_public::bounded_cli_exports_verified_keys_for_every_target",
+      "name": "p256_public_key::bounded_cli_exports_verified_keys_for_every_target",
       "previous": "metal_p256_public::bounded_cli_exports_verified_keys_for_every_target",
-      "owner": "crates/cli/tests/metal/p256_public.rs",
+      "owner": "crates/cli/tests/metal/p256_public_key.rs",
       "coverage": "bounded cli exports verified keys for every target",
       "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
       "suite": "cli"
@@ -122,18 +122,18 @@
     },
     {
       "target": "metal_gpu",
-      "name": "rsa::independent_candidates_and_host_key_verification",
+      "name": "rsa_modulus::independent_candidates_and_host_key_verification",
       "previous": "metal_rsa::independent_candidates_and_host_key_verification",
-      "owner": "crates/cli/tests/metal/rsa.rs",
+      "owner": "crates/cli/tests/metal/rsa_modulus.rs",
       "coverage": "independent candidates and host key verification",
       "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
       "suite": "production"
     },
     {
       "target": "metal_gpu",
-      "name": "rsa::bounded_cli_search_and_entropy_policy",
+      "name": "rsa_modulus::bounded_cli_search_and_entropy_policy",
       "previous": "metal_rsa::bounded_cli_search_and_entropy_policy",
-      "owner": "crates/cli/tests/metal/rsa.rs",
+      "owner": "crates/cli/tests/metal/rsa_modulus.rs",
       "coverage": "bounded cli search and entropy policy",
       "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
       "suite": "cli"

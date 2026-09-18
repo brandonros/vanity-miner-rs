@@ -22,7 +22,7 @@ use logic::{
 };
 use rand::{RngCore, rngs::OsRng};
 use rsa::{BigUint, Pss, RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 #[derive(Clone)]

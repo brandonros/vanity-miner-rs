@@ -12,10 +12,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 COMMANDS = []
-MODES = [
-    "shallenge", "ethereum", "bitcoin", "solana", "rsa-modulus",
-    "p256-public-key", "p256-signature", "rsa-pss",
-]
+from modes import MODES
 
 def run(*args, capture=False, timeout=None):
     args = list(map(str, args))
@@ -65,7 +62,7 @@ def main():
     declared_interface = device / 'kernel.interface.json'
     device_target = ROOT / 'target/metal/device' / options.mode
     output = (options.output or ROOT / 'target/metal' / options.mode).resolve()
-    sources = [device / 'Cargo.toml', device / 'Cargo.lock', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock',
+    sources = [device / 'Cargo.toml', device / 'Cargo.lock', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock', ROOT / 'scripts/modes.py',
                    *sorted((device / 'src').rglob('*.rs')),
                    *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()),
                    *sorted(p for p in (ROOT / 'vendor/sec1').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]

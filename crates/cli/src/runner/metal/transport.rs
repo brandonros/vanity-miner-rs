@@ -92,6 +92,24 @@ impl<C: Contract> Transport<C> {
             launches: 0,
         })
     }
+    /// Identical timing accounting for every candidate mode.
+    pub fn print_timings(&self, label: &str) {
+        eprintln!(
+            "{label}: {} launches; library {:.3} ms; pipeline {:.3} ms; allocation {:.3} ms ({} rounds); upload {:.3} ms; download {:.3} ms; dispatch {:.3} ms; GPU {:.3} ms ({} timed); validation {:.3} ms; cleanup {:.3} ms",
+            self.launches,
+            self.load_stages.library.as_secs_f64() * 1000.,
+            self.load_stages.pipeline.as_secs_f64() * 1000.,
+            self.allocation_time.as_secs_f64() * 1000.,
+            self.allocation_rounds,
+            self.upload_time.as_secs_f64() * 1000.,
+            self.download_time.as_secs_f64() * 1000.,
+            self.dispatch_time.as_secs_f64() * 1000.,
+            self.gpu_time.as_secs_f64() * 1000.,
+            self.gpu_timed_launches,
+            self.verification_time.as_secs_f64() * 1000.,
+            self.cleanup_time.as_secs_f64() * 1000.,
+        );
+    }
     pub fn evaluate(
         &mut self,
         request: &C::Request,

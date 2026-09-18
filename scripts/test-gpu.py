@@ -10,8 +10,7 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-MODES = ['shallenge', 'bitcoin', 'ethereum', 'solana', 'p256-public-key',
-         'p256-signature', 'rsa-modulus', 'rsa-pss']
+from modes import MODES
 
 
 def run(command, timeout):

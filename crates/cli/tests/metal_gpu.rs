@@ -4,12 +4,12 @@
 mod bitcoin;
 #[path = "metal/ethereum.rs"]
 mod ethereum;
-#[path = "metal/p256_public.rs"]
-mod p256_public;
+#[path = "metal/p256_public_key.rs"]
+mod p256_public_key;
 #[path = "metal/p256_signature.rs"]
 mod p256_signature;
-#[path = "metal/rsa.rs"]
-mod rsa;
+#[path = "metal/rsa_modulus.rs"]
+mod rsa_modulus;
 #[path = "metal/rsa_pss.rs"]
 mod rsa_pss;
 #[path = "metal/self_test.rs"]

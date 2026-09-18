@@ -1,21 +1,6 @@
 use crate::args::Command;
-#[cfg(any(
-    feature = "solana",
-    feature = "bitcoin",
-    feature = "ethereum",
-    feature = "shallenge",
-    feature = "self_test_support",
-    feature = "crypto-cli"
-))]
+#[allow(unused_imports)]
 use crate::modes;
-#[cfg(feature = "bitcoin")]
-use crate::modes::bitcoin::args::BitcoinArgs;
-#[cfg(feature = "ethereum")]
-use crate::modes::ethereum::args::EthereumArgs;
-#[cfg(feature = "shallenge")]
-use crate::modes::shallenge::args::ShallengeArgs;
-#[cfg(feature = "solana")]
-use crate::modes::solana::args::SolanaArgs;
 use crate::runner::Runner;
 use crate::runner::progress::GlobalStats;
 use std::error::Error;
@@ -27,10 +12,12 @@ pub struct CpuRunner {
 }
 
 impl CpuRunner {
-    pub fn new() -> Self {
-        let num_threads = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(4);
+    pub fn new(threads: Option<usize>) -> Self {
+        let num_threads = threads.unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(4)
+        });
         Self {
             num_threads,
             exit_on_first_match: false,
@@ -51,10 +38,7 @@ impl Runner for CpuRunner {
         command: &Command,
         stats: Arc<GlobalStats>,
     ) -> Result<(), Box<dyn Error + Send + Sync>> {
-        println!(
-            "Starting CPU mode with {} threads",
-            command.details().cpu_threads.unwrap_or(self.num_threads)
-        );
+        println!("Starting CPU mode with {} threads", self.num_threads);
         let _ = &stats;
 
         match command {
@@ -84,42 +68,20 @@ impl Runner for CpuRunner {
                 self.exit_on_first_match,
             ),
             #[cfg(feature = "solana")]
-            Command::SolanaVanity(SolanaArgs { prefix, suffix }) => modes::solana::cpu::run(
-                self.num_threads,
-                prefix.clone(),
-                suffix.clone(),
-                stats,
-                self.exit_on_first_match,
-            ),
+            Command::SolanaVanity(args) => {
+                modes::solana::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
+            }
             #[cfg(feature = "bitcoin")]
-            Command::BitcoinVanity(BitcoinArgs { prefix, suffix }) => modes::bitcoin::cpu::run(
-                self.num_threads,
-                prefix.clone(),
-                suffix.clone(),
-                stats,
-                self.exit_on_first_match,
-            ),
+            Command::BitcoinVanity(args) => {
+                modes::bitcoin::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
+            }
             #[cfg(feature = "ethereum")]
-            Command::EthereumVanity(EthereumArgs { prefix, suffix }) => modes::ethereum::cpu::run(
-                self.num_threads,
-                prefix.clone(),
-                suffix.clone(),
-                stats,
-                self.exit_on_first_match,
-            ),
+            Command::EthereumVanity(args) => {
+                modes::ethereum::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
+            }
             #[cfg(feature = "shallenge")]
-            Command::Shallenge(ShallengeArgs {
-                username,
-                target_hash,
-            }) => {
-                let target_hash_bytes = hex::decode(target_hash)?;
-                modes::shallenge::cpu::run(
-                    self.num_threads,
-                    username.clone(),
-                    target_hash_bytes,
-                    stats,
-                    self.exit_on_first_match,
-                )
+            Command::Shallenge(args) => {
+                modes::shallenge::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "self_test_support")]
             Command::SelfTest(args) => modes::self_test::cpu::run(args),
