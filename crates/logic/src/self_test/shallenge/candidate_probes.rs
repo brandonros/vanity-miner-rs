@@ -7,7 +7,7 @@ register_self_test! {
     fn candidate_match() -> u32 {
         use crate::search::xoroshiro::BatchSeed;
         let seed = black_box(BatchSeed {
-            seed: 12344, // Counter 32 + lane advances to the known-answer seed.
+            seed: 12313, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
         let result = crate::modes::shallenge::candidate(
@@ -29,7 +29,7 @@ register_self_test! {
     fn candidate_miss() -> u32 {
         use crate::search::xoroshiro::BatchSeed;
         let seed = black_box(BatchSeed {
-            seed: 12344, // Counter 32 + lane advances to the known-answer seed.
+            seed: 12313, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
         for target in [super::SHALLENGE_TEST_HASH, [0; 32]] {
