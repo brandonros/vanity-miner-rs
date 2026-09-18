@@ -1,24 +1,5 @@
 {
   "nodes": {
-    "cumetal": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1789685202,
-        "narHash": "sha256-532Rm1kNYq5ReLGAI84hjZdUb4WREoSiWcayLPwewIs=",
-        "ref": "upstream/ptx-helper-record-contexts",
-        "rev": "1b9e6852bc4053f5e5cf347f78c185a916bbbf3a",
-        "revCount": 624,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
-      },
-      "original": {
-        "ref": "upstream/ptx-helper-record-contexts",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
-      }
-    },
     "llvm-downgrade": {
       "flake": false,
       "locked": {
@@ -73,45 +54,9 @@
         "type": "github"
       }
     },
-    "nixpkgs-llvm7": {
-      "locked": {
-        "lastModified": 1704290814,
-        "narHash": "sha256-LWvKHp7kGxk/GEtlrGYV68qIvPHkU9iToomNFGagixU=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "70bdadeb94ffc8806c0570eb5c2695ad29f0e421",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-23.05",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
-      "locked": {
-        "lastModified": 1789264731,
-        "narHash": "sha256-llGJbC0CcU8DfROr6mZjRJgMLQd/SKwfpzxJH/2lHO4=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "02f5696b0e6097e589076d886b317b83ff0437d7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
-        "cumetal": "cumetal",
-        "llvm-metal": "llvm-metal",
-        "nixpkgs": "nixpkgs_2",
-        "nixpkgs-llvm7": "nixpkgs-llvm7",
-        "rust-overlay": "rust-overlay_2"
+        "llvm-metal": "llvm-metal"
       }
     },
     "rust-overlay": {
@@ -133,26 +78,6 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "rev": "753568957a87312ed599cba5699e67126eded6c0",
-        "type": "github"
-      }
-    },
-    "rust-overlay_2": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1776136407,
-        "narHash": "sha256-Cp8XrVLGruSDBTRs8L4LmvaEcd76tHHU9esLk7Ysa4E=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "753568957a87312ed599cba5699e67126eded6c0",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
         "type": "github"
       }
     }

@@ -3,5 +3,4 @@ target
 build
 .direnv
 
-.cumetal-artifacts/
 /artifacts/

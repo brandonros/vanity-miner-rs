@@ -60,7 +60,7 @@ def main():
     compiler_key = hashlib.sha256(str(compiler).encode()).hexdigest()[:16]
     compiler_target = ROOT / 'target/metal/compiler' / compiler_key
     compiler_binary = compiler_target / 'release/llvm-metalc'
-    device = ROOT / f'crates/kernels/{options.mode}/metal'
+    device = ROOT / f'crates/kernels/{options.mode}'
     entry = json.loads((device / 'kernel.interface.json').read_text())['entry']
     device_target = ROOT / 'target/metal/device' / options.mode
     output = (options.output or ROOT / 'target/metal' / options.mode).resolve()
@@ -77,7 +77,7 @@ def main():
             raise RuntimeError(f'unset {name} for the pinned stock producer')
     rust = run('rustc', '-vV', capture=True)
     if 'release: 1.93.0\n' not in rust or 'LLVM version: 21.1.8\n' not in rust:
-        raise RuntimeError('use llvm-metal\'s .#rust-fixtures shell (stable Rust 1.93 / LLVM 21.1.8)')
+        raise RuntimeError('use the repository\'s default Nix shell (stable Rust 1.93 / LLVM 21.1.8)')
     if 'LLVM version 21.1.8' not in run('llvm-link', '--version', capture=True):
         raise RuntimeError('LLVM tools must be 21.1.8')
     run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', compiler_target)

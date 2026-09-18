@@ -2,9 +2,6 @@
 use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, vanity::BytePattern, xoroshiro::BatchSeed};
 
-#[cfg(any(feature = "gpu", feature = "cumetal"))]
-pub const ENTRY: &str = "kernel_ethereum_vanity";
-
 pub fn search(
     prefix: &str,
     suffix: &str,

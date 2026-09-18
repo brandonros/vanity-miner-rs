@@ -14,17 +14,12 @@ pub struct PatternArgs {
 }
 
 impl PatternArgs {
-    pub fn details(
-        &self,
-        description: &str,
-        cuda_module: &'static str,
-    ) -> crate::args::CommandDetails {
+    pub fn details(&self, description: &str) -> crate::args::CommandDetails {
         crate::args::CommandDetails {
             prefix_len: self.prefix.len(),
             suffix_len: self.suffix.len(),
             cpu_threads: self.threads,
             description: description.into(),
-            cuda_module: Some(cuda_module),
         }
     }
 }

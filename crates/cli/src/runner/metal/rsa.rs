@@ -11,7 +11,7 @@ pub struct RsaModulus;
 unsafe impl Contract for RsaModulus {
     type Request = SearchConfig;
     const INTERFACE: &'static str =
-        include_str!("../../../../kernels/rsa-modulus/metal/kernel.interface.json");
+        include_str!("../../../../kernels/rsa-modulus/kernel.interface.json");
     fn candidate(
         request: &SearchConfig,
         pattern: &HexPattern,

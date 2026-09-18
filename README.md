@@ -1,7 +1,8 @@
 # vanity-miner-rs
 
-Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-CuMetal, and experimental direct Metal.
+Vanity address, key, and signature search in Rust on Apple GPUs. Kernels compile
+with stock Rust through llvm-metal; Metal is the default application backend.
+CPU references verify winners and support testing without a GPU.
 
 ## Modes
 
@@ -16,82 +17,51 @@ CuMetal, and experimental direct Metal.
 | `rsa-modulus` | `rsa-modulus-vanity` |
 | `rsa-pss` | `rsa-pss-signature-vanity` |
 
-## CPU
+## Build and run · macOS
 
-Use the pinned Rust toolchain from the repository root:
-
-```sh
-cargo build -p vanity-miner --release --locked --no-default-features --features solana
-./target/release/vanity-miner solana-vanity --prefix aaa
-```
-
-Combine mode features with commas; use `<command> --help` for options.
-Address searches accept `--prefix` and `--suffix`; signature searches also need
-`--key` and `--message`. Matches print to stdout; Ctrl-C stops the search.
-
-## CUDA · Linux
+Install Nix, then run from the repository root. The script uses the pinned
+stable Rust and llvm-metal compiler, builds matching kernels and host artifacts,
+and starts the search. `--mode` selects a mode from the table above.
 
 ```sh
-nix develop .#v21 --command cargo build -p vanity-miner --release --locked --no-default-features --features llvm21,solana
-./target/llvm21/release/vanity-miner solana-vanity --prefix aaa
-```
-
-For LLVM7, use `.#v7`, features `cuda-kernels,solana`, and `target/llvm7`.
-Running requires a compatible NVIDIA GPU and driver.
-
-Build the 8 production and 8 self-test PTX modules separately:
-
-```sh
-./scripts/build-ptx.sh 21
-./scripts/build-ptx.sh 7
-```
-
-Bundles land in `artifacts/ptx-bundle-llvm<version>.tar.gz`. Use runner and PTX
-artifacts from the same source revision. `PTX_PATH` selects an external bundle.
-
-## Metal · macOS
-
-Use a local llvm-metal checkout. The runner builds matching device and host
-artifacts with stable Rust, then runs the `metal` backend. `--mode` selects a
-mode from the table above; use its command's `--help` for search options.
-
-```sh
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode solana \
+./scripts/run-metal.sh --mode solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode p256-public-key \
+./scripts/run-metal.sh --mode p256-public-key \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   p256-public-key-vanity --prefix ab
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode rsa-pss \
+./scripts/run-metal.sh --mode rsa-pss \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   rsa-pss-signature-vanity --key private.pem --message message.bin
 ```
 
 Omit `--batches` for continuous search. `--verify` compares every lane with the
 CPU; winners are always CPU-verified. P-256 and RSA use OS cryptographic entropy
-and reject `--seed`; start with small batches.
-Backend features `metal`, `gpu` and `cumetal` are mutually exclusive.
+and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
+stops the search. Use `<command> --help` for options.
 
-## CuMetal · macOS
+For compiler development, pass `--llvm-metal ../llvm-metal` before `--mode`.
+To build a kernel separately:
 
 ```sh
-nix develop .#cumetal --command cargo run -p vanity-miner --release --locked \
-  --no-default-features --features cumetal,solana -- \
-  --ptx /path/to/solana.ptx --batches 1 --verify solana-vanity --prefix aaa
+nix develop --command python3 scripts/build-metal.py --mode shallenge
+nix develop --command cargo build --locked --release -p vanity-miner
 ```
 
-The shell supplies the compiler/runtime pinned in `flake.lock`. `--ptx` accepts
-a module or bundle directory. See the [issue matrix](docs/cumetal-issue-matrix.md)
-for working workloads and remaining blockers. Do not combine `gpu` and `cumetal`
-or use `--all-features`.
+Kernel crates live in `crates/kernels/<mode>`. The stock NVPTX target supplies
+LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 
-## Self-tests
+## CPU references and self-tests
 
 ```sh
-cargo run -p vanity-miner --release --locked --no-default-features --features self_test -- self-test
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode self-test self-test
+nix develop --command cargo run -p vanity-miner --release --locked \
+  --no-default-features --features self_test -- self-test
+./scripts/run-metal.sh --mode self-test self-test
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
 For a Metal group, use `--mode self-test-solana`. Select named cases with
-`self-test --check MODE.CHECK`; `self-test --list` lists the original checks.
+`self-test --check MODE.CHECK`; `self-test --list` lists the checks.
+
+CPU-only builds work on Linux and macOS with `--no-default-features` and one or
+more mode features, for example `--features solana`. Combine features with commas.

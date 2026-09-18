@@ -30,7 +30,7 @@ pub(crate) fn join<'scope, T>(
 }
 
 #[cfg(all(
-    not(any(feature = "gpu", feature = "cumetal", feature = "metal")),
+    not(feature = "metal"),
     any(
         feature = "solana",
         feature = "bitcoin",

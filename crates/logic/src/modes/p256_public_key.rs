@@ -1,4 +1,4 @@
-//! Candidate evaluation and CUDA request layout for p256-public-key.
+//! Candidate evaluation and device request layout for p256-public-key.
 //! Owners must clear secret records after synchronized device use.
 use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
@@ -60,7 +60,7 @@ impl zeroize::Zeroize for P256PublicRequest {
 mod tests {
     #[test]
     fn request_has_no_implicit_padding() {
-        // CUDA transport copies the complete initialized request record.
+        // Metal transport copies the complete initialized request record.
         assert_eq!(core::mem::size_of::<super::P256PublicRequest>(), 48);
     }
 }

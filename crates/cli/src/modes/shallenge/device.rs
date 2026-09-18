@@ -4,9 +4,6 @@ use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, xoroshiro::BatchSeed};
 use std::sync::{Arc, RwLock};
 
-#[cfg(any(feature = "gpu", feature = "cumetal"))]
-pub const ENTRY: &str = "kernel_shallenge";
-
 pub fn search(
     username: &str,
     best: Arc<RwLock<SharedBestHash>>,

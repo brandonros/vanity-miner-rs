@@ -200,16 +200,10 @@ impl Drop for CancelOnExit<'_> {
     }
 }
 
-#[cfg(all(
-    feature = "crypto-cli",
-    not(any(feature = "gpu", feature = "cumetal", feature = "metal"))
-))]
+#[cfg(all(feature = "crypto-cli", not(feature = "metal")))]
 use crate::runner::RunResult;
 
-#[cfg(all(
-    feature = "crypto-cli",
-    not(any(feature = "gpu", feature = "cumetal", feature = "metal"))
-))]
+#[cfg(all(feature = "crypto-cli", not(feature = "metal")))]
 pub(crate) fn run_controlled(
     stats: Arc<crate::runner::progress::GlobalStats>,
     unit: &'static str,
@@ -237,7 +231,7 @@ pub(crate) fn run_controlled(
 }
 
 /// Run a continuous device session once, preserving counters and prepared state.
-#[cfg(any(feature = "cumetal", feature = "metal"))]
+#[cfg(feature = "metal")]
 pub(crate) fn run_device_session(
     stats: Arc<GlobalStats>,
     unit: &'static str,

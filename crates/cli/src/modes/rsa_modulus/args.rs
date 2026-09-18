@@ -39,6 +39,6 @@ impl RsaModulusArgs {
     }
     pub fn details(&self) -> crate::args::CommandDetails {
         self.pattern
-            .details("Constructing an RSA-2048 vanity modulus", "rsa_modulus")
+            .details("Constructing an RSA-2048 vanity modulus")
     }
 }

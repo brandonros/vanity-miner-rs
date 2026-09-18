@@ -5,11 +5,8 @@ use clap::Parser;
 use std::error::Error;
 use std::sync::Arc;
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
+#[cfg(not(feature = "metal"))]
 use crate::runner::CpuRunner;
-
-#[cfg(feature = "gpu")]
-use crate::runner::GpuRunner;
 
 pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     let cli = Cli::parse();
@@ -30,14 +27,8 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     }
 
     // Create runner based on compile-time feature
-    #[cfg(feature = "gpu")]
-    let runner = GpuRunner::new()?;
-
-    #[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
+    #[cfg(not(feature = "metal"))]
     let runner = CpuRunner::new();
-
-    #[cfg(feature = "cumetal")]
-    let runner = crate::runner::CumetalRunner::new(cli.cumetal.clone())?;
 
     #[cfg(feature = "metal")]
     let runner = crate::runner::metal::MetalRunner::new(cli.metal.clone())?;
@@ -46,7 +37,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Create stats
     let reporting_workers = runner.device_count();
-    #[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
+    #[cfg(not(feature = "metal"))]
     let reporting_workers = details.cpu_threads.unwrap_or(reporting_workers);
     let stats = Arc::new(GlobalStats::new(
         reporting_workers,

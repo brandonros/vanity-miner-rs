@@ -41,7 +41,6 @@ impl P256PublicArgs {
         Ok(())
     }
     pub fn details(&self) -> crate::args::CommandDetails {
-        self.pattern
-            .details("Searching NIST P-256 public points", "p256_public_key")
+        self.pattern.details("Searching NIST P-256 public points")
     }
 }

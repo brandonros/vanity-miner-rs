@@ -29,7 +29,7 @@ impl EthereumArgs {
             prefix_len: prefix.len(),
             suffix_len: suffix.len(),
             cpu_threads: None,
-            cuda_module: Some("ethereum"),
+
             description: format!(
                 "Searching for ethereum vanity key with prefix '{}' and suffix '{}'",
                 prefix, suffix

@@ -16,9 +16,6 @@ pub struct Cli {
     #[cfg(feature = "metal")]
     #[command(flatten)]
     pub metal: crate::runner::metal::MetalOptions,
-    #[cfg(feature = "cumetal")]
-    #[command(flatten)]
-    pub cumetal: crate::runner::CumetalOptions,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -173,13 +170,8 @@ pub struct CommandDetails {
     pub prefix_len: usize,
     pub suffix_len: usize,
     pub description: String,
-    #[cfg_attr(
-        any(feature = "gpu", feature = "cumetal", feature = "metal"),
-        allow(dead_code)
-    )]
+    #[cfg_attr(feature = "metal", allow(dead_code))]
     pub cpu_threads: Option<usize>,
-    #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
-    pub cuda_module: Option<&'static str>,
 }
 
 impl Command {
@@ -206,7 +198,6 @@ impl Command {
                 prefix_len: 0,
                 suffix_len: 0,
                 cpu_threads: None,
-                cuda_module: None,
                 description: "Running self-tests".into(),
             },
         }

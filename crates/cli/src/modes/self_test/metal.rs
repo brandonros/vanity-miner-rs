@@ -14,28 +14,28 @@ const GUARD: usize = 256;
 fn interface(kernel: &str) -> Result<&'static str, String> {
     match kernel {
         "kernel_self_test_solana" => Ok(include_str!(
-            "../../../../kernels/self-test-solana/metal/kernel.interface.json"
+            "../../../../kernels/self-test-solana/kernel.interface.json"
         )),
         "kernel_self_test_bitcoin" => Ok(include_str!(
-            "../../../../kernels/self-test-bitcoin/metal/kernel.interface.json"
+            "../../../../kernels/self-test-bitcoin/kernel.interface.json"
         )),
         "kernel_self_test_ethereum" => Ok(include_str!(
-            "../../../../kernels/self-test-ethereum/metal/kernel.interface.json"
+            "../../../../kernels/self-test-ethereum/kernel.interface.json"
         )),
         "kernel_self_test_shallenge" => Ok(include_str!(
-            "../../../../kernels/self-test-shallenge/metal/kernel.interface.json"
+            "../../../../kernels/self-test-shallenge/kernel.interface.json"
         )),
         "kernel_self_test_p256_public_key" => Ok(include_str!(
-            "../../../../kernels/self-test-p256-public-key/metal/kernel.interface.json"
+            "../../../../kernels/self-test-p256-public-key/kernel.interface.json"
         )),
         "kernel_self_test_p256_signature" => Ok(include_str!(
-            "../../../../kernels/self-test-p256-signature/metal/kernel.interface.json"
+            "../../../../kernels/self-test-p256-signature/kernel.interface.json"
         )),
         "kernel_self_test_rsa_pss" => Ok(include_str!(
-            "../../../../kernels/self-test-rsa-pss/metal/kernel.interface.json"
+            "../../../../kernels/self-test-rsa-pss/kernel.interface.json"
         )),
         "kernel_self_test_rsa_modulus" => Ok(include_str!(
-            "../../../../kernels/self-test-rsa-modulus/metal/kernel.interface.json"
+            "../../../../kernels/self-test-rsa-modulus/kernel.interface.json"
         )),
         _ => Err(format!("unknown Metal self-test group: {kernel}")),
     }

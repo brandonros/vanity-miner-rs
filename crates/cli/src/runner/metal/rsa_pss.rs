@@ -11,7 +11,7 @@ pub struct RsaPss;
 unsafe impl Contract for RsaPss {
     type Request = RsaPssRequest;
     const INTERFACE: &'static str =
-        include_str!("../../../../kernels/rsa-pss/metal/kernel.interface.json");
+        include_str!("../../../../kernels/rsa-pss/kernel.interface.json");
     fn candidate(
         request: &RsaPssRequest,
         pattern: &HexPattern,

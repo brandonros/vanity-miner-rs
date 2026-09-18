@@ -93,7 +93,6 @@ impl RsaPssArgs {
         Ok(())
     }
     pub fn details(&self) -> crate::args::CommandDetails {
-        self.pattern
-            .details("Searching raw RSA-PSS signatures", "rsa_pss")
+        self.pattern.details("Searching raw RSA-PSS signatures")
     }
 }

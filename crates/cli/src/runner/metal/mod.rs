@@ -96,17 +96,17 @@ impl Runner for MetalRunner {
     }
 }
 
-#[path = "../../../../kernels/shallenge/metal/src/contract.rs"]
+#[path = "../../../../kernels/shallenge/src/contract.rs"]
 mod contract;
 
 #[cfg(feature = "ethereum")]
-#[path = "../../../../kernels/ethereum/metal/src/contract.rs"]
+#[path = "../../../../kernels/ethereum/src/contract.rs"]
 mod ethereum_contract;
 
 #[cfg(feature = "bitcoin")]
-#[path = "../../../../kernels/bitcoin/metal/src/contract.rs"]
+#[path = "../../../../kernels/bitcoin/src/contract.rs"]
 mod bitcoin_contract;
 
 #[cfg(feature = "solana")]
-#[path = "../../../../kernels/solana/metal/src/contract.rs"]
+#[path = "../../../../kernels/solana/src/contract.rs"]
 mod solana_contract;

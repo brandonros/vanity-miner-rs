@@ -42,7 +42,7 @@ impl Prepared<'_> {
     }
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal", feature = "metal")))]
+#[cfg(not(feature = "metal"))]
 pub fn run(
     args: &crate::modes::p256_public_key::args::P256PublicArgs,
     workers: usize,

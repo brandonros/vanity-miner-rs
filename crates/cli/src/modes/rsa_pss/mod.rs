@@ -2,10 +2,6 @@
 
 pub(crate) mod args;
 pub(crate) mod cpu;
-#[cfg(feature = "gpu")]
-pub(crate) mod cuda;
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;
 #[cfg(feature = "metal")]
 pub(crate) mod metal;
 

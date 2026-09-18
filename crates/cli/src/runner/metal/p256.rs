@@ -10,7 +10,7 @@ pub struct PublicKey;
 unsafe impl Contract for PublicKey {
     type Request = logic::modes::p256_public_key::P256PublicRequest;
     const INTERFACE: &'static str =
-        include_str!("../../../../kernels/p256-public-key/metal/kernel.interface.json");
+        include_str!("../../../../kernels/p256-public-key/kernel.interface.json");
     fn candidate(
         request: &Self::Request,
         pattern: &HexPattern,
@@ -31,7 +31,7 @@ pub struct Signature;
 unsafe impl Contract for Signature {
     type Request = logic::modes::p256_signature::P256SignatureRequest;
     const INTERFACE: &'static str =
-        include_str!("../../../../kernels/p256-signature/metal/kernel.interface.json");
+        include_str!("../../../../kernels/p256-signature/kernel.interface.json");
     fn candidate(
         request: &Self::Request,
         pattern: &HexPattern,

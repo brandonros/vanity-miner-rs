@@ -8,4 +8,4 @@ if [[ "${1:-}" == "--llvm-metal" ]]; then
     shift 2
 fi
 cd "$miner_root"
-exec nix develop "path:$miner_root#metal" "${compiler_options[@]}" --command python3 "$miner_root/scripts/run-metal.py" "$@"
+exec nix develop "path:$miner_root" "${compiler_options[@]}" --command python3 "$miner_root/scripts/run-metal.py" "$@"
