@@ -190,9 +190,14 @@ pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
         result_len += 1;
     }
 
-    // Apply alphabet encoding
+    // A small output can retain caller bytes in positions not populated by
+    // digit extraction. Report failure instead of indexing past the alphabet.
+    // For a complete conversion every stored digit is already in 0..58.
     for val in &mut output[..result_len] {
-        *val = BASE58_ALPHABET[*val as usize];
+        let Some(&encoded) = BASE58_ALPHABET.get(*val as usize) else {
+            return 0;
+        };
+        *val = encoded;
     }
 
     // Reverse the result
@@ -204,6 +209,15 @@ pub fn base58_encode(input: &[u8], output: &mut [u8]) -> usize {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn undersized_uninitialized_digit_storage_returns_failure() {
+        // The encoder cannot emit a five-digit limb into this output. Caller
+        // bytes must never become an unchecked alphabet-table index.
+        let mut output = [0xa5];
+        assert_eq!(base58_encode(&[255], &mut output), 0);
+        assert_eq!(output, [0xa5]);
+    }
 
     #[test]
     fn should_encode_32_correctly() {

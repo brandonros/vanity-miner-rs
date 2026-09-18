@@ -75,7 +75,7 @@ impl HexPattern {
         mask: u8,
         value: u8,
     ) -> Result<(), PatternError> {
-        if offset >= self.len as usize {
+        if offset >= self.len as usize || offset >= MAX_HEX_TARGET_BYTES {
             return Err(PatternError::InvalidTargetLength);
         }
         if (self.value[offset] ^ value) & self.mask[offset] & mask != 0 {
@@ -88,10 +88,11 @@ impl HexPattern {
 
     pub fn matches(&self, bytes: &[u8]) -> bool {
         bytes.len() == self.len as usize
+            && bytes.len() <= MAX_HEX_TARGET_BYTES
             && bytes
                 .iter()
-                .enumerate()
-                .all(|(i, byte)| (byte ^ self.value[i]) & self.mask[i] == 0)
+                .zip(self.value.iter().zip(self.mask.iter()))
+                .all(|(byte, (value, mask))| (byte ^ value) & mask == 0)
     }
 
     /// Unique constrained bits, counting prefix/suffix overlap only once.
@@ -109,6 +110,20 @@ impl HexPattern {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn malformed_device_width_is_rejected_without_indexing_past_storage() {
+        let mut pattern = HexPattern {
+            value: [0; 256],
+            mask: [0; 256],
+            len: 257,
+        };
+        assert!(!pattern.matches(&[0; 257]));
+        assert_eq!(
+            pattern.constrain_byte(256, 255, 1),
+            Err(PatternError::InvalidTargetLength)
+        );
+    }
 
     #[test]
     fn odd_nibbles_case_and_exact_width() {

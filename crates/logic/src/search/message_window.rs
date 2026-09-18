@@ -36,9 +36,11 @@ pub fn write_message_counter(
         return Err(WindowError::Exhausted);
     }
     let bytes = counter.to_be_bytes();
-    let count = length.min(bytes.len());
-    message[offset..end].fill(0);
-    message[end - count..end].copy_from_slice(&bytes[bytes.len() - count..]);
+    let window = &mut message[offset..end];
+    window.fill(0);
+    for (destination, byte) in window.iter_mut().rev().zip(bytes.iter().rev()) {
+        *destination = *byte;
+    }
     Ok(())
 }
 
