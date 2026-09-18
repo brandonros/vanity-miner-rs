@@ -1,0 +1,22 @@
+[package]
+name = "kernel-self-test-p256-signature-metal"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+resolver = "3"
+
+[dependencies]
+logic = { path = "../../../logic", default-features = false, features = ["self_test_metal_entries", "self_test_p256_signature"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+
+[patch.crates-io]
+zeroize = { git = "https://github.com/brandonros/utils", rev = "4c9734e1ae4a6cb61db4693f9d164866f084ca97" }
+
+[[example]]
+name = "inventory"
+path = "../../common/metal_self_test_inventory.rs"

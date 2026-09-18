@@ -334,7 +334,7 @@ impl Transport<Solana> {
 }
 
 /// Validate bundle hashes and exact application bindings before creating a pipeline.
-pub(super) fn load_artifact(
+pub(crate) fn load_artifact(
     directory: &Path,
     interface_json: &str,
 ) -> Result<(Kernel, Duration), String> {
