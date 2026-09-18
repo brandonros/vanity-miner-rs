@@ -59,8 +59,9 @@ mod test {
     }
 }
 
-/// Reproduce a candidate from its session counter. Each batch advances the seed
-/// and starts its lane index at zero, preserving deterministic batch sequences.
+/// Reproduce a candidate from its session counter. The effective RNG input is
+/// seed + counter (modulo 2^64), independent of the batch partition. Advancing
+/// only by the batch number would overlap adjacent batches when lanes are added.
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BatchSeed {
@@ -72,10 +73,8 @@ impl BatchSeed {
         if self.width == 0 || self.width > u32::MAX as u64 {
             return None;
         }
-        Some((
-            self.seed.wrapping_add(counter / self.width),
-            (counter % self.width) as usize,
-        ))
+        let lane = counter % self.width;
+        Some((self.seed.wrapping_add(counter - lane), lane as usize))
     }
 }
 // SAFETY: repr(C), two initialized u64 fields, all bit patterns valid.
@@ -93,8 +92,8 @@ mod batch_seed_tests {
         for (counter, expected) in [
             (0, (u64::MAX, 0)),
             (31, (u64::MAX, 31)),
-            (32, (0, 0)),
-            (65, (1, 1)),
+            (32, (31, 0)),
+            (65, (63, 1)),
         ] {
             assert_eq!(seed.position(counter), Some(expected));
             let (rng_seed, lane) = seed.position(counter).unwrap();
@@ -104,5 +103,58 @@ mod batch_seed_tests {
             );
         }
         assert!(BatchSeed { seed: 0, width: 0 }.position(0).is_none());
+    }
+    #[test]
+    fn batches_do_not_repeat_keys_or_nonces() {
+        for initial in [0, u64::MAX - 8] {
+            let seed = BatchSeed {
+                seed: initial,
+                width: 33,
+            };
+            let mut keys = alloc::collections::BTreeSet::new();
+            let mut nonces = alloc::collections::BTreeSet::new();
+            for counter in 0..256 {
+                let (rng_seed, lane) = seed.position(counter).unwrap();
+                assert!(
+                    keys.insert(generate_random_private_key(lane, rng_seed)),
+                    "repeated key at counter {counter}"
+                );
+                let mut nonce = [0; 21];
+                generate_base64_nonce(lane, rng_seed, &mut nonce);
+                assert!(nonces.insert(nonce), "repeated nonce at counter {counter}");
+            }
+        }
+    }
+
+    #[test]
+    fn candidate_stream_is_independent_of_batch_partition() {
+        for initial in [0, u64::MAX - 8, 583437459223573146] {
+            for counter in [
+                0,
+                1,
+                31,
+                32,
+                33,
+                65,
+                u64::from(u32::MAX),
+                u64::from(u32::MAX) + 1,
+                u64::MAX,
+            ] {
+                let expected = generate_random_private_key(0, initial.wrapping_add(counter));
+                for width in [1, 2, 31, 32, 33, 4096, u64::from(u32::MAX)] {
+                    let (rng_seed, lane) = BatchSeed {
+                        seed: initial,
+                        width,
+                    }
+                    .position(counter)
+                    .unwrap();
+                    assert_eq!(
+                        generate_random_private_key(lane, rng_seed),
+                        expected,
+                        "counter {counter}, width {width}"
+                    );
+                }
+            }
+        }
     }
 }

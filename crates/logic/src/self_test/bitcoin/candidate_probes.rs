@@ -7,7 +7,7 @@ register_self_test! {
     fn candidate_match() -> u32 {
         use crate::search::{vanity::BytePattern, xoroshiro::BatchSeed};
         let seed = black_box(BatchSeed {
-            seed: 13278869120712471091, // Counter 32 + lane advances to the known-answer seed.
+            seed: 13278869120712471060, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
         let pattern = black_box(BytePattern::new(b"bc1q", b"ju9s4").unwrap());
@@ -24,7 +24,7 @@ register_self_test! {
     fn candidate_miss() -> u32 {
         use crate::search::{vanity::BytePattern, xoroshiro::BatchSeed};
         let seed = black_box(BatchSeed {
-            seed: 13278869120712471091, // Counter 32 + lane advances to the known-answer seed.
+            seed: 13278869120712471060, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
         let pattern = black_box(BytePattern::new(b"bc1q", b"ju9s5").unwrap());
