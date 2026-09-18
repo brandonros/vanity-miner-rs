@@ -12,6 +12,7 @@ use std::sync::Arc;
 pub type RunResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 pub trait Runner {
+    fn set_exit_on_first_match(&mut self, enabled: bool);
     fn device_count(&self) -> usize;
     fn run(
         &self,

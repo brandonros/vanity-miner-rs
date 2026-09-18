@@ -22,6 +22,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 pub struct CpuRunner {
+    pub(crate) exit_on_first_match: bool,
     num_threads: usize,
 }
 
@@ -30,11 +31,17 @@ impl CpuRunner {
         let num_threads = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(4);
-        Self { num_threads }
+        Self {
+            num_threads,
+            exit_on_first_match: false,
+        }
     }
 }
 
 impl Runner for CpuRunner {
+    fn set_exit_on_first_match(&mut self, enabled: bool) {
+        self.exit_on_first_match = enabled;
+    }
     fn device_count(&self) -> usize {
         self.num_threads
     }
@@ -52,33 +59,54 @@ impl Runner for CpuRunner {
 
         match command {
             #[cfg(feature = "rsa-modulus")]
-            Command::RsaModulusVanity(args) => {
-                modes::rsa_modulus::cpu::run(args, self.num_threads, stats)
-            }
+            Command::RsaModulusVanity(args) => modes::rsa_modulus::cpu::run(
+                args,
+                self.num_threads,
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "rsa-pss")]
             Command::RsaPssSignatureVanity(args) => {
-                modes::rsa_pss::cpu::run(args, self.num_threads, stats)
+                modes::rsa_pss::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "p256-public-key")]
-            Command::P256PublicKeyVanity(args) => {
-                modes::p256_public_key::cpu::run(args, self.num_threads, stats)
-            }
+            Command::P256PublicKeyVanity(args) => modes::p256_public_key::cpu::run(
+                args,
+                self.num_threads,
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "p256-signature")]
-            Command::P256SignatureVanity(args) => {
-                modes::p256_signature::cpu::run(args, self.num_threads, stats)
-            }
+            Command::P256SignatureVanity(args) => modes::p256_signature::cpu::run(
+                args,
+                self.num_threads,
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "solana")]
-            Command::SolanaVanity(SolanaArgs { prefix, suffix }) => {
-                modes::solana::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
-            }
+            Command::SolanaVanity(SolanaArgs { prefix, suffix }) => modes::solana::cpu::run(
+                self.num_threads,
+                prefix.clone(),
+                suffix.clone(),
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "bitcoin")]
-            Command::BitcoinVanity(BitcoinArgs { prefix, suffix }) => {
-                modes::bitcoin::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
-            }
+            Command::BitcoinVanity(BitcoinArgs { prefix, suffix }) => modes::bitcoin::cpu::run(
+                self.num_threads,
+                prefix.clone(),
+                suffix.clone(),
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "ethereum")]
-            Command::EthereumVanity(EthereumArgs { prefix, suffix }) => {
-                modes::ethereum::cpu::run(self.num_threads, prefix.clone(), suffix.clone(), stats)
-            }
+            Command::EthereumVanity(EthereumArgs { prefix, suffix }) => modes::ethereum::cpu::run(
+                self.num_threads,
+                prefix.clone(),
+                suffix.clone(),
+                stats,
+                self.exit_on_first_match,
+            ),
             #[cfg(feature = "shallenge")]
             Command::Shallenge(ShallengeArgs {
                 username,
@@ -90,6 +118,7 @@ impl Runner for CpuRunner {
                     username.clone(),
                     target_hash_bytes,
                     stats,
+                    self.exit_on_first_match,
                 )
             }
             #[cfg(feature = "self_test_support")]

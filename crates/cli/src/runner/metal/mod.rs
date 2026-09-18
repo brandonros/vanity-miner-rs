@@ -40,6 +40,7 @@ pub struct MetalOptions {
 }
 
 pub struct MetalRunner {
+    pub(crate) exit_on_first_match: bool,
     pub(crate) options: MetalOptions,
 }
 impl MetalRunner {
@@ -56,10 +57,16 @@ impl MetalRunner {
         {
             return Err("invalid Metal dispatch size".into());
         }
-        Ok(Self { options })
+        Ok(Self {
+            options,
+            exit_on_first_match: false,
+        })
     }
 }
 impl Runner for MetalRunner {
+    fn set_exit_on_first_match(&mut self, enabled: bool) {
+        self.exit_on_first_match = enabled;
+    }
     fn device_count(&self) -> usize {
         1
     }

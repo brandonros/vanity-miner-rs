@@ -26,6 +26,7 @@ pub fn run(
         "candidates",
         options.batches,
         options.batch_size,
+        runner.exit_on_first_match,
         |control| {
             super::pipeline::run(&config, &control, |r, p, start, count| {
                 engine.evaluate(r, p, &[], start, count)

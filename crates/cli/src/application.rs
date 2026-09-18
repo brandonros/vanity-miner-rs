@@ -28,10 +28,12 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     // Create runner based on compile-time feature
     #[cfg(not(feature = "metal"))]
-    let runner = CpuRunner::new();
+    let mut runner = CpuRunner::new();
 
     #[cfg(feature = "metal")]
-    let runner = crate::runner::metal::MetalRunner::new(cli.metal.clone())?;
+    let mut runner = crate::runner::metal::MetalRunner::new(cli.metal.clone())?;
+
+    runner.set_exit_on_first_match(cli.exit_on_first_match);
 
     let details = cli.command.details();
 

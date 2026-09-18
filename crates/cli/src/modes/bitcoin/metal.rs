@@ -20,6 +20,7 @@ pub fn run(runner: &MetalRunner, args: &BitcoinArgs, stats: Arc<GlobalStats>) ->
         "keys",
         options.batches,
         options.batch_size,
+        runner.exit_on_first_match,
         |control| {
             super::device::search(
                 &args.prefix,

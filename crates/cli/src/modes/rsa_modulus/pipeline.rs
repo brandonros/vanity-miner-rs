@@ -29,7 +29,7 @@ pub fn run(
         },
     )?;
     if let Some(output) = output {
-        println!("{output}");
+        crate::runner::progress::print_verified(control, output)?;
     }
     Ok(())
 }

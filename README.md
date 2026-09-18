@@ -33,12 +33,17 @@ and starts the search. `--mode` selects a mode from the table above.
 ./scripts/run-metal.sh --mode rsa-pss \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   rsa-pss-signature-vanity --key private.pem --message message.bin
+./scripts/smoke-metal.sh
 ```
+
+The smoke script builds and runs all 8 modes, requiring one verified match each.
+It creates temporary signing keys; RSA modulus still needs to find a prime pair.
 
 Omit `--batches` for continuous search. `--verify` compares every lane with the
 CPU; winners are always CPU-verified. P-256 and RSA use OS cryptographic entropy
 and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
-stops the search. Use `<command> --help` for options.
+stops the search. Use `--exit-on-first-match` to stop after one verified match.
+Use `<command> --help` for options.
 
 For compiler development, pass `--llvm-metal ../llvm-metal` before `--mode`.
 To build a kernel separately:
@@ -56,11 +61,13 @@ LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 ```sh
 nix develop --command cargo run -p vanity-miner --release --locked \
   --no-default-features --features self_test -- self-test
-./scripts/run-metal.sh --mode self-test self-test
+./scripts/test-metal.sh
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-For a Metal group, use `--mode self-test-solana`. Select named cases with
+The Metal script requires every slot to pass; `--skip-build` reuses device bundles.
+For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
+Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.
 
 CPU-only builds work on Linux and macOS with `--no-default-features` and one or

@@ -60,7 +60,9 @@ fn worker(
                 best_hash_guard.update_if_better(result.hash)
             };
 
-            if was_global_best {
+            if was_global_best
+                && (!cancelled.exit_on_first_match() || cancelled.claim_verified_winner())
+            {
                 println!(
                     "[CPU-{}] NEW GLOBAL BEST found: thread_idx = {}",
                     thread_id, thread_id
@@ -91,6 +93,7 @@ pub fn run(
     username: String,
     target_hash: Vec<u8>,
     global_stats: Arc<GlobalStats>,
+    exit_on_first_match: bool,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     println!("Starting CPU shallenge mode with {} threads", num_threads);
 
@@ -102,11 +105,17 @@ pub fn run(
     // Create shared state for the best hash found so far
     let shared_best_hash = Arc::new(RwLock::new(SharedBestHash::new(initial_target)));
 
+    let control = Arc::new(crate::runner::session::SearchControl::with_stats(
+        global_stats.clone(),
+    ));
+    if exit_on_first_match {
+        control.set_exit_on_first_match();
+    }
     let data = Arc::new(WorkerData {
         username,
         shared_best_hash,
         global_stats,
     });
 
-    spawn_cpu_workers(num_threads, data, worker)
+    spawn_cpu_workers(num_threads, data, control, worker)
 }

@@ -44,12 +44,13 @@ pub fn run(
     args: &crate::modes::rsa_modulus::args::RsaModulusArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers)?;
     estimate(config.validate()?.pattern.constrained_bits() - 2);
     println!("Constructive search restricts every q candidate to the requested modulus pattern.");
-    run_controlled(stats, "candidates", |control| {
+    run_controlled(stats, "candidates", exit_on_first_match, |control| {
         super::run_cpu(&config, control).map(|report| report.found)
     })
 }
