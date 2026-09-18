@@ -1,7 +1,7 @@
 # vanity-miner-rs
 
 Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-CuMetal, and direct Metal for Shallenge, Ethereum, Bitcoin, Solana and RSA modulus.
+CuMetal, and experimental direct Metal.
 
 ## Modes
 
@@ -51,30 +51,25 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 
 ## Metal · macOS
 
-```sh
-./scripts/run-metal-shallenge.sh --batches 4 --batch-size 33 --seed 12345 --verify \
-  shallenge --username brandonros \
-  --target-hash ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-```
-
-This builds matching device/host artifacts using `nix develop .#metal` (stable
-Rust), then runs the `metal` backend. Omit `--batches` for continuous search.
-`--verify` compares every lane with the CPU; winners are always CPU-verified.
-The other Metal modes require a newer local llvm-metal checkout:
+Use a local llvm-metal checkout. The runner builds matching device and host
+artifacts with stable Rust, then runs the `metal` backend. `--mode` selects a
+mode from the table above; use its command's `--help` for search options.
 
 ```sh
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode bitcoin \
-  --batches 2 --batch-size 33 --seed 10088153575472065218 --verify \
-  bitcoin-vanity --prefix bc1qg --suffix 6m
 ./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode rsa-modulus \
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode p256-public-key \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
-  rsa-modulus-vanity --prefix ab --steps-per-launch 1
+  p256-public-key-vanity --prefix ab
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode rsa-pss \
+  --batches 2 --batch-size 1 --threads-per-group 1 --verify \
+  rsa-pss-signature-vanity --key private.pem --message message.bin
 ```
 
-RSA uses OS cryptographic entropy and rejects `--seed`; start with small batches.
+Omit `--batches` for continuous search. `--verify` compares every lane with the
+CPU; winners are always CPU-verified. P-256 and RSA use OS cryptographic entropy
+and reject `--seed`; start with small batches.
 Backend features `metal`, `gpu` and `cumetal` are mutually exclusive.
 
 ## CuMetal · macOS
@@ -94,6 +89,9 @@ or use `--all-features`.
 
 ```sh
 cargo run -p vanity-miner --release --locked --no-default-features --features self_test -- self-test
+./scripts/run-metal.sh --llvm-metal ../llvm-metal --mode self-test self-test
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
+For a Metal group, use `--mode self-test-solana`. Select named cases with
+`self-test --check MODE.CHECK`; `self-test --list` lists the original checks.

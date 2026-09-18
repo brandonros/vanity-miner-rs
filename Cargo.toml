@@ -49,6 +49,7 @@ exclude = [
 ]
 
 [patch.crates-io]
+sec1 = { path = "vendor/sec1" }
 # put compiler_fence behind a feature flag that is disabled by default
 zeroize = { git = "https://github.com/brandonros/utils", branch = "nvptx64-support" }
 

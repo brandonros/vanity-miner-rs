@@ -61,7 +61,8 @@ def main():
     output = (options.output or ROOT / 'target/metal' / options.mode).resolve()
     sources = [device / 'Cargo.toml', device / 'Cargo.lock', device / 'kernel.interface.json', Path(__file__).resolve(), ROOT / 'crates/logic/Cargo.toml', ROOT / 'flake.lock', ROOT / 'Cargo.toml', ROOT / 'Cargo.lock',
                    *sorted((device / 'src').rglob('*.rs')),
-                   *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
+                   *sorted(p for p in (ROOT / 'vendor/crypto-bigint').rglob('*') if p.is_file()),
+                   *sorted(p for p in (ROOT / 'vendor/sec1').rglob('*') if p.is_file()), *sorted((ROOT / 'crates/logic/src').rglob('*.rs'))]
     if is_self_test:
         sources.append(ROOT / 'crates/kernels/common/metal_self_test_inventory.rs')
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in sources}
