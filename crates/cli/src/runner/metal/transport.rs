@@ -146,6 +146,7 @@ impl<C: Contract> Transport<C> {
             count,
             audit: u32::from(self.audit),
         };
+        let started = Instant::now();
         if message.len() > self.buffers.0[3].bytes.len() - 512 {
             let length = message
                 .len()
@@ -154,7 +155,6 @@ impl<C: Contract> Transport<C> {
                 .ok_or("Metal payload is too large")?;
             self.buffers.0[3].bytes.resize(length, 0);
         }
-        let started = Instant::now();
         if self.kernel.reconfigure(&self.buffers.0)? {
             self.allocation_rounds += 1;
         }
