@@ -4,8 +4,18 @@ use crate::{
     runner::{RunResult, Runner, progress::GlobalStats},
 };
 use std::{path::PathBuf, sync::Arc};
+#[cfg(any(
+    feature = "p256-public-key",
+    feature = "p256-signature",
+    feature = "rsa-pss"
+))]
+pub mod candidate;
+#[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
+pub mod p256;
 #[cfg(feature = "rsa-modulus")]
 pub mod rsa;
+#[cfg(feature = "rsa-pss")]
+pub mod rsa_pss;
 pub mod transport;
 
 #[derive(clap::Args, Clone)]
@@ -65,11 +75,20 @@ impl Runner for MetalRunner {
             Command::RsaModulusVanity(args) => {
                 crate::modes::rsa_modulus::metal::run(self, args, stats)
             }
+            #[cfg(feature = "p256-public-key")]
+            Command::P256PublicKeyVanity(args) => {
+                crate::modes::p256_public_key::metal::run(self, args, stats)
+            }
+            #[cfg(feature = "p256-signature")]
+            Command::P256SignatureVanity(args) => {
+                crate::modes::p256_signature::metal::run(self, args, stats)
+            }
+            #[cfg(feature = "rsa-pss")]
+            Command::RsaPssSignatureVanity(args) => {
+                crate::modes::rsa_pss::metal::run(self, args, stats)
+            }
             #[allow(unreachable_patterns)]
-            _ => Err(
-                "the Metal backend supports Shallenge, Ethereum, Bitcoin, Solana, and RSA modulus"
-                    .into(),
-            ),
+            _ => Err("command is unavailable in this Metal build".into()),
         }
     }
 }

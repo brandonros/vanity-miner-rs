@@ -6,6 +6,8 @@ pub(crate) mod cpu;
 pub(crate) mod cuda;
 #[cfg(feature = "cumetal")]
 pub(crate) mod cumetal;
+#[cfg(feature = "metal")]
+pub(crate) mod metal;
 
 mod device;
 #[cfg(test)]
