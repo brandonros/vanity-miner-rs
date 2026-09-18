@@ -5,7 +5,7 @@ mod scalar_fixtures;
 pub(super) mod scalar_probes;
 use super::known_answers::*;
 use super::record_candidate;
-use core::hint::black_box;
+use crate::self_test::black_box;
 use fixtures::*;
 
 register_self_test! {
@@ -99,7 +99,7 @@ register_self_test! {
     }
 }
 
-fn self_test_digest_p256_public() -> [u8; 32] {
+fn self_test_digest_p256_public() -> Option<[u8; 32]> {
     use crate::crypto::sha256::Sha256;
     use crate::{modes::p256_public_key::*, search::hex_pattern::HexPattern};
     let mut h = Sha256::new();
@@ -110,14 +110,18 @@ fn self_test_digest_p256_public() -> [u8; 32] {
             target,
             reserved: 0,
         });
-        for prefix in ["", "f"] {
-            let pattern = black_box(HexPattern::new(prefix, "", width).unwrap());
+        let patterns = [
+            HexPattern::new("", "", width).ok()?,
+            HexPattern::new("f", "", width).ok()?,
+        ];
+        for pattern in patterns {
+            let pattern = black_box(pattern);
             for counter in u64::MAX - 7..=u64::MAX {
                 record_candidate(&mut h, p256_public(&request, black_box(counter), &pattern));
             }
         }
     }
-    h.finalize()
+    Some(h.finalize())
 }
 
 register_self_test! {
@@ -125,10 +129,10 @@ register_self_test! {
     fn end_to_end() -> u32 {
         u32::from(
             self_test_digest_p256_public()
-                == [
+                == Some([
                     239, 76, 14, 206, 113, 184, 37, 233, 82, 252, 160, 108, 166, 113, 26, 230, 132, 89,
                     110, 201, 235, 102, 51, 125, 141, 160, 109, 133, 191, 253, 11, 243,
-                ],
+                ]),
         )
     }
 }

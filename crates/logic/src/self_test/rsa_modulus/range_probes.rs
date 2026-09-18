@@ -1,6 +1,6 @@
 //! Focused range probes for the rsa_modulus self-test.
 use crate::modes::rsa_modulus::{self as pipeline, SearchConfig, Task};
-use core::hint::black_box;
+use crate::self_test::black_box;
 use crypto_bigint::{Encoding, U1024, U2048};
 
 register_self_test! {

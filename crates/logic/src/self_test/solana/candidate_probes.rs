@@ -1,6 +1,6 @@
 //! Candidate probes owned by the solana self-test kernel.
 use crate::search::candidate_result::CandidateResult;
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// solana candidate match payload
@@ -10,7 +10,8 @@ register_self_test! {
             seed: 583437459223573114, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
-        let pattern = black_box(BytePattern::new(b"aaa", b"PjNFC").unwrap());
+        let Ok(pattern) = BytePattern::new(b"aaa", b"PjNFC") else { return 0; };
+        let pattern = black_box(pattern);
         let result = crate::modes::solana::candidate(&seed, black_box(35), &pattern);
         // Fixed expected payload, including the zero-filled remainder of the record.
         let mut expected = [0u8; 256];
@@ -27,7 +28,8 @@ register_self_test! {
             seed: 583437459223573114, // The second batch advances by 32 to the known-answer seed.
             width: 32,
         });
-        let pattern = black_box(BytePattern::new(b"aaa", b"PjNFD").unwrap());
+        let Ok(pattern) = BytePattern::new(b"aaa", b"PjNFD") else { return 0; };
+        let pattern = black_box(pattern);
         let result = crate::modes::solana::candidate(&seed, black_box(35), &pattern);
         u32::from(result.status == CandidateResult::STATUS_MISS && result.bytes == [0; 256])
     }
@@ -41,7 +43,7 @@ register_self_test! {
             seed: 583437459223573146,
             width: 32,
         });
-        let mut pattern = BytePattern::new(b"", b"").unwrap();
+        let Ok(mut pattern) = BytePattern::new(b"", b"") else { return 0; };
         let bad_seed = black_box(BatchSeed { seed: 0, width: 0 });
         let result = crate::modes::solana::candidate(&bad_seed, black_box(0), &black_box(pattern));
         if result.status != CandidateResult::STATUS_ERROR || result.bytes != [0; 256] {

@@ -1,5 +1,5 @@
 //! Batch seed probes owned by the solana self-test kernel.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// batch seed lane boundary and seed wrap

@@ -1,5 +1,5 @@
 //! Comparison probes owned by the shallenge self-test kernel.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// compare hashes differing only at last byte

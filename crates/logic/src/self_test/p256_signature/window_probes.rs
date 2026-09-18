@@ -1,5 +1,5 @@
 //! Focused window probes for the p256_signature self-test.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// message counter last value and exhaustion

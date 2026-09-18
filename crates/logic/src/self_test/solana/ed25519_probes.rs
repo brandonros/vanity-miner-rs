@@ -1,6 +1,6 @@
 //! Concrete ed25519 probes used by this mode's device self-test.
 use super::*;
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 // Slot 70: curve25519-dalek `clamp_integer` in isolation. The smallest
 // possible dalek call — pure bit-mask on bytes 0 and 31, no field math,
@@ -14,7 +14,7 @@ use core::hint::black_box;
 register_self_test! {
     /// dalek clamp_integer
     fn dalek_clamp_integer() -> u32 {
-        let input = core::hint::black_box([0xFFu8; 32]);
+        let input = crate::self_test::black_box([0xFFu8; 32]);
         let clamped = curve25519_dalek::scalar::clamp_integer(input);
         const EXPECTED: [u8; 32] = {
             let mut e = [0xFFu8; 32];
@@ -61,7 +61,7 @@ register_self_test! {
     fn dalek_scalar52_from_bytes() -> u32 {
         let mut bytes = [0u8; 32];
         bytes[0] = 1;
-        let bytes = core::hint::black_box(bytes);
+        let bytes = crate::self_test::black_box(bytes);
         let s = bisect_scalar52::Scalar52::from_bytes(&bytes);
         (s.0 == DALEK_ONE_LIMBS) as u32
     }
@@ -79,7 +79,7 @@ register_self_test! {
         for (i, x) in r.0.iter().enumerate() {
             widened[i] = *x as u128;
         }
-        let widened = core::hint::black_box(widened);
+        let widened = crate::self_test::black_box(widened);
         let result = bisect_scalar52::Scalar52::montgomery_reduce_no_sub(&widened);
         (result.0 == DALEK_ONE_LIMBS) as u32
     }
@@ -92,8 +92,8 @@ register_self_test! {
     fn dalek_scalar52_mul_internal_then_reduce_one_r() -> u32 {
         use bisect_scalar52::Scalar52;
         const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
-        let one = core::hint::black_box(ONE);
-        let r = core::hint::black_box(bisect_scalar52::R);
+        let one = crate::self_test::black_box(ONE);
+        let r = crate::self_test::black_box(bisect_scalar52::R);
         let x_r = Scalar52::mul_internal(&one, &r);
         let result = Scalar52::montgomery_reduce_no_sub(&x_r);
         (result.0 == DALEK_ONE_LIMBS) as u32
@@ -106,7 +106,7 @@ register_self_test! {
     fn dalek_scalar52_as_bytes_one() -> u32 {
         use bisect_scalar52::Scalar52;
         const ONE: Scalar52 = Scalar52(DALEK_ONE_LIMBS);
-        let one = core::hint::black_box(ONE);
+        let one = crate::self_test::black_box(ONE);
         let bytes = one.as_bytes();
         let mut expected = [0u8; 32];
         expected[0] = 1;
@@ -121,7 +121,7 @@ register_self_test! {
 register_self_test! {
     /// dalek Scalar52::sub(R, R) == 0 (no underflow)
     fn dalek_scalar52_sub_no_underflow() -> u32 {
-        let r = core::hint::black_box(bisect_scalar52::R);
+        let r = crate::self_test::black_box(bisect_scalar52::R);
         let result = bisect_scalar52::Scalar52::sub(&r, &r);
         (result.0 == [0u64; 5]) as u32
     }
@@ -137,8 +137,8 @@ register_self_test! {
     /// dalek Scalar52::sub(0, 1) underflow path
     fn dalek_scalar52_sub_with_underflow() -> u32 {
         use bisect_scalar52::Scalar52;
-        let zero = core::hint::black_box(Scalar52::ZERO);
-        let one = core::hint::black_box(Scalar52(DALEK_ONE_LIMBS));
+        let zero = crate::self_test::black_box(Scalar52::ZERO);
+        let one = crate::self_test::black_box(Scalar52(DALEK_ONE_LIMBS));
         let result = Scalar52::sub(&zero, &one);
         let expected: [u64; 5] = [
             0x0002631a5cf5d3ec, // L[0] - 1
@@ -163,7 +163,7 @@ register_self_test! {
         for (i, x) in r.0.iter().enumerate() {
             widened[i] = *x as u128;
         }
-        let widened = core::hint::black_box(widened);
+        let widened = crate::self_test::black_box(widened);
         let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
         (result.0 == DALEK_ONE_LIMBS) as u32
     }
@@ -176,7 +176,7 @@ register_self_test! {
 register_self_test! {
     /// dalek Scalar::ONE.to_bytes() direct
     fn dalek_scalar_one_to_bytes_direct() -> u32 {
-        let s = core::hint::black_box(curve25519_dalek::Scalar::ONE);
+        let s = crate::self_test::black_box(curve25519_dalek::Scalar::ONE);
         let bytes = s.to_bytes();
         let mut expected = [0u8; 32];
         expected[0] = 1;
@@ -193,7 +193,7 @@ register_self_test! {
     /// dalek scalar round-trip ZERO
     fn dalek_scalar_round_trip_zero() -> u32 {
         let input = [0u8; 32];
-        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(core::hint::black_box(input));
+        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order(crate::self_test::black_box(input));
         let bytes = scalar.to_bytes();
         (bytes == input) as u32
     }
@@ -208,7 +208,7 @@ register_self_test! {
     /// dalek from_bytes_mod_order_wide zero
     fn dalek_scalar_from_bytes_wide_zero() -> u32 {
         let input = [0u8; 64];
-        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order_wide(&core::hint::black_box(input));
+        let scalar = curve25519_dalek::Scalar::from_bytes_mod_order_wide(&crate::self_test::black_box(input));
         let bytes = scalar.to_bytes();
         (bytes == [0u8; 32]) as u32
     }
@@ -224,7 +224,7 @@ register_self_test! {
     /// dalek Scalar(0) == Scalar::ZERO (no to_bytes)
     fn dalek_scalar_eq_zero() -> u32 {
         use curve25519_dalek::Scalar;
-        let input = core::hint::black_box([0u8; 32]);
+        let input = crate::self_test::black_box([0u8; 32]);
         let s = Scalar::from_bytes_mod_order(input);
         let zero = Scalar::ZERO;
         (s == zero) as u32
@@ -239,8 +239,8 @@ register_self_test! {
     /// dalek Scalar::ZERO == Scalar::ZERO (PartialEq)
     fn dalek_zero_eq_zero() -> u32 {
         use curve25519_dalek::Scalar;
-        let a = core::hint::black_box(Scalar::ZERO);
-        let b = core::hint::black_box(Scalar::ZERO);
+        let a = crate::self_test::black_box(Scalar::ZERO);
+        let b = crate::self_test::black_box(Scalar::ZERO);
         (a == b) as u32
     }
 }
@@ -255,7 +255,7 @@ register_self_test! {
     /// dalek Scalar::from_canonical_bytes(0) == ZERO
     fn dalek_from_canonical_zero() -> u32 {
         use curve25519_dalek::Scalar;
-        let opt = Scalar::from_canonical_bytes(core::hint::black_box([0u8; 32]));
+        let opt = Scalar::from_canonical_bytes(crate::self_test::black_box([0u8; 32]));
         let s_opt: Option<Scalar> = opt.into();
         let s = match s_opt {
             Some(s) => s,
@@ -273,7 +273,7 @@ register_self_test! {
 register_self_test! {
     /// dalek bisect Scalar52::from_bytes(0)
     fn dalek_scalar52_from_bytes_zero() -> u32 {
-        let bytes = core::hint::black_box([0u8; 32]);
+        let bytes = crate::self_test::black_box([0u8; 32]);
         let s = bisect_scalar52::Scalar52::from_bytes(&bytes);
         (s.0 == [0u64; 5]) as u32
     }
@@ -286,8 +286,8 @@ register_self_test! {
     /// dalek bisect Scalar52::mul_internal(0, R)
     fn dalek_scalar52_mul_internal_zero() -> u32 {
         use bisect_scalar52::Scalar52;
-        let zero = core::hint::black_box(Scalar52::ZERO);
-        let r = core::hint::black_box(bisect_scalar52::R);
+        let zero = crate::self_test::black_box(Scalar52::ZERO);
+        let r = crate::self_test::black_box(bisect_scalar52::R);
         let product = Scalar52::mul_internal(&zero, &r);
         (product == [0u128; 9]) as u32
     }
@@ -301,7 +301,7 @@ register_self_test! {
 register_self_test! {
     /// dalek bisect Scalar52::montgomery_reduce(0)
     fn dalek_scalar52_montgomery_reduce_zero() -> u32 {
-        let widened = core::hint::black_box([0u128; 9]);
+        let widened = crate::self_test::black_box([0u128; 9]);
         let result = bisect_scalar52::Scalar52::montgomery_reduce(&widened);
         (result.0 == [0u64; 5]) as u32
     }
@@ -314,7 +314,7 @@ register_self_test! {
     /// dalek bisect Scalar52::ZERO.as_bytes()
     fn dalek_scalar52_as_bytes_zero() -> u32 {
         use bisect_scalar52::Scalar52;
-        let zero = core::hint::black_box(Scalar52::ZERO);
+        let zero = crate::self_test::black_box(Scalar52::ZERO);
         let bytes = zero.as_bytes();
         (bytes == [0u8; 32]) as u32
     }
@@ -331,7 +331,7 @@ register_self_test! {
     /// dalek bisect full reduce pipeline (zero in)
     fn dalek_reduce_pipeline_zero() -> u32 {
         use bisect_scalar52::{R, Scalar52};
-        let bytes = core::hint::black_box([0u8; 32]);
+        let bytes = crate::self_test::black_box([0u8; 32]);
         let x = Scalar52::from_bytes(&bytes);
         let x_r = Scalar52::mul_internal(&x, &R);
         let reduced = Scalar52::montgomery_reduce(&x_r);

@@ -2,7 +2,7 @@
 mod fixtures;
 pub(super) mod range_probes;
 use super::known_answers::*;
-use core::hint::black_box;
+use crate::self_test::black_box;
 use fixtures::*;
 
 register_self_test! {
@@ -80,7 +80,7 @@ register_self_test! {
     /// rsa modulus equal factors rejected
     fn equal_factors_rejected() -> u32 {
         use crate::modes::rsa_modulus as pipeline;
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         u32::from(!pipeline::eligible_pair(
             &black_box(SELF_TEST_RSA_P),
             &black_box(SELF_TEST_RSA_P),
@@ -93,7 +93,7 @@ register_self_test! {
     /// rsa modulus undersized factor rejected
     fn undersized_factor_rejected() -> u32 {
         use crate::modes::rsa_modulus as pipeline;
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         u32::from(!pipeline::eligible_pair(
             &black_box([0; 128]),
             &black_box(SELF_TEST_RSA_Q),
@@ -107,7 +107,7 @@ register_self_test! {
     fn end_to_end() -> u32 {
         use crate::modes::rsa_modulus::{self as mining, Task};
         let config = black_box(device_config());
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         let mut task = Task::EMPTY;
         let (prepared, pair) = mining::mine(&config, &pattern, &mut task, black_box(9), 1, black_box(1));
         if pair.is_some() || prepared.errors != 0 || prepared.p_accepted != 1
