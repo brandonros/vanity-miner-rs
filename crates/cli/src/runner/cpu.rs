@@ -41,50 +41,50 @@ impl Runner for CpuRunner {
         println!("Starting CPU mode with {} threads", self.num_threads);
         let _ = &stats;
 
-        match command {
+        match *command {
             #[cfg(feature = "rsa-modulus")]
-            Command::RsaModulusVanity(args) => modes::rsa_modulus::cpu::run(
+            Command::RsaModulusVanity(ref args) => modes::rsa_modulus::cpu::run(
                 args,
                 self.num_threads,
                 stats,
                 self.exit_on_first_match,
             ),
             #[cfg(feature = "rsa-pss")]
-            Command::RsaPssSignatureVanity(args) => {
+            Command::RsaPssSignatureVanity(ref args) => {
                 modes::rsa_pss::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "p256-public-key")]
-            Command::P256PublicKeyVanity(args) => modes::p256_public_key::cpu::run(
+            Command::P256PublicKeyVanity(ref args) => modes::p256_public_key::cpu::run(
                 args,
                 self.num_threads,
                 stats,
                 self.exit_on_first_match,
             ),
             #[cfg(feature = "p256-signature")]
-            Command::P256SignatureVanity(args) => modes::p256_signature::cpu::run(
+            Command::P256SignatureVanity(ref args) => modes::p256_signature::cpu::run(
                 args,
                 self.num_threads,
                 stats,
                 self.exit_on_first_match,
             ),
             #[cfg(feature = "solana")]
-            Command::SolanaVanity(args) => {
+            Command::SolanaVanity(ref args) => {
                 modes::solana::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "bitcoin")]
-            Command::BitcoinVanity(args) => {
+            Command::BitcoinVanity(ref args) => {
                 modes::bitcoin::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "ethereum")]
-            Command::EthereumVanity(args) => {
+            Command::EthereumVanity(ref args) => {
                 modes::ethereum::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "shallenge")]
-            Command::Shallenge(args) => {
+            Command::Shallenge(ref args) => {
                 modes::shallenge::cpu::run(args, self.num_threads, stats, self.exit_on_first_match)
             }
             #[cfg(feature = "self_test_support")]
-            Command::SelfTest(args) => modes::self_test::cpu::run(args),
+            Command::SelfTest(ref args) => modes::self_test::cpu::run(args),
         }
     }
 }
