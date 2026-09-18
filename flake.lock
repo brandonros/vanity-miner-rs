@@ -3,17 +3,17 @@
     "cumetal": {
       "flake": false,
       "locked": {
-        "lastModified": 1789682514,
-        "narHash": "sha256-FmKAHcCqnhcXpKpJkwvtG7o5MEXo9/Ir387C9WNKAe0=",
-        "ref": "upstream/ptx-counted-pointer-ranges",
-        "rev": "684bb0302953f0e60748a8a4ea046f9baeca37b7",
-        "revCount": 622,
+        "lastModified": 1789685202,
+        "narHash": "sha256-532Rm1kNYq5ReLGAI84hjZdUb4WREoSiWcayLPwewIs=",
+        "ref": "upstream/ptx-helper-record-contexts",
+        "rev": "1b9e6852bc4053f5e5cf347f78c185a916bbbf3a",
+        "revCount": 624,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/brandonros/cuda-metal"
       },
       "original": {
-        "ref": "upstream/ptx-counted-pointer-ranges",
+        "ref": "upstream/ptx-helper-record-contexts",
         "submodules": true,
         "type": "git",
         "url": "https://github.com/brandonros/cuda-metal"

@@ -9,7 +9,7 @@
     # Cumulative contribution series; flake.lock selects the exact tested commit.
     # Include the VF64 submodule in the immutable source closure.
     cumetal = {
-      url = "git+https://github.com/brandonros/cuda-metal?ref=upstream/ptx-counted-pointer-ranges&submodules=1";
+      url = "git+https://github.com/brandonros/cuda-metal?ref=upstream/ptx-helper-record-contexts&submodules=1";
       flake = false;
     };
   };
