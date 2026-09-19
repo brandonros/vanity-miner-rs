@@ -1,6 +1,6 @@
 //! Stateless range construction and sampling probes.
 use crate::modes::rsa_modulus as pipeline;
-use core::hint::black_box;
+use crate::self_test::black_box;
 use crypto_bigint::{Encoding, U1024, U2048};
 
 register_self_test! {

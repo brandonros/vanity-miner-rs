@@ -85,7 +85,7 @@ impl P256SignatureArgs {
                 SForm::High => Form::High,
                 SForm::Either => Form::Either,
             },
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         })
     }
 }
@@ -96,7 +96,6 @@ impl P256SignatureArgs {
         Ok(())
     }
     pub fn details(&self) -> crate::args::CommandDetails {
-        self.pattern
-            .details("Searching NIST P-256 signatures", "p256_signature")
+        self.pattern.details("Searching NIST P-256 signatures")
     }
 }

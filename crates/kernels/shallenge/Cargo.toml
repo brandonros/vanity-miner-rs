@@ -1,16 +1,15 @@
 [package]
-name = "kernel-shallenge"
+name = "kernel-shallenge-metal"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
-[features]
-default = ["cuda"]
-cuda = ["dep:cuda_builder"]
-llvm21 = ["cuda", "cuda_builder/llvm21"]
+[workspace]
+resolver = "3"
 
-[build-dependencies.cuda_builder]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50"
-default-features = false
-features = ["rustc_codegen_nvvm"]
-optional = true
+[dependencies]
+logic = { path = "../../logic", default-features = false, features = ["shallenge"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1

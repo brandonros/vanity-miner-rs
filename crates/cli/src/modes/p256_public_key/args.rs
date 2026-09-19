@@ -30,7 +30,7 @@ impl P256PublicArgs {
                 PublicTarget::Xy => Target::Xy,
                 PublicTarget::Uncompressed => Target::Uncompressed,
             },
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         }
     }
 }
@@ -41,7 +41,6 @@ impl P256PublicArgs {
         Ok(())
     }
     pub fn details(&self) -> crate::args::CommandDetails {
-        self.pattern
-            .details("Searching NIST P-256 public points", "p256_public_key")
+        self.pattern.details("Searching NIST P-256 public points")
     }
 }

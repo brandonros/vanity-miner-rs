@@ -1,5 +1,5 @@
 //! Focused salt probes for the rsa_pss self-test.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// salt counter last value and exhaustion
@@ -22,7 +22,7 @@ register_self_test! {
     /// empty salt capacity and mismatched output length
     fn salt_empty_and_invalid() -> u32 {
         use crate::search::{message_window::WindowError, salt_counter::write_salt_counter};
-        let empty = black_box(&[] as &[u8]);
+        let empty = &black_box([] as [u8; 0]);
         let mut out = [0xa5; 1];
         u32::from(
             write_salt_counter(empty, black_box(0), &mut []) == Ok(())

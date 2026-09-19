@@ -1,9 +1,13 @@
 use crate::modes::shallenge::shared_best_hash::SharedBestHash;
 use crate::runner::progress::GlobalStats;
-use std::error::Error;
+use std::fmt::Write as _;
 use std::sync::{Arc, RwLock};
 
-use crate::runner::workers::cpu::spawn_cpu_workers;
+use crate::runner::{
+    progress::print_verified,
+    session::{SearchControl, run_controlled},
+    workers,
+};
 use rand::Rng as _;
 
 struct WorkerData {
@@ -14,12 +18,10 @@ struct WorkerData {
 
 fn worker(
     thread_id: usize,
-    data: Arc<WorkerData>,
-    cancelled: Arc<crate::runner::session::SearchControl>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+    data: &WorkerData,
+    cancelled: &SearchControl,
+) -> Result<Option<String>, String> {
     let mut rng = rand::thread_rng();
-
-    println!("[CPU-{}] Starting CPU shallenge worker thread", thread_id);
 
     while !cancelled.stopped() {
         let rng_seed: u64 = rng.r#gen();
@@ -57,56 +59,76 @@ fn worker(
                     .shared_best_hash
                     .write()
                     .unwrap_or_else(|e| e.into_inner());
-                best_hash_guard.update_if_better(result.hash)
+                if result.hash < best_hash_guard.get_current() && cancelled.claim_verified_winner()
+                {
+                    best_hash_guard.update_if_better(result.hash)
+                } else {
+                    false
+                }
             };
 
             if was_global_best {
-                println!(
+                let mut record = String::new();
+                writeln!(
+                    &mut record,
                     "[CPU-{}] NEW GLOBAL BEST found: thread_idx = {}",
                     thread_id, thread_id
-                );
-                println!(
+                )
+                .unwrap();
+                writeln!(
+                    &mut record,
                     "[CPU-{}] NEW GLOBAL BEST hash: {}",
                     thread_id,
                     hex::encode(result.hash)
-                );
-                println!(
+                )
+                .unwrap();
+                writeln!(
+                    &mut record,
                     "[CPU-{}] NEW GLOBAL BEST nonce: {}",
                     thread_id, nonce_string
-                );
-                println!(
+                )
+                .unwrap();
+                writeln!(
+                    &mut record,
                     "[CPU-{}] Challenge string: {}/{}",
                     thread_id, data.username, nonce_string
-                );
+                )
+                .unwrap();
 
-                data.global_stats.add_matches(1);
+                return Ok(Some(record));
             }
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 pub fn run(
-    num_threads: usize,
-    username: String,
-    target_hash: Vec<u8>,
+    args: &super::args::ShallengeArgs,
+    workers: usize,
     global_stats: Arc<GlobalStats>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    println!("Starting CPU shallenge mode with {} threads", num_threads);
-
+    exit_on_first_match: bool,
+) -> crate::runner::RunResult {
     // Convert Vec<u8> to [u8; 32] for the initial target
-    let initial_target: [u8; 32] = target_hash
+    let initial_target: [u8; 32] = hex::decode(&args.target_hash)?
         .try_into()
         .map_err(|_| "target hash must contain exactly 32 bytes")?;
 
     // Create shared state for the best hash found so far
     let shared_best_hash = Arc::new(RwLock::new(SharedBestHash::new(initial_target)));
 
-    let data = Arc::new(WorkerData {
-        username,
+    let data = WorkerData {
+        username: args.username.clone(),
         shared_best_hash,
-        global_stats,
-    });
+        global_stats: global_stats.clone(),
+    };
 
-    spawn_cpu_workers(num_threads, data, worker)
+    run_controlled(global_stats, "nonces", exit_on_first_match, |control| {
+        let winner = workers::search(workers, &control, |id| worker(id, &data, &control))?;
+        if let Some(record) = winner {
+            print_verified(&control, record)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    })
 }

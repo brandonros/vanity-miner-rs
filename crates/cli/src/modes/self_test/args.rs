@@ -4,7 +4,7 @@ use clap::Args;
 #[derive(Args, Clone, Default)]
 pub struct SelfTestArgs {
     /// Run named checks (repeat this option to select more than one).
-    /// GPU execution runs each containing mode kernel in full and reports selected checks.
+    /// Metal executes the selected checks on the GPU.
     #[arg(long = "check", value_name = "MODE.CHECK")]
     pub checks: Vec<String>,
     /// List enabled check names and descriptions without initializing a device.

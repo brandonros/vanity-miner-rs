@@ -7,7 +7,6 @@ pub(super) fn construct_worker(
     pattern: &HexPattern,
     control: &SearchControl,
 ) -> Result<Option<String>, String> {
-    let _stop_peers = control.cancel_on_exit();
     while !control.stopped() {
         let Some(ids) = control.reserve_batch(u64::from(control.batch_size())) else {
             break;
@@ -26,7 +25,7 @@ pub(super) fn construct_worker(
                         q: result.bytes[128..].try_into().unwrap(),
                         id,
                     });
-                    let output = pipeline::verify_pair(config, pattern, &pair)?;
+                    let output = device::verify_pair(config, pattern, &pair)?;
                     if control.claim_verified_winner() {
                         return Ok(Some(output));
                     }
@@ -39,17 +38,18 @@ pub(super) fn construct_worker(
     Ok(None)
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "metal"))]
 pub fn run(
     args: &crate::modes::rsa_modulus::args::RsaModulusArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers)?;
     estimate(config.validate()?.pattern.constrained_bits() - 2);
     println!("Constructive search restricts every q candidate to the requested modulus pattern.");
-    run_controlled(stats, "candidates", |control| {
+    run_controlled(stats, "candidates", exit_on_first_match, |control| {
         super::run_cpu(&config, control).map(|report| report.found)
     })
 }

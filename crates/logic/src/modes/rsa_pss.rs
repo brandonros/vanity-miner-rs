@@ -1,8 +1,8 @@
-//! Candidate evaluation and CUDA request layout for rsa-pss.
+//! Candidate evaluation and device request layout for rsa-pss.
 //! Owners must clear secret records after synchronized device use.
 use crate::{search::candidate_result::CandidateResult, search::hex_pattern::HexPattern};
 
-#[repr(C)]
+llvm_metal_kernel::record! {
 #[derive(Clone, Copy)]
 pub struct RsaPssRequest {
     pub p: [u8; 128],
@@ -18,6 +18,7 @@ pub struct RsaPssRequest {
     /// 0 = enumerate salts, 1 = enumerate message window with fixed salt.
     pub source: u32,
     pub salt_length: u32,
+}
 }
 
 pub fn rsa_pss(
@@ -95,15 +96,6 @@ impl zeroize::Zeroize for RsaPssRequest {
         self.length.zeroize();
         self.source.zeroize();
         self.salt_length.zeroize();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn request_has_no_implicit_padding() {
-        // CUDA transport copies the complete initialized request record.
-        assert_eq!(core::mem::size_of::<super::RsaPssRequest>(), 920);
     }
 }
 

@@ -2,10 +2,9 @@
 
 pub(crate) mod args;
 pub(crate) mod cpu;
-#[cfg(feature = "gpu")]
-pub(crate) mod cuda;
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;
+
+#[cfg(feature = "metal")]
+pub mod metal;
 
 mod device;
 #[cfg(test)]
@@ -20,7 +19,7 @@ use logic::{
 };
 use p256::SecretKey;
 use rand::{RngCore, rngs::OsRng};
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 pub struct PublicKeySearch {
@@ -124,7 +123,7 @@ fn run(
     };
     let found = output.is_some();
     if let Some(record) = &output {
-        println!("{record}");
+        crate::runner::progress::print_verified(&control, record.clone())?;
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(SearchReport {

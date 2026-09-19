@@ -10,63 +10,49 @@ impl Prepared<'_> {
         let digest = self.digest;
         let base_salt = &self.base_salt;
         let limit = self.limit;
-        thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for _ in 0..config.workers {
-                handles.push(scope.spawn(move || -> Result<Option<Winner>, String> {
-                    let stop_peers = control.cancel_on_exit();
-                    let mut message = original.clone();
-                    let mut salt = base_salt.clone();
-                    while let Some(batch) = control.reserve_bounded_batch(16, limit) {
-                        for counter in batch {
-                            if control.stopped() {
-                                return Ok(None);
-                            }
-                            apply_candidate(
-                                &config.source,
-                                base_salt,
-                                counter,
-                                &mut message,
-                                &mut salt,
-                            )?;
-                            let candidate_digest =
-                                if matches!(config.source, PssSource::Salt { .. }) {
-                                    digest
-                                } else {
-                                    Sha256::digest(&message)
-                                };
-                            let signature = sign_explicit_salt(key, &candidate_digest, &salt)?;
-                            control.add_tested(1);
-                            if !pattern.matches(&signature) {
-                                continue;
-                            }
-                            public
-                                .verify(
-                                    Pss::new_with_salt::<Sha256>(salt.len()),
-                                    &candidate_digest,
-                                    &signature,
-                                )
-                                .map_err(|_| "RSA-PSS winner failed independent verification")?;
-                            if control.claim_verified_winner() {
-                                return Ok(Some(Winner { counter, signature }));
-                            }
-                            return Ok(None);
-                        }
+        crate::runner::workers::search(config.workers, control, |_| {
+            let mut message = original.clone();
+            let mut salt = base_salt.clone();
+            while let Some(batch) = control.reserve_bounded_batch(16, limit) {
+                for counter in batch {
+                    if control.stopped() {
+                        return Ok(None);
                     }
-                    stop_peers.finish();
-                    Ok(None)
-                }));
+                    apply_candidate(&config.source, base_salt, counter, &mut message, &mut salt)?;
+                    let candidate_digest = if matches!(config.source, PssSource::Salt { .. }) {
+                        digest
+                    } else {
+                        Sha256::digest(&message)
+                    };
+                    let signature = sign_explicit_salt(key, &candidate_digest, &salt)?;
+                    control.add_tested(1);
+                    if !pattern.matches(&signature) {
+                        continue;
+                    }
+                    public
+                        .verify(
+                            Pss::new_with_salt::<Sha256>(salt.len()),
+                            &candidate_digest,
+                            &signature,
+                        )
+                        .map_err(|_| "RSA-PSS winner failed independent verification")?;
+                    if control.claim_verified_winner() {
+                        return Ok(Some(Winner { counter, signature }));
+                    }
+                    return Ok(None);
+                }
             }
-            crate::runner::workers::join(handles, control, "RSA-PSS worker panicked")
+            Ok(None)
         })
     }
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "metal"))]
 pub fn run(
     args: &crate::modes::rsa_pss::args::RsaPssArgs,
     workers: usize,
     stats: std::sync::Arc<crate::runner::progress::GlobalStats>,
+    exit_on_first_match: bool,
 ) -> crate::runner::RunResult {
     use crate::runner::{progress::estimate, session::run_controlled};
     let config = args.config(workers)?;
@@ -76,7 +62,7 @@ pub fn run(
     } else {
         "messages"
     };
-    run_controlled(stats, unit, |control| {
+    run_controlled(stats, unit, exit_on_first_match, |control| {
         crate::modes::rsa_pss::run_cpu(&config, control).map(|report| report.found)
     })
 }

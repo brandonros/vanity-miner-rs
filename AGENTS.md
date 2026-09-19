@@ -1,48 +1,26 @@
-# CuMetal validation
+# Metal validation
 
-`flake.lock` selects the CuMetal fork revision and source hash used for validation.
-The `cumetal` Nix package builds its compiler and runtime together, including the
-pinned VF64 submodule. Local contribution worktrees are not build inputs.
+Use the default `nix develop` shell. `rust-toolchain.toml` selects the stock Rust
+producer; `flake.lock` and Cargo manifests pin the llvm-metal compiler/runtime.
+Keep their revisions aligned. The NVPTX target emits LLVM bitcode only.
 
-- Use `nix develop .#cumetal --command cargo ...` with the `cumetal` Cargo feature.
-  This builds the dependency and embeds its absolute package path in the CLI.
-  `--cumetal-root` can select another output of `nix build .#cumetal`; the CLI
-  verifies its manifest against the consumer's locked revision and checks both
-  artifact hashes before loading the runtime.
-- When additional contribution changes are requested, inspect the branch history
-  and update the CuMetal flake input/lock deliberately. Directory names such as
-  `cuda-metal-upstream` do not identify which patches a checkout contains. Verify
-  the locked commit actually contains the requested changes before reporting results.
-- Use PTX inputs. The CLI translates a snapshot through the pinned compiler;
-  independently supplied compiler/runtime binaries and precompiled Metal modules
-  cannot bypass the dependency selection.
-- Record the source revision, compiler/runtime paths and hashes, and PTX path/hash
-  printed by the CLI with validation results. Also identify the vanity-miner
-  revision that produced the PTX.
-- If the selected build cannot compile, load, or execute, report that exact
-  failure. Do not substitute an older build and attribute its results to the
-  selected source.
-
-Keep validation claims scoped to the recorded source and artifacts. Historical
-results must be labeled historical when the tested dependency revision changes.
-
-## Development loop
-
-- Iterate on small reproducers, refusal cases, and focused CPU/GPU tests. Replay
-  an affected full module after its small tests pass; batch shared regression
-  checks and the matched Nix integration build after a coherent group of fixes.
-- Give one integrator control of the active checkout, build directory, pin, and
-  GPU runs. Parallelize independent research or edits to separately owned files.
-  Reuse incremental builds; relink affected test executables before running them.
-- Measure PTX translation, Metal compilation, pipeline creation, and GPU execution
-  separately. A faster rejection or smaller source is not a workload pass.
-- Keep acceptance runs fresh and record any cache use explicitly. Never attribute
-  a cached result to a different compiler, input, entry, or set of options.
+- Build bundles with `scripts/build-metal.py --mode <mode>`. Each promoted kernel
+  crate lives directly in `crates/kernels/<mode>` and has its own Cargo lockfile.
+- Run searches through `scripts/run-metal.sh`. Default Cargo features use Metal;
+  `--no-default-features` supports CPU references and non-Apple test hosts.
+- Keep validation scoped to the actual source and artifacts. Record build manifests
+  and logs under ignored `artifacts/`. Do not substitute old bundles for fresh
+  source and attribute their results to the new revision.
+- Test affected kernel contracts, host validation, and CPU references first, then
+  compile the affected full kernels and run their ignored integration tests on an
+  Apple GPU. Compilation alone is not a workload pass.
+- Measure Rust/LLVM compilation, AIR lowering, Apple pipeline compilation, and GPU
+  execution separately. Record cache use; reuse incremental builds deliberately.
+- Keep one integrator in control of a checkout, pins, build directories, and GPU
+  execution. Use separate worktrees for concurrent changes.
 
 ## Documentation
 
-- Keep `docs/cumetal-issue-matrix.md` as the single concise CuMetal status summary.
-  Update current rows; do not append historical reports or repeated evidence.
 - Do not create per-task, per-artifact, planning, validation, or handoff Markdown
   files unless the user explicitly requests one. These reports are disposable
   and can be regenerated when needed.
@@ -63,7 +41,7 @@ results must be labeled historical when the tested dependency revision changes.
   plain, direct wording; omit promotional language and repeated explanations.
 - Do not add implementation narratives, debugging history, validation reports,
   timings, hashes, artifact inventories, agent handoffs, or migration chronicles.
-- Use `--help` for exhaustive CLI options and the issue matrix for CuMetal status.
+- Use `--help` for exhaustive CLI options.
   Do not duplicate those details in the README or create extra Markdown files to
   hold material removed from it. Follow the documentation policy above.
 - Before finishing a README edit, review the whole file for stale instructions,

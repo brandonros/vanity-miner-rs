@@ -1,8 +1,12 @@
 use crate::runner::progress::GlobalStats;
-use std::error::Error;
+use std::fmt::Write as _;
 use std::sync::Arc;
 
-use crate::runner::workers::cpu::spawn_cpu_workers;
+use crate::runner::{
+    progress::print_verified,
+    session::{SearchControl, run_controlled},
+    workers,
+};
 use rand::Rng as _;
 
 struct WorkerData {
@@ -13,12 +17,10 @@ struct WorkerData {
 
 fn worker(
     thread_id: usize,
-    data: Arc<WorkerData>,
-    cancelled: Arc<crate::runner::session::SearchControl>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+    data: &WorkerData,
+    cancelled: &SearchControl,
+) -> Result<Option<String>, String> {
     let mut rng = rand::thread_rng();
-
-    println!("[CPU-{thread_id}] Starting CPU bitcoin vanity worker thread");
 
     while !cancelled.stopped() {
         let rng_seed: u64 = rng.r#gen();
@@ -34,7 +36,7 @@ fn worker(
 
         data.global_stats.add_launch(1);
 
-        if result.matches {
+        if result.matches && cancelled.claim_verified_winner() {
             let encoded_public_key_str =
                 std::str::from_utf8(&result.encoded_public_key[0..result.encoded_len])
                     .unwrap_or("invalid_utf8");
@@ -48,47 +50,71 @@ fn worker(
             let encoded_private_key_str =
                 std::str::from_utf8(&encoded_private_key[0..encoded_len]).unwrap_or("invalid_utf8");
 
-            println!("[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}");
-            println!("[CPU-{thread_id}] Vanity match: thread_idx = {thread_id}");
-            println!(
+            let mut record = String::new();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: rng_seed = {rng_seed}"
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: thread_idx = {thread_id}"
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: encoded_public_key = {encoded_public_key_str}"
-            );
-            println!(
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: public_key = {}",
                 hex::encode(result.public_key)
-            );
-            println!(
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: public_key_hash = {}",
                 hex::encode(result.public_key_hash)
-            );
-            println!(
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
                 "[CPU-{thread_id}] Vanity match: private_key = {}",
                 hex::encode(result.private_key)
-            );
-            println!("[CPU-{thread_id}] Vanity match: wallet = {encoded_private_key_str}");
+            )
+            .unwrap();
+            writeln!(
+                &mut record,
+                "[CPU-{thread_id}] Vanity match: wallet = {encoded_private_key_str}"
+            )
+            .unwrap();
 
-            data.global_stats.add_matches(1);
+            return Ok(Some(record));
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 pub fn run(
-    num_threads: usize,
-    prefix: String,
-    suffix: String,
+    args: &super::args::BitcoinArgs,
+    workers: usize,
     global_stats: Arc<GlobalStats>,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    println!(
-        "Starting CPU bitcoin vanity mode with {} threads",
-        num_threads
-    );
+    exit_on_first_match: bool,
+) -> crate::runner::RunResult {
+    let data = WorkerData {
+        prefix_bytes: args.prefix.as_bytes().to_vec(),
+        suffix_bytes: args.suffix.as_bytes().to_vec(),
+        global_stats: global_stats.clone(),
+    };
 
-    let data = Arc::new(WorkerData {
-        prefix_bytes: prefix.as_bytes().to_vec(),
-        suffix_bytes: suffix.as_bytes().to_vec(),
-        global_stats,
-    });
-
-    spawn_cpu_workers(num_threads, data, worker)
+    run_controlled(global_stats, "keys", exit_on_first_match, |control| {
+        let winner = workers::search(workers, &control, |id| worker(id, &data, &control))?;
+        if let Some(record) = winner {
+            print_verified(&control, record)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    })
 }

@@ -4,8 +4,6 @@ use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, xoroshiro::BatchSeed};
 use std::sync::{Arc, RwLock};
 
-pub const ENTRY: &str = "kernel_shallenge";
-
 pub fn search(
     username: &str,
     best: Arc<RwLock<SharedBestHash>>,
@@ -18,7 +16,7 @@ pub fn search(
         width: u64::from(control.batch_size()),
     };
     let initial = best.read().unwrap_or_else(|e| e.into_inner()).get_current();
-    batches::search(
+    let output = batches::search(
         |start, count| {
             let target = best.read().unwrap_or_else(|e| e.into_inner()).get_current();
             evaluate(&request, &target, username.as_bytes(), start, count)
@@ -54,7 +52,13 @@ pub fn search(
                 nonce
             )))
         },
-    )
+    )?;
+    if control.exit_on_first_match()
+        && let Some(record) = &output
+    {
+        crate::runner::progress::print_verified(control, record.clone())?;
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
@@ -115,3 +119,7 @@ mod tests {
         assert!(control.has_winner());
     }
 }
+
+#[cfg(all(test, feature = "metal"))]
+#[path = "../../../tests/metal/session.rs"]
+mod metal_tests;

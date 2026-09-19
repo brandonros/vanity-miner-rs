@@ -27,7 +27,7 @@ impl RsaModulusArgs {
         Ok(crate::modes::rsa_modulus::ModulusSearch {
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         })
     }
 }
@@ -39,6 +39,6 @@ impl RsaModulusArgs {
     }
     pub fn details(&self) -> crate::args::CommandDetails {
         self.pattern
-            .details("Constructing an RSA-2048 vanity modulus", "rsa_modulus")
+            .details("Constructing an RSA-2048 vanity modulus")
     }
 }

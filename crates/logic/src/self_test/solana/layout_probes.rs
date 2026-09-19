@@ -9,7 +9,8 @@ register_self_test! {
         // projection — pure indexed read from a `&'static [u8; N]` plus an
         // equality check.
         const TABLE: &[u8; 4] = b"ABCD";
-        let idx = core::hint::black_box(0usize);
+        let idx = crate::self_test::black_box(0usize);
+        if idx >= TABLE.len() { return 0; }
         (TABLE[idx] == b'A') as u32
     }
 }
@@ -22,7 +23,8 @@ register_self_test! {
         // from any table lookup. If this FAILs, the iter_mut over a sliced
         // `&mut [T; N]` is the broken op.
         let mut buf = [0u8; 8];
-        let n = core::hint::black_box(4usize);
+        let n = crate::self_test::black_box(4usize);
+        if n > buf.len() { return 0; }
         for val in &mut buf[..n] {
             *val = 0xAA;
         }
@@ -39,8 +41,10 @@ register_self_test! {
         // base58.rs:99-101.
         const TABLE: &[u8; 4] = b"ABCD";
         let mut buf = [0u8; 8];
-        let n = core::hint::black_box(4usize);
+        let n = crate::self_test::black_box(4usize);
+        if n > buf.len() { return 0; }
         for val in &mut buf[..n] {
+            if *val as usize >= TABLE.len() { return 0; }
             *val = TABLE[*val as usize];
         }
         (buf[0] == b'A' && buf[3] == b'A' && buf[4] == 0 && buf[7] == 0) as u32
@@ -59,7 +63,8 @@ register_self_test! {
         // controlled one-variable test: if 60 CRASHes and 63 PASSes, the
         // backend mishandles array-ref static indexing specifically.
         const TABLE: &[u8] = b"ABCD";
-        let idx = core::hint::black_box(0usize);
+        let idx = crate::self_test::black_box(0usize);
+        if idx >= TABLE.len() { return 0; }
         (TABLE[idx] == b'A') as u32
     }
 }
@@ -84,7 +89,7 @@ register_self_test! {
         const D: u64 = 58_u64.pow(5);
         let mut limbs = [0u32; 10];
         let mut limb_count: usize = 0;
-        let mut remaining_carry = core::hint::black_box(0xDEAD_BEEF_CAFE_BABE_u64);
+        let mut remaining_carry = crate::self_test::black_box(0xDEAD_BEEF_CAFE_BABE_u64);
 
         while remaining_carry > 0 && limb_count < 10 {
             limbs[limb_count] = (remaining_carry % D) as u32;
@@ -137,7 +142,8 @@ register_self_test! {
 register_self_test! {
     /// static depth-4 newtype nesting
     fn static_depth4_newtype_nesting() -> u32 {
-        let idx = core::hint::black_box(2usize);
+        let idx = crate::self_test::black_box(2usize);
+        if idx >= NESTED_ONE_PROBE.0.limbs.len() { return 0; }
         let v = NESTED_ONE_PROBE.0.limbs[idx].0;
         (v == 0x9999_AAAA_BBBB_CCCC) as u32
     }
@@ -153,8 +159,9 @@ register_self_test! {
 register_self_test! {
     /// reverse range iterator write
     fn reverse_range_write() -> u32 {
-        let limb_count: usize = core::hint::black_box(3);
+        let limb_count: usize = crate::self_test::black_box(3);
         let mut out = [0u32; 10];
+        if limb_count > out.len() { return 0; }
         for idx in (0..limb_count).rev() {
             out[idx] = (idx as u32) * 100;
         }
@@ -176,10 +183,11 @@ register_self_test! {
     /// Index/IndexMut trait dispatch
     fn index_trait_dispatch() -> u32 {
         let mut p = IdxProbe([0u64; 5]);
-        let idx = core::hint::black_box(2usize);
-        let val = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+        let idx = crate::self_test::black_box(2usize);
+        let val = crate::self_test::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+        if idx >= p.0.len() { return 0; }
         p[idx] = val;
-        let read = core::hint::black_box(p[idx]);
+        let read = crate::self_test::black_box(p[idx]);
         (read == val) as u32
     }
 }
@@ -187,7 +195,7 @@ register_self_test! {
 register_self_test! {
     /// named-field struct return (Scalar shape)
     fn named_field_struct_return() -> u32 {
-        let input = core::hint::black_box([0u8; 32]);
+        let input = crate::self_test::black_box([0u8; 32]);
         let out = make_wrap_named(input);
         let mut expected = [0u8; 32];
         let mut i = 0;
@@ -222,7 +230,8 @@ register_self_test! {
         arr[2] = 0x33;
         arr[3] = 0x44;
         arr[4] = 0x55;
-        let result_len = core::hint::black_box(5usize);
+        let result_len = crate::self_test::black_box(5usize);
+        if result_len > arr.len() { return 0; }
         arr[..result_len].reverse();
         // Expected after reverse: [0x55, 0x44, 0x33, 0x22, 0x11, 0, 0, ...]
         let mut expected = [0u8; 64];

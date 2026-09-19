@@ -25,6 +25,26 @@ macro_rules! register_self_test {
     (@device $name:ident, $reason:literal) => { 2 };
 }
 
+// A single declaration supplies both grouped and per-check self-test layouts.
+macro_rules! self_test_kernel {
+    ($module:ident, $entry:ident, $export:expr, |$selector:ident, $results:ident| $body:block) => {
+        llvm_metal_kernel::kernel! {
+            pub mod $module;
+            entry $export;
+            /// # Safety
+            /// One invocation, a valid selector and disjoint initialized registry storage.
+            #[cfg(feature = "self_test_metal_entries")]
+            pub unsafe extern "C" fn $entry(
+                $selector: Read Fixed u32,
+                $results: ReadWrite Fixed [u32; crate::self_test::SELF_TEST_NUM_CHECKS],
+            ) {
+                let $results = $results.cast::<u32>();
+                $body
+            } dispatch Single;
+        }
+    };
+}
+
 // The central list supplies only paths, mode ownership, and ordering.
 macro_rules! define_self_tests {
     ($($mode:ident ($feature:literal, $file:literal) {
@@ -53,6 +73,7 @@ macro_rules! define_self_tests {
                     /// Description for enabled checks; the name for disabled checks.
                     pub label: &'static str,
                     pub kernel: &'static str,
+                    pub metal_entry: &'static str,
                     pub enabled: bool,
                     /// Device skip policy, available when the check is enabled.
                     pub gpu_skip: Option<&'static str>,
@@ -67,6 +88,7 @@ macro_rules! define_self_tests {
                         { concat!(stringify!($mode), ".", define_self_tests!(@name $($check)::+)) }
                     },
                     kernel: concat!("kernel_self_test_", stringify!($mode)),
+                    metal_entry: concat!("kernel_self_test_", stringify!($mode), "_", define_self_tests!(@name $($check)::+)),
                     enabled: cfg!(feature = $feature),
                     gpu_skip: {
                         #[cfg(feature = $feature)]
@@ -107,8 +129,39 @@ macro_rules! define_self_tests {
                 $(#[cfg(feature = $feature)]
                 pub mod $mode {
                     use super::super::{Slot, $mode as checks};
+                    self_test_kernel!(group_abi, [<kernel_self_test_ $mode>], concat!("kernel_self_test_", stringify!($mode)), |selector, results| {
+                        let slot = unsafe { selector.read() };
+                        let results = unsafe { core::slice::from_raw_parts_mut(results, crate::self_test::SELF_TEST_NUM_CHECKS) };
+                        run_slot(results, slot as usize);
+                    });
+                    $(self_test_kernel!([<abi $(_ $check)*>], [<kernel_self_test_ $mode $(_ $check)*>], concat!("kernel_self_test_", stringify!($mode), "_", define_self_tests!(@name $($check)::+)), |selector, results| {
+                        let slot = Slot::[<$mode:camel $($check:camel)*>].index();
+                        let selected = unsafe { selector.read() };
+                        if selected == slot as u32 || selected == u32::MAX {
+                            unsafe { results.add(slot).write(checks::$($check)::+()); }
+                        }
+                    });)*
+                    pub fn descriptor(entry: &str) -> Option<&'static [u8]> {
+                        if entry == group_abi::ENTRY { return Some(&group_abi::DESCRIPTOR); }
+                        $(if entry == [<abi $(_ $check)*>]::ENTRY { return Some(&[<abi $(_ $check)*>]::DESCRIPTOR); })*
+                        None
+                    }
+                    #[cfg(feature = "self_test_metal_entries")]
+                    pub fn metal_entry(slot: usize) -> Option<unsafe extern "C" fn(*const u32, *mut [u32; crate::self_test::SELF_TEST_NUM_CHECKS])> {
+                        $(if slot == Slot::[<$mode:camel $($check:camel)*>].index() {
+                            return Some([<kernel_self_test_ $mode $(_ $check)*>]);
+                        })*
+                        None
+                    }
                     pub fn run(results: &mut [u32]) {
                         $(results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();)*
+                    }
+                    /// Execute one original check, or the full group for u32::MAX.
+                    /// Unlike run_device, this does not apply backend-specific skips.
+                    pub fn run_slot(results: &mut [u32], slot: usize) {
+                        $(if slot == u32::MAX as usize || slot == Slot::[<$mode:camel $($check:camel)*>].index() {
+                            results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();
+                        })*
                     }
                     pub fn run_device(results: &mut [u32]) {
                         $(results[Slot::[<$mode:camel $($check:camel)*>].index()] =
@@ -120,6 +173,13 @@ macro_rules! define_self_tests {
                         })*
                     }
                 })*
+            }
+
+            /// Native expected descriptors from the same declarations as device entries.
+            pub fn descriptor(entry: &str) -> Option<&'static [u8]> {
+                $(#[cfg(feature = $feature)]
+                if let Some(d) = runners::$mode::descriptor(entry) { return Some(d); })*
+                None
             }
 
             /// All enabled checks, in registry order.

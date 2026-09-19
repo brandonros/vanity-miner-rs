@@ -82,7 +82,7 @@ impl RsaPssArgs {
             source,
             prefix: self.pattern.prefix.clone(),
             suffix: self.pattern.suffix.clone(),
-            workers: self.pattern.threads.unwrap_or(workers),
+            workers: workers,
         })
     }
 }
@@ -93,7 +93,6 @@ impl RsaPssArgs {
         Ok(())
     }
     pub fn details(&self) -> crate::args::CommandDetails {
-        self.pattern
-            .details("Searching raw RSA-PSS signatures", "rsa_pss")
+        self.pattern.details("Searching raw RSA-PSS signatures")
     }
 }

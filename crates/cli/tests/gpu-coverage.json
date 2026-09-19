@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "baseline": "d5fb9e6",
+  "command": "scripts/test-gpu.sh",
+  "cases": [
+    {
+      "target": "metal_gpu",
+      "name": "shallenge::application_batches_compare_every_lane_and_preserve_guards",
+      "previous": "metal::application_batches_compare_every_lane_and_preserve_guards",
+      "owner": "crates/cli/tests/metal/shallenge.rs",
+      "coverage": "application batches compare every lane and preserve guards",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "shallenge::bounded_cli_search_verifies_winners_and_finishes_without_matches",
+      "previous": "metal::bounded_cli_search_verifies_winners_and_finishes_without_matches",
+      "owner": "crates/cli/tests/metal/shallenge.rs",
+      "coverage": "bounded cli search verifies winners and finishes without matches",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "shallenge::large_partial_grid_checks_every_application_result",
+      "previous": "metal::large_partial_grid_checks_every_application_result",
+      "owner": "crates/cli/tests/metal/shallenge.rs",
+      "coverage": "large partial grid checks every application result",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "bitcoin::candidates_patterns_winners_and_errors_match_cpu",
+      "previous": "metal_bitcoin::candidates_patterns_winners_and_errors_match_cpu",
+      "owner": "crates/cli/tests/metal/bitcoin.rs",
+      "coverage": "candidates patterns winners and errors match cpu",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "bitcoin::bounded_cli_prints_verified_winners_and_completes_misses",
+      "previous": "metal_bitcoin::bounded_cli_prints_verified_winners_and_completes_misses",
+      "owner": "crates/cli/tests/metal/bitcoin.rs",
+      "coverage": "bounded cli prints verified winners and completes misses",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "ethereum::candidates_patterns_winners_and_errors_match_cpu",
+      "previous": "metal_ethereum::candidates_patterns_winners_and_errors_match_cpu",
+      "owner": "crates/cli/tests/metal/ethereum.rs",
+      "coverage": "candidates patterns winners and errors match cpu",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "ethereum::bounded_cli_prints_verified_winners_and_completes_misses",
+      "previous": "metal_ethereum::bounded_cli_prints_verified_winners_and_completes_misses",
+      "owner": "crates/cli/tests/metal/ethereum.rs",
+      "coverage": "bounded cli prints verified winners and completes misses",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "solana::candidates_patterns_winners_and_errors_match_cpu",
+      "previous": "metal_solana::candidates_patterns_winners_and_errors_match_cpu",
+      "owner": "crates/cli/tests/metal/solana.rs",
+      "coverage": "candidates patterns winners and errors match cpu",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "solana::bounded_cli_prints_verified_winners_and_completes_misses",
+      "previous": "metal_solana::bounded_cli_prints_verified_winners_and_completes_misses",
+      "owner": "crates/cli/tests/metal/solana.rs",
+      "coverage": "bounded cli prints verified winners and completes misses",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "p256_public_key::targets_multilane_winners_misses_and_errors_match_cpu",
+      "previous": "metal_p256_public::targets_multilane_winners_misses_and_errors_match_cpu",
+      "owner": "crates/cli/tests/metal/p256_public_key.rs",
+      "coverage": "targets multilane winners misses and errors match cpu",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "p256_public_key::bounded_cli_exports_verified_keys_for_every_target",
+      "previous": "metal_p256_public::bounded_cli_exports_verified_keys_for_every_target",
+      "owner": "crates/cli/tests/metal/p256_public_key.rs",
+      "coverage": "bounded cli exports verified keys for every target",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "p256_signature::sources_targets_s_forms_and_variable_messages_match_cpu",
+      "previous": "metal_p256_signature::sources_targets_s_forms_and_variable_messages_match_cpu",
+      "owner": "crates/cli/tests/metal/p256_signature.rs",
+      "coverage": "sources targets s forms and variable messages match cpu",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "p256_signature::bounded_cli_verifies_both_sources_and_s_forms",
+      "previous": "metal_p256_signature::bounded_cli_verifies_both_sources_and_s_forms",
+      "owner": "crates/cli/tests/metal/p256_signature.rs",
+      "coverage": "bounded cli verifies both sources and s forms",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "rsa_modulus::independent_candidates_and_host_key_verification",
+      "previous": "metal_rsa::independent_candidates_and_host_key_verification",
+      "owner": "crates/cli/tests/metal/rsa_modulus.rs",
+      "coverage": "independent candidates and host key verification",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "rsa_modulus::bounded_cli_search_and_entropy_policy",
+      "previous": "metal_rsa::bounded_cli_search_and_entropy_policy",
+      "owner": "crates/cli/tests/metal/rsa_modulus.rs",
+      "coverage": "bounded cli search and entropy policy",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "rsa_pss::salt_and_message_candidates_crt_validation_and_winners",
+      "previous": "metal_rsa_pss::salt_and_message_candidates_crt_validation_and_winners",
+      "owner": "crates/cli/tests/metal/rsa_pss.rs",
+      "coverage": "salt and message candidates crt validation and winners",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "production"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "rsa_pss::cli_both_sources_verify_exported_signatures_and_reject_seed",
+      "previous": "metal_rsa_pss::cli_both_sources_verify_exported_signatures_and_reject_seed",
+      "owner": "crates/cli/tests/metal/rsa_pss.rs",
+      "coverage": "cli both sources verify exported signatures and reject seed",
+      "oracle": "CPU candidate comparison plus mode-specific known answers/output assertions",
+      "suite": "cli"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "self_test::original_registry_groups_pass_on_metal_without_skips",
+      "previous": "metal_self_test::original_registry_groups_pass_on_metal_without_skips",
+      "owner": "crates/cli/tests/metal/self_test.rs",
+      "coverage": "original registry groups pass on metal without skips",
+      "oracle": "registry fixed known answers and complete PASS report",
+      "suite": "self-tests"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "self_test::named_checks_use_device_slot_selection_and_registry_order",
+      "previous": "metal_self_test::named_checks_use_device_slot_selection_and_registry_order",
+      "owner": "crates/cli/tests/metal/self_test.rs",
+      "coverage": "named checks use device slot selection and registry order",
+      "oracle": "registry fixed known answers and complete PASS report",
+      "suite": "self-tests"
+    },
+    {
+      "target": "metal_gpu",
+      "name": "self_test::named_checks_report_load_pipeline_and_gpu_timings",
+      "previous": "metal_self_test::named_checks_report_load_pipeline_and_gpu_timings",
+      "owner": "crates/cli/tests/metal/self_test.rs",
+      "coverage": "named checks report load pipeline and gpu timings",
+      "oracle": "registry fixed known answers and complete PASS report",
+      "suite": "self-tests"
+    },
+    {
+      "target": "lib",
+      "name": "modes::shallenge::device::metal_tests::real_search_updates_target_advances_counters_and_honors_cancellation",
+      "previous": "modes::shallenge::device::metal_tests::real_search_updates_target_advances_counters_and_honors_cancellation",
+      "owner": "crates/cli/tests/metal/session.rs",
+      "coverage": "real GPU session target updates, no counter reuse, resume after match, cancellation prevents dispatch",
+      "oracle": "CPU-verified candidate and session state assertions",
+      "suite": "production"
+    }
+  ],
+  "cpu_only": [
+    "kernel layout/slot selection tests",
+    "artifact/dispatch rejection tests",
+    "exit_on_first_match.rs"
+  ],
+  "benchmarks": [
+    "examples/metal_bench.rs",
+    "examples/metal_solana_bench.rs"
+  ],
+  "compiler_ownership": "Reduced LLVM regressions and runtime-input intermediate corpora remain in llvm-metal; application grid/CLI coverage belongs here. No crypto case is deleted by this consolidation.",
+  "excluded_ignored": [
+    {
+      "target": "lib",
+      "name": "modes::rsa_modulus::tests::constructive_keys_round_trip_and_pass_libressl_checks",
+      "reason": "manual stochastic CPU search, not an Apple GPU test"
+    },
+    {
+      "target": "rsa_device_pipeline",
+      "name": "benchmark_narrow_range_construction",
+      "reason": "CPU range-construction microbenchmark; not GPU correctness coverage"
+    }
+  ],
+  "shared_harness": {
+    "owner": "crates/cli/tests/metal/support.rs",
+    "modes": [
+      "bitcoin",
+      "ethereum",
+      "solana"
+    ],
+    "preserved": [
+      "counts 1/31/32/33/65/129/257",
+      "normal/max/zero seeds, widths 32/33/1, counter starts 0/31/u64::MAX-256",
+      "match-all, impossible, prefix/suffix, suffix-only patterns",
+      "exact overlapping prefix/suffix and unique known winner lane",
+      "conflicting suffix returns a miss",
+      "invalid width and oversized prefix/suffix return device errors",
+      "zero count, excess capacity, counter overflow rejected without a launch",
+      "audit-off winner verification and misses",
+      "CLI match-all/known winner/miss; 66 keys; mode-specific exported output assertions"
+    ],
+    "solana_only": [
+      "next batch must not repeat the first winner",
+      "threadgroup sizes 32 and 128",
+      "exactly one known-address CLI record"
+    ],
+    "removed_assertions": []
+  },
+  "artifacts": {
+    "builder": "scripts/build-metal.py",
+    "production": "target/metal/<mode>/kernel.build.json",
+    "registry": "target/metal/self-test-<mode>/self-tests.json and per-case kernel.build.json",
+    "provenance": "Each manifest records the consumer HEAD, relative source SHA-256 values, rustc version, compiler binary hash and artifact hashes. The runner checks current source hashes; the loader checks bundle hashes and ABI. Local dirty sources are attributable by hashes rather than HEAD alone."
+  }
+}

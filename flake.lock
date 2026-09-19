@@ -1,22 +1,41 @@
 {
   "nodes": {
-    "cumetal": {
+    "llvm-downgrade": {
       "flake": false,
       "locked": {
-        "lastModified": 1789685202,
-        "narHash": "sha256-532Rm1kNYq5ReLGAI84hjZdUb4WREoSiWcayLPwewIs=",
-        "ref": "upstream/ptx-helper-record-contexts",
-        "rev": "1b9e6852bc4053f5e5cf347f78c185a916bbbf3a",
-        "revCount": 624,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
+        "lastModified": 1780992850,
+        "narHash": "sha256-1dSnxXWdqyE2XDBtBP1XJmDFPVFffNBhRuCYNJK9rYk=",
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "49459235028889ea741f2aee3e7f346d53f68f5d",
+        "type": "github"
       },
       "original": {
-        "ref": "upstream/ptx-helper-record-contexts",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "49459235028889ea741f2aee3e7f346d53f68f5d",
+        "type": "github"
+      }
+    },
+    "llvm-metal": {
+      "inputs": {
+        "llvm-downgrade": "llvm-downgrade",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1789776364,
+        "narHash": "sha256-mCdBT8jOR5WX3h8HdH17kEMtWT5Srf1jnaZNaEFU7/c=",
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "98667d14404aaffc9f6823daa5cbd0ad29bae26a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "98667d14404aaffc9f6823daa5cbd0ad29bae26a",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -35,33 +54,15 @@
         "type": "github"
       }
     },
-    "nixpkgs-llvm7": {
-      "locked": {
-        "lastModified": 1704290814,
-        "narHash": "sha256-LWvKHp7kGxk/GEtlrGYV68qIvPHkU9iToomNFGagixU=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "70bdadeb94ffc8806c0570eb5c2695ad29f0e421",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-23.05",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
-        "cumetal": "cumetal",
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-llvm7": "nixpkgs-llvm7",
-        "rust-overlay": "rust-overlay"
+        "llvm-metal": "llvm-metal"
       }
     },
     "rust-overlay": {
       "inputs": {
         "nixpkgs": [
+          "llvm-metal",
           "nixpkgs"
         ]
       },
@@ -76,6 +77,7 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "rev": "753568957a87312ed599cba5699e67126eded6c0",
         "type": "github"
       }
     }

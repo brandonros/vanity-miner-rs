@@ -1,5 +1,69 @@
 use seq_macro::seq;
 
+/// Narrow diagnostics for compiler integration tests. Production hashing keeps
+/// its existing unrolled implementation; these exports do not change that path.
+#[cfg(feature = "compiler-probes")]
+pub mod compiler_probes {
+    /// Actual production helpers, plus byte order and variable rotation checks.
+    pub fn operations(x: u32, y: u32, z: u32) -> [u32; 8] {
+        [
+            super::small_sigma0(x),
+            super::small_sigma1(x),
+            super::big_sigma0(x),
+            super::big_sigma1(x),
+            super::ch(x, y, z),
+            super::maj(x, y, z),
+            x.swap_bytes(),
+            super::rotr32(x, y),
+        ]
+    }
+
+    /// Compose the production helpers for one schedule expansion word.
+    pub fn schedule_word(words: &[u32; 4]) -> u32 {
+        super::small_sigma1(words[0])
+            .wrapping_add(words[1])
+            .wrapping_add(super::small_sigma0(words[2]))
+            .wrapping_add(words[3])
+    }
+
+    /// Diagnostic single round with caller-supplied schedule word and constant.
+    /// This composition exposes all intermediate state, not a replacement hash.
+    pub fn round(state: &[u32; 8], word: u32, constant: u32) -> [u32; 8] {
+        let [a, b, c, d, e, f, g, h] = *state;
+        let t1 = h
+            .wrapping_add(super::big_sigma1(e))
+            .wrapping_add(super::ch(e, f, g))
+            .wrapping_add(constant)
+            .wrapping_add(word);
+        let t2 = super::big_sigma0(a).wrapping_add(super::maj(a, b, c));
+        [t1.wrapping_add(t2), a, b, c, d.wrapping_add(t1), e, f, g]
+    }
+
+    /// Call the actual production compression implementation.
+    pub fn compression(block: &[u32; 16], state: &mut [u32; 8]) {
+        super::process_block(block, state);
+    }
+
+    #[cfg(test)]
+    mod tests {
+        #[test]
+        fn compression_of_padded_abc_matches_fips_sha256() {
+            let mut block = [0; 16];
+            block[0] = 0x61626380;
+            block[15] = 24;
+            let mut state = super::super::H0;
+            super::compression(&block, &mut state);
+            assert_eq!(
+                state,
+                [
+                    0xba7816bf, 0x8f01cfea, 0x414140de, 0x5dae2223, 0xb00361a3, 0x96177a9c,
+                    0xb410ff61, 0xf20015ad
+                ]
+            );
+        }
+    }
+}
+
 // SHA-256 constants (first 32 bits of the fractional parts of the cube roots of the first 64 primes)
 const K: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -216,7 +280,6 @@ pub fn sha256_from_bytes(input: &[u8]) -> [u8; 32] {
 pub struct Sha256 {
     state: [u32; 8],
     buffer: [u8; 64],
-    used: usize,
     bytes: u64,
 }
 
@@ -225,7 +288,6 @@ impl Sha256 {
         Self {
             state: H0,
             buffer: [0; 64],
-            used: 0,
             bytes: 0,
         }
     }
@@ -239,24 +301,25 @@ impl Sha256 {
     }
 
     fn update_slice(&mut self, mut input: &[u8]) {
+        // The buffered length is the low six bits of the total byte count.
+        // Deriving it here keeps the bound explicit across non-inlined calls;
+        // wrapping the count also preserves its remainder modulo 64.
+        let used = (self.bytes & 63) as usize;
         self.bytes = self.bytes.wrapping_add(input.len() as u64);
-        if self.used != 0 {
-            let take = (64 - self.used).min(input.len());
-            self.buffer[self.used..self.used + take].copy_from_slice(&input[..take]);
-            self.used += take;
+        if used != 0 {
+            let take = (64 - used).min(input.len());
+            self.buffer[used..used + take].copy_from_slice(&input[..take]);
             input = &input[take..];
-            if self.used != 64 {
+            if used + take != 64 {
                 return;
             }
             Self::compress(&mut self.state, &self.buffer);
-            self.used = 0;
         }
         while input.len() >= 64 {
             Self::compress(&mut self.state, &input[..64]);
             input = &input[64..];
         }
         self.buffer[..input.len()].copy_from_slice(input);
-        self.used = input.len();
     }
 
     fn compress(state: &mut [u32; 8], bytes: &[u8]) {
@@ -268,9 +331,10 @@ impl Sha256 {
     }
 
     pub fn finalize(mut self) -> [u8; 32] {
-        self.buffer[self.used] = 0x80;
-        self.buffer[self.used + 1..].fill(0);
-        if self.used >= 56 {
+        let used = (self.bytes & 63) as usize;
+        self.buffer[used] = 0x80;
+        self.buffer[used + 1..].fill(0);
+        if used >= 56 {
             Self::compress(&mut self.state, &self.buffer);
             self.buffer = [0; 64];
         }
