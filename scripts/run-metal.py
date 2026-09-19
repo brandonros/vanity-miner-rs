@@ -10,6 +10,7 @@ root = Path(__file__).resolve().parents[1]
 from modes import MODES
 parser = argparse.ArgumentParser(description=__doc__, add_help=False)
 parser.add_argument('--mode', choices=MODES + ['self-test'] + ['self-test-' + mode for mode in MODES], default='shallenge')
+parser.add_argument('--inlining', choices=['selective', 'all', 'retain-scalar'], default='selective', help='Use all to opt out of selective inlining')
 options, cli_args = parser.parse_known_args()
 if options.mode in ('shallenge', 'ethereum', 'bitcoin', 'solana'):
     # Baseline search settings; explicit CLI values remain authoritative.
@@ -28,7 +29,7 @@ else:
     modes = [options.mode]
     features = f'metal,{options.mode}'
 for mode in modes:
-    subprocess.run([sys.executable, str(root / 'scripts/build-metal.py'), '--mode', mode], cwd=root, check=True)
+    subprocess.run([sys.executable, str(root / 'scripts/build-metal.py'), '--mode', mode, '--inlining', options.inlining], cwd=root, check=True)
 subprocess.run(['cargo', 'build', '--locked', '--release', '-p', 'vanity-miner', '--no-default-features', '--features', features, '--target-dir', str(root / 'target/metal/host')], cwd=root, check=True)
 os.chdir(root)
 os.execv(root / 'target/metal/host/release/vanity-miner', ['vanity-miner', *cli_args])

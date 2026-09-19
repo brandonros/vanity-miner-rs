@@ -45,6 +45,7 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--case', help='Build one named self-test case into an explicit --output directory')
     parser.add_argument('--monolithic-self-test', action='store_true', help='Build the legacy whole-group self-test kernel')
+    parser.add_argument('--inlining', choices=['all', 'retain-scalar', 'selective'], default='selective', help='Helper-retention policy (default: selective); use all to force full inlining')
     options = parser.parse_args()
     is_self_test = options.mode.startswith('self-test-')
     if (options.case or options.monolithic_self_test) and not is_self_test:
@@ -155,11 +156,25 @@ def main():
             unit_start = time.perf_counter()
             # Select and discard unrelated exported cases before forced inlining.
             # Rust compilation/linking are shared once across this group's cases.
-            run('opt', '-passes=internalize,globaldce,forceattrs,always-inline,default<O3>,globaldce,strip-dead-prototypes,verify',
-                '-force-remove-attribute=noinline', '-force-attribute=alwaysinline',
-                '-inline-threshold=10000', f'-internalize-public-api-list={unit_entry}',
-                '-vectorize-slp=false', '-vectorize-loops=false',
-                linked_input, '-o', unit / 'inlined.bc')
+            if options.inlining == 'all':
+                run('opt', '-passes=internalize,globaldce,forceattrs,always-inline,default<O3>,globaldce,strip-dead-prototypes,verify',
+                    '-force-remove-attribute=noinline', '-force-attribute=alwaysinline',
+                    '-inline-threshold=10000', f'-internalize-public-api-list={unit_entry}',
+                    '-vectorize-slp=false', '-vectorize-loops=false',
+                    linked_input, '-o', unit / 'inlined.bc')
+            else:
+                run('opt', '-passes=internalize,globaldce,function(sroa,instcombine,simplifycfg,tailcallelim),globaldce,verify',
+                    f'-internalize-public-api-list={unit_entry}', linked_input, '-o', unit / 'selected.bc')
+                try:
+                    run(compiler_binary, 'prepare', unit / 'selected.bc', '--entry', unit_entry,
+                        '--output', unit / 'prepared.bc', '--inlining', options.inlining)
+                except subprocess.CalledProcessError:
+                    shutil.copyfile(unit / 'selected.bc', output / 'rejected-prepare.bc')
+                    run('llvm-dis', unit / 'selected.bc', '-o', output / 'rejected-prepare.ll')
+                    raise
+                run('opt', '-passes=always-inline,default<O3>,globaldce,strip-dead-prototypes,verify',
+                    '-vectorize-slp=false', '-vectorize-loops=false',
+                    unit / 'prepared.bc', '-o', unit / 'inlined.bc')
             unit_timings = dict(timings, inline_seconds=time.perf_counter() - unit_start)
             stage_start = time.perf_counter()
             post_inline(unit / 'inlined.bc', unit / 'kernel.bc')
@@ -176,7 +191,8 @@ def main():
             frontend_total += frontend_seconds
             stage_start = time.perf_counter()
             try:
-                run(compiler_binary, 'compile', unit / 'kernel.bc', '--descriptor', interface, '--output', unit)
+                run(compiler_binary, 'compile', unit / 'kernel.bc', '--descriptor', interface, '--output', unit,
+                    '--inlining', options.inlining)
             except subprocess.CalledProcessError:
                 for name in ['kernel.bc', 'kernel.ll']:
                     shutil.copyfile(unit / name, destination / ('rejected.' + name.split('.')[-1]))
@@ -188,7 +204,7 @@ def main():
             if compiler_hash != digest(compiler_binary):
                 raise RuntimeError('compiler changed during lowering; rerun the build')
             names = ['kernel.descriptor.json'] + ['kernel.bc', 'kernel.ll', 'kernel.air.ll', 'kernel.air.bc', 'kernel.bindings.json', 'kernel.metallib']
-            report = dict(schema=1, rustc=rust, source_revision=source_revision,
+            report = dict(schema=1, rustc=rust, source_revision=source_revision, inlining=options.inlining,
                           compiler_source=str(compiler), compiler_flake_lock_sha256=digest(compiler / 'flake.lock'),
                           compiler_sha256=compiler_hash,
                           linked_bitcode_sha256=linked_hash, source_sha256=source_hashes,

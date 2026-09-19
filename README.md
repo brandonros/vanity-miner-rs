@@ -49,6 +49,9 @@ and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
 stops the search. Use `--exit-on-first-match` to stop after one verified match.
 Use `<command> --help` for options.
 
+Selective inlining is the default. Add `--inlining all` to `run-metal.sh`,
+`build-metal.py`, or `test-gpu.sh` to opt into full inlining.
+
 For compiler development, pass `--llvm-metal ../llvm-metal` before `--mode`.
 To build a kernel separately:
 
