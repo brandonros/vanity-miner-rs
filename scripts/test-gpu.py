@@ -89,7 +89,7 @@ def main():
     groups = (MODES if options.suite != 'self-tests' else []) + (['self-test-' + mode for mode in MODES] if options.suite in ['all', 'self-tests'] else [])
     if not options.skip_build:
         for mode in groups:
-            run(['python3', 'scripts/build-metal.py', '--mode', mode, '--inlining', options.inlining, '--output', str(bundles / mode)], options.timeout)
+            run(['bash', 'scripts/build-metal.sh', '--mode', mode, '--inlining', options.inlining, '--output', str(bundles / mode)], options.timeout)
     # The loader validates artifact hashes/ABI; verify source provenance here too.
     # CI downloads bundles built in a different checkout, so compare relative source hashes.
     import hashlib

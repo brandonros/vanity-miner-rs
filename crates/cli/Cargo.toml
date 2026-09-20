@@ -36,8 +36,8 @@ self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss"]
 self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
-llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "df7f9bc4369cfddbdc5ac235154e24e60c8ba4d7", optional = true }
-llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "df7f9bc4369cfddbdc5ac235154e24e60c8ba4d7", optional = true }
+llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "1c011e80fae5c9b83fdd44226a69d4173a816c54", optional = true }
+llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "1c011e80fae5c9b83fdd44226a69d4173a816c54", optional = true }
 sha2 = { version = "0.10", optional = true }
 serde_json = { version = "1", optional = true }
 ctrlc = { version = "3.4" }

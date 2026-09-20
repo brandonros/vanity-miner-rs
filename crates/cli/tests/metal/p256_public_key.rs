@@ -33,7 +33,7 @@ fn invalid_dispatch_is_rejected_before_loading_artifacts() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.py --mode p256-public-key first; requires Apple GPU"]
+#[ignore = "build scripts/build-metal.sh --mode p256-public-key first; requires Apple GPU"]
 fn targets_multilane_winners_misses_and_errors_match_cpu() {
     for audit in [true, false] {
         let mut engine = P256PublicTransport::load(&artifacts(), 5, 4, audit).unwrap();
@@ -116,7 +116,7 @@ fn targets_multilane_winners_misses_and_errors_match_cpu() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.py --mode p256-public-key first; requires Apple GPU"]
+#[ignore = "build scripts/build-metal.sh --mode p256-public-key first; requires Apple GPU"]
 fn bounded_cli_exports_verified_keys_for_every_target() {
     use p256::elliptic_curve::sec1::ToEncodedPoint;
     for target in ["x", "y", "xy", "uncompressed"] {

@@ -10,7 +10,7 @@ pub mod transport;
 
 #[derive(clap::Args, Clone)]
 pub struct MetalOptions {
-    /// Bundle from scripts/build-metal.py; defaults to target/metal/<mode>.
+    /// Bundle from scripts/build-metal.sh; defaults to target/metal/<mode>.
     #[arg(long, global = true)]
     pub metal_artifacts: Option<PathBuf>,
     /// Stop after this many launches; omitted means continuous search.

@@ -29,7 +29,7 @@ else:
     modes = [options.mode]
     features = f'metal,{options.mode}'
 for mode in modes:
-    subprocess.run([sys.executable, str(root / 'scripts/build-metal.py'), '--mode', mode, '--inlining', options.inlining], cwd=root, check=True)
+    subprocess.run(['bash', str(root / 'scripts/build-metal.sh'), '--mode', mode, '--inlining', options.inlining], cwd=root, check=True)
 subprocess.run(['cargo', 'build', '--locked', '--release', '-p', 'vanity-miner', '--no-default-features', '--features', features, '--target-dir', str(root / 'target/metal/host')], cwd=root, check=True)
 os.chdir(root)
 os.execv(root / 'target/metal/host/release/vanity-miner', ['vanity-miner', *cli_args])

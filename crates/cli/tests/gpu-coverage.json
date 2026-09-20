@@ -241,9 +241,9 @@
     "removed_assertions": []
   },
   "artifacts": {
-    "builder": "scripts/build-metal.py",
+    "builder": "scripts/build-metal.sh",
     "production": "target/metal/<mode>/kernel.build.json",
-    "registry": "target/metal/self-test-<mode>/self-tests.json and per-case kernel.build.json",
+    "registry": "target/metal/self-test-<mode>/kernel.group.json and per-case kernel.build.json",
     "provenance": "Each manifest records the consumer HEAD, relative source SHA-256 values, rustc version, compiler binary hash and artifact hashes. The runner checks current source hashes; the loader checks bundle hashes and ABI. Local dirty sources are attributable by hashes rather than HEAD alone."
   }
 }

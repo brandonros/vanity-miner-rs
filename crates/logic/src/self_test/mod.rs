@@ -30,11 +30,27 @@ pub fn black_box<T>(value: T) -> T {
 #[cfg(any(target_arch = "nvptx64", test))]
 #[inline(always)]
 fn volatile_identity<T>(value: T) -> T {
-    let value = core::mem::ManuallyDrop::new(value);
-    // SAFETY: the aligned reference points to an initialized T. ManuallyDrop
-    // prevents dropping the original; ownership moves to the returned value.
-    // read_volatile also permits zero-sized T and preserves pointer provenance.
-    unsafe { core::ptr::read_volatile(&*value) }
+    use core::mem::{ManuallyDrop, MaybeUninit};
+    let value = ManuallyDrop::new(value);
+    let mut copy = MaybeUninit::<T>::uninit();
+    let (from, to) = (
+        (&raw const *value).cast::<MaybeUninit<u8>>(),
+        copy.as_mut_ptr().cast::<MaybeUninit<u8>>(),
+    );
+    // One volatile read per byte. LLVM 22 turns a volatile read of a whole T
+    // into a load of one integer as wide as T (i256, i8576), which llvm-metal's
+    // integer profile rightly refuses; volatile byte reads cannot be merged.
+    // SAFETY: both pointers cover size_of::<T>() bytes of distinct storage.
+    // MaybeUninit<u8> admits padding. ManuallyDrop prevents dropping the
+    // original; ownership moves to the returned value, a byte copy of it.
+    unsafe {
+        let mut i = 0;
+        while i < core::mem::size_of::<T>() {
+            to.add(i).write(core::ptr::read_volatile(from.add(i)));
+            i += 1;
+        }
+        copy.assume_init()
+    }
 }
 
 #[macro_use]

@@ -33,7 +33,7 @@ fn config() -> SearchConfig {
     }
 }
 #[test]
-#[ignore = "build scripts/build-metal.py --mode rsa-modulus first; requires Apple GPU"]
+#[ignore = "build scripts/build-metal.sh --mode rsa-modulus first; requires Apple GPU"]
 fn independent_candidates_and_host_key_verification() {
     use logic::modes::rsa_modulus::Pair;
     use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};

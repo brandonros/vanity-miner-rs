@@ -1,10 +1,14 @@
 # Metal validation
 
 Use the default `nix develop` shell. `rust-toolchain.toml` selects the stock Rust
-producer; `flake.lock` and Cargo manifests pin the llvm-metal compiler/runtime.
-Keep their revisions aligned. The NVPTX target emits LLVM bitcode only.
+producer, whose LLVM must be the major llvm-metal links and no newer. The flake
+supplies that toolchain and `llvm-metalc`, which brings its own LLVM; nothing
+else of llvm-metal's build belongs here. `flake.nix` pins the compiler and the
+Cargo manifests pin its runtime crates: keep the revisions aligned. The NVPTX
+target emits LLVM bitcode only.
 
-- Build bundles with `scripts/build-metal.py --mode <mode>`. Each promoted kernel
+- Build bundles with `scripts/build-metal.sh --mode <mode>`, a wrapper around
+  `llvm-metalc build`. Each promoted kernel
   crate lives directly in `crates/kernels/<mode>` and has its own Cargo lockfile.
 - Run searches through `scripts/run-metal.sh`. Default Cargo features use Metal;
   `--no-default-features` supports CPU references and non-Apple test hosts.

@@ -53,8 +53,8 @@ jobs:
         env:
           MODE: ${{ matrix.mode }}
         run: |
-          nix develop --command python3 scripts/build-metal.py --mode "$MODE"
-          nix develop --command python3 scripts/build-metal.py --mode "self-test-$MODE"
+          nix develop --command scripts/build-metal.sh --mode "$MODE"
+          nix develop --command scripts/build-metal.sh --mode "self-test-$MODE"
       - uses: actions/upload-artifact@v4
         with:
           name: metal-${{ matrix.mode }}

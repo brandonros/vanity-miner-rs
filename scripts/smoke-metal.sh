@@ -8,14 +8,14 @@ case "${1:-}" in
     ""|--skip-build) ;;
     *) echo "Usage: $0 [--skip-build]" >&2; exit 2 ;;
 esac
-if [[ -z "${VANITY_LLVM_METAL_SOURCE:-}" ]]; then
+if ! command -v llvm-metalc >/dev/null; then
     exec nix develop "path:$miner_root" --command bash "$miner_root/scripts/smoke-metal.sh" "$@"
 fi
 
 modes=(shallenge ethereum bitcoin solana rsa-modulus p256-public-key p256-signature rsa-pss)
 if [[ "${1:-}" != --skip-build ]]; then
     for mode in "${modes[@]}"; do
-        python3 scripts/build-metal.py --mode "$mode"
+        scripts/build-metal.sh --mode "$mode"
     done
 fi
 cargo build --release --locked -p vanity-miner --no-default-features \
