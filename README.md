@@ -27,19 +27,17 @@ candidates per batch and 64 threads per group. Override these with `--batch-size
 and `--threads-per-group`.
 
 ```sh
-./scripts/run-metal.sh --mode solana \
+just run solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/run-metal.sh --mode p256-public-key \
+just run p256-public-key \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   p256-public-key-vanity --prefix ab
-./scripts/run-metal.sh --mode rsa-pss \
+just run rsa-pss \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   rsa-pss-signature-vanity --key private.pem --message message.bin
-./scripts/smoke-metal.sh
 ```
 
-The smoke script builds and runs all 8 modes, requiring one verified match each.
 It creates temporary signing keys and fails on errors, missing output, or timeout.
 RSA modulus still needs to find a prime pair.
 
@@ -49,14 +47,12 @@ and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
 stops the search. Use `--exit-on-first-match` to stop after one verified match.
 Use `<command> --help` for options.
 
-Selective inlining is the default. Add `--inlining all` to `run-metal.sh`,
-`build-metal.py`, or `test-gpu.sh` to opt into full inlining.
-
-For compiler development, pass `--llvm-metal ../llvm-metal` before `--mode`.
-To build a kernel separately:
+Selective inlining is the default; `just build <mode> --inlining all` opts
+into full inlining. For compiler development, enter the shell with
+`nix develop --override-input llvm-metal path:../llvm-metal`. To build a kernel separately:
 
 ```sh
-nix develop --command python3 scripts/build-metal.py --mode shallenge
+nix develop --command just build shallenge
 nix develop --command cargo build --locked --release -p vanity-miner
 ```
 
@@ -68,19 +64,17 @@ LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 ```sh
 nix develop --command cargo run -p vanity-miner --release --locked \
   --no-default-features --features self_test -- self-test
-./scripts/test-metal.sh
+just test self_test::
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-The Metal script requires every slot to pass; `--skip-build` reuses matching bundles.
-`./scripts/test-gpu.sh` runs production, CLI, session, and registry GPU tests.
-Use `--list` to check discovery against `crates/cli/tests/gpu-coverage.json`
-without executing GPU code. CPU-only layout/rejection tests remain in Cargo.
-For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
+`just test` builds every bundle and runs the ignored GPU tests with
+`cargo test`; `--skip-build` reuses bundles, and a test name filter selects tests.
+For one group, use `just run self-test-solana self-test`.
 Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.
 
 CPU-only builds work on Linux and macOS with `--no-default-features` and one or
 more mode features, for example `--features solana`. Combine features with commas.
 CPU searches accept a common `--threads N`; Metal builds select `metal` plus the
-mode feature. `nix develop --command python3 scripts/check-modes.py` checks each.
+mode feature.

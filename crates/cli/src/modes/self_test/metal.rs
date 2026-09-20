@@ -171,8 +171,8 @@ fn directory(runner: &MetalRunner, kernel: &str) -> PathBuf {
     match &runner.options.metal_artifacts {
         Some(root)
             if !root.join("kernel.build.json").is_file()
-                && !root.join("self-tests.json").is_file()
-                && !root.join("self-tests.pending.json").is_file() =>
+                && !root.join("kernel.group.json").is_file()
+                && !root.join("kernel.group.pending.json").is_file() =>
         {
             root.join(mode)
         }
@@ -190,7 +190,7 @@ fn validate_case_manifest(
     case: super::Case,
 ) -> Result<serde_json::Value, String> {
     let manifest = read_json(&directory.join("kernel.build.json"))?;
-    let identity = &manifest["self_test"];
+    let identity = &manifest["case"];
     if manifest["schema"] != 1
         || identity["name"] != case.name
         || identity["slot"] != case.slot
@@ -208,8 +208,8 @@ fn validate_case_manifest(
 /// Require the entire original group inventory, even for a selected-check run.
 /// Individual debug bundles use the separate explicit --metal-artifacts path.
 fn validate_group(directory: &Path, kernel: &str) -> Result<(), String> {
-    let group = read_json(&directory.join("self-tests.json"))?;
-    if group["schema"] != 1 || group["kind"] != "self-test-group" || group["kernel"] != kernel {
+    let group = read_json(&directory.join("kernel.group.json"))?;
+    if group["schema"] != 1 || group["kind"] != "entry-group" || group["kernel"] != kernel {
         return Err("invalid Metal self-test group manifest".into());
     }
     let entries = group["cases"]
@@ -271,10 +271,10 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
     let mut timings = Timings::default();
     let result = super::run("Metal", &cases, |case| {
         let group_dir = directory(runner, case.kernel);
-        if group_dir.join("self-tests.pending.json").exists() {
+        if group_dir.join("kernel.group.pending.json").exists() {
             return Err("Metal self-test group build is incomplete; rerun the builder".into());
         }
-        let (case_dir, is_case) = if group_dir.join("self-tests.json").is_file() {
+        let (case_dir, is_case) = if group_dir.join("kernel.group.json").is_file() {
             groups
                 .entry(case.kernel)
                 .or_insert_with(|| validate_group(&group_dir, case.kernel))
@@ -283,7 +283,7 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
             (group_dir.join("cases").join(case.name), true)
         } else {
             let manifest = read_json(&group_dir.join("kernel.build.json"))?;
-            let is_case = !manifest["self_test"].is_null();
+            let is_case = !manifest["case"].is_null();
             if is_case && (cases.len() != 1 || args.checks.is_empty()) {
                 return Err(
                     "an individual Metal self-test bundle requires exactly one named --check"
@@ -415,12 +415,12 @@ mod tests {
             let relative = format!("cases/{}", case.name);
             let directory = root.join(&relative);
             fs::create_dir_all(&directory).unwrap();
-            let manifest = json!({"schema": 1, "self_test": {"kernel": kernel, "name": case.name, "slot": case.slot, "entry": case.metal_entry}, "source_revision": "test", "source_sha256": {"logic.rs": "test"}, "compiler_sha256": "compiler", "rustc": "test"});
+            let manifest = json!({"schema": 1, "case": {"kernel": kernel, "name": case.name, "slot": case.slot, "entry": case.metal_entry}, "source_revision": "test", "source_sha256": {"logic.rs": "test"}, "compiler_sha256": "compiler", "rustc": "test"});
             let bytes = serde_json::to_vec(&manifest).unwrap();
             fs::write(directory.join("kernel.build.json"), &bytes).unwrap();
             cases.push(json!({"name": case.name, "slot": case.slot, "entry": case.metal_entry, "directory": relative, "manifest_sha256": hex::encode(Sha256::digest(&bytes))}));
         }
-        json!({"schema": 1, "kind": "self-test-group", "kernel": kernel, "cases": cases, "source_revision": "test", "source_sha256": {"logic.rs": "test"}, "compiler_sha256": "compiler", "rustc": "test"})
+        json!({"schema": 1, "kind": "entry-group", "kernel": kernel, "cases": cases, "source_revision": "test", "source_sha256": {"logic.rs": "test"}, "compiler_sha256": "compiler", "rustc": "test"})
     }
     #[test]
     fn incomplete_misidentified_and_mixed_provenance_groups_are_rejected() {
@@ -428,7 +428,7 @@ mod tests {
         let complete = group_fixture(&fixture.0);
         let check = |group: &serde_json::Value| {
             fs::write(
-                fixture.0.join("self-tests.json"),
+                fixture.0.join("kernel.group.json"),
                 serde_json::to_vec(group).unwrap(),
             )
             .unwrap();

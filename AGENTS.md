@@ -1,12 +1,16 @@
 # Metal validation
 
 Use the default `nix develop` shell. `rust-toolchain.toml` selects the stock Rust
-producer; `flake.lock` and Cargo manifests pin the llvm-metal compiler/runtime.
-Keep their revisions aligned. The NVPTX target emits LLVM bitcode only.
+producer, whose LLVM must be the major llvm-metal links and no newer. The flake
+supplies that toolchain and `llvm-metalc`, which brings its own LLVM; nothing
+else of llvm-metal's build belongs here. `flake.nix` pins the compiler and the
+Cargo manifests pin its runtime crates: keep the revisions aligned. The NVPTX
+target emits LLVM bitcode only.
 
-- Build bundles with `scripts/build-metal.py --mode <mode>`. Each promoted kernel
+- Build bundles with `just build <mode>`, a wrapper around
+  `llvm-metalc build`. Each promoted kernel
   crate lives directly in `crates/kernels/<mode>` and has its own Cargo lockfile.
-- Run searches through `scripts/run-metal.sh`. Default Cargo features use Metal;
+- Run searches through `just run <mode>`. Default Cargo features use Metal;
   `--no-default-features` supports CPU references and non-Apple test hosts.
 - Keep validation scoped to the actual source and artifacts. Record build manifests
   and logs under ignored `artifacts/`. Do not substitute old bundles for fresh
@@ -18,6 +22,33 @@ Keep their revisions aligned. The NVPTX target emits LLVM bitcode only.
   execution separately. Record cache use; reuse incremental builds deliberately.
 - Keep one integrator in control of a checkout, pins, build directories, and GPU
   execution. Use separate worktrees for concurrent changes.
+
+## Tooling rules
+
+Each of these removes something that was built here and had to be deleted.
+
+- **No Python, and no second scripting language.** Logic is Rust: a `#[test]`, a
+  CLI subcommand, or llvm-metal's builder. The `justfile` is the only task
+  runner, and a recipe only sequences `cargo` and `llvm-metalc`. If a recipe
+  needs parsing, conditions beyond a line, or state, the logic belongs in Rust.
+  Do not add scripts.
+- **Tests are `cargo test`.** No runner around the runner: no test inventories,
+  coverage or ownership JSON, discovery cross-checks, per-test timeouts, or
+  wrappers that select tests by name. A test that must not run by default is
+  `#[ignore]` with its requirement in the reason. CI's job timeout is the timeout.
+- **No metadata about the code that the code does not read.** No catalogs,
+  manifests or registries kept in step by hand, and no checker whose job is to
+  compare two hand-written lists. Derive the list (from a directory, a Cargo
+  feature, a Rust const) or delete it.
+- **llvm-metal's build is not this repository's concern.** `flake.nix` is the Rust
+  toolchain plus the `llvm-metalc` package. Never name LLVM, `LLVM_SYS_*`,
+  llvm-downgrade, `opt` pipelines or compiler source paths here. If building a
+  kernel needs something new, it goes into `llvm-metalc build`.
+- **Provenance is the builder's manifest.** Do not re-hash sources, re-verify
+  bundles or record commands in scripts; `kernel.build.json` and the loader do it.
+- **Fix forward.** When a toolchain bump breaks something, find the cause and fix
+  it on the new toolchain; do not retreat to the old one to keep tests green.
+  Delete a check that blocks work and guards nothing anyone would act on.
 
 ## Documentation
 

@@ -8,7 +8,7 @@ fn artifacts() -> PathBuf {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.py --mode ethereum first; requires Apple GPU"]
+#[ignore = "build just build ethereum first; requires Apple GPU"]
 fn candidates_patterns_winners_and_errors_match_cpu() {
     super::support::address::check::<EthereumTransport>(
         &artifacts(),
@@ -29,7 +29,7 @@ fn candidates_patterns_winners_and_errors_match_cpu() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.py --mode ethereum first; requires Apple GPU"]
+#[ignore = "build just build ethereum first; requires Apple GPU"]
 fn bounded_cli_prints_verified_winners_and_completes_misses() {
     for (prefix, suffix, matches) in [
         ("", "", true),

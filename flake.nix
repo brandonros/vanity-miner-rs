@@ -1,20 +1,30 @@
 {
-  description = "Stock Rust and LLVM-to-Metal development environment";
-  inputs.llvm-metal.url = "github:brandonros/llvm-metal/df7f9bc4369cfddbdc5ac235154e24e60c8ba4d7";
+  description = "Stock Rust producer and the llvm-metal compiler";
 
-  outputs = { llvm-metal, ... }: {
-    devShells = builtins.mapAttrs (system: shells:
-      let
-        pkgs = import llvm-metal.inputs.nixpkgs {
-          inherit system;
-          overlays = [ llvm-metal.inputs.rust-overlay.overlays.default ];
-        };
-        toolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-        shell = shells.rust-fixtures.overrideAttrs (old: {
-          nativeBuildInputs = [ toolchain ] ++ old.nativeBuildInputs;
-          VANITY_LLVM_METAL_SOURCE = "${llvm-metal}";
-        });
-      in { default = shell; metal = shell; }
-    ) llvm-metal.devShells;
-  };
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.rust-overlay.url = "github:oxalica/rust-overlay/1fb104a12a8667045559b2575d6d448ae2fbd99b";
+  inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+  # Keep this revision aligned with the llvm-metal crates in the Cargo manifests.
+  inputs.llvm-metal.url = "github:brandonros/llvm-metal/8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1";
+
+  outputs = { nixpkgs, rust-overlay, llvm-metal, ... }:
+    let
+      systems = [ "aarch64-darwin" "x86_64-darwin" "aarch64-linux" "x86_64-linux" ];
+    in {
+      devShells = nixpkgs.lib.genAttrs systems (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ rust-overlay.overlays.default ];
+          };
+          shell = pkgs.mkShell {
+            packages = [
+              (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+              # The compiler with its own LLVM and llvm-downgrade.
+              llvm-metal.packages.${system}.llvm-metalc
+              pkgs.just
+            ];
+          };
+        in { default = shell; metal = shell; });
+    };
 }

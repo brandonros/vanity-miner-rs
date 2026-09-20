@@ -22,8 +22,6 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - name: Test CPU references
         run: |
-          nix develop --command python3 scripts/test_gpu_runner.py
-          nix develop --command python3 scripts/check-modes.py
           nix develop --command cargo test --locked --release --workspace --no-default-features --features solana,bitcoin,ethereum,shallenge,p256-public-key,p256-signature,rsa-modulus,rsa-pss,self_test
           nix develop --command cargo run --locked --release -p vanity-miner --no-default-features --features self_test -- self-test
 
@@ -35,9 +33,7 @@ jobs:
       - name: Check formatting and test Metal host validation
         run: |
           nix develop --command cargo fmt --all --check
-          nix develop --command python3 scripts/check-modes.py
           nix develop --command cargo test --locked --release --workspace --all-features
-          ./scripts/test-gpu.sh --list
 
   kernels:
     runs-on: ubuntu-24.04
@@ -53,8 +49,8 @@ jobs:
         env:
           MODE: ${{ matrix.mode }}
         run: |
-          nix develop --command python3 scripts/build-metal.py --mode "$MODE"
-          nix develop --command python3 scripts/build-metal.py --mode "self-test-$MODE"
+          nix develop --command just build "$MODE"
+          nix develop --command just build "self-test-$MODE"
       - uses: actions/upload-artifact@v4
         with:
           name: metal-${{ matrix.mode }}
@@ -77,4 +73,4 @@ jobs:
           path: target/metal
           merge-multiple: true
       - name: Execute the complete GPU coverage inventory
-        run: ./scripts/test-gpu.sh --skip-build
+        run: nix develop --command just test-built

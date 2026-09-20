@@ -48,7 +48,7 @@ fn invalid_dispatch_is_rejected_before_loading_artifacts() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.py --mode p256-signature first; requires Apple GPU"]
+#[ignore = "build just build p256-signature first; requires Apple GPU"]
 fn sources_targets_s_forms_and_variable_messages_match_cpu() {
     let message = b"sample";
     let mut engine = P256SignatureTransport::load(&artifacts(), 3, 4, true).unwrap();
@@ -210,7 +210,7 @@ impl Drop for Directory {
     }
 }
 #[test]
-#[ignore = "build scripts/build-metal.py --mode p256-signature first; requires Apple GPU"]
+#[ignore = "build just build p256-signature first; requires Apple GPU"]
 fn bounded_cli_verifies_both_sources_and_s_forms() {
     use p256::pkcs8::{EncodePrivateKey, LineEnding};
     let directory = Directory(std::env::temp_dir().join(format!(

@@ -1,4 +1,5 @@
 [toolchain]
-channel = "1.93.0"
+channel = "1.98.1"
+profile = "minimal"
 components = ["rust-src", "rust-analyzer", "clippy", "rustfmt"]
 targets = ["nvptx64-nvidia-cuda"]
