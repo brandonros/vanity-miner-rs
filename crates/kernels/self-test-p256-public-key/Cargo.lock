@@ -140,7 +140,7 @@ dependencies = [
 [[package]]
 name = "llvm-metal-kernel"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=98667d14404aaffc9f6823daa5cbd0ad29bae26a#98667d14404aaffc9f6823daa5cbd0ad29bae26a"
+source = "git+https://github.com/brandonros/llvm-metal?rev=df7f9bc4369cfddbdc5ac235154e24e60c8ba4d7#df7f9bc4369cfddbdc5ac235154e24e60c8ba4d7"
 
 [[package]]
 name = "logic"
