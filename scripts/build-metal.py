@@ -75,10 +75,10 @@ def main():
         if os.environ.get(name):
             raise RuntimeError(f'unset {name} for the pinned stock producer')
     rust = run('rustc', '-vV', capture=True)
-    if 'release: 1.93.0\n' not in rust or 'LLVM version: 21.1.8\n' not in rust:
-        raise RuntimeError('use the repository\'s default Nix shell (stable Rust 1.93 / LLVM 21.1.8)')
-    if 'LLVM version 21.1.8' not in run('llvm-link', '--version', capture=True):
-        raise RuntimeError('LLVM tools must be 21.1.8')
+    if 'release: 1.98.1\n' not in rust or 'LLVM version: 22.1.8\n' not in rust:
+        raise RuntimeError('use the repository\'s default Nix shell (stable Rust 1.98 / LLVM 22.1.8)')
+    if 'LLVM version 22.1.8' not in run('llvm-link', '--version', capture=True):
+        raise RuntimeError('LLVM tools must be 22.1.8')
     run('cargo', 'build', '--locked', '--release', '--manifest-path', compiler / 'Cargo.toml', '-p', 'llvm-metal-compiler', '--bin', 'llvm-metalc', '--target-dir', compiler_target)
     common = ['--locked', '--manifest-path', device / 'Cargo.toml', '--release', '--target-dir', device_target]
     run('cargo', 'test', *common)
