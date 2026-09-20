@@ -1,5 +1,47 @@
-use rand_core::{RngCore, SeedableRng};
-use rand_xoshiro::Xoroshiro128StarStar;
+/// Xoroshiro128** seeded as `rand_xoshiro`'s `seed_from_u64` does. Written here
+/// because that crate's all-zero-seed fallback recurses, which a GPU cannot do.
+struct Xoroshiro128StarStar {
+    s0: u64,
+    s1: u64,
+}
+
+impl Xoroshiro128StarStar {
+    fn seed_from_u64(seed: u64) -> Self {
+        let mut state = seed;
+        let mut next = || {
+            state = state.wrapping_add(0x9e3779b97f4a7c15);
+            let mut z = state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+            z ^ (z >> 31)
+        };
+        let (s0, s1) = (next(), next());
+        if s0 | s1 == 0 {
+            // Unreachable for SplitMix64 output; keep the state valid regardless.
+            return Self { s0: 1, s1: 0 };
+        }
+        Self { s0, s1 }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let result = self.s0.wrapping_mul(5).rotate_left(7).wrapping_mul(9);
+        self.s1 ^= self.s0;
+        self.s0 = self.s0.rotate_left(24) ^ self.s1 ^ (self.s1 << 16);
+        self.s1 = self.s1.rotate_left(37);
+        result
+    }
+
+    fn next_u32(&mut self) -> u32 {
+        self.next_u64() as u32
+    }
+
+    fn fill_bytes(&mut self, bytes: &mut [u8]) {
+        for chunk in bytes.chunks_mut(8) {
+            let word = self.next_u64().to_le_bytes();
+            chunk.copy_from_slice(&word[..chunk.len()]);
+        }
+    }
+}
 
 const BASE64_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
