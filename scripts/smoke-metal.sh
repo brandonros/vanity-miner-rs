@@ -38,7 +38,7 @@ run() {
     if [[ "$mode" == rsa-modulus ]]; then batch_size=256; threads=32; fi
     if [[ "$mode" == shallenge ]]; then marker='[shallenge] hash='; fi
     echo "=== $mode ==="
-    python3 scripts/bounded-command.py "${VANITY_SMOKE_TIMEOUT:-1800}" "$miner" --exit-on-first-match --verify \
+    timeout --kill-after=5 "${VANITY_SMOKE_TIMEOUT:-1800}" "$miner" --exit-on-first-match --verify \
         --batch-size "$batch_size" --threads-per-group "$threads" \
         --metal-artifacts "target/metal/$mode" "$@" | tee "$smoke_dir/$mode.log"
     if [[ $(grep -cF "$marker" "$smoke_dir/$mode.log" || true) != 1 ]]; then

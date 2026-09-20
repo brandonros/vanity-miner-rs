@@ -68,14 +68,14 @@ LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 ```sh
 nix develop --command cargo run -p vanity-miner --release --locked \
   --no-default-features --features self_test -- self-test
-./scripts/test-metal.sh
+./scripts/test-gpu.sh --suite self-tests
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
 The Metal script requires every slot to pass; `--skip-build` reuses matching bundles.
-`./scripts/test-gpu.sh` runs production, CLI, session, and registry GPU tests.
-Use `--list` to check discovery against `crates/cli/tests/gpu-coverage.json`
-without executing GPU code. CPU-only layout/rejection tests remain in Cargo.
+`./scripts/test-gpu.sh` builds every bundle and runs the ignored GPU tests with
+`cargo test`: production, CLI, session, and registry. CPU-only layout/rejection
+tests run in the ordinary Cargo suite.
 For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
 Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.
@@ -83,4 +83,4 @@ Select named cases with
 CPU-only builds work on Linux and macOS with `--no-default-features` and one or
 more mode features, for example `--features solana`. Combine features with commas.
 CPU searches accept a common `--threads N`; Metal builds select `metal` plus the
-mode feature. `nix develop --command python3 scripts/check-modes.py` checks each.
+mode feature. `nix develop --command scripts/check-modes.sh` checks each.
