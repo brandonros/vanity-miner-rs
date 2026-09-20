@@ -91,7 +91,7 @@ fn invalid_dispatch_rejected_before_artifact_loading() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.sh --mode rsa-pss first; requires Apple GPU"]
+#[ignore = "build scripts/metal.sh build rsa-pss first; requires Apple GPU"]
 fn salt_and_message_candidates_crt_validation_and_winners() {
     let key = key();
     let any = HexPattern::new("", "", 256).unwrap();

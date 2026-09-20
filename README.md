@@ -27,19 +27,17 @@ candidates per batch and 64 threads per group. Override these with `--batch-size
 and `--threads-per-group`.
 
 ```sh
-./scripts/run-metal.sh --mode solana \
+./scripts/metal.sh run solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/run-metal.sh --mode p256-public-key \
+./scripts/metal.sh run p256-public-key \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   p256-public-key-vanity --prefix ab
-./scripts/run-metal.sh --mode rsa-pss \
+./scripts/metal.sh run rsa-pss \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   rsa-pss-signature-vanity --key private.pem --message message.bin
-./scripts/smoke-metal.sh
 ```
 
-The smoke script builds and runs all 8 modes, requiring one verified match each.
 It creates temporary signing keys and fails on errors, missing output, or timeout.
 RSA modulus still needs to find a prime pair.
 
@@ -49,14 +47,12 @@ and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
 stops the search. Use `--exit-on-first-match` to stop after one verified match.
 Use `<command> --help` for options.
 
-Selective inlining is the default. Add `--inlining all` to `run-metal.sh`,
-`build-metal.sh`, or `test-gpu.sh` to opt into full inlining.
-
-For compiler development, pass `--llvm-metal ../llvm-metal` before `--mode`.
-To build a kernel separately:
+Selective inlining is the default; `metal.sh build <mode> --inlining all` opts
+into full inlining. For compiler development, set `LLVM_METAL=../llvm-metal` to
+build the compiler from that checkout. To build a kernel separately:
 
 ```sh
-nix develop --command scripts/build-metal.sh --mode shallenge
+nix develop --command scripts/metal.sh build shallenge
 nix develop --command cargo build --locked --release -p vanity-miner
 ```
 
@@ -68,19 +64,17 @@ LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 ```sh
 nix develop --command cargo run -p vanity-miner --release --locked \
   --no-default-features --features self_test -- self-test
-./scripts/test-gpu.sh --suite self-tests
+./scripts/metal.sh test self_test::
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-The Metal script requires every slot to pass; `--skip-build` reuses matching bundles.
-`./scripts/test-gpu.sh` builds every bundle and runs the ignored GPU tests with
-`cargo test`: production, CLI, session, and registry. CPU-only layout/rejection
-tests run in the ordinary Cargo suite.
-For one group, use `scripts/run-metal.sh --mode self-test-solana self-test`.
+`./scripts/metal.sh test` builds every bundle and runs the ignored GPU tests with
+`cargo test`; `--skip-build` reuses bundles, and a test name filter selects tests.
+For one group, use `scripts/metal.sh run self-test-solana self-test`.
 Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.
 
 CPU-only builds work on Linux and macOS with `--no-default-features` and one or
 more mode features, for example `--features solana`. Combine features with commas.
 CPU searches accept a common `--threads N`; Metal builds select `metal` plus the
-mode feature. `nix develop --command scripts/check-modes.sh` checks each.
+mode feature.

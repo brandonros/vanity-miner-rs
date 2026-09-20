@@ -8,7 +8,7 @@ fn artifacts() -> PathBuf {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.sh --mode bitcoin first; requires Apple GPU"]
+#[ignore = "build scripts/metal.sh build bitcoin first; requires Apple GPU"]
 fn candidates_patterns_winners_and_errors_match_cpu() {
     super::support::address::check::<BitcoinTransport>(
         &artifacts(),
@@ -29,7 +29,7 @@ fn candidates_patterns_winners_and_errors_match_cpu() {
 }
 
 #[test]
-#[ignore = "build scripts/build-metal.sh --mode bitcoin first; requires Apple GPU"]
+#[ignore = "build scripts/metal.sh build bitcoin first; requires Apple GPU"]
 fn bounded_cli_prints_verified_winners_and_completes_misses() {
     for (prefix, suffix, matches) in [
         ("", "", true),

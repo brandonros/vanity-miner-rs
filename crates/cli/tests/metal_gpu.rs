@@ -1,4 +1,4 @@
-//! All production Metal and registry integration tests. Run scripts/test-gpu.sh.
+//! All production Metal and registry integration tests. Run scripts/metal.sh test.
 #![cfg(all(feature = "metal", target_os = "macos"))]
 #[path = "metal/bitcoin.rs"]
 mod bitcoin;

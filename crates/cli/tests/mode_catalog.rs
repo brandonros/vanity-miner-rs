@@ -1,5 +1,5 @@
 //! Every production mode has its kernel crates, CLI adapters, Cargo features,
-//! CI matrix entry and smoke command. Adding a mode means touching all of them.
+//! and CI matrix entry. Adding a mode means touching all of them.
 use std::{collections::BTreeSet, fs, path::PathBuf};
 
 const MODES: [&str; 8] = [
@@ -41,7 +41,6 @@ fn every_mode_is_wired_everywhere() {
     let manifest = read("crates/cli/Cargo.toml");
     let features = manifest.split("[features]").nth(1).expect("features table");
     let features = features.split("\n[").next().unwrap();
-    let smoke = read("scripts/smoke-metal.sh");
     for mode in MODES {
         let module = mode.replace('-', "_");
         for path in [
@@ -60,9 +59,5 @@ fn every_mode_is_wired_everywhere() {
                 "missing mode feature: {feature}"
             );
         }
-        assert!(
-            smoke.lines().any(|line| line.starts_with(&format!("run {mode} "))),
-            "missing smoke command: {mode}"
-        );
     }
 }
