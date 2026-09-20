@@ -5,7 +5,7 @@
   inputs.rust-overlay.url = "github:oxalica/rust-overlay/1fb104a12a8667045559b2575d6d448ae2fbd99b";
   inputs.rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
   # Keep this revision aligned with the llvm-metal crates in the Cargo manifests.
-  inputs.llvm-metal.url = "github:brandonros/llvm-metal/1c011e80fae5c9b83fdd44226a69d4173a816c54";
+  inputs.llvm-metal.url = "github:brandonros/llvm-metal/8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1";
 
   outputs = { nixpkgs, rust-overlay, llvm-metal, ... }:
     let
