@@ -91,8 +91,7 @@ impl BitcoinArgs {
         crate::args::CommandDetails {
             prefix_len: prefix.len(),
             suffix_len: suffix.len(),
-            cpu_threads: None,
-            cuda_module: Some("bitcoin"),
+
             description: format!(
                 "Searching for bitcoin vanity key with prefix '{}' and suffix '{}'",
                 prefix, suffix

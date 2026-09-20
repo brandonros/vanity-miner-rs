@@ -61,6 +61,7 @@ impl CandidateDeriver {
 
     /// `attempt` separates rejection-sampling retries for the same candidate.
     /// Consumers must reject counter overflow instead of restarting at zero.
+    #[inline(always)]
     pub fn block(&self, worker: u64, counter: u128, attempt: u32) -> [u8; 32] {
         // HMAC-SHA256 accepts keys of every length, including this fixed 32 bytes.
         let mut mac = SimpleHmac::<Sha256>::new_from_slice(&self.seed)

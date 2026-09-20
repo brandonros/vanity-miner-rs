@@ -79,10 +79,19 @@ impl Rsa2048Crt {
         let dq = Zeroizing::new(U1024::from_be_slice(dq));
         let q_inv = Zeroizing::new(U1024::from_be_slice(q_inv));
         let n = p.mul(&q);
+        // Preserve a fallible path through parameter construction. `new` panics
+        // for even moduli; its lower-level check need not be inferred from the
+        // serialized component checks when compiling this code for a device.
+        #[allow(deprecated)]
+        let (p_params, q_params, n_params) = (
+            Option::<Params1024>::from(Params1024::new_checked(&p))?,
+            Option::<Params1024>::from(Params1024::new_checked(&q))?,
+            Option::<Params2048>::from(Params2048::new_checked(&n))?,
+        );
         let result = Self {
-            p_params: Params1024::new(&p),
-            q_params: Params1024::new(&q),
-            n_params: Params2048::new(&n),
+            p_params,
+            q_params,
+            n_params,
             n,
             p,
             q,
@@ -209,6 +218,51 @@ mod tests {
             key.private_operation(&U2048::from_u64(65).to_be_bytes())
                 .is_none()
         );
+    }
+
+    #[test]
+    fn malformed_moduli_and_crt_components_return_none() {
+        // The checked Montgomery constructor must preserve the fallible API,
+        // including values that cannot represent an odd, distinct factor pair.
+        for (p, q) in [
+            (0, 53),
+            (1, 53),
+            (2, 53),
+            (61, 0),
+            (61, 1),
+            (61, 2),
+            (61, 61),
+        ] {
+            assert!(
+                Rsa2048Crt::build(
+                    &component(p),
+                    &component(q),
+                    &component(53),
+                    &component(49),
+                    &component(38),
+                )
+                .is_none()
+            );
+        }
+        for (dp, dq, inverse) in [
+            (0, 49, 38),
+            (60, 49, 38),
+            (53, 0, 38),
+            (53, 52, 38),
+            (53, 49, 0),
+            (53, 49, 61),
+        ] {
+            assert!(
+                Rsa2048Crt::build(
+                    &component(61),
+                    &component(53),
+                    &component(dp),
+                    &component(dq),
+                    &component(inverse),
+                )
+                .is_none()
+            );
+        }
     }
 
     #[test]

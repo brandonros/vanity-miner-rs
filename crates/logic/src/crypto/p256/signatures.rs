@@ -1,9 +1,6 @@
 use crate::search::hex_pattern::HexPattern;
 use ecdsa::hazmat::SignPrimitive;
-use p256::ecdsa::{
-    Signature, SigningKey, VerifyingKey,
-    signature::{Signer, Verifier},
-};
+use p256::ecdsa::{Signature, VerifyingKey, signature::Verifier};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SignatureTarget {
@@ -31,17 +28,26 @@ pub enum SForm {
 
 /// RFC 6979 deterministic ECDSA with SHA-256, before S normalization.
 pub fn sign_message(private: &[u8; 32], message: &[u8]) -> Option<[u8; 64]> {
-    let key = SigningKey::from_slice(private).ok()?;
-    let signature: Signature = key.try_sign(message).ok()?;
-    Some(signature.to_bytes().into())
+    sign_digest(private, &crate::crypto::sha256::Sha256::digest(message))
 }
 
 /// RFC 6979 over an already computed SHA-256 digest (no second hash).
 pub fn sign_digest(private: &[u8; 32], digest: &[u8; 32]) -> Option<[u8; 64]> {
-    use p256::ecdsa::signature::hazmat::PrehashSigner;
-    let key = SigningKey::from_slice(private).ok()?;
-    let signature: Signature = key.sign_prehash(digest).ok()?;
-    Some(signature.to_bytes().into())
+    use p256::elliptic_curve::{Curve, FieldBytesEncoding};
+    // Keep RustCrypto's RFC 6979 generation and signing primitive, but carry
+    // invalid scalar results through Option instead of CtOption::unwrap (which
+    // retains a panic runtime behind subtle's optimization barrier on the GPU).
+    p256::SecretKey::from_slice(private).ok()?;
+    let nonce = zeroize::Zeroizing::new(<[u8; 32]>::from(rfc6979::generate_k::<
+        crate::crypto::sha256::Sha256,
+        _,
+    >(
+        &(*private).into(),
+        &<_ as FieldBytesEncoding<p256::NistP256>>::encode_field_bytes(&p256::NistP256::ORDER),
+        &(*digest).into(),
+        &[],
+    )));
+    sign_digest_ephemeral(private, digest, &nonce)
 }
 
 /// Sign an SHA-256 digest with an explicitly supplied secret nonce.
@@ -98,17 +104,22 @@ pub fn matching_representation(
     form: SForm,
     pattern: &HexPattern,
 ) -> Option<[u8; 64]> {
-    let signature = Signature::from_slice(raw).ok()?;
-    let low = signature.normalize_s().unwrap_or(signature);
-    let (r, s) = low.split_scalars();
-    let high = Signature::from_scalars(r.to_bytes(), (-s).to_bytes()).ok()?;
+    use p256::elliptic_curve::{PrimeField, scalar::IsHigh};
+    // Validate both components without the infallible NonZeroScalar accessors,
+    // whose hidden CtOption assertions require a device panic runtime.
+    Signature::from_slice(raw).ok()?;
+    let s_bytes: [u8; 32] = raw[32..].try_into().ok()?;
+    let s = Option::<p256::Scalar>::from(p256::Scalar::from_repr(s_bytes.into()))?;
+    let low = if bool::from(s.is_high()) { -s } else { s };
+    let high = -low;
     let choices = match form {
         SForm::Low => [low, low],
         SForm::High => [high, high],
         SForm::Either => [low, high],
     };
     for choice in choices {
-        let bytes = choice.to_bytes().into();
+        let mut bytes = *raw;
+        bytes[32..].copy_from_slice(&choice.to_repr());
         if pattern.matches(target.bytes(&bytes)) {
             return Some(bytes);
         }
@@ -127,13 +138,47 @@ pub fn verify(public: &[u8; 65], message: &[u8], raw: &[u8; 64]) -> bool {
 }
 #[cfg(test)]
 mod tests {
-    use super as signatures;
     use super::super::{candidate_scalar, public_point};
+    use crate::crypto::p256::signatures;
     fn test_scalar() -> [u8; 32] {
         // Public test value only; never used by a candidate generator.
         let mut scalar = [0; 32];
         scalar[31] = 1;
         scalar
+    }
+
+    #[test]
+    fn checked_signing_matches_rustcrypto_for_digest_and_message_boundaries() {
+        use p256::ecdsa::{
+            Signature, SigningKey,
+            signature::{Signer, hazmat::PrehashSigner},
+        };
+        let private = test_scalar();
+        let key = SigningKey::from_slice(&private).unwrap();
+        let order: [u8; 32] =
+            hex::decode("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        for digest in [[0; 32], [255; 32], order, [0x42; 32]] {
+            let expected: Signature = key.sign_prehash(&digest).unwrap();
+            assert_eq!(
+                signatures::sign_digest(&private, &digest),
+                Some(expected.to_bytes().into())
+            );
+        }
+        for length in [0, 1, 55, 56, 63, 64, 65, 127, 128, 129] {
+            let message = &([0x61; 129])[..length];
+            let expected: Signature = key.try_sign(message).unwrap();
+            assert_eq!(
+                signatures::sign_message(&private, message),
+                Some(expected.to_bytes().into())
+            );
+        }
+        for private in [[0; 32], [255; 32], order] {
+            assert!(signatures::sign_digest(&private, &[0; 32]).is_none());
+            assert!(signatures::sign_message(&private, b"sample").is_none());
+        }
     }
 
     #[test]

@@ -1,0 +1,46 @@
+use super::{args::ShallengeArgs, shared_best_hash::SharedBestHash};
+use crate::runner::{
+    RunResult,
+    metal::{MetalRunner, transport::Transport},
+    progress::GlobalStats,
+    session::run_device_session,
+};
+use std::sync::{Arc, RwLock};
+
+pub fn run(runner: &MetalRunner, args: &ShallengeArgs, stats: Arc<GlobalStats>) -> RunResult {
+    let best = Arc::new(RwLock::new(SharedBestHash::new(
+        hex::decode(&args.target_hash)?
+            .try_into()
+            .map_err(|_| "invalid target width")?,
+    )));
+    let options = &runner.options;
+    let mut engine = ShallengeTransport::load(
+        &runner.artifacts("shallenge"),
+        options.batch_size,
+        options.threads_per_group as usize,
+        options.verify,
+    )?;
+    let result = run_device_session(
+        stats,
+        "nonces",
+        options.batches,
+        options.batch_size,
+        runner.exit_on_first_match,
+        |control| {
+            super::device::search(
+                &args.username,
+                best,
+                options.seed,
+                &control,
+                |r, p, m, start, count| engine.evaluate(r, p, m, start, count),
+            )
+            .map(|_| ())
+        },
+    );
+    engine.print_timings("Metal");
+    result
+}
+
+#[path = "../../../../kernels/shallenge/src/contract.rs"]
+mod contract;
+pub type ShallengeTransport = Transport<contract::Shallenge>;

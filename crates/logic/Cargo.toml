@@ -9,8 +9,9 @@ solana = ["dep:curve25519-dalek"]
 bitcoin = ["dep:k256"]
 ethereum = ["dep:k256", "dep:tiny-keccak"]
 shallenge = []
+compiler-probes = []
 p256-public-key = ["dep:p256", "dep:hmac", "dep:digest"]
-p256-signature = ["dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest"]
+p256-signature = ["dep:rfc6979", "dep:p256", "p256/ecdsa", "dep:ecdsa", "dep:hmac", "dep:digest"]
 rsa-pss = [ "dep:digest", "dep:crypto-bigint"]
 rsa-modulus = [ "dep:digest", "dep:hmac", "dep:crypto-bigint"]
 self_test = [
@@ -23,7 +24,9 @@ self_test = [
     "self_test_rsa_pss",
     "self_test_rsa_modulus",
 ]
-self_test_support = ["dep:paste"]
+test-vectors = []
+self_test_support = ["dep:paste", "test-vectors"]
+self_test_metal_entries = ["self_test_support"]
 self_test_solana = ["self_test_support", "solana"]
 self_test_bitcoin = ["self_test_support", "bitcoin"]
 self_test_ethereum = ["self_test_support", "ethereum"]
@@ -34,8 +37,10 @@ self_test_rsa_pss = ["self_test_support", "rsa-pss"]
 self_test_rsa_modulus = ["self_test_support", "rsa-modulus"]
 
 [dependencies]
+llvm-metal-kernel = { git = "https://github.com/brandonros/llvm-metal", rev = "8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1" }
+rfc6979 = { version = "0.4.0", default-features = false, optional = true }
 paste = { version = "1.0", optional = true }
-crypto-bigint = { version = "0.5.5", default-features = false, features = ["zeroize"], optional = true }
+crypto-bigint = { path = "../../vendor/crypto-bigint", version = "0.5.5", default-features = false, features = ["zeroize"], optional = true }
 ecdsa = { version = "0.16.9", default-features = false, features = ["hazmat"], optional = true }
 hmac = { version = "0.12.1", default-features = false, optional = true }
 digest = { version = "0.10.7", default-features = false, features = ["core-api"], optional = true }

@@ -4,57 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["shallenge"]
-gpu = ["dep:cust", "dep:cust_raw", "dep:backtrace"]
-cuda-kernels = [
-    "gpu",
-    "kernel-solana?/cuda",
-    "kernel-self-test-solana?/cuda",
-    "kernel-bitcoin?/cuda",
-    "kernel-self-test-bitcoin?/cuda",
-    "kernel-ethereum?/cuda",
-    "kernel-self-test-ethereum?/cuda",
-    "kernel-shallenge?/cuda",
-    "kernel-self-test-shallenge?/cuda",
-    "kernel-p256-public-key?/cuda",
-    "kernel-self-test-p256-public-key?/cuda",
-    "kernel-p256-signature?/cuda",
-    "kernel-self-test-p256-signature?/cuda",
-    "kernel-rsa-pss?/cuda",
-    "kernel-self-test-rsa-pss?/cuda",
-    "kernel-rsa-modulus?/cuda",
-    "kernel-self-test-rsa-modulus?/cuda",
-]
-cumetal = ["dep:libloading", "dep:serde", "dep:serde_json"]
-llvm21 = [
-    "cuda-kernels",
-    "kernel-solana?/llvm21",
-    "kernel-self-test-solana?/llvm21",
-    "kernel-bitcoin?/llvm21",
-    "kernel-self-test-bitcoin?/llvm21",
-    "kernel-ethereum?/llvm21",
-    "kernel-self-test-ethereum?/llvm21",
-    "kernel-shallenge?/llvm21",
-    "kernel-self-test-shallenge?/llvm21",
-    "kernel-p256-public-key?/llvm21",
-    "kernel-self-test-p256-public-key?/llvm21",
-    "kernel-p256-signature?/llvm21",
-    "kernel-self-test-p256-signature?/llvm21",
-    "kernel-rsa-pss?/llvm21",
-    "kernel-self-test-rsa-pss?/llvm21",
-    "kernel-rsa-modulus?/llvm21",
-    "kernel-self-test-rsa-modulus?/llvm21",
-]
-solana = ["logic/solana", "dep:kernel-solana"]
-bitcoin = ["logic/bitcoin", "dep:kernel-bitcoin"]
-ethereum = ["logic/ethereum", "dep:kernel-ethereum"]
-shallenge = ["logic/shallenge", "dep:kernel-shallenge"]
-crypto-cli = []
-p256-public-key = ["logic/p256-public-key", "dep:p256", "crypto-cli", "dep:kernel-p256-public-key"]
-p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "crypto-cli", "dep:kernel-p256-signature"]
-rsa-common = ["dep:rsa", "dep:num-bigint-dig", "crypto-cli"]
-rsa-modulus = ["rsa-common", "logic/rsa-modulus", "dep:kernel-rsa-modulus"]
-rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat", "dep:kernel-rsa-pss"]
+default = ["metal", "shallenge"]
+metal = ["dep:llvm-metal-runtime", "dep:llvm-metal-abi", "dep:serde_json", "dep:sha2"]
+solana = ["logic/solana"]
+bitcoin = ["logic/bitcoin"]
+ethereum = ["logic/ethereum"]
+shallenge = ["logic/shallenge"]
+p256-public-key = ["logic/p256-public-key", "dep:p256"]
+p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa"]
+rsa-common = ["dep:rsa", "dep:num-bigint-dig"]
+rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
+rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
 self_test = [
     "self_test_solana",
     "self_test_bitcoin",
@@ -66,34 +26,19 @@ self_test = [
     "self_test_rsa_modulus",
 ]
 self_test_support = ["logic/self_test_support"]
-self_test_solana = ["self_test_support", "logic/self_test_solana", "dep:kernel-self-test-solana"]
-self_test_bitcoin = ["self_test_support", "logic/self_test_bitcoin", "dep:kernel-self-test-bitcoin"]
-self_test_ethereum = ["self_test_support", "logic/self_test_ethereum", "dep:kernel-self-test-ethereum"]
-self_test_shallenge = ["self_test_support", "logic/self_test_shallenge", "dep:kernel-self-test-shallenge"]
-self_test_p256_public_key = ["self_test_support", "logic/self_test_p256_public_key", "dep:kernel-self-test-p256-public-key"]
-self_test_p256_signature = ["self_test_support", "logic/self_test_p256_signature", "dep:kernel-self-test-p256-signature"]
-self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss", "dep:kernel-self-test-rsa-pss"]
-self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus", "dep:kernel-self-test-rsa-modulus"]
+self_test_solana = ["self_test_support", "logic/self_test_solana"]
+self_test_bitcoin = ["self_test_support", "logic/self_test_bitcoin"]
+self_test_ethereum = ["self_test_support", "logic/self_test_ethereum"]
+self_test_shallenge = ["self_test_support", "logic/self_test_shallenge"]
+self_test_p256_public_key = ["self_test_support", "logic/self_test_p256_public_key"]
+self_test_p256_signature = ["self_test_support", "logic/self_test_p256_signature"]
+self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss"]
+self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
-kernel-solana = { path = "../kernels/solana", default-features = false, optional = true }
-kernel-self-test-solana = { path = "../kernels/self-test-solana", default-features = false, optional = true }
-kernel-bitcoin = { path = "../kernels/bitcoin", default-features = false, optional = true }
-kernel-self-test-bitcoin = { path = "../kernels/self-test-bitcoin", default-features = false, optional = true }
-kernel-ethereum = { path = "../kernels/ethereum", default-features = false, optional = true }
-kernel-self-test-ethereum = { path = "../kernels/self-test-ethereum", default-features = false, optional = true }
-kernel-shallenge = { path = "../kernels/shallenge", default-features = false, optional = true }
-kernel-self-test-shallenge = { path = "../kernels/self-test-shallenge", default-features = false, optional = true }
-kernel-p256-public-key = { path = "../kernels/p256-public-key", default-features = false, optional = true }
-kernel-self-test-p256-public-key = { path = "../kernels/self-test-p256-public-key", default-features = false, optional = true }
-kernel-p256-signature = { path = "../kernels/p256-signature", default-features = false, optional = true }
-kernel-self-test-p256-signature = { path = "../kernels/self-test-p256-signature", default-features = false, optional = true }
-kernel-rsa-pss = { path = "../kernels/rsa-pss", default-features = false, optional = true }
-kernel-self-test-rsa-pss = { path = "../kernels/self-test-rsa-pss", default-features = false, optional = true }
-kernel-rsa-modulus = { path = "../kernels/rsa-modulus", default-features = false, optional = true }
-kernel-self-test-rsa-modulus = { path = "../kernels/self-test-rsa-modulus", default-features = false, optional = true }
-libloading = { version = "0.8", optional = true }
-serde = { version = "1", features = ["derive"], optional = true }
+llvm-metal-runtime = { git = "https://github.com/brandonros/llvm-metal", rev = "8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1", optional = true }
+llvm-metal-abi = { git = "https://github.com/brandonros/llvm-metal", rev = "8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1", optional = true }
+sha2 = { version = "0.10", optional = true }
 serde_json = { version = "1", optional = true }
 ctrlc = { version = "3.4" }
 num-bigint-dig = { version = "0.8.6", default-features = false, features = ["prime", "zeroize"], optional = true }
@@ -106,20 +51,17 @@ hex = "0.4.3"
 rand = "0.8"
 paste = "1.0"
 
-[dependencies.cust]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50"
-optional = true
+[[example]]
+name = "metal_bench"
+required-features = ["metal", "shallenge"]
 
-[dependencies.cust_raw]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50"
-optional = true
+[[example]]
+name = "metal_solana_bench"
+required-features = ["metal", "solana"]
 
-[dependencies.backtrace]
-version = "0.3"
-optional = true
+[dev-dependencies]
+logic = { path = "../logic", default-features = false, features = ["test-vectors"] }
 
-[build-dependencies.serde_json]
-version = "1"
-optional = true
+[[example]]
+name = "metal_candidates_bench"
+required-features = ["metal", "shallenge", "bitcoin", "ethereum", "solana", "p256-public-key", "p256-signature", "rsa-modulus", "rsa-pss"]

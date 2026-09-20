@@ -62,6 +62,61 @@ mod tests {
     use logic::search::candidate_result::CandidateResult;
 
     #[test]
+    fn exit_on_first_match_verifies_before_claim_and_preserves_last_launch() {
+        let control = SearchControl::new();
+        control.set_exit_on_first_match();
+        control.set_continuous(); // CLI startup must not override the policy.
+        control.set_batch_size(1).unwrap();
+        control.set_device_launch_limit(Some(2));
+        let mut evaluations = 0;
+        let record = search(
+            |_, _| {
+                evaluations += 1;
+                Ok(BatchResult {
+                    matches: 1,
+                    errors: 0,
+                    lane: 0,
+                    candidate: CandidateResult::matched(&[42]),
+                })
+            },
+            100,
+            &control,
+            |counter, _| {
+                assert!(!control.has_winner());
+                Ok((counter == 1).then(|| "verified".to_string()))
+            },
+        )
+        .unwrap();
+        assert_eq!(record.as_deref(), Some("verified"));
+        assert_eq!(evaluations, 2);
+        assert!(control.has_winner());
+        assert!(!control.resume_after_match());
+        assert!(!control.reserve_device_launch());
+    }
+
+    #[test]
+    fn first_match_verification_error_never_claims_a_winner() {
+        let control = SearchControl::new();
+        control.set_exit_on_first_match();
+        let result = search(
+            |_, _| {
+                Ok(BatchResult {
+                    matches: 1,
+                    errors: 0,
+                    lane: 0,
+                    candidate: CandidateResult::matched(&[42]),
+                })
+            },
+            1,
+            &control,
+            |_, _| Err("verification failed".into()),
+        );
+        assert_eq!(result.unwrap_err(), "verification failed");
+        assert!(!control.has_winner());
+        assert!(control.stopped());
+    }
+
+    #[test]
     fn launch_limit_keeps_last_winner_and_persists_across_rounds() {
         let control = SearchControl::new();
         control.set_device_launch_limit(Some(1));

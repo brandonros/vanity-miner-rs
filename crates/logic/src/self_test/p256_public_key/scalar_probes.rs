@@ -1,5 +1,5 @@
 //! Focused scalar probes for the p256_public_key self-test.
-use core::hint::black_box;
+use crate::self_test::black_box;
 
 register_self_test! {
     /// p256 order minus one produces negative generator

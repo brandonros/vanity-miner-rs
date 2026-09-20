@@ -2,7 +2,7 @@
 mod fixtures;
 pub(super) mod range_probes;
 use super::known_answers::*;
-use core::hint::black_box;
+use crate::self_test::black_box;
 use fixtures::*;
 
 register_self_test! {
@@ -56,7 +56,7 @@ register_self_test! {
     fn zero_count_rejected() -> u32 {
         let mut config = black_box(device_config());
         config.p_count = [0; 128];
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         u32::from(crate::modes::rsa_modulus::rsa_modulus(&config, 9, &pattern).status == 2)
     }
 }
@@ -76,7 +76,7 @@ register_self_test! {
     /// rsa modulus equal factors rejected
     fn equal_factors_rejected() -> u32 {
         use crate::modes::rsa_modulus as pipeline;
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         u32::from(!pipeline::eligible_pair(
             &black_box(SELF_TEST_RSA_P),
             &black_box(SELF_TEST_RSA_P),
@@ -89,7 +89,7 @@ register_self_test! {
     /// rsa modulus undersized factor rejected
     fn undersized_factor_rejected() -> u32 {
         use crate::modes::rsa_modulus as pipeline;
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         u32::from(!pipeline::eligible_pair(
             &black_box([0; 128]),
             &black_box(SELF_TEST_RSA_Q),
@@ -102,7 +102,7 @@ register_self_test! {
     /// end-to-end independent rsa modulus candidate
     fn end_to_end() -> u32 {
         let config = black_box(device_config());
-        let pattern = crate::search::hex_pattern::HexPattern::new("", "", 256).unwrap();
+        let Ok(pattern) = crate::search::hex_pattern::HexPattern::new("", "", 256) else { return 0; };
         let result = crate::modes::rsa_modulus::rsa_modulus(&config, black_box(9), &pattern);
         u32::from(
             result.status == 1

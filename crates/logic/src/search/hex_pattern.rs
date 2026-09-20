@@ -3,13 +3,14 @@
 /// Largest supported target: an RSA-2048 modulus or signature.
 pub const MAX_HEX_TARGET_BYTES: usize = 256;
 
+llvm_metal_kernel::record! {
 /// A byte mask avoids allocating or parsing strings inside device kernels.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct HexPattern {
     value: [u8; MAX_HEX_TARGET_BYTES],
     mask: [u8; MAX_HEX_TARGET_BYTES],
     len: u32,
+}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -52,20 +53,24 @@ impl HexPattern {
         if prefix.len() > len * 2 || suffix.len() > len * 2 {
             return Err(PatternError::TooLong);
         }
-        for (text, start) in [(prefix, 0), (suffix, len * 2 - suffix.len())] {
-            for (offset, c) in text.bytes().enumerate() {
-                let digit = match c {
-                    b'0'..=b'9' => c - b'0',
-                    b'a'..=b'f' => c - b'a' + 10,
-                    b'A'..=b'F' => c - b'A' + 10,
-                    _ => return Err(PatternError::InvalidHex),
-                };
-                let nibble = start + offset;
-                let shift = if nibble % 2 == 0 { 4 } else { 0 };
-                pattern.constrain_byte(nibble / 2, 15 << shift, digit << shift)?;
-            }
-        }
+        pattern.constrain_text(prefix, 0)?;
+        pattern.constrain_text(suffix, len * 2 - suffix.len())?;
         Ok(pattern)
+    }
+
+    fn constrain_text(&mut self, text: &str, start: usize) -> Result<(), PatternError> {
+        for (offset, c) in text.bytes().enumerate() {
+            let digit = match c {
+                b'0'..=b'9' => c - b'0',
+                b'a'..=b'f' => c - b'a' + 10,
+                b'A'..=b'F' => c - b'A' + 10,
+                _ => return Err(PatternError::InvalidHex),
+            };
+            let nibble = start + offset;
+            let shift = if nibble % 2 == 0 { 4 } else { 0 };
+            self.constrain_byte(nibble / 2, 15 << shift, digit << shift)?;
+        }
+        Ok(())
     }
 
     /// Add known format bits, rejecting incompatible requested patterns.
@@ -75,7 +80,7 @@ impl HexPattern {
         mask: u8,
         value: u8,
     ) -> Result<(), PatternError> {
-        if offset >= self.len as usize {
+        if offset >= self.len as usize || offset >= MAX_HEX_TARGET_BYTES {
             return Err(PatternError::InvalidTargetLength);
         }
         if (self.value[offset] ^ value) & self.mask[offset] & mask != 0 {
@@ -88,10 +93,11 @@ impl HexPattern {
 
     pub fn matches(&self, bytes: &[u8]) -> bool {
         bytes.len() == self.len as usize
+            && bytes.len() <= MAX_HEX_TARGET_BYTES
             && bytes
                 .iter()
-                .enumerate()
-                .all(|(i, byte)| (byte ^ self.value[i]) & self.mask[i] == 0)
+                .zip(self.value.iter().zip(self.mask.iter()))
+                .all(|(byte, (value, mask))| (byte ^ value) & mask == 0)
     }
 
     /// Unique constrained bits, counting prefix/suffix overlap only once.
@@ -109,6 +115,20 @@ impl HexPattern {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn malformed_device_width_is_rejected_without_indexing_past_storage() {
+        let mut pattern = HexPattern {
+            value: [0; 256],
+            mask: [0; 256],
+            len: 257,
+        };
+        assert!(!pattern.matches(&[0; 257]));
+        assert_eq!(
+            pattern.constrain_byte(256, 255, 1),
+            Err(PatternError::InvalidTargetLength)
+        );
+    }
 
     #[test]
     fn odd_nibbles_case_and_exact_width() {

@@ -1,0 +1,76 @@
+name: metal
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      apple_gpu:
+        description: Run integration tests on a configured Apple GPU runner
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  references:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Test CPU references
+        run: |
+          nix develop --command cargo test --locked --release --workspace --no-default-features --features solana,bitcoin,ethereum,shallenge,p256-public-key,p256-signature,rsa-modulus,rsa-pss,self_test
+          nix develop --command cargo run --locked --release -p vanity-miner --no-default-features --features self_test -- self-test
+
+  host:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Check formatting and test Metal host validation
+        run: |
+          nix develop --command cargo fmt --all --check
+          nix develop --command cargo test --locked --release --workspace --all-features
+
+  kernels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [shallenge, bitcoin, ethereum, solana, p256-public-key, p256-signature, rsa-modulus, rsa-pss]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Compile production and self-test bundles
+        env:
+          MODE: ${{ matrix.mode }}
+        run: |
+          nix develop --command just build "$MODE"
+          nix develop --command just build "self-test-$MODE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metal-${{ matrix.mode }}
+          path: |
+            target/metal/${{ matrix.mode }}/
+            target/metal/self-test-${{ matrix.mode }}/
+          if-no-files-found: error
+
+  apple-gpu:
+    if: github.event_name == 'workflow_dispatch' && inputs.apple_gpu
+    needs: [references, host, kernels]
+    # Configure this label on an Apple GPU machine with Nix installed.
+    runs-on: [self-hosted, macOS, ARM64, apple-gpu]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: metal-*
+          path: target/metal
+          merge-multiple: true
+      - name: Execute the complete GPU coverage inventory
+        run: nix develop --command just test-built

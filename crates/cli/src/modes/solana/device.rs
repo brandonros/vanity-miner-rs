@@ -1,8 +1,6 @@
-//! Shared CUDA/CuMetal candidate reconstruction, verification, and output.
+//! Shared GPU candidate reconstruction, verification, and output.
 use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, vanity::BytePattern, xoroshiro::BatchSeed};
-
-pub const ENTRY: &str = "kernel_solana_vanity";
 
 pub fn search(
     prefix: &str,
@@ -16,12 +14,18 @@ pub fn search(
         seed: seed.unwrap_or_else(rand::random),
         width: u64::from(control.batch_size()),
     };
-    batches::search(
+    let output = batches::search(
         |start, count| evaluate(&request, &pattern, &[], start, count),
         u64::MAX,
         control,
         |counter, bytes| verify(&request, &pattern, counter, bytes).map(Some),
-    )
+    )?;
+    if control.exit_on_first_match()
+        && let Some(record) = &output
+    {
+        crate::runner::progress::print_verified(control, record.clone())?;
+    }
+    Ok(output)
 }
 
 fn verify(

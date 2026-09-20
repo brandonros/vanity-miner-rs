@@ -2,10 +2,8 @@
 
 pub(crate) mod args;
 pub(crate) mod cpu;
-#[cfg(feature = "gpu")]
-pub(crate) mod cuda;
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;
+#[cfg(feature = "metal")]
+pub mod metal;
 
 mod device;
 #[cfg(test)]
@@ -24,7 +22,7 @@ use logic::{
 };
 use rand::{RngCore, rngs::OsRng};
 use rsa::{BigUint, Pss, RsaPrivateKey, pkcs8::DecodePrivateKey, traits::PublicKeyParts};
-use std::{path::PathBuf, sync::Arc, thread, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use zeroize::Zeroizing;
 
 #[derive(Clone)]
@@ -230,7 +228,7 @@ fn run(
     }
     let found = output.is_some();
     if let Some(record) = &output {
-        println!("{record}");
+        crate::runner::progress::print_verified(&control, record.clone())?;
     }
     let (candidates_tested, elapsed) = control.statistics();
     Ok(PssReport {

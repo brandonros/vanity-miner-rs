@@ -1,4 +1,3 @@
-//! Compiled PTX for p256-public-key. GPU compilation is controlled by the `cuda` feature.
-
-#[cfg(feature = "cuda")]
-pub const PTX: &str = include_str!(concat!(env!("OUT_DIR"), "/p256_public_key.ptx"));
+#![no_std]
+pub mod contract;
+pub use contract::*;

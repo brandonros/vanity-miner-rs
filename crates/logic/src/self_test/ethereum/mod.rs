@@ -1,10 +1,10 @@
 //! ethereum self-tests: primitives, pipeline stages, and regressions.
 pub(super) mod candidate_probes;
 use crate::crypto::keccak256::keccak256_64bytes;
-use crate::crypto::secp256k1::secp256k1_derive_public_key_uncompressed;
+use crate::crypto::secp256k1::try_secp256k1_derive_public_key_uncompressed;
 use crate::modes::ethereum::EthereumVanityKeyRequest;
 use crate::modes::ethereum::EthereumVanityKeyResult;
-use crate::modes::ethereum::generate_and_check_ethereum_vanity_key;
+use crate::modes::ethereum::try_generate_and_check_ethereum_vanity_key;
 
 // === Non-solana primitive bisect (slots 4-9) ===
 // Same idea as slots 0-3, but for the primitives consumed by the bitcoin /
@@ -13,18 +13,9 @@ use crate::modes::ethereum::generate_and_check_ethereum_vanity_key;
 // fault here means the primitive itself is broken on the device — separate
 // from a fault in a composed pipeline kernel that just inlines it.
 
-const SECP256K1_PRIMITIVE_PRIV: [u8; 32] = [
-    0x15, 0x2d, 0x53, 0x72, 0x3d, 0xa4, 0x20, 0x34, 0x78, 0x57, 0x4b, 0x15, 0x31, 0x43, 0xa7, 0xea,
-    0xa9, 0x21, 0xa8, 0xd8, 0x2c, 0x62, 0x95, 0x17, 0xd6, 0xb1, 0x89, 0x49, 0xf0, 0x11, 0x1a, 0xbb,
-];
+use crate::test_vectors::SECP256K1_PRIMITIVE_PRIV;
 
-const SECP256K1_PRIMITIVE_UNCOMPRESSED_PUB: [u8; 65] = [
-    0x04, 0x91, 0x63, 0xab, 0x44, 0x9d, 0x4b, 0x90, 0xde, 0x13, 0xce, 0x60, 0xb5, 0x04, 0xbf, 0xc2,
-    0x7a, 0x4a, 0xed, 0x37, 0x8c, 0x1f, 0x83, 0x38, 0x68, 0x61, 0x56, 0xb9, 0x14, 0x45, 0x63, 0x7c,
-    0x8d, 0x33, 0x27, 0x2b, 0x79, 0x99, 0x4d, 0xae, 0x54, 0xda, 0x40, 0x11, 0xcc, 0x3e, 0x34, 0x91,
-    0xcc, 0xdf, 0x3b, 0xd3, 0xfd, 0x92, 0x97, 0x8a, 0x00, 0x87, 0x37, 0x27, 0xf9, 0x9b, 0xeb, 0x43,
-    0x75,
-];
+use crate::test_vectors::SECP256K1_PRIMITIVE_UNCOMPRESSED_PUB;
 
 const KECCAK256_PRIMITIVE_INPUT: [u8; 64] = [
     0x61, 0xa3, 0x14, 0xb0, 0x18, 0x37, 0x24, 0xea, 0x0e, 0x5f, 0x23, 0x75, 0x84, 0xcb, 0x76, 0x09,
@@ -46,36 +37,38 @@ const ETHEREUM_TEST_PRIV: [u8; 32] = [
 register_self_test! {
     /// secp256k1 uncompressed
     fn primitive_secp256k1_uncompressed() -> u32 {
-        let pub_key = secp256k1_derive_public_key_uncompressed(&core::hint::black_box(SECP256K1_PRIMITIVE_PRIV));
-        (pub_key == SECP256K1_PRIMITIVE_UNCOMPRESSED_PUB) as u32
+        let pub_key = try_secp256k1_derive_public_key_uncompressed(&crate::self_test::black_box(SECP256K1_PRIMITIVE_PRIV));
+        (pub_key == Some(SECP256K1_PRIMITIVE_UNCOMPRESSED_PUB)) as u32
     }
 }
 
 register_self_test! {
     /// keccak256 64bytes
     fn primitive_keccak256() -> u32 {
-        let hash = keccak256_64bytes(&core::hint::black_box(KECCAK256_PRIMITIVE_INPUT));
+        let hash = keccak256_64bytes(&crate::self_test::black_box(KECCAK256_PRIMITIVE_INPUT));
         (hash == KECCAK256_PRIMITIVE_OUTPUT) as u32
     }
 }
 
 // === Ethereum (rng_seed=15455378110306975741, thread_idx=0) ===
 
-fn ethereum_test() -> EthereumVanityKeyResult {
+fn ethereum_test() -> Option<EthereumVanityKeyResult> {
+    let prefix = crate::self_test::black_box(*b"");
+    let suffix = crate::self_test::black_box(*b"");
     let req = EthereumVanityKeyRequest {
-        prefix: b"",
-        suffix: b"",
-        thread_idx: 0,
-        rng_seed: 15455378110306975741,
+        prefix: &prefix,
+        suffix: &suffix,
+        thread_idx: crate::self_test::black_box(0),
+        rng_seed: crate::self_test::black_box(15455378110306975741),
     };
-    generate_and_check_ethereum_vanity_key(&core::hint::black_box(req))
+    try_generate_and_check_ethereum_vanity_key(&req)
 }
 
 register_self_test! {
     /// ethereum priv
     fn private_key() -> u32 {
         let expected = ETHEREUM_TEST_PRIV;
-        (ethereum_test().private_key == expected) as u32
+        u32::from(ethereum_test().is_some_and(|result| result.private_key == expected))
     }
 }
 
@@ -89,7 +82,7 @@ register_self_test! {
             0x8e, 0xe9, 0x26, 0x11, 0x8a, 0xbf, 0xf8, 0xaf, 0x52, 0x4e, 0x0a, 0x5d, 0x5e, 0x82, 0x75,
             0x28, 0x6d, 0xd4, 0xc9,
         ];
-        (ethereum_test().public_key == expected) as u32
+        u32::from(ethereum_test().is_some_and(|result| result.public_key == expected))
     }
 }
 
@@ -100,6 +93,6 @@ register_self_test! {
             0x55, 0x55, 0x63, 0x59, 0x0c, 0x72, 0x4a, 0x58, 0xf7, 0xbb, 0x48, 0xb6, 0xc8, 0x47, 0xaa,
             0x63, 0x1a, 0x48, 0x65, 0x1c,
         ];
-        (ethereum_test().address == expected) as u32
+        u32::from(ethereum_test().is_some_and(|result| result.address == expected))
     }
 }

@@ -1,4 +1,4 @@
-//! Shared test inventory and reporting for CPU, CUDA, and CuMetal.
+//! Shared test inventory and reporting for CPU references and Metal.
 pub use logic::self_test::metadata::Case;
 pub mod args;
 pub fn inventory() -> Vec<Case> {
@@ -41,10 +41,10 @@ impl DeviceResults {
         });
         let results = results.as_ref().map_err(Clone::clone)?;
         let slot = case.slot;
-        if results[slot] == 2 {
-            if let Some(reason) = case.gpu_skip {
-                return Ok(Outcome::Skipped(reason));
-            }
+        if results[slot] == 2
+            && let Some(reason) = case.gpu_skip
+        {
+            return Ok(Outcome::Skipped(reason));
         }
         if results[slot] != 1 {
             return Err(format!("{}: got {}, expected 1", case.name, results[slot]));
@@ -223,9 +223,8 @@ mod tests {
     }
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "metal"))]
 pub(crate) mod cpu;
-#[cfg(feature = "gpu")]
-pub(crate) mod cuda;
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;
+
+#[cfg(feature = "metal")]
+pub(crate) mod metal;

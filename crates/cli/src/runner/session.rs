@@ -17,6 +17,7 @@ pub struct SearchControl {
     batch_size: AtomicU32,
     device_launches_remaining: AtomicU64,
     continuous: AtomicBool,
+    exit_on_first_match: AtomicBool,
     stats: Arc<GlobalStats>,
 }
 
@@ -39,6 +40,7 @@ impl SearchControl {
             batch_size: AtomicU32::new(64),
             device_launches_remaining: AtomicU64::new(u64::MAX),
             continuous: AtomicBool::new(false),
+            exit_on_first_match: AtomicBool::new(false),
             stats,
         }
     }
@@ -88,7 +90,20 @@ impl SearchControl {
 
     /// Configure once before starting independent device searches.
     pub fn set_continuous(&self) {
-        self.continuous.store(true, Ordering::Release);
+        if !self.exit_on_first_match() {
+            self.continuous.store(true, Ordering::Release);
+        }
+    }
+
+    /// Configure before workers start. Winner verification completes before the
+    /// atomic claim; the winner remains stopped after its output is printed.
+    pub fn set_exit_on_first_match(&self) {
+        self.exit_on_first_match.store(true, Ordering::Release);
+        self.continuous.store(false, Ordering::Release);
+    }
+
+    pub fn exit_on_first_match(&self) -> bool {
+        self.exit_on_first_match.load(Ordering::Acquire)
     }
 
     pub fn continuous(&self) -> bool {
@@ -116,7 +131,8 @@ impl SearchControl {
     /// Called after every worker has joined and the winning record was printed.
     /// Keep the counter advancing so message searches never repeat candidates.
     pub fn resume_after_match(&self) -> bool {
-        !self.interrupted.load(Ordering::Acquire)
+        !self.exit_on_first_match()
+            && !self.interrupted.load(Ordering::Acquire)
             && self
                 .state
                 .compare_exchange(WINNER, RUNNING, Ordering::AcqRel, Ordering::Acquire)
@@ -200,17 +216,21 @@ impl Drop for CancelOnExit<'_> {
     }
 }
 
-#[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
+#[cfg(not(feature = "metal"))]
 use crate::runner::RunResult;
 
-#[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
+#[cfg(not(feature = "metal"))]
 pub(crate) fn run_controlled(
     stats: Arc<crate::runner::progress::GlobalStats>,
     unit: &'static str,
+    exit_on_first_match: bool,
     mut work: impl FnMut(Arc<SearchControl>) -> Result<bool, String>,
 ) -> RunResult {
     stats.set_unit(unit);
     let control = Arc::new(SearchControl::with_stats(stats.clone()));
+    if exit_on_first_match {
+        control.set_exit_on_first_match();
+    }
     let cancellation = control.clone();
     ctrlc::set_handler(move || cancellation.interrupt())
         .map_err(|_| "could not install Ctrl-C handler")?;
@@ -219,7 +239,6 @@ pub(crate) fn run_controlled(
             if !work(control.clone())? {
                 break;
             }
-            stats.add_matches(1);
             if !control.resume_after_match() {
                 break;
             }
@@ -231,16 +250,20 @@ pub(crate) fn run_controlled(
 }
 
 /// Run a continuous device session once, preserving counters and prepared state.
-#[cfg(feature = "cumetal")]
+#[cfg(feature = "metal")]
 pub(crate) fn run_device_session(
     stats: Arc<GlobalStats>,
     unit: &'static str,
     launches: Option<u64>,
     batch_size: u32,
+    exit_on_first_match: bool,
     work: impl FnOnce(Arc<SearchControl>) -> Result<(), String>,
 ) -> crate::runner::RunResult {
     stats.set_unit(unit);
     let control = Arc::new(SearchControl::with_stats(stats));
+    if exit_on_first_match {
+        control.set_exit_on_first_match();
+    }
     control.set_batch_size(batch_size)?;
     control.set_device_launch_limit(launches);
     control.set_continuous();
@@ -253,6 +276,19 @@ pub(crate) fn run_device_session(
 mod tests {
     use super::*;
     use std::sync::{Arc, Barrier};
+
+    #[test]
+    fn first_match_policy_prevents_continuous_restart() {
+        let control = SearchControl::new();
+        control.set_continuous();
+        control.set_exit_on_first_match();
+        control.set_continuous();
+        assert!(!control.continuous());
+        assert!(control.claim_verified_winner());
+        assert!(!control.resume_after_match());
+        assert!(control.stopped());
+        assert!(control.reserve_batch(1).is_none());
+    }
 
     #[test]
     fn only_one_verified_worker_wins() {

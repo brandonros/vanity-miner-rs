@@ -1,24 +1,17 @@
 /// Check if data matches the given prefix and suffix patterns.
 /// Works with any byte slice - encoded addresses (Solana/Bitcoin) or raw bytes (Ethereum).
 pub fn check_vanity_match(data: &[u8], prefix: &[u8], suffix: &[u8]) -> bool {
-    let len = data.len();
-
-    // Check prefix
-    if prefix.len() > len {
+    if prefix.len() > data.len() || suffix.len() > data.len() {
         return false;
     }
-    for i in 0..prefix.len() {
-        if data[i] != prefix[i] {
+    for (actual, expected) in data.iter().zip(prefix) {
+        if actual != expected {
             return false;
         }
     }
 
-    // Check suffix
-    if suffix.len() > len {
-        return false;
-    }
-    for i in 0..suffix.len() {
-        if data[len - suffix.len() + i] != suffix[i] {
+    for (actual, expected) in data.iter().rev().zip(suffix.iter().rev()) {
+        if actual != expected {
             return false;
         }
     }
@@ -29,6 +22,35 @@ pub fn check_vanity_match(data: &[u8], prefix: &[u8], suffix: &[u8]) -> bool {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn all_pattern_lengths_and_overlaps_match_slice_reference() {
+        let data: [u8; 20] = core::array::from_fn(|i| i as u8);
+        for n in 0..=64 {
+            for m in 0..=64 {
+                let mut prefix = [0u8; 64];
+                let mut suffix = [0u8; 64];
+                prefix[..n.min(20)].copy_from_slice(&data[..n.min(20)]);
+                suffix[..m.min(20)].copy_from_slice(&data[20 - m.min(20)..]);
+                for mismatch in [false, true] {
+                    if mismatch {
+                        if n > 0 {
+                            prefix[n - 1] ^= 1;
+                        }
+                        if m > 0 {
+                            suffix[0] ^= 1;
+                        }
+                    }
+                    assert_eq!(
+                        check_vanity_match(&data, &prefix[..n], &suffix[..m]),
+                        data.starts_with(&prefix[..n]) && data.ends_with(&suffix[..m])
+                    );
+                }
+            }
+        }
+        assert!(check_vanity_match(&[], &[], &[]));
+        assert!(!check_vanity_match(&[], &[0], &[]));
+    }
 
     #[test]
     fn test_prefix_match() {
@@ -60,14 +82,15 @@ mod test {
     }
 }
 
+llvm_metal_kernel::record! {
 /// Prefix and suffix bytes passed to an address-search kernel.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BytePattern {
     pub prefix_len: u32,
     pub suffix_len: u32,
     pub prefix: [u8; 64],
     pub suffix: [u8; 64],
+}
 }
 impl BytePattern {
     pub fn new(prefix: &[u8], suffix: &[u8]) -> Result<Self, &'static str> {

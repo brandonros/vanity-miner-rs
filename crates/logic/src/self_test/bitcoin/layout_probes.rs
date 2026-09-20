@@ -4,7 +4,8 @@ use super::*;
 register_self_test! {
     /// static [u64; 5] indexed read
     fn static_u64_array_lookup() -> u32 {
-        let idx = core::hint::black_box(3usize);
+        let idx = crate::self_test::black_box(3usize);
+        if idx >= STATIC_U64_TABLE.len() { return 0; }
         let val = STATIC_U64_TABLE[idx];
         (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
     }
@@ -13,7 +14,8 @@ register_self_test! {
 register_self_test! {
     /// static struct-wrapped [u64; 5] indexed read
     fn static_struct_wrapped_u64_lookup() -> u32 {
-        let idx = core::hint::black_box(3usize);
+        let idx = crate::self_test::black_box(3usize);
+        if idx >= STATIC_U64_WRAPPED.0.len() { return 0; }
         let val = STATIC_U64_WRAPPED.0[idx];
         (val == 0xAAAA_BBBB_CCCC_DDDD) as u32
     }
@@ -26,8 +28,8 @@ register_self_test! {
     /// subtle Choice from(u8) into bool
     fn subtle_choice_u8_into_bool() -> u32 {
         use k256::elliptic_curve::subtle::Choice;
-        let c0 = Choice::from(core::hint::black_box(0u8));
-        let c1 = Choice::from(core::hint::black_box(1u8));
+        let c0 = Choice::from(crate::self_test::black_box(0u8));
+        let c1 = Choice::from(crate::self_test::black_box(1u8));
         let b0: bool = c0.into();
         let b1: bool = c1.into();
         (!b0 && b1) as u32
@@ -46,10 +48,10 @@ register_self_test! {
     /// subtle u64::conditional_select(0|1)
     fn subtle_conditional_select_u64() -> u32 {
         use k256::elliptic_curve::subtle::{Choice, ConditionallySelectable};
-        let a = core::hint::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
-        let b = core::hint::black_box(0x1234_5678_9ABC_DEF0_u64);
-        let c0 = Choice::from(core::hint::black_box(0u8));
-        let c1 = Choice::from(core::hint::black_box(1u8));
+        let a = crate::self_test::black_box(0xCAFE_BABE_DEAD_BEEF_u64);
+        let b = crate::self_test::black_box(0x1234_5678_9ABC_DEF0_u64);
+        let c0 = Choice::from(crate::self_test::black_box(0u8));
+        let c1 = Choice::from(crate::self_test::black_box(1u8));
         let r0 = u64::conditional_select(&a, &b, c0);
         let r1 = u64::conditional_select(&a, &b, c1);
         (r0 == a && r1 == b) as u32
@@ -65,11 +67,11 @@ register_self_test! {
     /// Index trait const-idx (5 writes/reads)
     fn index_trait_const_indices() -> u32 {
         let mut p = IdxProbe([0u64; 5]);
-        p[0] = core::hint::black_box(0x1111_1111_1111_1111_u64);
-        p[1] = core::hint::black_box(0x2222_2222_2222_2222_u64);
-        p[2] = core::hint::black_box(0x3333_3333_3333_3333_u64);
-        p[3] = core::hint::black_box(0x4444_4444_4444_4444_u64);
-        p[4] = core::hint::black_box(0x5555_5555_5555_5555_u64);
+        p[0] = crate::self_test::black_box(0x1111_1111_1111_1111_u64);
+        p[1] = crate::self_test::black_box(0x2222_2222_2222_2222_u64);
+        p[2] = crate::self_test::black_box(0x3333_3333_3333_3333_u64);
+        p[3] = crate::self_test::black_box(0x4444_4444_4444_4444_u64);
+        p[4] = crate::self_test::black_box(0x5555_5555_5555_5555_u64);
         let r0 = p[0];
         let r1 = p[1];
         let r2 = p[2];
@@ -94,8 +96,9 @@ register_self_test! {
         use k256::elliptic_curve::generic_array::GenericArray;
         use k256::elliptic_curve::generic_array::typenum::U33;
         let mut ga: GenericArray<u8, U33> = GenericArray::default();
-        let i0 = core::hint::black_box(0usize);
-        let i32 = core::hint::black_box(32usize);
+        let i0 = crate::self_test::black_box(0usize);
+        let i32 = crate::self_test::black_box(32usize);
+        if i0 >= ga.len() || i32 >= ga.len() { return 0; }
         ga[i0] = 0xAA;
         ga[i32] = 0xBB;
         let v0 = ga[i0];
@@ -114,7 +117,7 @@ register_self_test! {
     fn generic_array_copy_from_slice() -> u32 {
         use k256::elliptic_curve::generic_array::GenericArray;
         use k256::elliptic_curve::generic_array::typenum::U33;
-        let src: [u8; 32] = core::hint::black_box(SECP256K1_GX_BYTES);
+        let src: [u8; 32] = crate::self_test::black_box(SECP256K1_GX_BYTES);
         let mut ga: GenericArray<u8, U33> = GenericArray::default();
         ga[0] = 0x02;
         ga[1..33].copy_from_slice(&src);
@@ -138,7 +141,7 @@ register_self_test! {
         let x_bytes = &SECP256K1_GX_BYTES;
         let y_bytes = &SECP256K1_GY_BYTES;
         // Compute tag: even y → 0x02, odd y → 0x03
-        let last_y = core::hint::black_box(y_bytes[31]);
+        let last_y = crate::self_test::black_box(y_bytes[31]);
         let tag: u8 = if last_y & 1 == 1 { 0x03 } else { 0x02 };
         let mut bytes = [0u8; 33];
         bytes[0] = tag;
@@ -152,7 +155,7 @@ register_self_test! {
     fn generic_array_as_slice_last() -> u32 {
         use k256::elliptic_curve::generic_array::GenericArray;
         use k256::elliptic_curve::generic_array::typenum::U32;
-        let input = core::hint::black_box(SECP256K1_GY_BYTES);
+        let input = crate::self_test::black_box(SECP256K1_GY_BYTES);
         let ga: &GenericArray<u8, U32> = (&input).into();
         let last = last_via_as_slice(ga);
         (last == 0xB8) as u32 // SECP256K1_GY_BYTES[31]
@@ -168,7 +171,7 @@ register_self_test! {
     fn field_bytes_into_conversion() -> u32 {
         use k256::elliptic_curve::FieldBytes;
         let arr: [u8; 32] = SECP256K1_GX_BYTES;
-        let arr = core::hint::black_box(arr);
+        let arr = crate::self_test::black_box(arr);
         let ga: &FieldBytes<k256::Secp256k1> = (&arr).into();
         let first = ga[0];
         let last = ga[31];
@@ -186,7 +189,7 @@ register_self_test! {
     fn generic_array_copy_from_ga_source() -> u32 {
         use k256::elliptic_curve::generic_array::GenericArray;
         use k256::elliptic_curve::generic_array::typenum::{U32, U33};
-        let src_arr = core::hint::black_box(SECP256K1_GX_BYTES);
+        let src_arr = crate::self_test::black_box(SECP256K1_GX_BYTES);
         let src: &GenericArray<u8, U32> = (&src_arr).into();
         let mut dst: GenericArray<u8, U33> = GenericArray::default();
         dst[0] = 0x02;

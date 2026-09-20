@@ -2,13 +2,14 @@
 //! Host and device use the same functions. Records containing secrets must be
 //! cleared by their owners after the synchronized launch; never log them.
 
+llvm_metal_kernel::record! {
 /// A lane returns only public output (or an RSA factor for host validation).
 /// Status: 0 = miss, 1 = match, 2 = invalid request or failed arithmetic.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct CandidateResult {
     pub status: u32,
     pub bytes: [u8; 256],
+}
 }
 impl CandidateResult {
     pub const STATUS_MISS: u32 = 0;
@@ -40,29 +41,17 @@ impl zeroize::Zeroize for CandidateResult {
     }
 }
 
-#[cfg(test)]
-mod abi_tests {
-    #[test]
-    fn records_have_no_implicit_padding() {
-        assert_eq!(core::mem::size_of::<super::CandidateResult>(), 260);
-        assert_eq!(core::mem::size_of::<super::BatchResult>(), 272);
-        assert_eq!(
-            core::mem::size_of::<crate::search::hex_pattern::HexPattern>(),
-            516
-        );
-    }
-}
-
+llvm_metal_kernel::record! {
 /// One shared winner per synchronized launch, matching the original kernels.
 /// Every matching lane increments `matches`; only the first writes the payload.
 /// Errors are counted separately so a winning lane cannot hide a device failure.
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct BatchResult {
     pub matches: u32,
     pub errors: u32,
     pub lane: u32,
     pub candidate: CandidateResult,
+}
 }
 impl BatchResult {
     pub const EMPTY: Self = Self {
@@ -162,3 +151,6 @@ mod winner_tests {
 
 // SAFETY: repr(C) record containing only padding-free u32 fields and byte arrays.
 unsafe impl super::device_record::DeviceRecord for BatchResult {}
+
+// SAFETY: repr(C), one u32 and a byte array, no padding; all bit patterns valid.
+unsafe impl super::device_record::DeviceRecord for CandidateResult {}

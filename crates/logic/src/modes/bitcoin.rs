@@ -29,11 +29,25 @@ pub struct BitcoinVanityKeyResult {
 pub fn generate_and_check_bitcoin_vanity_key(
     request: &BitcoinVanityKeyRequest,
 ) -> BitcoinVanityKeyResult {
-    // Generate private key
+    try_generate_and_check_bitcoin_vanity_key(request).expect("invalid secp256k1 private key")
+}
+
+/// Checked candidate evaluation for device code without a panic runtime.
+pub fn try_generate_and_check_bitcoin_vanity_key(
+    request: &BitcoinVanityKeyRequest,
+) -> Option<BitcoinVanityKeyResult> {
     let private_key = xoroshiro::generate_random_private_key(request.thread_idx, request.rng_seed);
 
-    // Derive public key (compressed secp256k1)
-    let public_key = secp256k1::secp256k1_derive_public_key(&private_key);
+    try_check_bitcoin_key(private_key, request.prefix, request.suffix)
+}
+
+/// Derive the existing mainnet P2WPKH result and match it, rejecting invalid keys.
+pub fn try_check_bitcoin_key(
+    private_key: [u8; 32],
+    prefix: &[u8],
+    suffix: &[u8],
+) -> Option<BitcoinVanityKeyResult> {
+    let public_key = secp256k1::try_secp256k1_derive_public_key(&private_key)?;
 
     // Hash public key: RIPEMD160(SHA256(public_key))
     let sha256_hash = sha256::sha256_from_bytes(&public_key);
@@ -58,13 +72,9 @@ pub fn generate_and_check_bitcoin_vanity_key(
         bech32::encode_p2wpkh_address(&public_key_hash, true, &mut encoded_public_key);
 
     // Check if matches vanity criteria
-    let matches = vanity::check_vanity_match(
-        &encoded_public_key[..encoded_len],
-        request.prefix,
-        request.suffix,
-    );
+    let matches = vanity::check_vanity_match(&encoded_public_key[..encoded_len], prefix, suffix);
 
-    BitcoinVanityKeyResult {
+    Some(BitcoinVanityKeyResult {
         private_key,
         public_key,
         public_key_hash,
@@ -73,7 +83,7 @@ pub fn generate_and_check_bitcoin_vanity_key(
         encoded_public_key,
         encoded_len,
         matches,
-    }
+    })
 }
 
 // Convert private key to WIF format
@@ -249,12 +259,14 @@ pub fn candidate(
     let Some((prefix, suffix)) = pattern.parts() else {
         return CandidateResult::ERROR;
     };
-    let result = generate_and_check_bitcoin_vanity_key(&BitcoinVanityKeyRequest {
+    let Some(result) = try_generate_and_check_bitcoin_vanity_key(&BitcoinVanityKeyRequest {
         prefix,
         suffix,
         thread_idx,
         rng_seed,
-    });
+    }) else {
+        return CandidateResult::ERROR;
+    };
     if result.matches {
         CandidateResult::matched(&result.private_key)
     } else {

@@ -3,5 +3,5 @@ target
 build
 .direnv
 
-.cumetal-artifacts/
 /artifacts/
+__pycache__/

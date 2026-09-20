@@ -3,7 +3,7 @@ mod fixtures;
 pub(super) mod salt_probes;
 use super::known_answers::*;
 use super::record_candidate;
-use core::hint::black_box;
+use crate::self_test::black_box;
 use fixtures::*;
 
 register_self_test! {
@@ -11,7 +11,7 @@ register_self_test! {
     fn sha256() -> u32 {
         u32::from((|| {
             use crate::crypto::sha256::Sha256;
-            let actual: [u8; 32] = Sha256::digest(black_box(b"sample"));
+            let actual: [u8; 32] = Sha256::digest(&black_box(*b"sample"));
             actual == CRYPTO_FIXTURE_SAMPLE_SHA256
         })())
     }
@@ -22,7 +22,7 @@ register_self_test! {
     fn mgf1_partial_block() -> u32 {
         u32::from((|| {
             let mut out = [0; 50];
-            crate::crypto::rsa_pss::mgf1_sha256(black_box(b"public test seed"), &mut out).is_ok()
+            crate::crypto::rsa_pss::mgf1_sha256(&black_box(*b"public test seed"), &mut out).is_ok()
                 && out == CRYPTO_FIXTURE_MGF_PARTIAL
         })())
     }
@@ -117,7 +117,7 @@ register_self_test! {
 register_self_test! {
     /// rsa pss crt known answer
     fn crt_known_answer() -> u32 {
-        let key = self_test_crt_key();
+        let Some(key) = self_test_crt_key() else { return 0; };
         let mut input = [0; 256];
         input[255] = 65;
         u32::from(key.private_operation(&black_box(input)) == Some(SELF_TEST_RSA_SIGNATURE_65))
@@ -130,14 +130,13 @@ register_self_test! {
         // Deliberately composite p simulates inconsistent CRT arithmetic while
         // leaving constructor congruence checks satisfied. The final public-operation
         // verification must reject the result. No private fields or test hooks needed.
-        let key = crate::crypto::rsa_crt::Rsa2048Crt::new(
+        let Some(key) = crate::crypto::rsa_crt::Rsa2048Crt::new(
             &black_box([255; 128]),
             &black_box(SELF_TEST_RSA_Q),
             &black_box(SELF_TEST_COMPOSITE_DP),
             &black_box(SELF_TEST_RSA_DQ),
             &black_box(SELF_TEST_COMPOSITE_Q_INV),
-        )
-        .unwrap();
+        ) else { return 0; };
         let mut input = [0; 256];
         input[255] = 65;
         u32::from(key.private_operation(&black_box(input)).is_none())
@@ -147,12 +146,12 @@ register_self_test! {
 register_self_test! {
     /// rsa pss crt modulus rejected
     fn crt_modulus_rejected() -> u32 {
-        let key = self_test_crt_key();
+        let Some(key) = self_test_crt_key() else { return 0; };
         u32::from(key.private_operation(&black_box(key.modulus())).is_none())
     }
 }
 
-fn self_test_crt_key() -> crate::crypto::rsa_crt::Rsa2048Crt {
+fn self_test_crt_key() -> Option<crate::crypto::rsa_crt::Rsa2048Crt> {
     crate::crypto::rsa_crt::Rsa2048Crt::new(
         &black_box(SELF_TEST_RSA_P),
         &black_box(SELF_TEST_RSA_Q),
@@ -160,14 +159,13 @@ fn self_test_crt_key() -> crate::crypto::rsa_crt::Rsa2048Crt {
         &black_box(SELF_TEST_RSA_DQ),
         &black_box(SELF_TEST_RSA_Q_INV),
     )
-    .unwrap()
 }
 
-fn self_test_digest_rsa_pss() -> [u8; 32] {
+fn self_test_digest_rsa_pss() -> Option<[u8; 32]> {
     use crate::crypto::sha256::Sha256;
     use crate::{modes::rsa_pss::*, search::hex_pattern::HexPattern};
     let mut h = Sha256::new();
-    let message = black_box(b"header\0\0footer");
+    let message = &black_box(*b"header\0\0footer");
     for source in [0, 1] {
         for length in [0, 1, 32, 222] {
             let request = black_box(RsaPssRequest {
@@ -184,7 +182,7 @@ fn self_test_digest_rsa_pss() -> [u8; 32] {
                 source,
                 salt_length: length,
             });
-            let pattern = black_box(HexPattern::new("", "", 256).unwrap());
+            let pattern = black_box(HexPattern::new("", "", 256).ok()?);
             let count = if length == 0 && source == 0 { 1 } else { 4 };
             for counter in 0..count {
                 record_candidate(
@@ -194,7 +192,7 @@ fn self_test_digest_rsa_pss() -> [u8; 32] {
             }
         }
     }
-    h.finalize()
+    Some(h.finalize())
 }
 
 register_self_test! {
@@ -203,10 +201,10 @@ register_self_test! {
     fn end_to_end() -> u32 {
         u32::from(
             self_test_digest_rsa_pss()
-                == [
+                == Some([
                     186, 112, 218, 248, 118, 160, 144, 0, 191, 165, 67, 7, 165, 196, 6, 70, 218, 174,
                     58, 193, 60, 84, 214, 84, 233, 131, 204, 111, 141, 86, 47, 85,
-                ],
+                ]),
         )
     }
 }

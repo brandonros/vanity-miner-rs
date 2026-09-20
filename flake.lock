@@ -1,22 +1,41 @@
 {
   "nodes": {
-    "cumetal": {
+    "llvm-downgrade": {
       "flake": false,
       "locked": {
-        "lastModified": 1789685202,
-        "narHash": "sha256-532Rm1kNYq5ReLGAI84hjZdUb4WREoSiWcayLPwewIs=",
-        "ref": "upstream/ptx-helper-record-contexts",
-        "rev": "1b9e6852bc4053f5e5cf347f78c185a916bbbf3a",
-        "revCount": 624,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
+        "lastModified": 1788953358,
+        "narHash": "sha256-5bZSIKUGft6LPqHjEVUMe5CIsbfkVK25fZ2Un77VSc0=",
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "09c2e50d4526b08f55010f6c091ace35332a78a8",
+        "type": "github"
       },
       "original": {
-        "ref": "upstream/ptx-helper-record-contexts",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/brandonros/cuda-metal"
+        "owner": "JuliaLLVM",
+        "repo": "llvm-downgrade",
+        "rev": "09c2e50d4526b08f55010f6c091ace35332a78a8",
+        "type": "github"
+      }
+    },
+    "llvm-metal": {
+      "inputs": {
+        "llvm-downgrade": "llvm-downgrade",
+        "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay"
+      },
+      "locked": {
+        "lastModified": 1789942439,
+        "narHash": "sha256-QaqJ3O+2aeEDqN+GvPppjnhwqjtH7k5RDLFnZAli2Ro=",
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "brandonros",
+        "repo": "llvm-metal",
+        "rev": "8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -35,47 +54,69 @@
         "type": "github"
       }
     },
-    "nixpkgs-llvm7": {
+    "nixpkgs_2": {
       "locked": {
-        "lastModified": 1704290814,
-        "narHash": "sha256-LWvKHp7kGxk/GEtlrGYV68qIvPHkU9iToomNFGagixU=",
+        "lastModified": 1789724158,
+        "narHash": "sha256-nlKgrm0dsVhOSopKheVBCcOpiIticufPPVLdVOI0euA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "70bdadeb94ffc8806c0570eb5c2695ad29f0e421",
+        "rev": "0a3468a402c449992505b6a9fc5b06580141b750",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixos-23.05",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
     },
     "root": {
       "inputs": {
-        "cumetal": "cumetal",
-        "nixpkgs": "nixpkgs",
-        "nixpkgs-llvm7": "nixpkgs-llvm7",
-        "rust-overlay": "rust-overlay"
+        "llvm-metal": "llvm-metal",
+        "nixpkgs": "nixpkgs_2",
+        "rust-overlay": "rust-overlay_2"
       }
     },
     "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "llvm-metal",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1789889921,
+        "narHash": "sha256-aL/ogiN7qZCGeNovS1f9hX73jwYIKb4Pcq6AZm57WtY=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "1fb104a12a8667045559b2575d6d448ae2fbd99b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "1fb104a12a8667045559b2575d6d448ae2fbd99b",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
       "inputs": {
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1776136407,
-        "narHash": "sha256-Cp8XrVLGruSDBTRs8L4LmvaEcd76tHHU9esLk7Ysa4E=",
+        "lastModified": 1789889921,
+        "narHash": "sha256-aL/ogiN7qZCGeNovS1f9hX73jwYIKb4Pcq6AZm57WtY=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "753568957a87312ed599cba5699e67126eded6c0",
+        "rev": "1fb104a12a8667045559b2575d6d448ae2fbd99b",
         "type": "github"
       },
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "rev": "1fb104a12a8667045559b2575d6d448ae2fbd99b",
         "type": "github"
       }
     }

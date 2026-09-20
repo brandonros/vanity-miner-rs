@@ -23,7 +23,7 @@ register_self_test! {
 register_self_test! {
     /// base58 32 all-zeros
     fn base58_all_zeros() -> u32 {
-        let input = core::hint::black_box([0u8; 32]);
+        let input = crate::self_test::black_box([0u8; 32]);
         let mut out = [0u8; 64];
         let n = base58_encode_32(&input, &mut out);
         if n != BASE58_ALLZERO_EXPECTED.len() {
@@ -64,7 +64,7 @@ register_self_test! {
             ((LIMB / (58 * 58 * 58 * 58)) % 58) as u8,
         ];
 
-        let limb = core::hint::black_box(LIMB);
+        let limb = crate::self_test::black_box(LIMB);
         let got: [u8; 5] = [
             ((limb / 1) % 58) as u8,
             ((limb / 58) % 58) as u8,
@@ -95,11 +95,11 @@ register_self_test! {
         // 32))` — that's the suspect shape.
         const D: u64 = 58_u64.pow(5);
         let mut limbs = [0u32; 8];
-        let write_idx = core::hint::black_box(3usize) & 7;
-        let limb_val: u32 = core::hint::black_box(0x089A_23FF_u32);
+        let write_idx = crate::self_test::black_box(3usize) & 7;
+        let limb_val: u32 = crate::self_test::black_box(0x089A_23FF_u32);
         limbs[write_idx] = limb_val;
 
-        let carry: u64 = core::hint::black_box(0xDEAD_BEEF_u64);
+        let carry: u64 = crate::self_test::black_box(0xDEAD_BEEF_u64);
         let dividend = carry.wrapping_add((limbs[write_idx] as u64) << 32);
 
         // Const-eval baseline computed on the host rustc.
@@ -141,10 +141,11 @@ register_self_test! {
         const E_RC: u64 = expected_rc();
 
         let mut limbs = [0u32; 10];
-        limbs[0] = core::hint::black_box(LIMB0_IN);
-        let limb_count: usize = core::hint::black_box(1);
+        limbs[0] = crate::self_test::black_box(LIMB0_IN);
+        let limb_count: usize = crate::self_test::black_box(1);
+        if limb_count > limbs.len() { return 0; }
 
-        let chunk: u32 = core::hint::black_box(CHUNK_IN);
+        let chunk: u32 = crate::self_test::black_box(CHUNK_IN);
         let mut remaining_carry: u64 = chunk as u64;
         for i in 0..limb_count {
             remaining_carry += (limbs[i] as u64) << 32;
@@ -192,7 +193,7 @@ register_self_test! {
 
         let mut input = [0u8; 32];
         input[31] = 1;
-        let input = core::hint::black_box(input);
+        let input = crate::self_test::black_box(input);
 
         // num_leading_zeros
         let mut num_leading_zeros: usize = 0;
@@ -230,6 +231,7 @@ register_self_test! {
 
             let mut j = 0;
             while j < limb_count {
+                if j >= limbs.len() { return 0; }
                 remaining_carry += (limbs[j] as u64) << 32;
                 limbs[j] = (remaining_carry % D) as u32;
                 remaining_carry /= D;
@@ -253,22 +255,26 @@ register_self_test! {
         let mut idx = limb_count;
         while idx > 0 {
             idx -= 1;
+            if idx >= limbs.len() { return 0; }
             let limb_value = limbs[idx] as u64;
             let output_offset = idx * 5;
             let mut di = 0;
             while di < 5 {
+                if output_offset + di >= output.len() { return 0; }
                 output[output_offset + di] = ((limb_value / DIVISORS[di]) % 58) as u8;
                 di += 1;
             }
         }
 
         let mut result_len = limb_count * 5;
+        if result_len > output.len() { return 0; }
         while result_len > 0 && output[result_len - 1] == 0 {
             result_len -= 1;
         }
 
         let mut z = 0;
         while z < num_leading_zeros {
+            if result_len >= output.len() { return 0; }
             output[result_len] = 0;
             result_len += 1;
             z += 1;
@@ -276,6 +282,7 @@ register_self_test! {
 
         let mut a = 0;
         while a < result_len {
+            if a >= output.len() || output[a] as usize >= BASE58_ALPHABET.len() { return 0; }
             output[a] = BASE58_ALPHABET[output[a] as usize];
             a += 1;
         }
