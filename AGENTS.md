@@ -7,10 +7,10 @@ else of llvm-metal's build belongs here. `flake.nix` pins the compiler and the
 Cargo manifests pin its runtime crates: keep the revisions aligned. The NVPTX
 target emits LLVM bitcode only.
 
-- Build bundles with `scripts/metal.sh build <mode>`, a wrapper around
+- Build bundles with `just build <mode>`, a wrapper around
   `llvm-metalc build`. Each promoted kernel
   crate lives directly in `crates/kernels/<mode>` and has its own Cargo lockfile.
-- Run searches through `scripts/metal.sh run <mode>`. Default Cargo features use Metal;
+- Run searches through `just run <mode>`. Default Cargo features use Metal;
   `--no-default-features` supports CPU references and non-Apple test hosts.
 - Keep validation scoped to the actual source and artifacts. Record build manifests
   and logs under ignored `artifacts/`. Do not substitute old bundles for fresh
@@ -28,10 +28,10 @@ target emits LLVM bitcode only.
 Each of these removes something that was built here and had to be deleted.
 
 - **No Python, and no second scripting language.** Logic is Rust: a `#[test]`, a
-  CLI subcommand, or llvm-metal's builder. `scripts/metal.sh` is the only script,
-  and it only sequences `cargo` and `llvm-metalc`. If it needs a loop with
-  conditions, parsing, or more than about 80 lines, the logic belongs in Rust. Do
-  not add a script; extend `metal.sh` or, better, the Rust.
+  CLI subcommand, or llvm-metal's builder. The `justfile` is the only task
+  runner, and a recipe only sequences `cargo` and `llvm-metalc`. If a recipe
+  needs parsing, conditions beyond a line, or state, the logic belongs in Rust.
+  Do not add scripts.
 - **Tests are `cargo test`.** No runner around the runner: no test inventories,
   coverage or ownership JSON, discovery cross-checks, per-test timeouts, or
   wrappers that select tests by name. A test that must not run by default is

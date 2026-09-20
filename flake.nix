@@ -22,6 +22,7 @@
               (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
               # The compiler with its own LLVM and llvm-downgrade.
               llvm-metal.packages.${system}.llvm-metalc
+              pkgs.just
             ];
           };
         in { default = shell; metal = shell; });

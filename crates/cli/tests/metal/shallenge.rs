@@ -8,7 +8,7 @@ fn artifacts() -> PathBuf {
 }
 
 #[test]
-#[ignore = "build scripts/metal.sh build shallenge first; requires Apple GPU"]
+#[ignore = "build just build shallenge first; requires Apple GPU"]
 fn application_batches_compare_every_lane_and_preserve_guards() {
     let mut engine = ShallengeTransport::load(&artifacts(), 257, 64, true).unwrap();
     for count in [1, 31, 32, 33, 64, 65, 257] {
@@ -73,7 +73,7 @@ fn application_batches_compare_every_lane_and_preserve_guards() {
 }
 
 #[test]
-#[ignore = "build scripts/metal.sh build shallenge first; requires Apple GPU"]
+#[ignore = "build just build shallenge first; requires Apple GPU"]
 fn bounded_cli_search_verifies_winners_and_finishes_without_matches() {
     for target in ["ff".repeat(32), "00".repeat(32)] {
         let output = super::support::command(&artifacts())
@@ -108,7 +108,7 @@ fn bounded_cli_search_verifies_winners_and_finishes_without_matches() {
 }
 
 #[test]
-#[ignore = "build scripts/metal.sh build shallenge first; requires Apple GPU"]
+#[ignore = "build just build shallenge first; requires Apple GPU"]
 fn large_partial_grid_checks_every_application_result() {
     let mut engine = ShallengeTransport::load(&artifacts(), 65537, 64, true).unwrap();
     for target in [[128; 32], [0; 32]] {

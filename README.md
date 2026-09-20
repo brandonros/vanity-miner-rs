@@ -27,13 +27,13 @@ candidates per batch and 64 threads per group. Override these with `--batch-size
 and `--threads-per-group`.
 
 ```sh
-./scripts/metal.sh run solana \
+just run solana \
   --batches 2 --batch-size 33 --seed 583437459223573146 --verify \
   solana-vanity --prefix aaa --suffix NFC
-./scripts/metal.sh run p256-public-key \
+just run p256-public-key \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   p256-public-key-vanity --prefix ab
-./scripts/metal.sh run rsa-pss \
+just run rsa-pss \
   --batches 2 --batch-size 1 --threads-per-group 1 --verify \
   rsa-pss-signature-vanity --key private.pem --message message.bin
 ```
@@ -47,12 +47,12 @@ and reject `--seed`; start with small batches. Matches print to stdout; Ctrl-C
 stops the search. Use `--exit-on-first-match` to stop after one verified match.
 Use `<command> --help` for options.
 
-Selective inlining is the default; `metal.sh build <mode> --inlining all` opts
-into full inlining. For compiler development, set `LLVM_METAL=../llvm-metal` to
-build the compiler from that checkout. To build a kernel separately:
+Selective inlining is the default; `just build <mode> --inlining all` opts
+into full inlining. For compiler development, enter the shell with
+`nix develop --override-input llvm-metal path:../llvm-metal`. To build a kernel separately:
 
 ```sh
-nix develop --command scripts/metal.sh build shallenge
+nix develop --command just build shallenge
 nix develop --command cargo build --locked --release -p vanity-miner
 ```
 
@@ -64,13 +64,13 @@ LLVM bitcode to llvm-metal; no NVIDIA toolkit or driver is needed.
 ```sh
 nix develop --command cargo run -p vanity-miner --release --locked \
   --no-default-features --features self_test -- self-test
-./scripts/metal.sh test self_test::
+just test self_test::
 ```
 
 `self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
-`./scripts/metal.sh test` builds every bundle and runs the ignored GPU tests with
+`just test` builds every bundle and runs the ignored GPU tests with
 `cargo test`; `--skip-build` reuses bundles, and a test name filter selects tests.
-For one group, use `scripts/metal.sh run self-test-solana self-test`.
+For one group, use `just run self-test-solana self-test`.
 Select named cases with
 `self-test --check MODE.CHECK`; `self-test --list` lists the checks.
 
