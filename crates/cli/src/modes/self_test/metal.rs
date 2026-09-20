@@ -33,6 +33,16 @@ impl Timings {
         }
     }
 
+    fn merge(&mut self, other: Timings) {
+        self.load.library += other.load.library;
+        self.load.pipeline += other.load.pipeline;
+        self.pipelines += other.pipelines;
+        self.dispatch_wall += other.dispatch_wall;
+        self.gpu += other.gpu;
+        self.launches += other.launches;
+        self.gpu_samples += other.gpu_samples;
+    }
+
     fn gpu_report(&self) -> String {
         let value = if self.gpu_samples == 0 {
             "unavailable".into()
@@ -269,7 +279,57 @@ pub(crate) fn run(runner: &MetalRunner, args: &super::args::SelfTestArgs) -> Run
     let mut legacy_cache = super::DeviceResults::default();
     let mut groups = std::collections::HashMap::<&str, Result<(), String>>::new();
     let mut timings = Timings::default();
+    // Apple compiles each pipeline on one core, so load and launch the independent
+    // case bundles concurrently. Reporting below stays in registry order.
+    let jobs: Vec<Option<(PathBuf, super::Case)>> = cases
+        .iter()
+        .map(|&case| {
+            let group_dir = directory(runner, case.kernel);
+            (!group_dir.join("kernel.group.pending.json").exists()
+                && group_dir.join("kernel.group.json").is_file()
+                && groups
+                    .entry(case.kernel)
+                    .or_insert_with(|| validate_group(&group_dir, case.kernel))
+                    .is_ok())
+            .then(|| (group_dir.join("cases").join(case.name), case))
+        })
+        .collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let launched = std::sync::Mutex::new(std::collections::HashMap::new());
+    std::thread::scope(|scope| {
+        for _ in 0..std::thread::available_parallelism().map_or(1, usize::from) {
+            scope.spawn(|| {
+                loop {
+                    let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(job) = jobs.get(index) else { break };
+                    let Some((case_dir, case)) = job else {
+                        continue;
+                    };
+                    let mut timings = Timings::default();
+                    let results = validate_case_manifest(case_dir, *case).and_then(|_| {
+                        launch(
+                            case_dir,
+                            case.kernel,
+                            Some(&[case.slot]),
+                            Some(case.metal_entry),
+                            &mut timings,
+                        )
+                    });
+                    launched.lock().unwrap().insert(index, (results, timings));
+                }
+            });
+        }
+    });
+    let mut launched = launched.into_inner().unwrap();
+    let mut index = 0;
     let result = super::run("Metal", &cases, |case| {
+        index += 1;
+        if let Some((results, case_timings)) = launched.remove(&(index - 1)) {
+            timings.merge(case_timings);
+            let results = results?;
+            // A fresh per-case cache preserves original outcome validation.
+            return super::DeviceResults::default().check(case, || Ok(results));
+        }
         let group_dir = directory(runner, case.kernel);
         if group_dir.join("kernel.group.pending.json").exists() {
             return Err("Metal self-test group build is incomplete; rerun the builder".into());
