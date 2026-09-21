@@ -23,7 +23,7 @@ build mode *options:
         cases=(--cases "$target/cases.json")
     fi
     llvm-metalc build --crate "$device" --target-dir "$target" --output target/metal/{{mode}} \
-        ${cases[@]+"${cases[@]}"} {{options}}
+        ${cases[@]+"${cases[@]}"} --inlining llvm --panics unreachable {{options}}
 
 # Build every kernel crate.
 build-all:

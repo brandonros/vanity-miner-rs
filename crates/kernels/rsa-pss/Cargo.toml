@@ -11,6 +11,8 @@ resolver = "3"
 logic = { path = "../../logic", default-features = false, features = ["rsa-pss"] }
 
 [profile.release]
+# Size, not speed: Apple compiles what it is given, and `z` miscompiles (llvm-metal #26).
+opt-level = "s"
 panic = "abort"
 codegen-units = 1
 

@@ -176,7 +176,7 @@ checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 [[package]]
 name = "llvm-metal-kernel"
 version = "0.1.0"
-source = "git+https://github.com/brandonros/llvm-metal?rev=8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1#8b056da7dbbc9c765aaa6f7ba67540c9e20dbca1"
+source = "git+https://github.com/brandonros/llvm-metal?rev=4b009b23236f04dce90ad9fec795e03c05bd442f#4b009b23236f04dce90ad9fec795e03c05bd442f"
 
 [[package]]
 name = "logic"
