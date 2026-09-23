@@ -1,50 +1,7 @@
 [workspace]
 resolver = "3"
-members = [
-  "crates/cli",
-  "crates/logic",
-  "crates/kernels/solana",
-  "crates/kernels/bitcoin",
-  "crates/kernels/ethereum",
-  "crates/kernels/shallenge",
-  "crates/kernels/p256-public-key",
-  "crates/kernels/p256-signature",
-  "crates/kernels/rsa-pss",
-  "crates/kernels/rsa-modulus",
-  "crates/kernels/self-test-solana",
-  "crates/kernels/self-test-bitcoin",
-  "crates/kernels/self-test-ethereum",
-  "crates/kernels/self-test-shallenge",
-  "crates/kernels/self-test-p256-public-key",
-  "crates/kernels/self-test-p256-signature",
-  "crates/kernels/self-test-rsa-pss",
-  "crates/kernels/self-test-rsa-modulus",
-  "crates/kernels/repro-nonce-sequence",
-]
+members = ["crates/cli", "crates/logic", "crates/kernels/*"]
 default-members = ["crates/cli", "crates/logic"]
-exclude = [
-  "crates/kernels/solana/device",
-  "crates/kernels/bitcoin/device",
-  "crates/kernels/ethereum/device",
-  "crates/kernels/shallenge/device",
-  "crates/kernels/p256-public-key/device",
-  "crates/kernels/p256-signature/device",
-  "crates/kernels/rsa-pss/device",
-  "crates/kernels/rsa-modulus/device",
-  "crates/kernels/self-test-solana/device",
-  "crates/kernels/self-test-bitcoin/device",
-  "crates/kernels/self-test-ethereum/device",
-  "crates/kernels/self-test-shallenge/device",
-  "crates/kernels/self-test-p256-public-key/device",
-  "crates/kernels/self-test-p256-signature/device",
-  "crates/kernels/self-test-rsa-pss/device",
-  "crates/kernels/self-test-rsa-modulus/device",
-  "crates/kernels/repro-nonce-sequence/device",
-]
-
-[patch.crates-io]
-# put compiler_fence behind a feature flag that is disabled by default
-zeroize = { git = "https://github.com/brandonros/utils", branch = "nvptx64-support" }
 
 [profile.dev]
 panic = "abort"

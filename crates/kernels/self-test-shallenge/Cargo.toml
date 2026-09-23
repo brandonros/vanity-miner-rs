@@ -3,14 +3,11 @@ name = "kernel-self-test-shallenge"
 version = "0.1.0"
 edition = "2024"
 
-[features]
-default = ["cuda"]
-cuda = ["dep:cuda_builder"]
-llvm21 = ["cuda", "cuda_builder/llvm21"]
+# Builds self_test_shallenge.ptx.
+[lib]
+name = "self_test_shallenge"
+crate-type = ["cdylib"]
 
-[build-dependencies.cuda_builder]
-git = "https://github.com/brandonros/Rust-CUDA.git"
-rev = "c0539920dfdce2b745df87d0d0685d2ffca66b50"
-default-features = false
-features = ["rustc_codegen_nvvm"]
-optional = true
+[dependencies]
+kernel-common = { path = "../common" }
+logic = { path = "../../logic", default-features = false, features = ["self_test_shallenge"] }

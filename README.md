@@ -1,7 +1,6 @@
 # vanity-miner-rs
 
-Vanity address, key, and signature search in Rust. Backends: CPU, NVIDIA CUDA,
-and CuMetal on Apple Silicon.
+Vanity address, key, and signature search in Rust. Backends: CPU, and NVIDIA CUDA.
 
 ## Modes
 
@@ -48,19 +47,6 @@ Build the 8 production and 8 self-test PTX modules separately:
 
 Bundles land in `artifacts/ptx-bundle-llvm<version>.tar.gz`. Use runner and PTX
 artifacts from the same source revision. `PTX_PATH` selects an external bundle.
-
-## CuMetal · macOS
-
-```sh
-nix develop .#cumetal --command cargo run -p vanity-miner --release --locked \
-  --no-default-features --features cumetal,solana -- \
-  --ptx /path/to/solana.ptx --batches 1 --verify solana-vanity --prefix aaa
-```
-
-The shell supplies the compiler/runtime pinned in `flake.lock`. `--ptx` accepts
-a module or bundle directory. See the [issue matrix](docs/cumetal-issue-matrix.md)
-for working workloads and remaining blockers. Do not combine `gpu` and `cumetal`
-or use `--all-features`.
 
 ## Self-tests
 

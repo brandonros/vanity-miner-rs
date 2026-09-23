@@ -1,3 +1,6 @@
+# Kernels use nightly features and the built-in nvptx64 target.
 [toolchain]
-channel = "nightly-2026-04-02"
-components = ["rust-src", "rustc-dev", "llvm-tools-preview", "rust-analyzer", "clippy", "rustfmt"]
+channel = "nightly-2026-09-22"
+profile = "minimal"
+components = ["rust-src", "llvm-tools", "llvm-bitcode-linker", "clippy", "rustfmt"]
+targets = ["nvptx64-nvidia-cuda"]

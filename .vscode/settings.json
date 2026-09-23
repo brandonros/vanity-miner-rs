@@ -16,8 +16,7 @@
         "./crates/kernels/self-test-p256-public-key/device/Cargo.toml",
         "./crates/kernels/self-test-p256-signature/device/Cargo.toml",
         "./crates/kernels/self-test-rsa-pss/device/Cargo.toml",
-        "./crates/kernels/self-test-rsa-modulus/device/Cargo.toml",
-        "./crates/kernels/repro-nonce-sequence/device/Cargo.toml"
+        "./crates/kernels/self-test-rsa-modulus/device/Cargo.toml"
     ],
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.allTargets": false
