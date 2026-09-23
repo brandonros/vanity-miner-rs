@@ -1,7 +1,6 @@
 //! Device runtime shared by the kernels: heap, panic handler, thread index,
 //! and atomic publication of one structured candidate result per launch.
 
-#![cfg(target_arch = "nvptx64")]
 #![no_std]
 #![feature(stdarch_nvptx)]
 

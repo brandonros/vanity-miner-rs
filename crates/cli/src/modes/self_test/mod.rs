@@ -19,7 +19,7 @@ impl DeviceResults {
         &mut self,
         case: Case,
         launch: impl FnOnce() -> Result<Vec<u32>, String>,
-    ) -> Result<Outcome, String> {
+    ) -> Result<(), String> {
         let results = self.kernels.entry(case.kernel).or_insert_with(|| {
             let results = launch()?;
             if results.len() != logic::self_test::SELF_TEST_NUM_CHECKS {
@@ -41,37 +41,24 @@ impl DeviceResults {
         });
         let results = results.as_ref().map_err(Clone::clone)?;
         let slot = case.slot;
-        if results[slot] == 2 {
-            if let Some(reason) = case.gpu_skip {
-                return Ok(Outcome::Skipped(reason));
-            }
-        }
         if results[slot] != 1 {
             return Err(format!("{}: got {}, expected 1", case.name, results[slot]));
         }
-        Ok(Outcome::Passed)
+        Ok(())
     }
 }
 
-pub enum Outcome {
-    Passed,
-    Skipped(&'static str),
-}
 pub fn run(
     backend: &str,
     cases: &[Case],
-    mut execute: impl FnMut(Case) -> Result<Outcome, String>,
+    mut execute: impl FnMut(Case) -> Result<(), String>,
 ) -> Result<(), String> {
-    let (mut passed, mut failed, mut skipped) = (0, 0, 0);
+    let (mut passed, mut failed) = (0, 0);
     for &case in cases {
         match execute(case) {
-            Ok(Outcome::Passed) => {
+            Ok(()) => {
                 passed += 1;
                 println!("[{backend}] PASS {}", case.name);
-            }
-            Ok(Outcome::Skipped(reason)) => {
-                skipped += 1;
-                println!("[{backend}] SKIP {}: {reason}", case.name);
             }
             Err(error) => {
                 failed += 1;
@@ -79,7 +66,7 @@ pub fn run(
             }
         }
     }
-    println!("[{backend}] self-test: {passed} passed, {failed} failed, {skipped} skipped");
+    println!("[{backend}] self-test: {passed} passed, {failed} failed");
     if failed == 0 {
         Ok(())
     } else {
@@ -89,28 +76,6 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "self_test_rsa_pss")]
-    #[test]
-    fn disabled_rsa_pipeline_is_skipped_but_failures_are_not_hidden() {
-        let case = inventory()
-            .into_iter()
-            .find(|case| case.name == "rsa_pss.end_to_end")
-            .unwrap();
-        for value in [0, 1, 2, SENTINEL] {
-            let mut cache = DeviceResults::default();
-            let outcome = cache.check(case, || {
-                let mut results = vec![SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
-                results[case.slot] = value;
-                Ok(results)
-            });
-            match value {
-                1 => assert!(matches!(outcome, Ok(Outcome::Passed))),
-                2 => assert!(matches!(outcome, Ok(Outcome::Skipped(_)))),
-                _ => assert!(outcome.is_err()),
-            }
-        }
-    }
-
     #[test]
     fn grouped_launches_preserve_individual_failures() {
         let mut cache = DeviceResults::default();
@@ -157,11 +122,8 @@ mod tests {
     }
 
     #[test]
-    fn malformed_result_buffers_and_undocumented_skips_fail() {
-        let case = inventory()
-            .into_iter()
-            .find(|case| case.gpu_skip.is_none())
-            .unwrap();
+    fn malformed_result_buffers_and_unexpected_values_fail() {
+        let case = inventory()[0];
         let count = logic::self_test::SELF_TEST_NUM_CHECKS;
         for length in [count - 1, count + 1] {
             let mut cache = DeviceResults::default();
@@ -182,7 +144,7 @@ mod tests {
                         Ok(results)
                     })
                     .is_err(),
-                "unexpected result {value} must not pass or become a skip"
+                "unexpected result {value} must not pass"
             );
         }
     }
@@ -215,7 +177,7 @@ mod tests {
             if case.slot == first {
                 Err("injected failure".into())
             } else {
-                Ok(Outcome::Skipped("test backend"))
+                Ok(())
             }
         });
         assert!(result.is_err());

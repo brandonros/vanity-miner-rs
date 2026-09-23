@@ -1,6 +1,5 @@
 //! p256 public key checks; result indices come from the shared registry.
 
-#![cfg(target_arch = "nvptx64")]
 #![no_std]
 #![feature(abi_ptx)]
 
@@ -13,5 +12,5 @@ pub unsafe extern "ptx-kernel" fn kernel_self_test_p256_public_key(results_ptr: 
     let results = unsafe {
         core::slice::from_raw_parts_mut(results_ptr, logic::self_test::SELF_TEST_NUM_CHECKS)
     };
-    logic::self_test::runners::p256_public_key::run_device(results);
+    logic::self_test::runners::p256_public_key::run(results);
 }

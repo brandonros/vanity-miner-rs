@@ -1,6 +1,5 @@
 //! Structured candidate entry for shallenge.
 
-#![cfg(target_arch = "nvptx64")]
 #![no_std]
 #![feature(abi_ptx)]
 

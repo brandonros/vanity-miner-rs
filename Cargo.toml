@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/cli", "crates/logic", "crates/kernels/*"]
-default-members = ["crates/cli", "crates/logic"]
+members = ["crates/cli", "crates/logic"]
 
 [profile.dev]
 panic = "abort"

@@ -1,6 +1,0 @@
-# Kernels (crates/kernels/*) run on this GPU architecture and newer.
-[target.nvptx64-nvidia-cuda]
-rustflags = ["-Ctarget-cpu=sm_75"]
-
-[alias]
-ptx = ["build", "--release", "--target", "nvptx64-nvidia-cuda", "-Zbuild-std=core,alloc"]

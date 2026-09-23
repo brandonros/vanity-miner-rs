@@ -1,6 +1,5 @@
 //! CUDA entry point for rsa-pss: one shared winner per launch.
 
-#![cfg(target_arch = "nvptx64")]
 #![no_std]
 #![feature(abi_ptx)]
 

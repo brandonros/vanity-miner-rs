@@ -1,0 +1,6 @@
+# GPU kernels: a separate workspace so every build, and rust-analyzer, targets
+# nvptx64-nvidia-cuda (see .cargo/config.toml).
+[workspace]
+resolver = "3"
+members = ["*"]
+exclude = [".cargo"]

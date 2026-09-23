@@ -1,7 +1,7 @@
-// Each check owns its documentation, no-inline boundary, and device skip policy.
+// Each check owns its documentation and no-inline boundary.
 // A same-named module holds metadata alongside the function (separate namespaces).
 macro_rules! register_self_test {
-    ($(#[doc = $description:literal])+ $(#[gpu_skip = $skip:literal])?
+    ($(#[doc = $description:literal])+
         fn $name:ident() -> u32 $body:block
     ) => {
         $(#[doc = $description])+
@@ -10,19 +10,8 @@ macro_rules! register_self_test {
 
         pub mod $name {
             pub const LABEL: &str = concat!($($description, "\n"),+).trim_ascii();
-            pub const GPU_SKIP: Option<&str> = register_self_test!(@skip $($skip)?);
-
-            #[inline(always)]
-            pub fn run_device() -> u32 {
-                register_self_test!(@device $name $(, $skip)?)
-            }
         }
     };
-    (@skip) => { None };
-    (@skip $reason:literal) => { Some($reason) };
-    (@device $name:ident) => { super::$name() };
-    // No reference to the skipped function is emitted into its device runner.
-    (@device $name:ident, $reason:literal) => { 2 };
 }
 
 // The central list supplies only paths, mode ownership, and ordering.
@@ -54,8 +43,6 @@ macro_rules! define_self_tests {
                     pub label: &'static str,
                     pub kernel: &'static str,
                     pub enabled: bool,
-                    /// Device skip policy, available when the check is enabled.
-                    pub gpu_skip: Option<&'static str>,
                 }
                 pub const CASES: &[Case] = &[$($(Case {
                     slot: Slot::[<$mode:camel $($check:camel)*>].index(),
@@ -68,12 +55,6 @@ macro_rules! define_self_tests {
                     },
                     kernel: concat!("kernel_self_test_", stringify!($mode)),
                     enabled: cfg!(feature = $feature),
-                    gpu_skip: {
-                        #[cfg(feature = $feature)]
-                        { super::$mode::$($check)::+::GPU_SKIP }
-                        #[cfg(not(feature = $feature))]
-                        { None }
-                    },
                 },)*)*];
 
                 pub fn find(name: &str) -> Option<&'static Case> {
@@ -110,10 +91,6 @@ macro_rules! define_self_tests {
                     pub fn run(results: &mut [u32]) {
                         $(results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();)*
                     }
-                    pub fn run_device(results: &mut [u32]) {
-                        $(results[Slot::[<$mode:camel $($check:camel)*>].index()] =
-                            checks::$($check)::+::run_device();)*
-                    }
                     pub fn run_selected(results: &mut [u32], selected: &[Slot]) {
                         $(if selected.contains(&Slot::[<$mode:camel $($check:camel)*>]) {
                             results[Slot::[<$mode:camel $($check:camel)*>].index()] = checks::$($check)::+();
@@ -121,13 +98,6 @@ macro_rules! define_self_tests {
                     }
                 })*
             }
-
-            /// Enabled device runners by kernel name, for host checks of slot ownership.
-            #[cfg(test)]
-            pub(crate) const DEVICE_RUNNERS: &[(&str, fn(&mut [u32]))] = &[$(
-                #[cfg(feature = $feature)]
-                (concat!("kernel_self_test_", stringify!($mode)), runners::$mode::run_device),
-            )*];
 
             /// All enabled checks, in registry order.
             pub fn run_self_test(results: &mut [u32]) {
@@ -160,35 +130,20 @@ mod tests {
     use crate::self_test::{SELF_TEST_NUM_CHECKS, Slot, metadata};
 
     #[test]
-    fn device_skip_does_not_execute_the_check_body() {
-        use core::sync::atomic::Ordering;
-
+    fn registered_check_keeps_its_label() {
         // Local functions cannot be reached via super, so keep the generated
         // function and its metadata together in a module, as in real checks.
         mod probes {
-            use core::sync::atomic::{AtomicU32, Ordering};
-
-            pub(super) static CALLS: AtomicU32 = AtomicU32::new(0);
-
             register_self_test! {
-                /// CPU-only check with an observable side effect.
-                #[gpu_skip = "test skip"]
-                fn cpu_only() -> u32 {
-                    CALLS.fetch_add(1, Ordering::Relaxed);
-                    0
+                /// Check with a label.
+                fn labeled() -> u32 {
+                    1
                 }
             }
         }
 
-        assert_eq!(
-            probes::cpu_only::LABEL,
-            "CPU-only check with an observable side effect."
-        );
-        assert_eq!(probes::cpu_only::GPU_SKIP, Some("test skip"));
-        assert_eq!(probes::cpu_only::run_device(), 2);
-        assert_eq!(probes::CALLS.load(Ordering::Relaxed), 0);
-        assert_eq!(probes::cpu_only(), 0);
-        assert_eq!(probes::CALLS.load(Ordering::Relaxed), 1);
+        assert_eq!(probes::labeled::LABEL, "Check with a label.");
+        assert_eq!(probes::labeled(), 1);
     }
 
     #[test]

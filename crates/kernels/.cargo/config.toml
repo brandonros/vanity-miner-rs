@@ -1,0 +1,10 @@
+[build]
+target = "nvptx64-nvidia-cuda"
+target-dir = "../../target"
+
+# Minimum GPU architecture; the driver compiles the PTX for newer GPUs.
+[target.nvptx64-nvidia-cuda]
+rustflags = ["-Ctarget-cpu=sm_75"]
+
+[unstable]
+build-std = ["core", "alloc"]

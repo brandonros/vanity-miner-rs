@@ -1,4 +1,4 @@
-use super::{self as self_test, Outcome};
+use super as self_test;
 use std::error::Error;
 pub fn run(args: &super::args::SelfTestArgs) -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut results = [0; logic::self_test::SELF_TEST_NUM_CHECKS];
@@ -13,7 +13,7 @@ pub fn run(args: &super::args::SelfTestArgs) -> Result<(), Box<dyn Error + Send 
         if results[slot] != 1 {
             return Err("known-answer mismatch".into());
         }
-        Ok(Outcome::Passed)
+        Ok(())
     })
     .map_err(Into::into)
 }
