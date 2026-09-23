@@ -5,7 +5,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
-/// `cargo ptx` writes every kernel to target/nvptx64-nvidia-cuda/release.
+/// Building crates/kernels writes every module to target/nvptx64-nvidia-cuda/release.
 const PTX_PATH_UNSET: &str = "set PTX_PATH to a directory of PTX modules (see README)";
 
 pub(crate) fn load_module(

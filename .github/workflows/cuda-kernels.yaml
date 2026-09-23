@@ -36,7 +36,7 @@ jobs:
 
       - name: Compile PTX
         run: |
-          nix develop --command cargo ptx --locked -p 'kernel-*'
+          nix develop --command bash -c 'cd crates/kernels && cargo build --release --locked'
 
           mkdir -p artifacts
           cd target/nvptx64-nvidia-cuda/release

@@ -33,15 +33,16 @@ Address searches accept `--prefix` and `--suffix`; signature searches also need
 
 ## CUDA · Linux
 
-Kernels and the runner build separately. PTX builds on any OS:
+Kernels and the runner build separately. `crates/kernels` is its own workspace;
+its `.cargo/config.toml` targets `nvptx64-nvidia-cuda` with a minimum GPU
+architecture of `sm_75`. PTX builds on any OS:
 
 ```sh
-cargo ptx -p 'kernel-*'
+(cd crates/kernels && cargo build --release)
 ```
 
-This writes one `<module>.ptx` per crate in `crates/kernels/` to
+This writes one `<module>.ptx` per kernel crate to
 `target/nvptx64-nvidia-cuda/release`; `-p kernel-solana` builds one.
-`.cargo/config.toml` defines `cargo ptx` and the minimum GPU architecture (`sm_75`).
 
 ```sh
 nix develop --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,solana
