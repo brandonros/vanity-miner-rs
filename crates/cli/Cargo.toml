@@ -14,9 +14,7 @@ shallenge = ["logic/shallenge"]
 crypto-cli = []
 p256-public-key = ["logic/p256-public-key", "dep:p256", "crypto-cli"]
 p256-signature = ["logic/p256-signature", "dep:p256", "p256/ecdsa", "crypto-cli"]
-rsa-common = ["dep:rsa", "dep:num-bigint-dig", "crypto-cli"]
-rsa-modulus = ["rsa-common", "logic/rsa-modulus"]
-rsa-pss = ["logic/rsa-pss", "rsa-common", "rsa/hazmat"]
+rsa-pss = ["logic/rsa-pss", "dep:rsa", "rsa/hazmat", "dep:num-bigint-dig", "crypto-cli"]
 self_test = [
     "self_test_solana",
     "self_test_bitcoin",
@@ -25,7 +23,6 @@ self_test = [
     "self_test_p256_public_key",
     "self_test_p256_signature",
     "self_test_rsa_pss",
-    "self_test_rsa_modulus",
 ]
 self_test_support = ["logic/self_test_support"]
 self_test_solana = ["self_test_support", "logic/self_test_solana"]
@@ -35,7 +32,6 @@ self_test_shallenge = ["self_test_support", "logic/self_test_shallenge"]
 self_test_p256_public_key = ["self_test_support", "logic/self_test_p256_public_key"]
 self_test_p256_signature = ["self_test_support", "logic/self_test_p256_signature"]
 self_test_rsa_pss = ["self_test_support", "logic/self_test_rsa_pss"]
-self_test_rsa_modulus = ["self_test_support", "logic/self_test_rsa_modulus"]
 
 [dependencies]
 ctrlc = { version = "3.4" }

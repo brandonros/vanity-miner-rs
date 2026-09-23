@@ -12,7 +12,6 @@ Vanity address, key, and signature search in Rust. Backends: CPU, and NVIDIA CUD
 | `shallenge` | `shallenge` |
 | `p256-public-key` | `p256-public-key-vanity` |
 | `p256-signature` | `p256-signature-vanity` |
-| `rsa-modulus` | `rsa-modulus-vanity` |
 | `rsa-pss` | `rsa-pss-signature-vanity` |
 
 ## CPU

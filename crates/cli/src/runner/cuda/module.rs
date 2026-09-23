@@ -5,48 +5,44 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
-#[cfg(feature = "cuda-kernels")]
+/// PTX that build.rs compiled for each enabled mode.
 fn embedded_ptx(name: &str) -> Option<&'static str> {
+    macro_rules! ptx {
+        ($module:literal) => {
+            Some(include_str!(concat!(env!("OUT_DIR"), "/", $module, ".ptx")))
+        };
+    }
     match name {
         #[cfg(feature = "solana")]
-        "solana" => Some(kernel_solana::PTX),
+        "solana" => ptx!("solana"),
         #[cfg(feature = "self_test_solana")]
-        "self_test_solana" => Some(kernel_self_test_solana::PTX),
+        "self_test_solana" => ptx!("self_test_solana"),
         #[cfg(feature = "bitcoin")]
-        "bitcoin" => Some(kernel_bitcoin::PTX),
+        "bitcoin" => ptx!("bitcoin"),
         #[cfg(feature = "self_test_bitcoin")]
-        "self_test_bitcoin" => Some(kernel_self_test_bitcoin::PTX),
+        "self_test_bitcoin" => ptx!("self_test_bitcoin"),
         #[cfg(feature = "ethereum")]
-        "ethereum" => Some(kernel_ethereum::PTX),
+        "ethereum" => ptx!("ethereum"),
         #[cfg(feature = "self_test_ethereum")]
-        "self_test_ethereum" => Some(kernel_self_test_ethereum::PTX),
+        "self_test_ethereum" => ptx!("self_test_ethereum"),
         #[cfg(feature = "shallenge")]
-        "shallenge" => Some(kernel_shallenge::PTX),
+        "shallenge" => ptx!("shallenge"),
         #[cfg(feature = "self_test_shallenge")]
-        "self_test_shallenge" => Some(kernel_self_test_shallenge::PTX),
+        "self_test_shallenge" => ptx!("self_test_shallenge"),
         #[cfg(feature = "p256-public-key")]
-        "p256_public_key" => Some(kernel_p256_public_key::PTX),
+        "p256_public_key" => ptx!("p256_public_key"),
         #[cfg(feature = "self_test_p256_public_key")]
-        "self_test_p256_public_key" => Some(kernel_self_test_p256_public_key::PTX),
+        "self_test_p256_public_key" => ptx!("self_test_p256_public_key"),
         #[cfg(feature = "p256-signature")]
-        "p256_signature" => Some(kernel_p256_signature::PTX),
+        "p256_signature" => ptx!("p256_signature"),
         #[cfg(feature = "self_test_p256_signature")]
-        "self_test_p256_signature" => Some(kernel_self_test_p256_signature::PTX),
+        "self_test_p256_signature" => ptx!("self_test_p256_signature"),
         #[cfg(feature = "rsa-pss")]
-        "rsa_pss" => Some(kernel_rsa_pss::PTX),
+        "rsa_pss" => ptx!("rsa_pss"),
         #[cfg(feature = "self_test_rsa_pss")]
-        "self_test_rsa_pss" => Some(kernel_self_test_rsa_pss::PTX),
-        #[cfg(feature = "rsa-modulus")]
-        "rsa_modulus" => Some(kernel_rsa_modulus::PTX),
-        #[cfg(feature = "self_test_rsa_modulus")]
-        "self_test_rsa_modulus" => Some(kernel_self_test_rsa_modulus::PTX),
+        "self_test_rsa_pss" => ptx!("self_test_rsa_pss"),
         _ => None,
     }
-}
-
-#[cfg(not(feature = "cuda-kernels"))]
-fn embedded_ptx(_name: &str) -> Option<&'static str> {
-    None
 }
 
 pub(crate) fn load_module(
@@ -83,8 +79,7 @@ pub(crate) fn load_module(
             std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
         &ptx_owned
     } else {
-        embedded_ptx(name)
-            .ok_or("PTX module unavailable; set PTX_PATH to the matching extracted kernel bundle")?
+        embedded_ptx(name).ok_or("PTX module unavailable; set PTX_PATH to a PTX directory")?
     };
     let module = load_ptx_with_log(ordinal, ptx)?;
     println!("[{ordinal}] Module loaded");
@@ -115,9 +110,7 @@ pub(crate) fn load_self_test_module(
         owned = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
         &owned
     } else {
-        embedded_ptx(name).ok_or(
-            "self-test PTX unavailable; set PTX_PATH to the matching extracted kernel bundle",
-        )?
+        embedded_ptx(name).ok_or("self-test PTX unavailable; set PTX_PATH to a PTX directory")?
     };
     load_ptx_with_log(ordinal, ptx)
 }

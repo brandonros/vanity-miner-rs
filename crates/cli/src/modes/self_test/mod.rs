@@ -1,4 +1,4 @@
-//! Shared test inventory and reporting for CPU, CUDA, and CuMetal.
+//! Shared test inventory and reporting for CPU and CUDA.
 pub use logic::self_test::metadata::Case;
 pub mod args;
 pub fn inventory() -> Vec<Case> {
@@ -223,9 +223,7 @@ mod tests {
     }
 }
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "gpu"))]
 pub(crate) mod cpu;
 #[cfg(feature = "gpu")]
 pub(crate) mod cuda;
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;

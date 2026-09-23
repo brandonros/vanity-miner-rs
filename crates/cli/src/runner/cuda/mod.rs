@@ -79,10 +79,6 @@ impl GpuRunner {
                 Command::RsaPssSignatureVanity(args) => {
                     modes::rsa_pss::cuda::run(args, gpu, stats.clone(), control.clone())
                 }
-                #[cfg(feature = "rsa-modulus")]
-                Command::RsaModulusVanity(args) => {
-                    modes::rsa_modulus::cuda::run(args, gpu, stats.clone(), control.clone())
-                }
                 #[cfg(feature = "solana")]
                 Command::SolanaVanity(SolanaArgs { prefix, suffix }) => modes::solana::cuda::run(
                     ordinal,
@@ -173,8 +169,7 @@ impl Runner for GpuRunner {
     feature = "shallenge",
     feature = "p256-public-key",
     feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
+    feature = "rsa-pss"
 ))]
 pub(crate) mod batch;
 pub(crate) mod buffers;

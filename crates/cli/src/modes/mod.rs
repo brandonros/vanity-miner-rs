@@ -17,19 +17,16 @@ pub mod solana;
 pub mod p256_public_key;
 #[cfg(feature = "p256-signature")]
 pub mod p256_signature;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa_modulus;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss;
 
-#[cfg(feature = "rsa-common")]
+#[cfg(feature = "rsa-pss")]
 pub(crate) mod rsa_keys;
 #[cfg(all(
     test,
     any(
         feature = "p256-public-key",
         feature = "p256-signature",
-        feature = "rsa-modulus",
         feature = "rsa-pss"
     )
 ))]

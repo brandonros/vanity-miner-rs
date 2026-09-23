@@ -51,10 +51,6 @@ impl Runner for CpuRunner {
         let _ = &stats;
 
         match command {
-            #[cfg(feature = "rsa-modulus")]
-            Command::RsaModulusVanity(args) => {
-                modes::rsa_modulus::cpu::run(args, self.num_threads, stats)
-            }
             #[cfg(feature = "rsa-pss")]
             Command::RsaPssSignatureVanity(args) => {
                 modes::rsa_pss::cpu::run(args, self.num_threads, stats)

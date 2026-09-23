@@ -200,10 +200,10 @@ impl Drop for CancelOnExit<'_> {
     }
 }
 
-#[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
+#[cfg(all(feature = "crypto-cli", not(feature = "gpu")))]
 use crate::runner::RunResult;
 
-#[cfg(all(feature = "crypto-cli", not(any(feature = "gpu", feature = "cumetal"))))]
+#[cfg(all(feature = "crypto-cli", not(feature = "gpu")))]
 pub(crate) fn run_controlled(
     stats: Arc<crate::runner::progress::GlobalStats>,
     unit: &'static str,
@@ -228,25 +228,6 @@ pub(crate) fn run_controlled(
     })();
     result?;
     Ok(())
-}
-
-/// Run a continuous device session once, preserving counters and prepared state.
-#[cfg(feature = "cumetal")]
-pub(crate) fn run_device_session(
-    stats: Arc<GlobalStats>,
-    unit: &'static str,
-    launches: Option<u64>,
-    batch_size: u32,
-    work: impl FnOnce(Arc<SearchControl>) -> Result<(), String>,
-) -> crate::runner::RunResult {
-    stats.set_unit(unit);
-    let control = Arc::new(SearchControl::with_stats(stats));
-    control.set_batch_size(batch_size)?;
-    control.set_device_launch_limit(launches);
-    control.set_continuous();
-    let cancellation = control.clone();
-    ctrlc::set_handler(move || cancellation.interrupt()).map_err(|e| e.to_string())?;
-    work(control).map_err(Into::into)
 }
 
 #[cfg(test)]

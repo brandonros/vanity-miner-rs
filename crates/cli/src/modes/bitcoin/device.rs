@@ -1,4 +1,4 @@
-//! Shared CUDA/CuMetal candidate reconstruction, verification, and output.
+//! CUDA candidate reconstruction, verification, and output.
 use crate::runner::{batches, session::SearchControl};
 use logic::search::{candidate_result::BatchResult, vanity::BytePattern, xoroshiro::BatchSeed};
 

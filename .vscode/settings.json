@@ -8,15 +8,13 @@
         "./crates/kernels/p256-public-key/device/Cargo.toml",
         "./crates/kernels/p256-signature/device/Cargo.toml",
         "./crates/kernels/rsa-pss/device/Cargo.toml",
-        "./crates/kernels/rsa-modulus/device/Cargo.toml",
         "./crates/kernels/self-test-solana/device/Cargo.toml",
         "./crates/kernels/self-test-bitcoin/device/Cargo.toml",
         "./crates/kernels/self-test-ethereum/device/Cargo.toml",
         "./crates/kernels/self-test-shallenge/device/Cargo.toml",
         "./crates/kernels/self-test-p256-public-key/device/Cargo.toml",
         "./crates/kernels/self-test-p256-signature/device/Cargo.toml",
-        "./crates/kernels/self-test-rsa-pss/device/Cargo.toml",
-        "./crates/kernels/self-test-rsa-modulus/device/Cargo.toml"
+        "./crates/kernels/self-test-rsa-pss/device/Cargo.toml"
     ],
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.allTargets": false

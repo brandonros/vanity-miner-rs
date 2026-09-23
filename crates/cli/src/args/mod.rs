@@ -13,9 +13,6 @@ use std::error::Error;
 #[command(name = "vanity-miner")]
 #[command(about = "GPU-accelerated vanity address generator for multiple blockchains")]
 pub struct Cli {
-    #[cfg(feature = "cumetal")]
-    #[command(flatten)]
-    pub cumetal: crate::runner::CumetalOptions,
     #[command(subcommand)]
     pub command: Command,
 }
@@ -24,9 +21,6 @@ pub struct Cli {
 // Feature subsets can leave only the public CLI names ending in `Vanity`.
 #[allow(clippy::enum_variant_names)]
 pub enum Command {
-    /// Continuously print matching RSA-2048 moduli and key pairs
-    #[cfg(feature = "rsa-modulus")]
-    RsaModulusVanity(crate::modes::rsa_modulus::args::RsaModulusArgs),
     /// Search raw RSA-PSS signatures over salts or a message window
     #[cfg(feature = "rsa-pss")]
     RsaPssSignatureVanity(crate::modes::rsa_pss::args::RsaPssArgs),
@@ -56,8 +50,6 @@ pub enum Command {
 impl Command {
     pub fn validate(&self) -> Result<(), Box<dyn Error + Send + Sync>> {
         match self {
-            #[cfg(feature = "rsa-modulus")]
-            Self::RsaModulusVanity(args) => args.validate(),
             #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => args.validate(),
             #[cfg(feature = "p256-public-key")]
@@ -170,7 +162,7 @@ pub struct CommandDetails {
     pub prefix_len: usize,
     pub suffix_len: usize,
     pub description: String,
-    #[cfg_attr(any(feature = "gpu", feature = "cumetal"), allow(dead_code))]
+    #[cfg_attr(feature = "gpu", allow(dead_code))]
     pub cpu_threads: Option<usize>,
     #[cfg_attr(not(feature = "gpu"), allow(dead_code))]
     pub cuda_module: Option<&'static str>,
@@ -179,8 +171,6 @@ pub struct CommandDetails {
 impl Command {
     pub fn details(&self) -> CommandDetails {
         match self {
-            #[cfg(feature = "rsa-modulus")]
-            Self::RsaModulusVanity(args) => args.details(),
             #[cfg(feature = "rsa-pss")]
             Self::RsaPssSignatureVanity(args) => args.details(),
             #[cfg(feature = "p256-public-key")]

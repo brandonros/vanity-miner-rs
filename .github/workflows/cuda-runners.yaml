@@ -44,7 +44,7 @@ jobs:
 
       - name: Build runner without kernels
         run: |
-          nix develop .#runner --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-modulus,rsa-pss,p256-public-key,p256-signature" --release --locked
+          nix develop .#runner --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-pss,p256-public-key,p256-signature" --release --locked
 
           mkdir -p artifacts
           cp target/runner/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}

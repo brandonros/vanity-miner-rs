@@ -1,14 +1,9 @@
-#[cfg(feature = "cumetal")]
-pub(crate) mod cumetal;
-#[cfg(feature = "cumetal")]
-pub use cumetal::{CumetalOptions, CumetalRunner};
-
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "gpu"))]
 mod cpu;
 #[cfg(feature = "gpu")]
 pub(crate) mod cuda;
 
-#[cfg(not(any(feature = "gpu", feature = "cumetal")))]
+#[cfg(not(feature = "gpu"))]
 pub use cpu::CpuRunner;
 #[cfg(feature = "gpu")]
 pub use cuda::GpuRunner;

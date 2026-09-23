@@ -1,34 +1,66 @@
+//! With `gpu`, compiles the kernel crate of each enabled mode for the built-in
+//! nvptx64-nvidia-cuda target. runner/cuda/module.rs embeds the PTX.
+use std::{env, fs, path::PathBuf, process::Command};
+
+/// PTX modules, named after the features that enable them.
+const MODULES: [&str; 14] = [
+    "solana",
+    "bitcoin",
+    "ethereum",
+    "shallenge",
+    "p256_public_key",
+    "p256_signature",
+    "rsa_pss",
+    "self_test_solana",
+    "self_test_bitcoin",
+    "self_test_ethereum",
+    "self_test_shallenge",
+    "self_test_p256_public_key",
+    "self_test_p256_signature",
+    "self_test_rsa_pss",
+];
+
+/// Oldest GPU architecture the PTX supports. The driver compiles it for newer GPUs.
+const ARCH: &str = "sm_75";
+
 fn main() {
-    // On Windows, nanorand's entropy uses SystemFunction036 (RtlGenRandom) from advapi32.
-    // Explicitly link it so the MSVC linker resolves the symbol (avoids LNK2019 when
-    // mixing CRTs or with certain link orders).
-    #[cfg(all(feature = "gpu", target_os = "windows"))]
-    println!("cargo:rustc-link-lib=advapi32");
-
     println!("cargo::rerun-if-changed=build.rs");
+    let modules: Vec<&str> = MODULES
+        .into_iter()
+        .filter(|module| env::var_os(format!("CARGO_FEATURE_{}", module.to_uppercase())).is_some())
+        .collect();
+    if env::var_os("CARGO_FEATURE_GPU").is_none() || modules.is_empty() {
+        return;
+    }
+    let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("../..");
+    for input in ["Cargo.toml", "Cargo.lock", "crates/logic", "crates/kernels"] {
+        println!("cargo::rerun-if-changed={}", root.join(input).display());
+    }
 
-    #[cfg(feature = "cumetal")]
-    pin_cumetal();
-}
-
-#[cfg(feature = "cumetal")]
-fn pin_cumetal() {
-    let lock_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../flake.lock");
-    println!("cargo::rerun-if-changed={}", lock_path.display());
-    println!("cargo::rerun-if-env-changed=VANITY_CUMETAL_ROOT");
-    let lock: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(lock_path).expect("read flake.lock"))
-            .expect("parse flake.lock");
-    let root = lock["root"].as_str().expect("flake root");
-    let input = lock["nodes"][root]["inputs"]["cumetal"]
-        .as_str()
-        .expect("CuMetal input must be pinned in flake.lock");
-    let pinned = &lock["nodes"][input]["locked"];
-    let revision = pinned["rev"].as_str().expect("CuMetal revision");
-    assert!(revision.len() == 40 && revision.bytes().all(|b| b.is_ascii_hexdigit()));
-    println!("cargo::rustc-env=VANITY_CUMETAL_REVISION={revision}");
-    println!(
-        "cargo::rustc-env=VANITY_CUMETAL_SOURCE={}",
-        pinned["url"].as_str().expect("CuMetal Git source URL")
+    // OUT_DIR is <target>/[<triple>/]<profile>/build/<package>/out. The kernels
+    // need another target directory: this build holds the lock on its own.
+    let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let target_dir = out.ancestors().nth(4).unwrap().join("nvptx");
+    let mut cargo = Command::new(env::var_os("CARGO").unwrap());
+    cargo
+        .current_dir(&root)
+        .args(["build", "--release", "--locked", "--target", "nvptx64-nvidia-cuda"])
+        .args(["-Zbuild-std=core,alloc", "--target-dir"])
+        .arg(&target_dir)
+        // Replace the host's flags, and do not run clippy on the kernels.
+        .env("CARGO_ENCODED_RUSTFLAGS", format!("-Ctarget-cpu={ARCH}"))
+        .env_remove("RUSTC_WORKSPACE_WRAPPER");
+    for module in &modules {
+        cargo.args(["-p", &format!("kernel-{}", module.replace('_', "-"))]);
+    }
+    let status = cargo.status().expect("run cargo");
+    assert!(
+        status.success(),
+        "kernel build failed; it needs the toolchain from rust-toolchain.toml"
     );
+    let ptx = target_dir.join("nvptx64-nvidia-cuda/release");
+    for module in modules {
+        let file = format!("{module}.ptx");
+        fs::copy(ptx.join(&file), out.join(&file)).unwrap();
+    }
 }

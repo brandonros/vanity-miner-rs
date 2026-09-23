@@ -66,7 +66,6 @@ case "${MINER_ARGS[0]}" in
     bitcoin-vanity) PTX_MODULE=bitcoin ;;
     ethereum-vanity) PTX_MODULE=ethereum ;;
     shallenge) PTX_MODULE=shallenge ;;
-    rsa-modulus-vanity) PTX_MODULE=rsa_modulus ;;
     rsa-pss-signature-vanity) PTX_MODULE=rsa_pss ;;
     p256-public-key-vanity) PTX_MODULE=p256_public_key ;;
     p256-signature-vanity) PTX_MODULE=p256_signature ;;
