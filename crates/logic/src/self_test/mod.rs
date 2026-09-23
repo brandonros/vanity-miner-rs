@@ -10,6 +10,7 @@
 //! `black_box` is best effort; inspect emitted PTX to verify the computation
 //! survives optimization.
 
+#[derive(Debug)]
 pub struct Check {
     pub name: &'static str,
     /// The doc comment of the check.
@@ -17,6 +18,7 @@ pub struct Check {
     pub run: fn() -> bool,
 }
 
+#[derive(Debug)]
 pub struct Mode {
     pub name: &'static str,
     pub checks: &'static [Check],

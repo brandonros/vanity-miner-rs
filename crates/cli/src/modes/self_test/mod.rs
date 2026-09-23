@@ -4,7 +4,7 @@ use logic::self_test::{MODES, Mode};
 use std::collections::HashMap;
 
 /// One check of one compiled-in mode.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Case {
     pub mode: &'static Mode,
     pub index: usize,
