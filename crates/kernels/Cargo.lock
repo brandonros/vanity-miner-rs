@@ -354,7 +354,6 @@ dependencies = [
  "hmac",
  "k256",
  "p256",
- "paste",
  "rand_core 0.9.3",
  "rand_xoshiro",
  "seq-macro",
@@ -383,12 +382,6 @@ dependencies = [
  "primeorder",
  "sha2",
 ]
-
-[[package]]
-name = "paste"
-version = "1.0.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pkcs8"

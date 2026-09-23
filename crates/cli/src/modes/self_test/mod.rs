@@ -1,61 +1,69 @@
-//! Shared test inventory and reporting for CPU and CUDA.
-pub use logic::self_test::metadata::Case;
+//! Check inventory and reporting shared by the CPU and CUDA runners.
 pub mod args;
-pub fn inventory() -> Vec<Case> {
-    logic::self_test::metadata::CASES
-        .iter()
-        .filter(|case| case.enabled)
-        .copied()
-        .collect()
+use logic::self_test::{MODES, Mode};
+use std::collections::HashMap;
+
+/// One check of one compiled-in mode.
+#[derive(Clone)]
+pub struct Case {
+    pub mode: &'static Mode,
+    pub index: usize,
+    /// `<mode>.<check>`, the `--check` selector.
+    pub name: String,
 }
-/// Cache each mode's launch while retaining per-slot reporting.
-#[derive(Default)]
-pub struct DeviceResults {
-    kernels: std::collections::HashMap<&'static str, Result<Vec<u32>, String>>,
-}
-pub const SENTINEL: u32 = 0xa5a5a5a5;
-impl DeviceResults {
-    pub fn check(
-        &mut self,
-        case: Case,
-        launch: impl FnOnce() -> Result<Vec<u32>, String>,
-    ) -> Result<(), String> {
-        let results = self.kernels.entry(case.kernel).or_insert_with(|| {
-            let results = launch()?;
-            if results.len() != logic::self_test::SELF_TEST_NUM_CHECKS {
-                return Err("incorrect self-test result length".into());
-            }
-            for (slot, &value) in results.iter().enumerate() {
-                let owned = logic::self_test::metadata::CASES
-                    .iter()
-                    .any(|owner| owner.slot == slot && owner.kernel == case.kernel);
-                if !owned && value != SENTINEL {
-                    return Err(format!(
-                        "{} overwrote unrelated check {}",
-                        case.kernel,
-                        logic::self_test::metadata::CASES[slot].name
-                    ));
-                }
-            }
-            Ok(results)
-        });
-        let results = results.as_ref().map_err(Clone::clone)?;
-        let slot = case.slot;
-        if results[slot] != 1 {
-            return Err(format!("{}: got {}, expected 1", case.name, results[slot]));
-        }
-        Ok(())
+
+impl Case {
+    pub fn label(&self) -> &'static str {
+        self.mode.checks[self.index].label
     }
 }
 
+pub fn inventory() -> Vec<Case> {
+    MODES
+        .iter()
+        .flat_map(|mode| {
+            mode.checks
+                .iter()
+                .enumerate()
+                .map(move |(index, check)| Case {
+                    mode,
+                    index,
+                    name: format!("{}.{}", mode.name, check.name),
+                })
+        })
+        .collect()
+}
+
+/// Result buffers start as SENTINEL so an unwritten check fails.
+pub const SENTINEL: u32 = 0xa5a5a5a5;
+
+/// Runs each selected mode once and reports its selected checks.
 pub fn run(
     backend: &str,
     cases: &[Case],
-    mut execute: impl FnMut(Case) -> Result<(), String>,
+    mut run_mode: impl FnMut(&'static Mode) -> Result<Vec<u32>, String>,
 ) -> Result<(), String> {
+    let mut launches: HashMap<&str, Result<Vec<u32>, String>> = HashMap::new();
     let (mut passed, mut failed) = (0, 0);
-    for &case in cases {
-        match execute(case) {
+    for case in cases {
+        let results = launches.entry(case.mode.name).or_insert_with(|| {
+            let results = run_mode(case.mode)?;
+            if results.len() != case.mode.checks.len() {
+                return Err(format!(
+                    "{} wrote {} results, expected {}",
+                    case.mode.name,
+                    results.len(),
+                    case.mode.checks.len()
+                ));
+            }
+            Ok(results)
+        });
+        let outcome = match results {
+            Ok(results) if results[case.index] == 1 => Ok(()),
+            Ok(results) => Err(format!("got {}, expected 1", results[case.index])),
+            Err(error) => Err(error.clone()),
+        };
+        match outcome {
             Ok(()) => {
                 passed += 1;
                 println!("[{backend}] PASS {}", case.name);
@@ -73,115 +81,104 @@ pub fn run(
         Err(format!("{backend} self-test: {failed} failed"))
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn failures(result: Result<(), String>) -> usize {
+        match result {
+            Ok(()) => 0,
+            Err(error) => error
+                .strip_prefix("test self-test: ")
+                .and_then(|rest| rest.strip_suffix(" failed"))
+                .and_then(|count| count.parse().ok())
+                .unwrap_or_else(|| panic!("unexpected error: {error}")),
+        }
+    }
+
     #[test]
-    fn grouped_launches_preserve_individual_failures() {
-        let mut cache = DeviceResults::default();
+    fn inventory_names_are_unique_and_cover_every_check() {
+        let cases = inventory();
+        let total: usize = MODES.iter().map(|mode| mode.checks.len()).sum();
+        assert_eq!(cases.len(), total);
+        assert!(!cases.is_empty());
+        for (index, case) in cases.iter().enumerate() {
+            assert!(cases[..index].iter().all(|other| other.name != case.name));
+            assert_eq!(
+                case.name,
+                format!("{}.{}", case.mode.name, case.mode.checks[case.index].name)
+            );
+            assert!(!case.label().is_empty());
+        }
+    }
+
+    #[test]
+    fn each_mode_runs_once_and_one_bad_result_fails_one_check() {
+        let cases = inventory();
         let mut launches = 0;
-        let first = inventory()[0].slot;
-        for case in inventory() {
-            let result = cache.check(case, || {
-                launches += 1;
-                let mut results = vec![SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
-                for owner in inventory() {
-                    if owner.kernel == case.kernel {
-                        results[owner.slot] = if owner.slot == first { 0 } else { 1 };
-                    }
+        let result = run("test", &cases, |mode| {
+            launches += 1;
+            let mut results = vec![1; mode.checks.len()];
+            if mode.name == cases[0].mode.name {
+                results[0] = 0;
+            }
+            Ok(results)
+        });
+        assert_eq!(failures(result), 1);
+        assert_eq!(launches, MODES.len());
+        assert_eq!(
+            failures(run("test", &cases, |mode| Ok(vec![1; mode.checks.len()]))),
+            0
+        );
+    }
+
+    #[test]
+    fn launch_errors_fail_every_check_of_that_mode_only() {
+        let cases = inventory();
+        let broken = cases[0].mode;
+        let mut launches = 0;
+        let result = run("test", &cases, |mode| {
+            launches += 1;
+            if mode.name == broken.name {
+                Err("launch failed".into())
+            } else {
+                Ok(vec![1; mode.checks.len()])
+            }
+        });
+        assert_eq!(failures(result), broken.checks.len());
+        assert_eq!(launches, MODES.len());
+    }
+
+    #[test]
+    fn wrong_result_counts_and_unexpected_values_fail() {
+        let cases = inventory();
+        let mode = cases[0].mode;
+        for length in [mode.checks.len() - 1, mode.checks.len() + 1] {
+            let result = run("test", &cases, |launched| {
+                let count = if launched.name == mode.name {
+                    length
+                } else {
+                    launched.checks.len()
+                };
+                Ok(vec![1; count])
+            });
+            assert_eq!(failures(result), mode.checks.len());
+        }
+        for value in [0, 2, SENTINEL, u32::MAX] {
+            let result = run("test", &cases, |launched| {
+                let mut results = vec![1; launched.checks.len()];
+                if launched.name == mode.name {
+                    results[0] = value;
                 }
                 Ok(results)
             });
-            assert_eq!(result.is_err(), case.slot == first);
-        }
-        let groups: std::collections::HashSet<_> = inventory().iter().map(|c| c.kernel).collect();
-        assert_eq!(launches, groups.len());
-    }
-    #[test]
-    fn unrelated_writes_and_launch_errors_fail_the_group() {
-        let cases = inventory();
-        let case = cases[0];
-        let mut cache = DeviceResults::default();
-        assert!(
-            cache
-                .check(case, || Ok(vec![1; logic::self_test::SELF_TEST_NUM_CHECKS]))
-                .is_err()
-        );
-        assert!(
-            cache
-                .check(case, || panic!("must reuse failed launch"))
-                .is_err()
-        );
-        let mut cache = DeviceResults::default();
-        assert!(cache.check(case, || Err("launch failed".into())).is_err());
-        assert!(
-            cache
-                .check(case, || panic!("must reuse failed launch"))
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn malformed_result_buffers_and_unexpected_values_fail() {
-        let case = inventory()[0];
-        let count = logic::self_test::SELF_TEST_NUM_CHECKS;
-        for length in [count - 1, count + 1] {
-            let mut cache = DeviceResults::default();
-            assert!(cache.check(case, || Ok(vec![SENTINEL; length])).is_err());
-            assert!(
-                cache
-                    .check(case, || panic!("must retain the malformed launch"))
-                    .is_err()
-            );
-        }
-        for value in [0, 2, SENTINEL, u32::MAX] {
-            let mut cache = DeviceResults::default();
-            assert!(
-                cache
-                    .check(case, || {
-                        let mut results = vec![SENTINEL; count];
-                        results[case.slot] = value;
-                        Ok(results)
-                    })
-                    .is_err(),
+            assert_eq!(
+                failures(result),
+                1,
                 "unexpected result {value} must not pass"
             );
         }
-    }
-
-    #[test]
-    fn inventory_preserves_slots_and_unique_entries() {
-        let cases = inventory();
-        let mut expected = [SENTINEL; logic::self_test::SELF_TEST_NUM_CHECKS];
-        logic::self_test::run_self_test(&mut expected);
-        let slots: Vec<_> = expected
-            .iter()
-            .enumerate()
-            .filter_map(|(slot, &value)| (value != SENTINEL).then_some(slot))
-            .collect();
-        assert!(!slots.is_empty());
-        assert_eq!(
-            cases.iter().map(|case| case.slot).collect::<Vec<_>>(),
-            slots
-        );
-        for case in cases {
-            assert_eq!(expected[case.slot], 1);
-        }
-    }
-    #[test]
-    fn failure_is_retained_and_remaining_tests_are_reported() {
-        let first = inventory()[0].slot;
-        let mut seen = 0;
-        let result = run("test", &inventory(), |case| {
-            seen += 1;
-            if case.slot == first {
-                Err("injected failure".into())
-            } else {
-                Ok(())
-            }
-        });
-        assert!(result.is_err());
-        assert_eq!(seen, inventory().len());
     }
 }
 

@@ -46,9 +46,8 @@ pub(crate) fn load_module(
 #[cfg(feature = "self_test_support")]
 pub(crate) fn load_self_test_module(
     ordinal: usize,
-    kernel: &str,
+    mode: &str,
 ) -> Result<Module, Box<dyn Error + Send + Sync>> {
-    let name = crate::runner::modules::self_test_module(kernel);
     if std::env::var_os("CUBIN_PATH").is_some() {
         return Err(
             "self-test modules require PTX; unset CUBIN_PATH and use PTX_PATH with a directory"
@@ -61,7 +60,7 @@ pub(crate) fn load_self_test_module(
             "self-test PTX_PATH must be a directory containing self_test_<mode>.ptx files".into(),
         );
     }
-    let ptx = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
+    let ptx = std::fs::read_to_string(directory.join(format!("self_test_{mode}.ptx")))?;
     load_ptx_with_log(ordinal, &ptx)
 }
 

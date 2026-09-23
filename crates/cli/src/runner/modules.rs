@@ -11,8 +11,3 @@ pub fn production_module(kernel: &str) -> &'static str {
         _ => panic!("unknown production kernel: {kernel}"),
     }
 }
-
-/// Standalone PTX containing this entry.
-pub fn self_test_module(kernel: &str) -> &str {
-    kernel.strip_prefix("kernel_").expect("kernel entry prefix")
-}

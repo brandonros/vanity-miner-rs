@@ -21,7 +21,7 @@ pub fn run_cli() -> Result<(), Box<dyn Error + Send + Sync>> {
     match &cli.command {
         crate::args::Command::SelfTest(args) if args.list => {
             for case in args.selected()? {
-                println!("{}\t{}", case.name, case.label);
+                println!("{}\t{}", case.name, case.label());
             }
             return Ok(());
         }
