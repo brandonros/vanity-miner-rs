@@ -575,14 +575,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kernel-rsa-modulus"
-version = "0.1.0"
-dependencies = [
- "kernel-common",
- "logic",
-]
-
-[[package]]
 name = "kernel-rsa-pss"
 version = "0.1.0"
 dependencies = [
@@ -616,14 +608,6 @@ dependencies = [
 
 [[package]]
 name = "kernel-self-test-p256-signature"
-version = "0.1.0"
-dependencies = [
- "kernel-common",
- "logic",
-]
-
-[[package]]
-name = "kernel-self-test-rsa-modulus"
 version = "0.1.0"
 dependencies = [
  "kernel-common",

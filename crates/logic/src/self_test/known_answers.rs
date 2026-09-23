@@ -1,5 +1,5 @@
 //! Public constants shared across self-test modes.
-#[cfg(any(feature = "self_test_rsa_pss", feature = "self_test_rsa_modulus"))]
+#[cfg(feature = "self_test_rsa_pss")]
 pub(super) const SELF_TEST_RSA_P: [u8; 128] = [
     230, 193, 25, 229, 124, 107, 185, 65, 204, 31, 198, 54, 106, 167, 39, 233, 84, 132, 101, 34,
     89, 136, 238, 48, 49, 10, 43, 143, 250, 120, 19, 84, 197, 231, 31, 217, 38, 224, 95, 129, 250,
@@ -10,7 +10,7 @@ pub(super) const SELF_TEST_RSA_P: [u8; 128] = [
     60, 129,
 ];
 
-#[cfg(any(feature = "self_test_rsa_pss", feature = "self_test_rsa_modulus"))]
+#[cfg(feature = "self_test_rsa_pss")]
 pub(super) const SELF_TEST_RSA_Q: [u8; 128] = [
     253, 245, 78, 185, 87, 127, 254, 215, 86, 5, 89, 212, 109, 218, 23, 57, 205, 114, 61, 94, 117,
     154, 248, 112, 189, 241, 159, 245, 98, 17, 198, 201, 98, 167, 7, 49, 168, 106, 233, 124, 210,

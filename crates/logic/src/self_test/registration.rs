@@ -122,6 +122,13 @@ macro_rules! define_self_tests {
                 })*
             }
 
+            /// Enabled device runners by kernel name, for host checks of slot ownership.
+            #[cfg(test)]
+            pub(crate) const DEVICE_RUNNERS: &[(&str, fn(&mut [u32]))] = &[$(
+                #[cfg(feature = $feature)]
+                (concat!("kernel_self_test_", stringify!($mode)), runners::$mode::run_device),
+            )*];
+
             /// All enabled checks, in registry order.
             pub fn run_self_test(results: &mut [u32]) {
                 $(#[cfg(feature = $feature)] runners::$mode::run(results);)*

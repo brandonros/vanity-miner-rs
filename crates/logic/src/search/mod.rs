@@ -1,10 +1,6 @@
 //! Search used by the shared host/device logic.
 
-#[cfg(any(
-    feature = "p256-public-key",
-    feature = "p256-signature",
-    feature = "rsa-modulus"
-))]
+#[cfg(any(feature = "p256-public-key", feature = "p256-signature"))]
 pub mod candidate_derivation;
 pub mod candidate_result;
 pub mod hex_pattern;

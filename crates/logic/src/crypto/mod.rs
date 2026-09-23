@@ -10,8 +10,6 @@ pub mod p256;
 pub mod ripemd160;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_crt;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa_prime;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss;
 #[cfg(any(feature = "bitcoin", feature = "ethereum"))]
@@ -21,15 +19,13 @@ pub mod secp256k1;
     feature = "shallenge",
     feature = "p256-public-key",
     feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
+    feature = "rsa-pss"
 ))]
 pub mod sha256;
 #[cfg(any(
     feature = "p256-public-key",
     feature = "p256-signature",
-    feature = "rsa-pss",
-    feature = "rsa-modulus"
+    feature = "rsa-pss"
 ))]
 mod sha256_digest;
 #[cfg(feature = "solana")]

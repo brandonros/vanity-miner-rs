@@ -17,8 +17,7 @@ include!("registry.rs");
 #[cfg(any(
     feature = "self_test_p256_public_key",
     feature = "self_test_p256_signature",
-    feature = "self_test_rsa_pss",
-    feature = "self_test_rsa_modulus"
+    feature = "self_test_rsa_pss"
 ))]
 mod known_answers;
 
@@ -87,6 +86,23 @@ mod test {
                 i,
                 metadata::CASES[i].name
             );
+        }
+    }
+
+    #[test]
+    fn device_runners_write_exactly_their_own_slots() {
+        const UNWRITTEN: u32 = 0xa5a5a5a5;
+        for &(kernel, run) in DEVICE_RUNNERS {
+            let mut results = [UNWRITTEN; SELF_TEST_NUM_CHECKS];
+            run(&mut results);
+            for (case, &result) in metadata::CASES.iter().zip(&results) {
+                let expected = match (case.kernel == kernel, case.gpu_skip) {
+                    (false, _) => UNWRITTEN,
+                    (true, Some(_)) => 2,
+                    (true, None) => 1,
+                };
+                assert_eq!(result, expected, "{kernel} slot {} ({})", case.slot, case.name);
+            }
         }
     }
 }

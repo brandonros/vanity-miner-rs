@@ -8,8 +8,6 @@ pub mod ethereum;
 pub mod p256_public_key;
 #[cfg(feature = "p256-signature")]
 pub mod p256_signature;
-#[cfg(feature = "rsa-modulus")]
-pub mod rsa_modulus;
 #[cfg(feature = "rsa-pss")]
 pub mod rsa_pss;
 #[cfg(feature = "shallenge")]
