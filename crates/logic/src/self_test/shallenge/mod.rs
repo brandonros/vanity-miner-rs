@@ -1,4 +1,4 @@
-//! shallenge self-tests: primitives, pipeline stages, and regressions.
+//! shallenge self-tests: primitives, pipeline stages, sha256 padding, and candidates.
 pub(super) mod candidate_probes;
 pub(super) mod comparison_probes;
 mod sha256_fixtures;
@@ -99,10 +99,8 @@ register_self_test! {
     }
 }
 
-// Captured by running `generate_base64_nonce(0, 12345, &mut [0u8; 21])` on
-// the host (see /tmp/probe). Same (thread_idx, rng_seed) the shallenge
-// pipeline uses, so this slot directly answers "is the nonce wrong, and is
-// that why shallenge_hash fails?".
+// Host output of `generate_base64_nonce(0, 12345, &mut [0u8; 21])`, the same
+// (thread_idx, rng_seed) as `shallenge_test`.
 const XOROSHIRO_NONCE_EXPECTED: [u8; 21] = [
     0x61, 0x63, 0x65, 0x43, 0x48, 0x73, 0x71, 0x46, 0x36, 0x67, 0x31, 0x33, 0x5a, 0x65, 0x32, 0x6e,
     0x47, 0x53, 0x4a, 0x67, 0x6d,

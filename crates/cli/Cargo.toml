@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = ["shallenge"]
-# CUDA runner; build.rs embeds PTX for each enabled mode (needs nightly).
+# CUDA runner; loads kernels from PTX_PATH.
 gpu = ["dep:cust", "dep:cust_raw"]
 solana = ["logic/solana"]
 bitcoin = ["logic/bitcoin"]

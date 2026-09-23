@@ -66,7 +66,7 @@ impl SearchControl {
         }
         let reserved = self
             .device_launches_remaining
-            .fetch_update(
+            .try_update(
                 Ordering::AcqRel,
                 Ordering::Acquire,
                 |remaining| match remaining {
@@ -137,7 +137,7 @@ impl SearchControl {
         }
         match self
             .next
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |next| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |next| {
                 next.checked_add(size)
             }) {
             Ok(start) => Some(start..start + size),
@@ -163,7 +163,7 @@ impl SearchControl {
             return None;
         }
         self.next
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |next| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |next| {
                 (next < end).then(|| next.saturating_add(size).min(end))
             })
             .ok()

@@ -38,16 +38,16 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/
-          key: miner-runner-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          key: miner-runner-v2-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            miner-runner-v1-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
+            miner-runner-v2-${{ matrix.arch }}-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
 
       - name: Build runner without kernels
         run: |
-          nix develop .#runner --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-pss,p256-public-key,p256-signature" --release --locked
+          nix develop --command cargo build -p vanity-miner --features "gpu,solana,bitcoin,ethereum,shallenge,self_test,rsa-pss,p256-public-key,p256-signature" --release --locked
 
           mkdir -p artifacts
-          cp target/runner/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
+          cp target/release/vanity-miner ./artifacts/vanity-miner-${{ matrix.arch }}
 
       - name: Patch ELF interpreter for portability
         run: |
@@ -59,7 +59,7 @@ jobs:
           else
             INTERP=/lib/ld-linux-aarch64.so.1
           fi
-          nix develop .#runner --command patchelf --set-interpreter "$INTERP" --remove-rpath \
+          nix develop --command patchelf --set-interpreter "$INTERP" --remove-rpath \
             ./artifacts/vanity-miner-${{ matrix.arch }}
 
       - name: Upload build artifact

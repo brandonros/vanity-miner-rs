@@ -1,4 +1,4 @@
-//! p256 signature self-tests: primitives, pipeline stages, and regressions.
+//! p256 signature self-tests: primitives, pipeline stages, and message windows.
 mod fixtures;
 mod window_fixtures;
 pub(super) mod window_probes;

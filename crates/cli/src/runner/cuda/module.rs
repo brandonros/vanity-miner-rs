@@ -5,52 +5,15 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::{c_char, c_uint};
 use std::ptr;
 
-/// PTX that build.rs compiled for each enabled mode.
-fn embedded_ptx(name: &str) -> Option<&'static str> {
-    macro_rules! ptx {
-        ($module:literal) => {
-            Some(include_str!(concat!(env!("OUT_DIR"), "/", $module, ".ptx")))
-        };
-    }
-    match name {
-        #[cfg(feature = "solana")]
-        "solana" => ptx!("solana"),
-        #[cfg(feature = "self_test_solana")]
-        "self_test_solana" => ptx!("self_test_solana"),
-        #[cfg(feature = "bitcoin")]
-        "bitcoin" => ptx!("bitcoin"),
-        #[cfg(feature = "self_test_bitcoin")]
-        "self_test_bitcoin" => ptx!("self_test_bitcoin"),
-        #[cfg(feature = "ethereum")]
-        "ethereum" => ptx!("ethereum"),
-        #[cfg(feature = "self_test_ethereum")]
-        "self_test_ethereum" => ptx!("self_test_ethereum"),
-        #[cfg(feature = "shallenge")]
-        "shallenge" => ptx!("shallenge"),
-        #[cfg(feature = "self_test_shallenge")]
-        "self_test_shallenge" => ptx!("self_test_shallenge"),
-        #[cfg(feature = "p256-public-key")]
-        "p256_public_key" => ptx!("p256_public_key"),
-        #[cfg(feature = "self_test_p256_public_key")]
-        "self_test_p256_public_key" => ptx!("self_test_p256_public_key"),
-        #[cfg(feature = "p256-signature")]
-        "p256_signature" => ptx!("p256_signature"),
-        #[cfg(feature = "self_test_p256_signature")]
-        "self_test_p256_signature" => ptx!("self_test_p256_signature"),
-        #[cfg(feature = "rsa-pss")]
-        "rsa_pss" => ptx!("rsa_pss"),
-        #[cfg(feature = "self_test_rsa_pss")]
-        "self_test_rsa_pss" => ptx!("self_test_rsa_pss"),
-        _ => None,
-    }
-}
+/// `cargo ptx` writes every kernel to target/nvptx64-nvidia-cuda/release.
+const PTX_PATH_UNSET: &str = "set PTX_PATH to a directory of PTX modules (see README)";
 
 pub(crate) fn load_module(
     ordinal: usize,
     name: &str,
 ) -> Result<Module, Box<dyn Error + Send + Sync>> {
     println!("[{ordinal}] Loading module...");
-    // An explicit CUBIN takes precedence over PTX_PATH and embedded PTX.
+    // An explicit CUBIN takes precedence over PTX_PATH.
     // Surface loading failures instead of silently falling back.
     if let Some(cubin_path) = std::env::var_os("CUBIN_PATH") {
         let cubin_path = std::path::PathBuf::from(cubin_path);
@@ -67,21 +30,15 @@ pub(crate) fn load_module(
         );
         return Ok(module);
     }
-    let ptx_owned;
-    let ptx: &str = if let Ok(ptx_path) = std::env::var("PTX_PATH") {
-        let path = std::path::PathBuf::from(ptx_path);
-        let path = if path.is_dir() {
-            path.join(format!("{name}.ptx"))
-        } else {
-            path
-        };
-        ptx_owned =
-            std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
-        &ptx_owned
+    let path = std::path::PathBuf::from(std::env::var_os("PTX_PATH").ok_or(PTX_PATH_UNSET)?);
+    let path = if path.is_dir() {
+        path.join(format!("{name}.ptx"))
     } else {
-        embedded_ptx(name).ok_or("PTX module unavailable; set PTX_PATH to a PTX directory")?
+        path
     };
-    let module = load_ptx_with_log(ordinal, ptx)?;
+    let ptx =
+        std::fs::read_to_string(path).map_err(|e| format!("Failed to read PTX file: {}", e))?;
+    let module = load_ptx_with_log(ordinal, &ptx)?;
     println!("[{ordinal}] Module loaded");
     Ok(module)
 }
@@ -98,21 +55,14 @@ pub(crate) fn load_self_test_module(
                 .into(),
         );
     }
-    let owned;
-    let ptx = if let Some(directory) = std::env::var_os("PTX_PATH") {
-        let directory = std::path::PathBuf::from(directory);
-        if !directory.is_dir() {
-            return Err(
-                "self-test PTX_PATH must be a directory containing self_test_<mode>.ptx files"
-                    .into(),
-            );
-        }
-        owned = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
-        &owned
-    } else {
-        embedded_ptx(name).ok_or("self-test PTX unavailable; set PTX_PATH to a PTX directory")?
-    };
-    load_ptx_with_log(ordinal, ptx)
+    let directory = std::path::PathBuf::from(std::env::var_os("PTX_PATH").ok_or(PTX_PATH_UNSET)?);
+    if !directory.is_dir() {
+        return Err(
+            "self-test PTX_PATH must be a directory containing self_test_<mode>.ptx files".into(),
+        );
+    }
+    let ptx = std::fs::read_to_string(directory.join(format!("{name}.ptx")))?;
+    load_ptx_with_log(ordinal, &ptx)
 }
 
 fn load_ptx_with_log(ordinal: usize, ptx: &str) -> Result<Module, Box<dyn Error + Send + Sync>> {

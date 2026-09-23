@@ -8,12 +8,8 @@ on:
 
 jobs:
   ptx:
-    name: PTX LLVM ${{ matrix.llvm }}
+    name: PTX
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        llvm: [7, 21]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,18 +30,23 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/
-          key: miner-ptx-llvm${{ matrix.llvm }}-v1-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
+          key: miner-ptx-v2-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-${{ github.sha }}
           restore-keys: |
-            miner-ptx-llvm${{ matrix.llvm }}-v1-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
+            miner-ptx-v2-${{ hashFiles('flake.nix', 'flake.lock', 'rust-toolchain.toml', '**/Cargo.toml', '**/Cargo.lock') }}-
 
-      - name: Compile PTX with nix devshell
-        run: ./scripts/build-ptx.sh ${{ matrix.llvm }}
+      - name: Compile PTX
+        run: |
+          nix develop --command cargo ptx --locked -p 'kernel-*'
+
+          mkdir -p artifacts
+          cd target/nvptx64-nvidia-cuda/release
+          tar -czf "$GITHUB_WORKSPACE/artifacts/ptx-bundle.tar.gz" *.ptx
 
       - name: Upload PTX bundle
         uses: actions/upload-artifact@v4
         with:
-          name: ptx-llvm${{ matrix.llvm }}
-          path: artifacts/ptx-bundle-llvm${{ matrix.llvm }}.tar.gz
+          name: ptx
+          path: artifacts/ptx-bundle.tar.gz
           if-no-files-found: error
 
       - name: Save Cargo cache even after compilation failures

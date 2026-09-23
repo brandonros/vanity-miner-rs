@@ -1,4 +1,4 @@
-//! ethereum self-tests: primitives, pipeline stages, and regressions.
+//! ethereum self-tests: primitives, pipeline stages, and candidates.
 pub(super) mod candidate_probes;
 use crate::crypto::keccak256::keccak256_64bytes;
 use crate::crypto::secp256k1::secp256k1_derive_public_key_uncompressed;
@@ -6,12 +6,7 @@ use crate::modes::ethereum::EthereumVanityKeyRequest;
 use crate::modes::ethereum::EthereumVanityKeyResult;
 use crate::modes::ethereum::generate_and_check_ethereum_vanity_key;
 
-// === Non-solana primitive bisect (slots 4-9) ===
-// Same idea as slots 0-3, but for the primitives consumed by the bitcoin /
-// ethereum / shallenge / WIF pipelines. Each KAT pair is taken from the
-// per-module unit tests in the corresponding `crates/logic/src/*.rs` file, so a
-// fault here means the primitive itself is broken on the device — separate
-// from a fault in a composed pipeline kernel that just inlines it.
+// Primitive known answers, shared with the unit tests in `crate::crypto`.
 
 const SECP256K1_PRIMITIVE_PRIV: [u8; 32] = [
     0x15, 0x2d, 0x53, 0x72, 0x3d, 0xa4, 0x20, 0x34, 0x78, 0x57, 0x4b, 0x15, 0x31, 0x43, 0xa7, 0xea,

@@ -1,4 +1,4 @@
-//! rsa pss self-tests: primitives, pipeline stages, and regressions.
+//! rsa pss self-tests: primitives, pipeline stages, and salt counters.
 mod fixtures;
 pub(super) mod salt_probes;
 use super::known_answers::*;
@@ -199,7 +199,6 @@ fn self_test_digest_rsa_pss() -> [u8; 32] {
 
 register_self_test! {
     /// end-to-end rsa pss candidate pipeline
-    #[gpu_skip = "temporarily disabled: RSA-PSS end-to-end GPU compilation takes ~7 min / 7.1 GiB and can OOM"]
     fn end_to_end() -> u32 {
         u32::from(
             self_test_digest_rsa_pss()

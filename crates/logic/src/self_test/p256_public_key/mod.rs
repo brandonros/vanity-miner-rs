@@ -1,4 +1,4 @@
-//! p256 public key self-tests: primitives, pipeline stages, and regressions.
+//! p256 public key self-tests: primitives, pipeline stages, matching, and scalar bounds.
 mod fixtures;
 pub(super) mod matching_probes;
 mod scalar_fixtures;

@@ -57,15 +57,6 @@ impl<'a, T: DeviceRecord> Records<'a, T> {
         self.bytes.as_device_ptr()
     }
 
-    pub fn clear_prefix(&mut self, count: usize) -> Result<(), String> {
-        if count > self.count {
-            return Err("device clear exceeds buffer".into());
-        }
-        self.bytes[..count * std::mem::size_of::<T>()]
-            .set_8(0)
-            .map_err(|e| e.to_string())
-    }
-
     /// Ordered with subsequent work in this stream; no host buffer is borrowed.
     pub fn clear_async(&mut self) -> Result<(), String> {
         unsafe { self.bytes.set_8_async(0, self.stream) }.map_err(|e| e.to_string())

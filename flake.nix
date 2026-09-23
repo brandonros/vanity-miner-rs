@@ -25,9 +25,9 @@
           default = pkgs.mkShell ({
             packages = [ rust ];
           } // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-            nativeBuildInputs = [ pkgs.patchelf ];
+            # bindgenHook points cust's bindgen at libclang and the C headers.
+            nativeBuildInputs = [ pkgs.patchelf pkgs.rustPlatform.bindgenHook ];
             CUDA_PATH = "${cuda}";
-            LIBCLANG_PATH = "${pkgs.lib.getLib pkgs.llvmPackages.libclang}/lib";
           });
         });
     };

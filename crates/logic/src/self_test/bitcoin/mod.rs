@@ -1,7 +1,7 @@
-//! bitcoin self-tests: primitives, pipeline stages, and regressions.
+//! bitcoin self-tests: primitives, pipeline stages, encodings, matching, and candidates.
+pub(super) mod base58_probes;
 pub(super) mod candidate_probes;
 pub(super) mod matching_probes;
-use super::IdxProbe;
 use super::bytes_eq_prefix;
 use crate::crypto::ripemd160::ripemd160_32bytes_from_bytes;
 use crate::crypto::secp256k1::secp256k1_derive_public_key;
@@ -13,12 +13,7 @@ use crate::modes::bitcoin::BitcoinVanityKeyResult;
 use crate::modes::bitcoin::generate_and_check_bitcoin_vanity_key;
 use crate::modes::bitcoin::private_key_to_wif;
 
-// === Non-solana primitive bisect (slots 4-9) ===
-// Same idea as slots 0-3, but for the primitives consumed by the bitcoin /
-// ethereum / shallenge / WIF pipelines. Each KAT pair is taken from the
-// per-module unit tests in the corresponding `crates/logic/src/*.rs` file, so a
-// fault here means the primitive itself is broken on the device — separate
-// from a fault in a composed pipeline kernel that just inlines it.
+// Primitive known answers, shared with the unit tests in `crate::crypto`.
 
 const SECP256K1_PRIMITIVE_PRIV: [u8; 32] = [
     0x15, 0x2d, 0x53, 0x72, 0x3d, 0xa4, 0x20, 0x34, 0x78, 0x57, 0x4b, 0x15, 0x31, 0x43, 0xa7, 0xea,
@@ -228,92 +223,3 @@ register_self_test! {
         1
     }
 }
-
-// Slot 74: full k256 derive for scalar=1. Compressed public key must
-// equal the well-known secp256k1 generator G.
-const SECP256K1_GENERATOR_COMPRESSED: [u8; 33] = [
-    0x02, 0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B,
-    0x07, 0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17,
-    0x98,
-];
-
-// Slot 75: full k256 derive for scalar=2. Compressed public key must
-// equal 2G (one more doubling beyond slot 74). A 74-PASS / 75-FAIL split
-// pinpoints the doubling formula; a 74-FAIL / 75-FAIL means scalar mult
-// is broken even for the trivial-scalar case.
-const SECP256K1_TWO_G_COMPRESSED: [u8; 33] = [
-    0x02, 0xC6, 0x04, 0x7F, 0x94, 0x41, 0xED, 0x7D, 0x6D, 0x30, 0x45, 0x40, 0x6E, 0x95, 0xC0, 0x7C,
-    0xD8, 0x5C, 0x77, 0x8E, 0x4B, 0x8C, 0xEF, 0x3C, 0xA7, 0xAB, 0xAC, 0x09, 0xB9, 0x5C, 0x70, 0x9E,
-    0xE5,
-];
-
-// Slot 76: bare `&'static [u64; 5]` runtime-indexed read. The simplest
-// possible test of the "element-width > 1 byte breaks &'static reads"
-// hypothesis. No struct wrapper, no arithmetic on the result.
-static STATIC_U64_TABLE: [u64; 5] = [
-    0x0123_4567_89AB_CDEF,
-    0xFEDC_BA98_7654_3210,
-    0x1111_2222_3333_4444,
-    0xAAAA_BBBB_CCCC_DDDD,
-    0xDEAD_BEEF_CAFE_BABE,
-];
-
-// Slot 77: same but wrapped in a single-field tuple struct — matches
-// dalek's `Scalar52(pub(crate) [u64; 5])` newtype shape. If 76 PASSes
-// and 77 FAILs, the bug is specifically in field projection through a
-// newtype, not in the underlying array.
-#[repr(transparent)]
-pub struct U64Wrap5(pub [u64; 5]);
-
-static STATIC_U64_WRAPPED: U64Wrap5 = U64Wrap5([
-    0x0123_4567_89AB_CDEF,
-    0xFEDC_BA98_7654_3210,
-    0x1111_2222_3333_4444,
-    0xAAAA_BBBB_CCCC_DDDD,
-    0xDEAD_BEEF_CAFE_BABE,
-]);
-
-// Slot 91: focused Index/IndexMut trait dispatch probe on a tuple
-// struct. Mirrors dalek's Scalar52 Index impl shape EXACTLY: tuple
-// struct wrapping `[u64; 5]`, Index returns `&u64`, IndexMut returns
-// `&mut u64`. If this FAILs, trait dispatch on `[i]` syntax is broken
-// on the cuda-oxide alpha-NVPTX backend — explains why dalek (uses
-// `a[i]`) fails while our port (uses `a.0[i]`) passes.
-
-// Slot 96: `EncodedPoint::from_affine_coordinates(&GX_bytes, &GY_bytes,
-// compress=true)` with hardcoded generator-x/y. Bypasses AffinePoint's
-// own `to_encoded_point` (which goes through `is_identity`+
-// `conditional_select`) and tests just the EncodedPoint construction.
-//
-// If 96 PASSes and 93 FAILs, the bug is in `is_identity`/`conditional_
-// select` (slot 95 should then also FAIL). If 96 FAILs, EncodedPoint
-// construction itself is broken.
-const SECP256K1_GX_BYTES: [u8; 32] = [
-    0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE, 0x87, 0x0B, 0x07,
-    0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81, 0x5B, 0x16, 0xF8, 0x17, 0x98,
-];
-
-const SECP256K1_GY_BYTES: [u8; 32] = [
-    0x48, 0x3A, 0xDA, 0x77, 0x26, 0xA3, 0xC4, 0x65, 0x5D, 0xA4, 0xFB, 0xFC, 0x0E, 0x11, 0x08, 0xA8,
-    0xFD, 0x17, 0xB4, 0x48, 0xA6, 0x85, 0x54, 0x19, 0x9C, 0x47, 0xD0, 0x8F, 0xFB, 0x10, 0xD4, 0xB8,
-];
-
-// Slot 101: probes the exact `y.as_slice().last()` shape inside
-// `Tag::compress_y`. Pass a `&GenericArray<u8, U32>` to a function, do
-// `as_slice().last()` inside. Slot 99 tested write-side copy; this
-// tests read-side slice access via Deref then `.last()`.
-#[inline(never)]
-fn last_via_as_slice(
-    ga: &k256::elliptic_curve::generic_array::GenericArray<
-        u8,
-        k256::elliptic_curve::generic_array::typenum::U32,
-    >,
-) -> u8 {
-    *ga.as_slice().last().expect("non-empty")
-}
-
-pub(super) mod layout_probes;
-
-pub(super) mod secp256k1_probes;
-
-pub(super) mod base58_probes;

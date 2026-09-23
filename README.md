@@ -1,6 +1,6 @@
 # vanity-miner-rs
 
-Vanity address, key, and signature search in Rust. Backends: CPU, and NVIDIA CUDA.
+Vanity address, key, and signature search in Rust. Backends: CPU and NVIDIA CUDA.
 
 ## Modes
 
@@ -14,9 +14,13 @@ Vanity address, key, and signature search in Rust. Backends: CPU, and NVIDIA CUD
 | `p256-signature` | `p256-signature-vanity` |
 | `rsa-pss` | `rsa-pss-signature-vanity` |
 
-## CPU
+## Toolchain
 
-Use the pinned Rust toolchain from the repository root:
+`rust-toolchain.toml` pins a nightly with the `nvptx64-nvidia-cuda` target;
+rustup installs it on first use. `nix develop` provides the same toolchain,
+plus the CUDA headers and libclang that GPU builds need on Linux.
+
+## CPU
 
 ```sh
 cargo build -p vanity-miner --release --locked --no-default-features --features solana
@@ -29,23 +33,24 @@ Address searches accept `--prefix` and `--suffix`; signature searches also need
 
 ## CUDA · Linux
 
-```sh
-nix develop .#v21 --command cargo build -p vanity-miner --release --locked --no-default-features --features llvm21,solana
-./target/llvm21/release/vanity-miner solana-vanity --prefix aaa
-```
-
-For LLVM7, use `.#v7`, features `cuda-kernels,solana`, and `target/llvm7`.
-Running requires a compatible NVIDIA GPU and driver.
-
-Build the 8 production and 8 self-test PTX modules separately:
+Kernels and the runner build separately. PTX builds on any OS:
 
 ```sh
-./scripts/build-ptx.sh 21
-./scripts/build-ptx.sh 7
+cargo ptx -p 'kernel-*'
 ```
 
-Bundles land in `artifacts/ptx-bundle-llvm<version>.tar.gz`. Use runner and PTX
-artifacts from the same source revision. `PTX_PATH` selects an external bundle.
+This writes one `<module>.ptx` per crate in `crates/kernels/` to
+`target/nvptx64-nvidia-cuda/release`; `-p kernel-solana` builds one.
+`.cargo/config.toml` defines `cargo ptx` and the minimum GPU architecture (`sm_75`).
+
+```sh
+nix develop --command cargo build -p vanity-miner --release --locked --no-default-features --features gpu,solana
+PTX_PATH=target/nvptx64-nvidia-cuda/release ./target/release/vanity-miner solana-vanity --prefix aaa
+```
+
+The runner loads `<module>.ptx` from `PTX_PATH` and needs an NVIDIA GPU and
+driver. Without Nix, building it needs a CUDA toolkit (`CUDA_PATH` or
+`/usr/local/cuda`) and libclang.
 
 ## Self-tests
 
@@ -53,6 +58,6 @@ artifacts from the same source revision. `PTX_PATH` selects an external bundle.
 cargo run -p vanity-miner --release --locked --no-default-features --features self_test -- self-test
 ```
 
-`self_test` enables all 8 groups; `self_test_solana`, for example, enables one.
+`self_test` enables all 7 groups; `self_test_solana`, for example, enables one.
 Use `self-test --list` to list checks and `self-test --check <name>` to select one.
-GPU builds use the same command with their backend feature and matching PTX.
+Add `gpu` to the features and set `PTX_PATH` to run the same checks on CUDA.

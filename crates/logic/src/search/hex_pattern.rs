@@ -1,6 +1,6 @@
 //! Fixed-width hexadecimal matching shared by host and device searches.
 
-/// Largest supported target: an RSA-2048 modulus or signature.
+/// Largest supported target: an RSA-2048 signature.
 pub const MAX_HEX_TARGET_BYTES: usize = 256;
 
 /// A byte mask avoids allocating or parsing strings inside device kernels.

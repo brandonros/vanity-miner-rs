@@ -39,7 +39,7 @@ impl GlobalStats {
     pub fn add_operations(&self, count: u64) {
         let _ = self
             .total_operations
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
                 Some(old.saturating_add(count))
             });
     }

@@ -4,10 +4,10 @@
 #   limactl start --name=vanity-nixos ./lima/nixos.yaml
 #   limactl shell vanity-nixos
 # Inside the VM, in this same checkout:
-#   nix develop .#v21
-#   export CARGO_TARGET_DIR="$HOME/.cache/vanity-miner/llvm21"
-#   cargo build -p vanity-miner --release --locked --features gpu,llvm21,self_test,solana,bitcoin,ethereum,shallenge,rsa-pss,p256-public-key,p256-signature
-# The guest can compile CUDA/PTX, but has no NVIDIA GPU to run CUDA kernels.
+#   nix develop
+#   export CARGO_TARGET_DIR="$HOME/.cache/vanity-miner"
+#   cargo build -p vanity-miner --release --locked --features gpu,self_test,solana,bitcoin,ethereum,shallenge,rsa-pss,p256-public-key,p256-signature
+# The guest can build the runner and PTX, but has no NVIDIA GPU to run CUDA kernels.
 
 arch: aarch64
 vmType: vz

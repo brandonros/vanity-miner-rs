@@ -2,8 +2,8 @@
 //! primitive against externally-validated expected values, writing
 //! pass(1)/fail(0) per check into the results buffer.
 //!
-//! Each slot has a dedicated `register_self_test!` function. GPU mode runs eight mode-specific
-//! kernels, using generated result indices. CPU mode calls all checks in sequence.
+//! Each slot has a dedicated `register_self_test!` function. GPU mode runs one kernel per
+//! mode, using generated result indices. CPU mode calls all checks in sequence.
 //!
 //! Keep known-answer inputs opaque before the operation under test. A barrier
 //! around the final boolean is too late: the operation can already be folded.
@@ -45,24 +45,6 @@ fn record_candidate(
 ) {
     h.update(result.status.to_le_bytes());
     h.update(result.bytes);
-}
-
-#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
-pub struct IdxProbe(pub [u64; 5]);
-
-#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
-impl core::ops::Index<usize> for IdxProbe {
-    type Output = u64;
-    fn index(&self, i: usize) -> &u64 {
-        &(self.0[i])
-    }
-}
-
-#[cfg(any(feature = "self_test_solana", feature = "self_test_bitcoin"))]
-impl core::ops::IndexMut<usize> for IdxProbe {
-    fn index_mut(&mut self, i: usize) -> &mut u64 {
-        &mut (self.0[i])
-    }
 }
 
 #[cfg(test)]

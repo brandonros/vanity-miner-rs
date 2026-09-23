@@ -1,4 +1,4 @@
-//! Concrete base58 probes used by this mode's device self-test.
+//! Base58 probes owned by the bitcoin self-test kernel.
 use super::*;
 
 register_self_test! {
